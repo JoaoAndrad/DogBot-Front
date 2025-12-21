@@ -44,6 +44,32 @@ async function handle(context) {
 
   logger.info('Mensagem recebida:', { from, body: body && body.slice(0, 120) });
 
+  // Forward a normalized message record to backend for storage/processing (no chat fallback)
+  try {
+    const msgId =
+      (msg && msg.id && (msg.id._serialized || msg.id.id)) || info.message_id || undefined;
+    const payload = {
+      message_id: msgId,
+      chat_id: from,
+      from_id: info.from || msg.author || msg.from,
+      display_name: (msg && msg._data && msg._data.notifyName) || info.pushName || undefined,
+      is_group: !!(msg && msg.isGroup) || !!info.is_group,
+      body: body || undefined,
+      snippet: body ? body.slice(0, 200) : undefined,
+      has_media: !!(msg && msg.hasMedia) || !!(msg && msg._data && msg._data.isMedia),
+      media_meta: (msg && msg.media) || undefined,
+      msg_type: msg && msg.type,
+      received_at: new Date().toISOString(),
+      origin: 'whatsapp-frontend',
+    };
+
+    backendClient.sendToBackend('/api/messages/', payload).catch(err => {
+      logger.debug('failed to send message to backend', err && err.message);
+    });
+  } catch (err) {
+    logger.debug('error preparing backend message payload', err && err.message);
+  }
+
   // prepare reply helper
   const reply = async text => {
     try {
@@ -120,7 +146,12 @@ async function handle(context) {
           } catch (err) {
             logger.debug('Failed to invoke poll callback for numeric vote', err && err.message);
           }
-          if (typeof reply === 'function') await reply(`Voto registrado: ${opts[idx]}`);
+          // only log vote registration; do not send a chat message
+          logger.info('fallback numeric vote', {
+            msgId,
+            voterId,
+            choice: (opts && opts[idx]) || String(idx),
+          });
           return;
         }
       }

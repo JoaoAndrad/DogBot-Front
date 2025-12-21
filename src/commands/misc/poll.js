@@ -38,13 +38,14 @@ module.exports = {
             (selectedIndexes && selectedIndexes[0] != null && opts && opts[selectedIndexes[0]]) ||
             null;
           try {
-            if (chosen) {
-              if (typeof ctx.reply === 'function') {
-                await ctx.reply(`Voto registrado de ${voter}: ${chosen}`);
-              } else if (ctx.client && chatTarget) {
-                await ctx.client.sendMessage(chatTarget, `Voto registrado de ${voter}: ${chosen}`);
-              }
-            }
+            // only log — do not send chat messages
+            logger.info('poll:onVote', {
+              messageId,
+              voter,
+              chosen,
+              selectedIndexes,
+              selectedNames,
+            });
           } catch (cbErr) {
             logger.error('poll onVote callback error', cbErr && cbErr.message);
           }
@@ -52,15 +53,13 @@ module.exports = {
       });
 
       if (res && res.msgId) {
-        if (typeof ctx.reply === 'function') await ctx.reply('Enquete criada. ID: ' + res.msgId);
-        else if (ctx.client && chatTarget)
-          await ctx.client.sendMessage(chatTarget, 'Enquete criada.');
+        // only log poll creation — do not send chat messages
+        logger.info('Enquete criada', { msgId: res.msgId, chatTarget, title });
         return;
       }
 
-      // no text fallback: log and inform minimal failure
+      // no text fallback: log the failure
       logger.error('createPoll returned null — poll not sent', { chatTarget, title, options });
-      if (typeof ctx.reply === 'function') await ctx.reply('Falha ao criar enquete (ver logs)');
     } catch (err) {
       logger.error('Error creating native poll:', err && (err.message || err));
       if (typeof ctx.reply === 'function') await ctx.reply('Erro ao criar enquete (ver logs)');

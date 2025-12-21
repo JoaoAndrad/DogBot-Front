@@ -24,40 +24,32 @@ function createSender(client) {
       return null;
     }
 
-    const pollOptions = Array.isArray(options)
-      ? options.map((o, i) => ({ name: o, localId: i }))
+    // Normalize options to strings for whatsapp-web.js Poll constructor
+    const normalizedOptionNames = Array.isArray(options)
+      ? options.map((o, i) => {
+          if (o == null) return String(i);
+          if (typeof o === 'string') return o;
+          if (typeof o === 'object' && o.name != null) return String(o.name);
+          return String(o);
+        })
       : [];
+
+    const pollOptions = normalizedOptionNames.map((name, i) => ({ name, localId: i }));
 
     try {
       await _openChatIfNeeded(chatId);
 
-      const poll = new Poll(title, pollOptions, optionsObj || {});
+      const poll = new Poll(title, normalizedOptionNames, optionsObj || {});
       const sent = await client.sendMessage(chatId, poll);
       const msgId = sent && sent.id && sent.id._serialized ? sent.id._serialized : sent.id;
       return { sent, msgId, type: 'native', pollOptions };
     } catch (err) {
-      logger.warn(
-        'Failed to send native poll (first attempt)',
-        err && (err.stack || err.message || err)
-      );
-      try {
-        // second attempt with alternate construction
-        const altPoll = new Poll(title, options, optionsObj || {});
-        const sent2 = await client.sendMessage(chatId, altPoll);
-        const msgId2 = sent2 && sent2.id && sent2.id._serialized ? sent2.id._serialized : sent2.id;
-        return {
-          sent: sent2,
-          msgId: msgId2,
-          type: 'native-alt',
-          pollOptions: options.map((o, i) => ({ name: o, localId: i })),
-        };
-      } catch (err2) {
-        logger.warn(
-          'Failed to send native poll (second attempt)',
-          err2 && (err2.stack || err2.message || err2)
-        );
-        return null;
-      }
+      logger.warn('sendPoll: failed to send native poll', {
+        chatId,
+        title,
+        err: err && (err.stack || err.message || err),
+      });
+      return null;
     }
   }
 

@@ -2,6 +2,9 @@ const logger = require('../../utils/logger');
 const storage = require('./storage');
 const builder = require('./builder');
 const { createSender } = require('./sender');
+const EventEmitter = require('events');
+const emitter = new EventEmitter();
+emitter.setMaxListeners(50);
 
 // in-memory callbacks map: messageId -> callback
 const callbacks = new Map();
@@ -162,12 +165,29 @@ async function handleVoteUpdate(vote) {
       }
     }
 
-    await storage.recordVote(messageId, voter, rawSelected);
+    await storage.recordVote(messageId, voter, rawSelected, selectedIndexes, selectedNames);
+
+    const payload = {
+      messageId,
+      poll: storedPoll,
+      voter,
+      selectedIndexes,
+      selectedNames,
+      raw: vote,
+    };
+
+    // emit global and per-message events
+    try {
+      emitter.emit('vote', payload);
+      emitter.emit(`vote:${messageId}`, payload);
+    } catch (e) {
+      logger.error('Erro ao emitir evento de vote', e);
+    }
 
     const cb = callbacks.get(messageId);
     if (cb) {
       try {
-        await cb({ messageId, poll: storedPoll, voter, selectedIndexes, selectedNames, raw: vote });
+        await cb(payload);
       } catch (err) {
         logger.error('Erro no callback de vote for poll', err);
       }
@@ -177,7 +197,32 @@ async function handleVoteUpdate(vote) {
   }
 }
 
-module.exports = { createPoll, handleVoteUpdate };
+function on(event, cb) {
+  return emitter.on(event, cb);
+}
+
+function off(event, cb) {
+  return emitter.off(event, cb);
+}
+
+function once(event, cb) {
+  return emitter.once(event, cb);
+}
+
+module.exports = { createPoll, handleVoteUpdate, on, off, once };
 module.exports.registerCallback = registerCallback;
 module.exports.saveFallbackPoll = saveFallbackPoll;
 module.exports.invokeCallback = invokeCallback;
+
+/**
+ * Convenience helper: ask a Yes/No question using native poll UI.
+ * Signature mirrors `createPoll(clientOrSender, chatId, title, options, opts)`
+ * Returns the same result as `createPoll` ({ sent, msgId }) or null on failure.
+ */
+async function askYesNo(clientOrSender, chatId, question, opts = {}) {
+  const options = opts.options || ['Sim', 'Não'];
+  const effectiveOpts = Object.assign({}, opts, { origin: opts.origin || 'askYesNo' });
+  return createPoll(clientOrSender, chatId, question, options, effectiveOpts);
+}
+
+module.exports.askYesNo = askYesNo;

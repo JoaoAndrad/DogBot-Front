@@ -91,11 +91,20 @@ async function removePoll(msgId) {
   return true;
 }
 
-async function recordVote(msgId, voterId, selectedOptions) {
+async function recordVote(
+  msgId,
+  voterId,
+  selectedOptions,
+  selectedIndexes = [],
+  selectedNames = []
+) {
   const payload = {
     voter_id: voterId,
     selected_options: selectedOptions,
+    selected_indexes: selectedIndexes,
+    selected_names: selectedNames,
   };
+
   const res = await _fetch(
     url.resolve(BACKEND_URL, `/api/polls/${encodeURIComponent(msgId)}/votes/`),
     {
