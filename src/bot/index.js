@@ -11,10 +11,16 @@ let client = null;
 async function start() {
   const auth = initSessionOptions();
 
-  const headless = process.env.PUPPETEER_HEADLESS === 'true';
+  // By default run Puppeteer in headless mode (do not show the browser).
+  // To explicitly show the browser set PUPPETEER_HEADLESS=false in env.
+  const headless = process.env.PUPPETEER_HEADLESS !== 'false';
+  const puppeteerOpts = { headless: headless, args: ['--no-sandbox'] };
+  // Only add UI-related flags when not headless
+  if (!headless) puppeteerOpts.args.push('--start-maximized');
+
   client = new Client({
     authStrategy: auth,
-    puppeteer: { headless: headless, args: ['--no-sandbox', '--start-maximized'] },
+    puppeteer: puppeteerOpts,
   });
 
   client.on('qr', qr => {
@@ -55,7 +61,7 @@ async function start() {
 
   // listen for poll votes (vote_update) and dispatch to polls handler
   try {
-    const polls = require('../components/pool');
+    const polls = require('../components/poll');
     client.on('vote_update', async vote => {
       try {
         await polls.handleVoteUpdate(vote);
@@ -71,7 +77,7 @@ async function start() {
   // Start a small internal HTTP API to trigger actions using the running client
   try {
     const http = require('http');
-    const polls = require('../components/pool');
+    const polls = require('../components/poll');
     const PORT = Number(process.env.INTERNAL_API_PORT || 3001);
     const server = http.createServer(async (req, res) => {
       try {
@@ -117,9 +123,10 @@ async function start() {
             res.writeHead(200, { 'Content-Type': 'application/json' });
             res.end(JSON.stringify({ ok: true, result }));
           } catch (err) {
-            logger.error('Internal API createPoll failed', err && (err.message || err));
+            const errMsg = err && (err.stack || err.message || String(err));
+            logger.error('Internal API createPoll failed', errMsg);
             res.writeHead(500, { 'Content-Type': 'application/json' });
-            res.end(JSON.stringify({ ok: false, error: String(err) }));
+            res.end(JSON.stringify({ ok: false, error: errMsg }));
           }
           return;
         }

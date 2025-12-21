@@ -14,7 +14,7 @@ async function handle(context) {
     const { MessageTypes } = require('whatsapp-web.js');
     if (msg && (msg.type === MessageTypes.POLL_CREATION || msg.type === 'poll_creation')) {
       // attempt to normalize poll data and save for fallback mapping
-      const polls = require('../components/pool');
+      const polls = require('../components/poll');
       const pollData = msg.poll || msg.pollCreation || msg.pollOptions || {};
       const title = pollData.pollName || pollData.title || body || 'Enquete';
       const options =
@@ -24,11 +24,11 @@ async function handle(context) {
         [];
       const msgId = msg.id && (msg.id._serialized || msg.id.id || msg.id);
       if (msgId) {
-        await require('../components/pool')
+        await require('../components/poll')
           .createPoll(context.client, from, title, options)
           .catch(() => {});
         // also save poll record directly if createPoll returned null or is unsupported
-        const storage = require('../components/pool/storage');
+        const storage = require('../components/poll/storage');
         await storage.savePoll(msgId, {
           type: 'native',
           chatId: from,
@@ -97,7 +97,7 @@ async function handle(context) {
     const numeric = body.match(/^\s*([1-9][0-9]*)\s*$/);
     if (numeric && from) {
       const idx = parseInt(numeric[1], 10) - 1;
-      const pollStorage = require('../components/pool/storage');
+      const pollStorage = require('../components/poll/storage');
       const pollsForChat = await pollStorage.findPollsByChat(from);
       if (pollsForChat && pollsForChat.length) {
         const latest = pollsForChat[0];
@@ -109,7 +109,7 @@ async function handle(context) {
           await pollStorage.recordVote(msgId, voterId, [idx]);
           // invoke callback if registered
           try {
-            const pollsModule = require('../components/pool');
+            const pollsModule = require('../components/poll');
             pollsModule.invokeCallback(msgId, {
               messageId: msgId,
               poll,

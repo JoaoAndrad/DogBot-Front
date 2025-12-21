@@ -1,4 +1,4 @@
-const storage = require('../../components/pool/storage');
+const storage = require('../../components/poll/storage');
 const logger = require('../../utils/logger');
 
 module.exports = {

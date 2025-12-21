@@ -1,6 +1,7 @@
-const { Poll } = require('whatsapp-web.js');
 const logger = require('../../utils/logger');
 const storage = require('./storage');
+const builder = require('./builder');
+const { createSender } = require('./sender');
 
 // in-memory callbacks map: messageId -> callback
 const callbacks = new Map();
@@ -41,83 +42,55 @@ function invokeCallback(msgId, data) {
   }
 }
 
-async function createPoll(client, chatId, title, options, opts = {}) {
-  if (!Array.isArray(options) || options.length < 2)
-    throw new Error('Poll requires at least 2 options');
+/**
+ * Facade: build -> send -> persist -> register callback
+ * Signature supports either passing a `client` as first arg (legacy) or an injected `sender` via opts.sender.
+ * createPoll(clientOrSender, chatId, title, options, opts={})
+ */
+async function createPoll(clientOrSender, chatId, title, options, opts = {}) {
+  // allow calling createPoll(chatId, title, options, opts) by shifting args if clientOrSender looks like chatId
+  let sender = null;
+  let effectiveChatId = chatId;
+  if (typeof clientOrSender === 'string' && !chatId) {
+    throw new Error('Invalid arguments: missing client/sender');
+  }
 
-  // normalize strings to NFC to avoid mojibake when sending/storing
-  const normTitle =
-    title && String(title).normalize ? String(title).normalize('NFC') : String(title);
-  const normOptions = Array.isArray(options)
-    ? options.map(o => (o && String(o).normalize ? String(o).normalize('NFC') : String(o)))
-    : options;
+  // If opts.sender provided, use it (DI)
+  if (opts && opts.sender) sender = opts.sender;
+  else if (clientOrSender && typeof clientOrSender.sendPoll === 'function') sender = clientOrSender;
+  else if (clientOrSender && typeof clientOrSender.sendMessage === 'function')
+    sender = createSender(clientOrSender);
+  else throw new Error('No sender or client provided to createPoll');
 
-  if (typeof Poll !== 'function') {
-    logger.debug('Native Poll not available in runtime');
+  // Build payload (validates and normalizes)
+  const payload = builder.buildPollPayload(chatId, title, options, opts);
+
+  // Send
+  const sendResult = await sender.sendPoll(payload, opts);
+  if (!sendResult) {
+    logger.warn('createPoll: sendResult null');
     return null;
   }
 
-  try {
-    try {
-      if (client && client.interface && typeof client.interface.openChatWindow === 'function') {
-        await client.interface.openChatWindow(chatId).catch(() => {});
-        await new Promise(r => setTimeout(r, 1200));
-      }
-    } catch (e) {
-      logger.debug('openChatWindow failed (non-fatal)', e && (e.message || e.stack));
-    }
+  const { msgId, sent, type, pollOptions } = sendResult;
 
-    const pollOptions = normOptions.map((o, i) => ({ name: o, localId: i }));
-    const optionsObj = opts.options || opts.pollOptions || {};
-    const poll = new Poll(normTitle, pollOptions, optionsObj);
-    const sent = await client.sendMessage(chatId, poll);
-    const msgId = sent && sent.id && sent.id._serialized ? sent.id._serialized : sent.id;
-    const record = {
-      type: 'native',
-      chatId,
-      title: normTitle,
-      options: normOptions,
-      pollOptions: pollOptions,
-      optionsObj: optionsObj,
-      createdAt: Date.now(),
-    };
-    await storage.savePoll(msgId, record);
+  // persist
+  const record = {
+    type: type || 'native',
+    chatId: payload.chatId,
+    title: payload.title,
+    options: payload.options,
+    pollOptions: pollOptions || payload.options.map((o, i) => ({ name: o, localId: i })),
+    optionsObj: payload.optionsObj || {},
+    createdAt: Date.now(),
+  };
+  await storage.savePoll(msgId, record);
 
-    if (typeof opts.onVote === 'function') callbacks.set(msgId, opts.onVote);
+  // register callback
+  if (typeof opts.onVote === 'function') callbacks.set(msgId, opts.onVote);
 
-    logger.info('Poll enviada', { chatId, msgId, title });
-    return { sent, msgId };
-  } catch (err) {
-    logger.warn(
-      'Falha ao enviar Poll nativo (primeira tentativa)',
-      err && (err.stack || err.message || err)
-    );
-
-    try {
-      const altPoll = new Poll(normTitle, normOptions, opts.options || opts.pollOptions || {});
-      const sent2 = await client.sendMessage(chatId, altPoll);
-      const msgId2 = sent2 && sent2.id && sent2.id._serialized ? sent2.id._serialized : sent2.id;
-      const record2 = {
-        type: 'native-alt',
-        chatId,
-        title: normTitle,
-        options: normOptions,
-        pollOptions: normOptions.map((o, i) => ({ name: o, localId: i })),
-        optionsObj: opts.options || opts.pollOptions || {},
-        createdAt: Date.now(),
-      };
-      await storage.savePoll(msgId2, record2);
-      if (typeof opts.onVote === 'function') callbacks.set(msgId2, opts.onVote);
-      logger.info('Poll enviada (segunda tentativa com strings)', { chatId, msgId: msgId2, title });
-      return { sent: sent2, msgId: msgId2 };
-    } catch (err2) {
-      logger.warn(
-        'Falha ao enviar Poll nativo (segunda tentativa)',
-        err2 && (err2.stack || err2.message || err2)
-      );
-      return null;
-    }
-  }
+  logger.info('Poll enviada', { chatId: payload.chatId, msgId, title: payload.title });
+  return { sent, msgId };
 }
 
 async function handleVoteUpdate(vote) {
@@ -157,7 +130,7 @@ async function handleVoteUpdate(vote) {
     let selectedIndexes = [];
     let selectedNames = [];
     const storedPoll = poll || (await storage.getPoll(messageId));
-    const opts =
+    const optsArr =
       storedPoll &&
       (storedPoll.pollOptions ||
         (storedPoll.options && storedPoll.options.map((o, i) => ({ name: o, localId: i }))));
@@ -169,10 +142,10 @@ async function handleVoteUpdate(vote) {
           const name = s.name || s.option || null;
           if (lid != null) {
             selectedIndexes.push(Number(lid));
-            const opt = opts && opts.find(o => o.localId === Number(lid));
+            const opt = optsArr && optsArr.find(o => o.localId === Number(lid));
             selectedNames.push(opt ? opt.name : name || String(lid));
           } else if (name) {
-            const idx = opts && opts.findIndex(o => o.name === name);
+            const idx = optsArr && optsArr.findIndex(o => o.name === name);
             if (idx != null && idx >= 0) {
               selectedIndexes.push(idx);
               selectedNames.push(name);
@@ -183,7 +156,9 @@ async function handleVoteUpdate(vote) {
         }
       } else {
         selectedIndexes = rawSelected.map(n => Number(n));
-        selectedNames = selectedIndexes.map(i => (opts && opts[i] && opts[i].name) || String(i));
+        selectedNames = selectedIndexes.map(
+          i => (optsArr && optsArr[i] && optsArr[i].name) || String(i)
+        );
       }
     }
 

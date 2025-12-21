@@ -1,1 +1,1 @@
-module.exports = require('./components/pool/builder');
+module.exports = require('./components/poll/builder');

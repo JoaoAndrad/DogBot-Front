@@ -1,5 +1,4 @@
-const polls = require('../../components/pool');
-const builder = require('../../components/pool/builder');
+const polls = require('../../components/poll');
 const logger = require('../../utils/logger');
 
 module.exports = {
@@ -29,9 +28,7 @@ module.exports = {
       'unknown';
 
     try {
-      // validate/normalize payload via builder
-      builder.buildPollPayload(chatTarget, title, options, { origin: 'command' });
-
+      // delegate validation/orchestration to createPoll (build -> send -> persist)
       const res = await polls.createPoll(ctx.client, chatTarget, title, options, {
         onVote: async ({ messageId, poll, voter, selectedIndexes, selectedNames }) => {
           const opts =
