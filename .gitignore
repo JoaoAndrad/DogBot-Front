@@ -4,3 +4,4 @@ temp/
 .env
 dist/
 .wwebjs_cache/
+data/
