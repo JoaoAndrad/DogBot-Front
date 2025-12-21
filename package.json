@@ -1,0 +1,20 @@
+{
+  "name": "dogbot-frontend",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "nodemon --watch src --exec node src/index.js",
+    "lint": "echo \"No linter configured\"",
+    "test": "echo \"No tests configured\""
+  },
+  "dependencies": {
+    "whatsapp-web.js": "^1.19.5",
+    "qrcode": "^1.5.1",
+    "dotenv": "^16.0.0",
+    "winston": "^3.8.2"
+  },
+  "devDependencies": {
+    "nodemon": "^2.0.22"
+  }
+}
