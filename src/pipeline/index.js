@@ -1,12 +1,12 @@
-const logger = require('../utils/logger');
-const middleware = require('./middleware');
-const dedupe = require('./dedupe');
+const logger = require("../utils/logger");
+const middleware = require("./middleware");
+const dedupe = require("./dedupe");
 
 async function processEvent(context) {
   // middleware chain
   try {
     if (await dedupe.isDuplicate(context)) {
-      logger.debug('pipeline: duplicate message, skipping');
+      console.log("pipeline: duplicate message, skipping");
       return false;
     }
 
@@ -14,13 +14,13 @@ async function processEvent(context) {
     if (!ok) return false;
 
     // delegate to handlers (handlers registry should be used)
-    const handlers = require('../handlers');
+    const handlers = require("../handlers");
     await handlers.handle(context);
 
     await dedupe.markProcessed(context);
     return true;
   } catch (err) {
-    logger.error('pipeline error', err);
+    console.log("pipeline error", err);
     return false;
   }
 }

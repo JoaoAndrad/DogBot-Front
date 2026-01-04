@@ -1,21 +1,22 @@
-const handlers = require('../handlers');
-const logger = require('../utils/logger');
-const storage = require('./storage');
+const handlers = require("../handlers");
+const logger = require("../utils/logger");
+const storage = require("./storage");
 
 async function processMessage(context) {
   try {
     const msg = context.msg;
-    const msgId = msg && msg.id && msg.id._serialized ? msg.id._serialized : null;
+    const msgId =
+      msg && msg.id && msg.id._serialized ? msg.id._serialized : null;
 
     if (msgId && storage.isProcessed(msgId)) {
-      logger.debug('Pipeline: mensagem já processada, pulando', { msgId });
+      console.log("Pipeline: mensagem já processada, pulando", { msgId });
       return false;
     }
 
     const info = {
       id: msgId,
       from: msg.from || (msg._data && msg._data.from),
-      body: msg.body || msg.caption || '',
+      body: msg.body || msg.caption || "",
     };
 
     await handlers.handle({ ...context, info });
@@ -27,7 +28,7 @@ async function processMessage(context) {
 
     return true;
   } catch (err) {
-    logger.error('Pipeline erro:', err);
+    console.log("Pipeline erro:", err);
     return false;
   }
 }

@@ -1,28 +1,86 @@
-const logger = require('../../utils/logger');
-const storage = require('./storage');
-const builder = require('./builder');
-const { createSender } = require('./sender');
-const EventEmitter = require('events');
+const logger = require("../../utils/logger");
+const storage = require("./storage");
+const builder = require("./builder");
+const { createSender } = require("./sender");
+const EventEmitter = require("events");
 const emitter = new EventEmitter();
 emitter.setMaxListeners(50);
 
 // in-memory callbacks map: messageId -> callback
 const callbacks = new Map();
 
+// WhatsApp client reference for resolving contact IDs
+let whatsappClient = null;
+
+// Store handlers for different vote types
+const voteHandlers = {
+  add: null,
+  skip: null,
+};
+
+function setWhatsAppClient(client) {
+  whatsappClient = client;
+  logger.info("[PollComponent] Cliente WhatsApp configurado");
+}
+
+function registerVoteHandler(voteType, handler) {
+  if (voteType === "add" || voteType === "skip") {
+    voteHandlers[voteType] = handler;
+    logger.info(`[PollComponent] Vote handler registrado para: ${voteType}`);
+  }
+}
+
+async function restoreCallbacksFromDatabase() {
+  try {
+    logger.info("[PollComponent] Restaurando callbacks de polls ativas...");
+    const polls = await storage.listPolls();
+
+    if (!polls || polls.length === 0) {
+      logger.info("[PollComponent] Nenhuma poll ativa para restaurar");
+      return;
+    }
+
+    logger.info(`[PollComponent] Encontradas ${polls.length} polls ativas`);
+
+    for (const poll of polls) {
+      const msgId = poll.id;
+      const voteType = poll.voteType || poll.vote_type;
+      const voteId = poll.voteId || poll.vote_id;
+
+      // Se houver handler registrado para este tipo, restaura o callback
+      if (voteType && voteHandlers[voteType]) {
+        callbacks.set(msgId, voteHandlers[voteType]);
+        logger.info(
+          `[PollComponent] Callback restaurado: msgId=${msgId}, voteType=${voteType}, voteId=${voteId}`
+        );
+      }
+    }
+
+    logger.info(
+      `[PollComponent] Callbacks restaurados: ${callbacks.size} polls ativas`
+    );
+  } catch (err) {
+    logger.error(`[PollComponent] Erro ao restaurar callbacks: ${err.message}`);
+  }
+}
+
 function registerCallback(msgId, cb) {
-  if (!msgId || typeof cb !== 'function') return false;
+  if (!msgId || typeof cb !== "function") return false;
   callbacks.set(msgId, cb);
   return true;
 }
 
 async function saveFallbackPoll(chatId, title, options, opts = {}) {
   const msgId = `fallback_${Date.now()}`;
-  const normTitle = title && String(title).normalize ? String(title).normalize('NFC') : title;
+  const normTitle =
+    title && String(title).normalize ? String(title).normalize("NFC") : title;
   const normOptions = Array.isArray(options)
-    ? options.map(o => (o && String(o).normalize ? String(o).normalize('NFC') : o))
+    ? options.map((o) =>
+        o && String(o).normalize ? String(o).normalize("NFC") : o
+      )
     : [];
   const record = {
-    type: 'fallback',
+    type: "fallback",
     chatId,
     title: normTitle,
     options: normOptions.slice(),
@@ -40,7 +98,7 @@ function invokeCallback(msgId, data) {
     try {
       cb(data);
     } catch (err) {
-      logger.error('Error invoking poll callback', err);
+      logger.error("Error invoking poll callback", err);
     }
   }
 }
@@ -54,16 +112,17 @@ async function createPoll(clientOrSender, chatId, title, options, opts = {}) {
   // allow calling createPoll(chatId, title, options, opts) by shifting args if clientOrSender looks like chatId
   let sender = null;
   let effectiveChatId = chatId;
-  if (typeof clientOrSender === 'string' && !chatId) {
-    throw new Error('Invalid arguments: missing client/sender');
+  if (typeof clientOrSender === "string" && !chatId) {
+    throw new Error("Invalid arguments: missing client/sender");
   }
 
   // If opts.sender provided, use it (DI)
   if (opts && opts.sender) sender = opts.sender;
-  else if (clientOrSender && typeof clientOrSender.sendPoll === 'function') sender = clientOrSender;
-  else if (clientOrSender && typeof clientOrSender.sendMessage === 'function')
+  else if (clientOrSender && typeof clientOrSender.sendPoll === "function")
+    sender = clientOrSender;
+  else if (clientOrSender && typeof clientOrSender.sendMessage === "function")
     sender = createSender(clientOrSender);
-  else throw new Error('No sender or client provided to createPoll');
+  else throw new Error("No sender or client provided to createPoll");
 
   // Build payload (validates and normalizes)
   const payload = builder.buildPollPayload(chatId, title, options, opts);
@@ -71,7 +130,7 @@ async function createPoll(clientOrSender, chatId, title, options, opts = {}) {
   // Send
   const sendResult = await sender.sendPoll(payload, opts);
   if (!sendResult) {
-    logger.warn('createPoll: sendResult null');
+    logger.warn("createPoll: sendResult null");
     return null;
   }
 
@@ -79,53 +138,164 @@ async function createPoll(clientOrSender, chatId, title, options, opts = {}) {
 
   // persist
   const record = {
-    type: type || 'native',
+    type: type || "native",
     chatId: payload.chatId,
     title: payload.title,
     options: payload.options,
-    pollOptions: pollOptions || payload.options.map((o, i) => ({ name: o, localId: i })),
+    pollOptions:
+      pollOptions || payload.options.map((o, i) => ({ name: o, localId: i })),
     optionsObj: payload.optionsObj || {},
+    voteType: opts.voteType || null,
+    voteId: opts.voteId || null,
+    groupId: opts.groupId || null,
     createdAt: Date.now(),
   };
-  await storage.savePoll(msgId, record);
+
+  console.log("[createPoll] Saving poll with msgId:", msgId);
+  try {
+    await storage.savePoll(msgId, record);
+    console.log("[createPoll] Poll saved successfully:", msgId);
+  } catch (err) {
+    console.error("[createPoll] Failed to save poll:", err.message);
+    throw err;
+  }
 
   // register callback
-  if (typeof opts.onVote === 'function') callbacks.set(msgId, opts.onVote);
+  if (typeof opts.onVote === "function") callbacks.set(msgId, opts.onVote);
 
-  logger.info('Poll enviada', { chatId: payload.chatId, msgId, title: payload.title });
+  logger.info("Poll enviada", {
+    chatId: payload.chatId,
+    msgId,
+    title: payload.title,
+  });
   return { sent, msgId };
 }
 
 async function handleVoteUpdate(vote) {
   try {
-    logger.info(
-      'vote_update recebido',
-      vote && (vote.messageId || vote.parentMsgKey || vote.message?.id || 'no-id')
-    );
+    //logger.debug("vote_update recebido", vote);
     let messageId = null;
-    if (vote.messageId) messageId = vote.messageId;
-    else if (vote.parentMsgKey && vote.parentMsgKey._serialized)
+
+    // Try parentMsgKey first (most reliable for poll votes)
+    if (vote.parentMsgKey && vote.parentMsgKey._serialized) {
       messageId = vote.parentMsgKey._serialized;
-    else if (vote.parentMsgKey && vote.parentMsgKey.id) messageId = vote.parentMsgKey.id;
-    else if (vote.message && vote.message.id) messageId = vote.message.id;
-    else if (vote.message && vote.message._serialized) messageId = vote.message._serialized;
+    } else if (vote.parentMsgKey && vote.parentMsgKey.id) {
+      messageId = vote.parentMsgKey.id;
+    } else if (vote.messageId) {
+      messageId = vote.messageId;
+    } else if (vote.message && vote.message.id) {
+      messageId = vote.message.id;
+    } else if (vote.message && vote.message._serialized) {
+      messageId = vote.message._serialized;
+    } else if (vote && vote._serialized) {
+      messageId = vote._serialized;
+    } else if (vote && vote.key && vote.key._serialized) {
+      messageId = vote.key._serialized;
+    } else if (vote && vote.id && vote.remote) {
+      const fromMeFlag = vote.fromMe ? "true" : "false";
+      messageId = `${fromMeFlag}_${vote.remote}_${vote.id}`;
+      if (vote.participant) messageId = `${messageId}_${vote.participant}`;
+    }
+
     if (!messageId) {
-      logger.debug('vote_update sem messageId — ignorando');
+      logger.debug("vote_update sem messageId — ignorando");
       return;
     }
 
-    const poll = await storage.getPoll(messageId);
+    // Try direct lookup first
+    let poll = await storage.getPoll(messageId);
+
+    console.log(
+      "[handleVoteUpdate] Direct lookup result:",
+      poll ? "found" : "not found",
+      "for msgId:",
+      messageId
+    );
+
+    // If not found and we have parentMsgKey with id parts, try to find by matching
+    if (
+      !poll &&
+      vote.parentMsgKey &&
+      vote.parentMsgKey.id &&
+      vote.parentMsgKey.remote
+    ) {
+      console.log(
+        "[handleVoteUpdate] Trying to find poll by chat_id:",
+        vote.parentMsgKey.remote
+      );
+      try {
+        const allPolls = await storage.listPolls();
+        console.log("[handleVoteUpdate] Found", allPolls.length, "total polls");
+
+        // Try to match by chat_id only - get most recent poll from this chat
+        const pollsInChat = allPolls.filter(
+          (p) => p.chat_id === vote.parentMsgKey.remote
+        );
+        console.log(
+          "[handleVoteUpdate] Found",
+          pollsInChat.length,
+          "polls in chat:",
+          vote.parentMsgKey.remote
+        );
+
+        if (pollsInChat.length > 0) {
+          // Get most recent poll
+          const sorted = pollsInChat.sort((a, b) => {
+            const timeA = new Date(a.created_at || 0).getTime();
+            const timeB = new Date(b.created_at || 0).getTime();
+            return timeB - timeA; // descending
+          });
+          poll = sorted[0];
+          messageId = poll.id;
+          console.log(
+            "[handleVoteUpdate] Using most recent poll from chat:",
+            messageId,
+            "title:",
+            poll.title
+          );
+        }
+      } catch (err) {
+        console.log(
+          "[handleVoteUpdate] Failed to search polls for match",
+          err.message
+        );
+      }
+    }
+
     if (!poll) {
-      logger.debug('vote_update para enquete desconhecida', messageId);
+      logger.debug("vote_update para enquete desconhecida", messageId);
       return;
     }
 
-    const voter =
+    // Extract raw voter ID from vote event
+    let voter =
       vote.voter ||
       vote.voterId ||
       (vote.author && vote.author.id) ||
       (vote.voter && vote.voter._serialized) ||
-      'unknown';
+      "unknown";
+
+    // Try to resolve voter to @c.us format using getContact()
+    // IMPORTANTE: getContactById() resolve @lid para o número real @c.us
+    if (whatsappClient && voter && voter !== "unknown") {
+      try {
+        // Use voter diretamente - getContactById() resolve @lid automaticamente
+        const contact = await whatsappClient.getContactById(voter);
+        if (contact && contact.id && contact.id._serialized) {
+          const resolvedVoter = contact.id._serialized;
+          logger.debug(
+            `[PollComponent] Voter resolvido: ${voter} → ${resolvedVoter}`
+          );
+          voter = resolvedVoter;
+        }
+      } catch (err) {
+        logger.debug(
+          `[PollComponent] Não foi possível resolver voter ${voter}:`,
+          err.message
+        );
+        // Keep original voter if resolution fails
+      }
+    }
     const selectedOptions =
       vote.selectedOptions || vote.selected || vote.selectedOptionIndexes || [];
 
@@ -136,19 +306,21 @@ async function handleVoteUpdate(vote) {
     const optsArr =
       storedPoll &&
       (storedPoll.pollOptions ||
-        (storedPoll.options && storedPoll.options.map((o, i) => ({ name: o, localId: i }))));
+        (storedPoll.options &&
+          storedPoll.options.map((o, i) => ({ name: o, localId: i }))));
 
     if (Array.isArray(rawSelected) && rawSelected.length) {
-      if (typeof rawSelected[0] === 'object') {
+      if (typeof rawSelected[0] === "object") {
         for (const s of rawSelected) {
           const lid = s.localId != null ? s.localId : s.local_id || null;
           const name = s.name || s.option || null;
           if (lid != null) {
             selectedIndexes.push(Number(lid));
-            const opt = optsArr && optsArr.find(o => o.localId === Number(lid));
+            const opt =
+              optsArr && optsArr.find((o) => o.localId === Number(lid));
             selectedNames.push(opt ? opt.name : name || String(lid));
           } else if (name) {
-            const idx = optsArr && optsArr.findIndex(o => o.name === name);
+            const idx = optsArr && optsArr.findIndex((o) => o.name === name);
             if (idx != null && idx >= 0) {
               selectedIndexes.push(idx);
               selectedNames.push(name);
@@ -158,14 +330,29 @@ async function handleVoteUpdate(vote) {
           }
         }
       } else {
-        selectedIndexes = rawSelected.map(n => Number(n));
+        selectedIndexes = rawSelected.map((n) => Number(n));
         selectedNames = selectedIndexes.map(
-          i => (optsArr && optsArr[i] && optsArr[i].name) || String(i)
+          (i) => (optsArr && optsArr[i] && optsArr[i].name) || String(i)
         );
       }
     }
 
-    await storage.recordVote(messageId, voter, rawSelected, selectedIndexes, selectedNames);
+    await storage.recordVote(
+      messageId,
+      voter,
+      rawSelected,
+      selectedIndexes,
+      selectedNames
+    );
+
+    // Log resumido do voto
+    const voterName = (voter && voter.split("@")[0]) || "unknown";
+    const pollTitle = (storedPoll && storedPoll.title) || "Poll";
+    console.log(
+      `🗳️ Voto | ${pollTitle} | 👤 ${voterName} | ✅ ${selectedNames.join(
+        ", "
+      )}`
+    );
 
     const payload = {
       messageId,
@@ -178,10 +365,10 @@ async function handleVoteUpdate(vote) {
 
     // emit global and per-message events
     try {
-      emitter.emit('vote', payload);
+      emitter.emit("vote", payload);
       emitter.emit(`vote:${messageId}`, payload);
     } catch (e) {
-      logger.error('Erro ao emitir evento de vote', e);
+      logger.error("Erro ao emitir evento de vote", e);
     }
 
     const cb = callbacks.get(messageId);
@@ -189,11 +376,37 @@ async function handleVoteUpdate(vote) {
       try {
         await cb(payload);
       } catch (err) {
-        logger.error('Erro no callback de vote for poll', err);
+        logger.error("Erro no callback de vote for poll", err);
+      }
+    } else if (storedPoll && (storedPoll.voteId || storedPoll.vote_id)) {
+      // Fallback: If callback not in memory but we have voteId (e.g., after bot restart),
+      // send vote directly to backend
+      logger.info(
+        `[PollComponent] Callback não encontrado em memória, enviando voto ao backend`
+      );
+      try {
+        const backendClient = require("../../services/backendClient");
+        const voteId = storedPoll.voteId || storedPoll.vote_id;
+
+        // Determine isFor based on selectedIndexes (0 = Yes/Sim)
+        const isFor = selectedIndexes && selectedIndexes.includes(0);
+
+        await backendClient.sendToBackend(`/api/groups/votes/${voteId}/cast`, {
+          userId: voter,
+          isFor,
+          pollId: messageId,
+        });
+
+        logger.info(`[PollComponent] Voto enviado ao backend: ${voteId}`);
+      } catch (err) {
+        logger.error(
+          "[PollComponent] Erro ao enviar voto ao backend:",
+          err.message
+        );
       }
     }
   } catch (err) {
-    logger.error('Erro ao handleVoteUpdate', err);
+    logger.error("Erro ao handleVoteUpdate", err);
   }
 }
 
@@ -209,7 +422,16 @@ function once(event, cb) {
   return emitter.once(event, cb);
 }
 
-module.exports = { createPoll, handleVoteUpdate, on, off, once };
+module.exports = {
+  createPoll,
+  handleVoteUpdate,
+  on,
+  off,
+  once,
+  setWhatsAppClient,
+  registerVoteHandler,
+  restoreCallbacksFromDatabase,
+};
 module.exports.registerCallback = registerCallback;
 module.exports.saveFallbackPoll = saveFallbackPoll;
 module.exports.invokeCallback = invokeCallback;
@@ -220,8 +442,10 @@ module.exports.invokeCallback = invokeCallback;
  * Returns the same result as `createPoll` ({ sent, msgId }) or null on failure.
  */
 async function askYesNo(clientOrSender, chatId, question, opts = {}) {
-  const options = opts.options || ['Sim', 'Não'];
-  const effectiveOpts = Object.assign({}, opts, { origin: opts.origin || 'askYesNo' });
+  const options = opts.options || ["Sim", "Não"];
+  const effectiveOpts = Object.assign({}, opts, {
+    origin: opts.origin || "askYesNo",
+  });
   return createPoll(clientOrSender, chatId, question, options, effectiveOpts);
 }
 

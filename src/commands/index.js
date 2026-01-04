@@ -1,5 +1,5 @@
-const fs = require('fs');
-const path = require('path');
+const fs = require("fs");
+const path = require("path");
 
 const commands = new Map();
 
@@ -12,12 +12,12 @@ function loadCommands(dir = __dirname) {
       loadCommands(full);
       continue;
     }
-    if (!entry.endsWith('.js') || entry === 'index.js') continue;
+    if (!entry.endsWith(".js") || entry === "index.js") continue;
     try {
       const mod = require(full);
       if (mod && mod.name) commands.set(mod.name, mod);
     } catch (err) {
-      console.error('Failed to load command', full, err && err.message);
+      console.log("Failed to load command", full, err && err.message);
     }
   }
 

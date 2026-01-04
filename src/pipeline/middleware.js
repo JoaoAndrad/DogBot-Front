@@ -1,4 +1,4 @@
-const logger = require('../utils/logger');
+const logger = require("../utils/logger");
 
 const middlewares = [];
 
@@ -10,7 +10,7 @@ async function run(context) {
   for (const mw of middlewares) {
     const ok = await mw(context);
     if (!ok) {
-      logger.debug('middleware short-circuit');
+      console.log("middleware short-circuit");
       return false;
     }
   }

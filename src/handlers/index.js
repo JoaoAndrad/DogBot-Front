@@ -1,90 +1,141 @@
-const logger = require('../utils/logger');
-const commands = require('../commands');
-const backendClient = require('../services/backendClient');
-const spotifyService = require('../services/spotifyService');
+const logger = require("../utils/logger");
+const commands = require("../commands");
+const backendClient = require("../services/backendClient");
+const spotifyService = require("../services/spotifyService");
+const conversationState = require("../services/conversationState");
+const { handleCadastroFlow } = require("./cadastroFlowHandler");
 
 async function handle(context) {
   // Accept either context.info (legacy) or context.msg (whatsapp-web.js)
   const info = context.info || {};
   const msg = context.msg || {};
-  const body = String(info.body || msg.body || '').trim();
+  const body = String(info.body || msg.body || "").trim();
   const from = info.from || msg.from;
-  // detect native poll creation messages (whatsapp-web.js MessageTypes.POLL_CREATION)
+
+  // Log resumido da mensagem
   try {
-    const { MessageTypes } = require('whatsapp-web.js');
-    if (msg && (msg.type === MessageTypes.POLL_CREATION || msg.type === 'poll_creation')) {
-      // attempt to normalize poll data and save for fallback mapping
-      const polls = require('../components/poll');
-      const pollData = msg.poll || msg.pollCreation || msg.pollOptions || {};
-      const title = pollData.pollName || pollData.title || body || 'Enquete';
-      const options =
-        pollData.pollOptions ||
-        pollData.options ||
-        (pollData.optionsList && pollData.optionsList.map(o => o.text)) ||
-        [];
-      const msgId = msg.id && (msg.id._serialized || msg.id.id || msg.id);
-      if (msgId) {
-        await require('../components/poll')
-          .createPoll(context.client, from, title, options)
-          .catch(() => {});
-        // also save poll record directly if createPoll returned null or is unsupported
-        const storage = require('../components/poll/storage');
-        await storage.savePoll(msgId, {
-          type: 'native',
-          chatId: from,
-          title,
-          options,
-          createdAt: Date.now(),
-        });
+    const isGroup = !!(msg && msg.isGroup) || !!info.is_group;
+    const author = msg.author || msg.from || info.from;
+    const authorName =
+      (msg._data && msg._data.notifyName) || info.pushName || author;
+    const msgType = msg.type || info.type || "text";
+
+    let logMsg = `📩 ${msgType}`;
+    if (isGroup) {
+      // Get group name - use getChat() to get full info
+      let groupName = from.split("@")[0];
+      try {
+        const chat = await msg.getChat();
+        if (chat && chat.name) {
+          groupName = chat.name;
+        }
+      } catch (e) {
+        // keep fallback groupName
       }
+
+      logMsg += ` | 👥 ${groupName} | 👤 ${authorName}`;
+    } else {
+      logMsg += ` | 👤 ${authorName}`;
     }
-  } catch (e) {
-    // ignore if whatsapp-web.js not available or shape differs
+    if (body)
+      logMsg += ` | 💬 ${body.slice(0, 50)}${body.length > 50 ? "..." : ""}`;
+
+    console.log(logMsg);
+  } catch (err) {
+    console.log(`📩 Mensagem de ${from}`);
   }
 
-  logger.info('Mensagem recebida:', { from, body: body && body.slice(0, 120) });
+  // Note: No longer auto-creating users on regular messages
+  // Users must explicitly register with /cadastro command
+
+  // prepare reply helper
+  const reply = async (text) => {
+    try {
+      if (typeof msg.reply === "function") return await msg.reply(text);
+      if (context.client && from)
+        return await context.client.sendMessage(from, text);
+      return null;
+    } catch (err) {
+      logger.error("Erro ao enviar reply:", err);
+    }
+  };
+
+  // Check if user is in an active conversation flow (e.g., cadastro)
+  const author = msg.author || msg.from || info.from;
+  const isGroup = !!(msg && msg.isGroup) || !!info.is_group;
+
+  let actualNumber = null;
+  if (!isGroup) {
+    // Try to get contact first for consistency with command
+    try {
+      const contact = await msg.getContact();
+      if (contact && contact.id && contact.id._serialized) {
+        actualNumber = contact.id._serialized;
+      } else {
+        actualNumber = from;
+      }
+    } catch (err) {
+      actualNumber = from;
+    }
+  } else {
+    actualNumber = author ? author.replace(/@lid$/i, "") : null;
+  }
+
+  logger.debug(`[Handler] Verificando fluxo ativo para: ${actualNumber}`);
+
+  if (actualNumber && conversationState.hasActiveFlow(actualNumber)) {
+    const state = conversationState.getState(actualNumber);
+    logger.debug(
+      `[Handler] Fluxo ativo detectado para ${actualNumber}: ${state.flowType}`
+    );
+
+    if (state.flowType === "cadastro") {
+      return await handleCadastroFlow(actualNumber, body, state, reply, {
+        author,
+        isGroup,
+        from,
+        pushName: (msg && msg._data && msg._data.notifyName) || info.pushName,
+        client: context.client,
+      });
+    }
+  }
 
   // Forward a normalized message record to backend for storage/processing (no chat fallback)
   try {
     const msgId =
-      (msg && msg.id && (msg.id._serialized || msg.id.id)) || info.message_id || undefined;
+      (msg && msg.id && (msg.id._serialized || msg.id.id)) ||
+      info.message_id ||
+      undefined;
     const payload = {
       message_id: msgId,
       chat_id: from,
       from_id: info.from || msg.author || msg.from,
-      display_name: (msg && msg._data && msg._data.notifyName) || info.pushName || undefined,
+      display_name:
+        (msg && msg._data && msg._data.notifyName) ||
+        info.pushName ||
+        undefined,
       is_group: !!(msg && msg.isGroup) || !!info.is_group,
       body: body || undefined,
       snippet: body ? body.slice(0, 200) : undefined,
-      has_media: !!(msg && msg.hasMedia) || !!(msg && msg._data && msg._data.isMedia),
+      has_media:
+        !!(msg && msg.hasMedia) || !!(msg && msg._data && msg._data.isMedia),
       media_meta: (msg && msg.media) || undefined,
       msg_type: msg && msg.type,
       received_at: new Date().toISOString(),
-      origin: 'whatsapp-frontend',
+      origin: "whatsapp-frontend",
     };
 
-    backendClient.sendToBackend('/api/messages/', payload).catch(err => {
-      logger.debug('failed to send message to backend', err && err.message);
+    backendClient.sendToBackend("/api/messages/", payload).catch((err) => {
+      logger.debug("failed to send message to backend", err && err.message);
     });
   } catch (err) {
-    logger.debug('error preparing backend message payload', err && err.message);
+    logger.debug("error preparing backend message payload", err && err.message);
   }
-
-  // prepare reply helper
-  const reply = async text => {
-    try {
-      if (typeof msg.reply === 'function') return await msg.reply(text);
-      if (context.client && from) return await context.client.sendMessage(from, text);
-      return null;
-    } catch (err) {
-      logger.error('Erro ao enviar reply:', err);
-    }
-  };
 
   // detect command: prefix-based (! or /) or exact keyword fallback (e.g. 'ping')
   let isCommand = false;
   let cmdName = null;
-  if (body.startsWith('!') || body.startsWith('/')) {
+  if (body.startsWith("!") || body.startsWith("/")) {
     isCommand = true;
     cmdName = body.slice(1).split(/\s+/)[0].toLowerCase();
   } else if (body.length && commands.commands.has(body.toLowerCase())) {
@@ -95,9 +146,70 @@ async function handle(context) {
   if (isCommand && cmdName) {
     const cmd = commands.getCommand(cmdName);
     if (!cmd) {
-      logger.debug('Comando não encontrado:', cmdName);
+      logger.debug("Comando não encontrado:", cmdName);
       await reply(`Comando desconhecido: ${cmdName}`);
       return;
+    }
+
+    // Commands that don't require user registration
+    const publicCommands = ["cadastro", "ajuda", "help"];
+    const requiresRegistration = !publicCommands.includes(cmdName);
+
+    // Check if user exists before executing command (unless public command)
+    if (requiresRegistration) {
+      try {
+        const author = msg.author || msg.from || info.from;
+        const isGroup = !!(msg && msg.isGroup) || !!info.is_group;
+
+        // Try to get actual phone number from contact
+        let actualNumber = null;
+        try {
+          const contact = await msg.getContact();
+          if (contact && contact.id && contact.id._serialized) {
+            actualNumber = contact.id._serialized;
+            logger.debug(`[Handler] Número do contato: ${actualNumber}`);
+          }
+        } catch (err) {
+          logger.debug(`[Handler] Erro ao buscar contato:`, err.message);
+        }
+
+        // Fallback: use from/author if contact fetch failed
+        if (!actualNumber) {
+          if (!isGroup) {
+            actualNumber = from;
+          } else {
+            actualNumber = author ? author.replace(/@lid$/i, "") : null;
+          }
+          logger.debug(`[Handler] Usando fallback: ${actualNumber}`);
+        }
+
+        if (actualNumber) {
+          logger.debug(`[Handler] Verificando cadastro para: ${actualNumber}`);
+          const lookupRes = await backendClient.sendToBackend(
+            `/api/users/lookup?identifier=${encodeURIComponent(actualNumber)}`,
+            null,
+            "GET"
+          );
+
+          logger.debug(`[Handler] Resultado lookup:`, lookupRes);
+
+          if (!lookupRes || !lookupRes.found) {
+            if (isGroup) {
+              await reply(
+                "hmmm parece que não te conheço... venha no meu privado e digite /cadastro"
+              );
+            } else {
+              await reply(
+                "É necessário enviar /cadastro no privado antes de utilizar qualquer comando"
+              );
+            }
+            return;
+          }
+        }
+      } catch (err) {
+        logger.error("Erro ao verificar usuário:", err);
+        // Continue execution on lookup error to avoid blocking legitimate users
+      }
     }
 
     const ctx = {
@@ -111,8 +223,8 @@ async function handle(context) {
     try {
       await cmd.execute(ctx);
     } catch (err) {
-      logger.error('Erro ao executar comando', cmdName, err);
-      await reply('Ocorreu um erro ao executar o comando.');
+      logger.error("Erro ao executar comando", cmdName, err);
+      await reply("Ocorreu um erro ao executar o comando.");
     }
 
     return;
@@ -123,7 +235,7 @@ async function handle(context) {
     const numeric = body.match(/^\s*([1-9][0-9]*)\s*$/);
     if (numeric && from) {
       const idx = parseInt(numeric[1], 10) - 1;
-      const pollStorage = require('../components/poll/storage');
+      const pollStorage = require("../components/poll/storage");
       const pollsForChat = await pollStorage.findPollsByChat(from);
       if (pollsForChat && pollsForChat.length) {
         const latest = pollsForChat[0];
@@ -135,7 +247,7 @@ async function handle(context) {
           await pollStorage.recordVote(msgId, voterId, [idx]);
           // invoke callback if registered
           try {
-            const pollsModule = require('../components/poll');
+            const pollsModule = require("../components/poll");
             pollsModule.invokeCallback(msgId, {
               messageId: msgId,
               poll,
@@ -144,10 +256,13 @@ async function handle(context) {
               selectedNames: [(opts && opts[idx]) || String(idx)],
             });
           } catch (err) {
-            logger.debug('Failed to invoke poll callback for numeric vote', err && err.message);
+            logger.debug(
+              "Failed to invoke poll callback for numeric vote",
+              err && err.message
+            );
           }
           // only log vote registration; do not send a chat message
-          logger.info('fallback numeric vote', {
+          logger.info("fallback numeric vote", {
             msgId,
             voterId,
             choice: (opts && opts[idx]) || String(idx),
@@ -158,15 +273,18 @@ async function handle(context) {
     }
   } catch (err) {
     // swallow fallback errors
-    logger.debug('Erro ao processar fallback numérico de poll', err && err.message);
+    logger.debug(
+      "Erro ao processar fallback numérico de poll",
+      err && err.message
+    );
   }
 
   // legacy: simple static ping handler fallback
-  if (body.toLowerCase() === 'ping') {
+  if (body.toLowerCase() === "ping") {
     try {
-      await reply('pong');
+      await reply("pong");
     } catch (err) {
-      logger.error('Erro ao enviar resposta:', err);
+      logger.error("Erro ao enviar resposta:", err);
     }
   }
 }

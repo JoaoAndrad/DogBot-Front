@@ -1,5 +1,6 @@
-require('dotenv').config();
+require("dotenv").config();
 module.exports = {
   port: process.env.PORT || 3000,
-  botSecret: process.env.BOT_SECRET || 'changeme',
+  botSecret: process.env.BOT_SECRET || "changeme",
+  enableCatchup: process.env.ENABLE_CATCHUP !== "false",
 };

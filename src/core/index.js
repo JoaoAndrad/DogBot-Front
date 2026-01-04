@@ -1,21 +1,24 @@
-const logger = require('../utils/logger');
-const config = require('./config');
+const logger = require("../utils/logger");
+const config = require("./config");
 
 async function start({ bot }) {
-  logger.info('core: starting services');
+  console.log("core: starting services");
   // start optional http server for health/metrics
   try {
-    const server = require('./server');
+    const server = require("./server");
     server.start(config.port);
   } catch (e) {
-    logger.debug('core: server module missing or failed to start', e && e.message);
+    console.log(
+      "core: server module missing or failed to start",
+      e && e.message
+    );
   }
 
-  logger.info('core: started');
+  console.log("core: started");
 }
 
 async function stop() {
-  logger.info('core: stopping services');
+  console.log("core: stopping services");
 }
 
 module.exports = { start, stop };
