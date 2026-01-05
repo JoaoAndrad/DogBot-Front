@@ -373,7 +373,7 @@ module.exports = {
                 );
                 return;
               }
-            }
+
               // consume balance
               try {
                 const res = await services.backend.sendToBackend(
@@ -424,6 +424,7 @@ module.exports = {
               }
 
               return;
+            }
             }
           }
         }
