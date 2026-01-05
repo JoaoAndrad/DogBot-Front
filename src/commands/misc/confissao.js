@@ -111,6 +111,75 @@ module.exports = {
       return;
     }
 
+    // If there's exactly one group in common, skip the poll and send directly
+    if (candidateGroups.length === 1) {
+      const target = candidateGroups[0];
+      try {
+        const groupMsg = `*📩 Confissão:* ${text}`;
+        await client.sendMessage(target.id, groupMsg);
+      } catch (err) {
+        console.error(
+          "Erro ao enviar confissão ao grupo (único grupo):",
+          err && err.message ? err.message : err
+        );
+        await reply(
+          "Ocorreu um erro ao enviar a confissão ao grupo. Tente novamente mais tarde."
+        );
+        return;
+      }
+
+      // consume balance
+      try {
+        const res = await services.backend.sendToBackend(
+          "/api/confessions/consume",
+          { senderNumber },
+          "POST"
+        );
+        try {
+          const remaining = res && res.remaining;
+          const isVip =
+            remaining === null ||
+            remaining === Infinity ||
+            String(remaining).toLowerCase() === "infinity";
+          if (isVip) {
+            await reply(
+              "*🎉 Sua confissão foi enviada anonimamente com sucesso!* \n\n🙏 Você possui confissões vitalícias — não será debitado. 💸"
+            );
+          } else if (res && res.ok) {
+            await reply(
+              `*✅ Sua confissão foi enviada anonimamente com sucesso!* \n\n📩 *Enviada para:* ${
+                target.name
+              }\n*Saldo restante:* ${remaining} confissão${
+                remaining === 1 ? "" : "ões"
+              }`
+            );
+          } else if (res && res.reason === "insufficient_balance") {
+            await reply(
+              `⚠️ Sua confissão foi enviada ao grupo ${target.name}, porém seu saldo está insuficiente para futuras confissões.`
+            );
+          } else {
+            await reply(
+              `✅ Confissão enviada ao grupo ${target.name}. Não foi possível atualizar seu saldo no momento.`
+            );
+          }
+        } catch (e) {
+          // ignore reply errors
+        }
+      } catch (err) {
+        console.error(
+          "Erro ao notificar backend sobre consumo de confissão (único grupo):",
+          err && err.message ? err.message : err
+        );
+        try {
+          await reply(
+            "Confissão enviada, porém ocorreu um erro ao atualizar seu saldo."
+          );
+        } catch (e) {}
+      }
+
+      return;
+    }
+
     // Build poll options (labels) and keep mapping to chat ids
     const polls = require("../../components/poll");
     const optionLabels = candidateGroups.map((g) => g.name || g.id);
@@ -173,9 +242,9 @@ module.exports = {
                       );
                     } else {
                       await reply(
-                        `*✅ Sua confissão foi enviada anonimamente para:* ${
+                        `*✅ Sua confissão foi enviada anonimamente com sucesso!* \n\n📩 *Enviada para:* ${
                           candidateGroups[pick].name
-                        }\n\n*Saldo restante:* ${remaining} confissão${
+                        }\n*Saldo restante:* ${remaining} confissão${
                           remaining === 1 ? "" : "ões"
                         }`
                       );
