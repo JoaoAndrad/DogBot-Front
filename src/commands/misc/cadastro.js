@@ -14,7 +14,12 @@ module.exports = {
     const pushName =
       (msg && msg._data && msg._data.notifyName) || info.pushName;
     const displayName = pushName || info.display_name;
-    const isGroup = !!(msg && msg.isGroup) || !!info.is_group;
+    let isGroup = !!(msg && msg.isGroup) || !!info.is_group;
+    // Fallback: detect group chat by chat id suffix when isGroup flag is absent
+    if (!isGroup) {
+      const chatId = (msg && msg.from) || info.from || "";
+      if (chatId && String(chatId).endsWith("@g.us")) isGroup = true;
+    }
     const from = info.from || msg.from;
 
     // Cadastro só funciona no privado

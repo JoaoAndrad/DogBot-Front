@@ -98,8 +98,12 @@ async function handleCadastroFlow(userId, body, state, reply, context) {
     return; // Wait for vote
   }
 
-  // If user sends text during step 1, ignore (waiting for poll vote)
+  // If user sends text during step 1, only notify when message is from private chat
   if (step === 1) {
+    if (context && context.isGroup) {
+      // Ignore group messages while waiting for the user's poll vote in private
+      return;
+    }
     return reply("⏳ Aguardando sua resposta na enquete acima...");
   }
 
