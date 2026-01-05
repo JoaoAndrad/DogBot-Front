@@ -423,8 +423,23 @@ module.exports = {
                               await client.forwardMessages(targetGroup.id, [
                                 mid,
                               ]);
+                              // After forwarding the media, send the confession text separately
+                              await client.sendMessage(
+                                targetGroup.id,
+                                groupMsg,
+                                {
+                                  mentions: mentionMap.map((m) => m.jid),
+                                }
+                              );
                             } else if (typeof message.forward === "function") {
                               await message.forward(targetGroup.id);
+                              await client.sendMessage(
+                                targetGroup.id,
+                                groupMsg,
+                                {
+                                  mentions: mentionMap.map((m) => m.jid),
+                                }
+                              );
                             } else {
                               throw new Error("forward-not-supported");
                             }
@@ -605,8 +620,11 @@ module.exports = {
                       mid
                     ) {
                       await client.forwardMessages(target.id, [mid]);
+                      // send confession text separately after forward
+                      await client.sendMessage(target.id, groupMsg);
                     } else if (typeof message.forward === "function") {
                       await message.forward(target.id);
+                      await client.sendMessage(target.id, groupMsg);
                     } else {
                       throw new Error("forward-not-supported");
                     }
@@ -783,8 +801,11 @@ module.exports = {
                               mid
                             ) {
                               await client.forwardMessages(targetChat, [mid]);
+                              // send confession text separately after forward
+                              await client.sendMessage(targetChat, groupMsg);
                             } else if (typeof message.forward === "function") {
                               await message.forward(targetChat);
+                              await client.sendMessage(targetChat, groupMsg);
                             } else {
                               throw new Error("forward-not-supported");
                             }

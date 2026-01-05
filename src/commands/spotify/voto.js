@@ -38,6 +38,43 @@ module.exports = {
 
       logger.info(`[Voto] Iniciando votação para adicionar no grupo ${chatId}`);
 
+      // Get initiator user info first
+      const initiatorLookup = await backendClient.sendToBackend(
+        `/api/users/lookup?identifier=${encodeURIComponent(whatsappId)}`,
+        null,
+        "GET"
+      );
+
+      if (!initiatorLookup || !initiatorLookup.found) {
+        return reply(
+          "⚠️ Você precisa ter uma conta cadastrada. Envie /cadastro no meu privado."
+        );
+      }
+
+      if (!initiatorLookup.hasSpotify) {
+        return reply(
+          "⚠️ Você precisa conectar sua conta do Spotify. Use /conectar."
+        );
+      }
+
+      const initiatorUserId = initiatorLookup.userId;
+
+      // Try to get display name from backend, then from WhatsApp contact, then fallback to phone number
+      let initiatorDisplayName = initiatorLookup.displayName;
+      if (!initiatorDisplayName) {
+        try {
+          const contact = await msg.getContact();
+          initiatorDisplayName =
+            contact?.pushname || contact?.name || whatsappId.split("@")[0];
+        } catch (err) {
+          initiatorDisplayName = whatsappId.split("@")[0];
+        }
+      }
+
+      logger.info(
+        `[Voto] Iniciador: ${initiatorDisplayName} (${initiatorUserId})`
+      );
+
       // Check if group has a playlist
       const groupRes = await backendClient.sendToBackend(
         `/api/groups/${encodeURIComponent(chatId)}`,
@@ -59,68 +96,82 @@ module.exports = {
 
       logger.info(`[Voto] 👥 Membros do grupo: ${memberIds.length}`);
 
-      // Get active listeners in this group
+      // Get active listeners to check if initiator is playing and get their current track
       const listenersRes = await backendClient.sendToBackend(
         `/api/groups/${encodeURIComponent(chatId)}/active-listeners`,
         { memberIds },
         "POST"
       );
 
-      if (
-        !listenersRes ||
-        !listenersRes.listeners ||
-        listenersRes.listeners.length === 0
-      ) {
-        logger.info(`[Voto] 🎵 Conectados ao Spotify: 0`);
-        return reply(
-          "⚠️ Nenhum usuário conectado ao Spotify está tocando música no momento neste grupo."
-        );
+      const listeners = (listenersRes && listenersRes.listeners) || [];
+      logger.info(`[Voto] 🎵 Usuários ouvindo música: ${listeners.length}`);
+
+      // Find initiator in listeners by userId (backend should return userId in listener object)
+      let initiatorTrack = null;
+      for (const listener of listeners) {
+        // Try to match by userId if available, otherwise fallback to identifier matching
+        if (
+          listener.userId === initiatorUserId ||
+          listener.identifier === whatsappId
+        ) {
+          initiatorTrack = listener.currentTrack;
+          break;
+        }
       }
 
-      const listeners = listenersRes.listeners;
-      logger.info(`[Voto] 🎵 Conectados ao Spotify: ${listeners.length}`);
-
-      // Check if initiator is listening - compare WhatsApp identifiers
-      const initiator = listeners.find((l) => l.identifier === whatsappId);
-
-      if (!initiator) {
-        logger.error(
-          `[Voto] Iniciador não encontrado nos listeners. whatsappId: ${whatsappId}`
+      if (!initiatorTrack) {
+        logger.warn(
+          `[Voto] Iniciador ${initiatorDisplayName} não está tocando música no momento`
         );
         return reply(
-          "⚠️ Você precisa estar ouvindo música no Spotify para votar em adicionar."
+          "⚠️ Você precisa estar ouvindo música no Spotify para iniciar uma votação."
         );
       }
 
       // Resolve all group members to user records and filter those with Spotify connected
       let spotifyMembers = [];
       try {
-        const lookups = await Promise.all(
-          memberIds.map((id) =>
-            backendClient
-              .sendToBackend(
+        // Preserve original member id alongside lookup result to avoid index mismatch
+        const lookupResults = await Promise.all(
+          memberIds.map(async (id) => {
+            try {
+              const res = await backendClient.sendToBackend(
                 `/api/users/lookup?identifier=${encodeURIComponent(id)}`,
                 null,
                 "GET"
-              )
-              .catch((err) => {
-                logger.warn(
-                  `[Voto] Falha lookup usuario ${id}: ${err.message}`
-                );
-                return null;
-              })
-          )
+              );
+              return { id, res };
+            } catch (err) {
+              logger.warn(`[Voto] Falha lookup usuario ${id}: ${err.message}`);
+              return { id, res: null };
+            }
+          })
         );
 
-        spotifyMembers = (lookups || [])
-          .filter((r) => r && r.found && r.hasSpotify)
-          .map((r, idx) => {
-            // keep identifier from original memberIds if backend didn't return it
-            const identifier = r.identifier || memberIds[idx];
+        // Helpful debug: log small sample of memberIds and listener identifiers
+        try {
+          logger.debug(
+            `[Voto] amostra memberIds: ${JSON.stringify(memberIds.slice(0, 5))}`
+          );
+          if (listeners && listeners.length > 0) {
+            logger.debug(
+              `[Voto] amostra listeners: ${JSON.stringify(
+                listeners.slice(0, 5).map((l) => l.identifier)
+              )}`
+            );
+          }
+        } catch (e) {
+          /* ignore logging errors */
+        }
+
+        spotifyMembers = (lookupResults || [])
+          .filter(({ res }) => res && res.found && res.hasSpotify)
+          .map(({ id, res }) => {
+            const identifier = res.identifier || id;
             return {
               identifier,
-              userId: r.userId,
-              displayName: r.displayName || null,
+              userId: res.userId,
+              displayName: res.displayName || null,
             };
           });
       } catch (err) {
@@ -138,8 +189,8 @@ module.exports = {
         return reply("⚠️ Nenhum usuário do grupo tem conta Spotify conectada.");
       }
 
-      // Get the track being played
-      const currentTrack = initiator.currentTrack;
+      // Get the track being played by initiator
+      const currentTrack = initiatorTrack;
       logger.debug(`[Voto] currentTrack:`, JSON.stringify(currentTrack));
 
       if (!currentTrack || !currentTrack.trackName) {
@@ -215,8 +266,19 @@ module.exports = {
             onVote: async (voteData) => {
               try {
                 const voter = voteData.voter;
+                // Lookup voter to get their userId
+                const voterLookup = await backendClient.sendToBackend(
+                  `/api/users/lookup?identifier=${encodeURIComponent(voter)}`,
+                  null,
+                  "GET"
+                );
+
                 // Only accept confirmation vote from initiator
-                if (voter !== initiator.identifier) {
+                if (
+                  !voterLookup ||
+                  !voterLookup.found ||
+                  voterLookup.userId !== initiatorUserId
+                ) {
                   logger.debug(
                     `[Voto] Ignorando confirmação de ${voter}; apenas iniciador pode confirmar.`
                   );
@@ -232,9 +294,7 @@ module.exports = {
                 if (!confirmed) {
                   await client.sendMessage(
                     chatId,
-                    `🚫 ${
-                      initiator.displayName || "Iniciador"
-                    } cancelou a votação.`
+                    `🚫 ${initiatorDisplayName} cancelou a votação.`
                   );
                   return;
                 }
@@ -271,7 +331,7 @@ module.exports = {
             trackId: currentTrack.trackId,
             trackName: currentTrack.trackName,
             trackArtists: currentTrack.artists,
-            initiatorUserId: initiator.userId,
+            initiatorUserId,
             targetUserIds,
             threshold: 0.5, // 50% needed
           }
@@ -287,11 +347,6 @@ module.exports = {
 
         const vote = voteRes.vote;
         const stats = voteRes.stats;
-
-        // Get initiator info (já definido anteriormente, apenas reusar)
-        const initiatorName = initiator
-          ? initiator.displayName || initiator.identifier
-          : "Alguém";
 
         // Get playlist name from relation or fetch from Spotify
         let playlistName = group.playlist?.name || null;
@@ -342,12 +397,12 @@ module.exports = {
 
         // Enviar mensagem de contexto separada com menções
         const otherMembers = spotifyMembers.filter(
-          (m) => m.userId !== initiator.userId
+          (m) => m.userId !== initiatorUserId
         );
 
         let contextMessage = playlistName
-          ? `${initiatorName} deseja adicionar a música à playlist ${playlistName}\n`
-          : `${initiatorName} deseja adicionar a música à playlist\n`;
+          ? `${initiatorDisplayName} deseja adicionar a música à playlist ${playlistName}\n`
+          : `${initiatorDisplayName} deseja adicionar a música à playlist\n`;
         const mentionsList = [];
 
         if (otherMembers.length > 0) {
@@ -375,7 +430,7 @@ module.exports = {
           await backendClient.sendToBackend(
             `/api/groups/votes/${vote.id}/cast`,
             {
-              userId: initiator.userId,
+              userId: initiatorUserId,
               isFor: true,
               pollId: pollResult.msgId,
             }
