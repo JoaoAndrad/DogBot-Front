@@ -231,6 +231,7 @@ module.exports = {
       }
     };
 
+    console.log("[confissao] texto recebido:", text);
     // Detect mention tokens in the text: occurrences of @ followed by non-space chars
     const mentionTokens = [];
     try {
@@ -246,6 +247,7 @@ module.exports = {
     // If there are mention tokens, ask the user whether to treat as mentions
     let mentionMap = []; // array of chosen jids in order
     if (mentionTokens.length > 0) {
+      console.log("[confissao] menções detectadas:", mentionTokens);
       try {
         const yn = await createPollPromise(
           client,
@@ -381,7 +383,16 @@ module.exports = {
           }
         }
       } catch (e) {
-        // ignore askYesNo errors and continue to normal flow
+        console.error(
+          "[confissao] erro ao criar enquete de menção:",
+          e && e.message ? e.message : e
+        );
+        try {
+          await reply(
+            "Não foi possível criar a enquete para menções. Enviando sem menções."
+          );
+        } catch (repErr) {}
+        // continue to normal flow
       }
     }
 
