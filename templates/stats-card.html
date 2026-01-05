@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Resumo Musical High-End</title>
+    <style>
+      @import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap");
+
+      :root {
+        --bg-color: #f0f2f5;
+        --card-bg: #ffffff;
+        --text-primary: #1f2937;
+        --text-secondary: #404349;
+        --brand-gradient: linear-gradient(180deg, #2dd4bf 0%, #3b82f6 100%);
+        --shadow-soft: 0 4px 20px -2px rgba(0, 0, 0, 0.05);
+      }
+
+      body {
+        margin: 0;
+        padding: 16px;
+        font-family: "Inter", sans-serif;
+        background-color: #f1f2f6;
+        width: 800px;
+        display: flex;
+        flex-direction: column;
+        gap: 0;
+      }
+
+      header {
+        display: flex;
+        align-items: baseline;
+        justify-content: center;
+        gap: 8px;
+        margin-bottom: 0;
+      }
+      h1 {
+        font-size: 28px;
+        font-weight: 700;
+        color: var(--text-primary);
+        margin: 0;
+      }
+      .header-suffix {
+        font-weight: 400;
+        color: var(--text-primary);
+        font-size: 20px;
+      }
+
+      .card {
+        background: var(--card-bg);
+        border-radius: 24px;
+        padding: 24px;
+        box-shadow: var(--shadow-soft);
+        border: 1px solid rgba(255, 255, 255, 0.5);
+        margin-bottom: 12px;
+      }
+
+      .card-title {
+        font-size: 18px;
+        font-weight: 700;
+        color: #374151;
+        margin-bottom: 20px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .icon-svg {
+        width: 22px;
+        height: 22px;
+        fill: #3b82f6;
+      }
+
+      .stats-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr 1fr;
+        gap: 8px;
+        text-align: center;
+      }
+      .stat-item {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+      }
+      .stat-value {
+        font-size: 42px;
+        font-weight: 800;
+        color: var(--text-primary);
+        line-height: 1.1;
+      }
+      .stat-icon {
+        margin: 10px 0;
+        color: #60a5fa;
+      }
+      .stat-label {
+        font-size: 14px;
+        color: var(--text-secondary);
+        font-weight: 500;
+      }
+
+      .chart-container {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-end;
+        height: 140px;
+        padding-top: 12px;
+        background-image: linear-gradient(#f3f4f6 1px, transparent 1px);
+        background-size: 100% 33%;
+      }
+      .bar-wrapper {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 8px;
+        flex: 1;
+        height: 100%;
+        justify-content: flex-end;
+      }
+      .bar-value-top {
+        font-size: 13px;
+        color: var(--text-secondary);
+        margin-bottom: 4px;
+      }
+      .bar {
+        width: 24px;
+        border-radius: 12px;
+        background: var(--brand-gradient);
+        min-height: 6px;
+      }
+      .day-label {
+        font-size: 14px;
+        color: #6b7280;
+        font-weight: 600;
+      }
+
+      .split-section {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 12px;
+      }
+
+      .list-item {
+        display: flex;
+        align-items: center;
+        margin-bottom: 18px;
+      }
+      .list-item:last-child {
+        margin-bottom: 0;
+      }
+      .rank-badge {
+        background-color: #3b82f6;
+        color: white;
+        width: 32px;
+        height: 32px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 14px;
+        font-weight: 700;
+        margin-right: 14px;
+        flex-shrink: 0;
+      }
+      .item-info {
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+        flex: 1;
+      }
+      .item-name {
+        font-size: 16px;
+        font-weight: 600;
+        color: var(--text-primary);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .item-sub {
+        font-size: 13px;
+        color: var(--text-secondary);
+      }
+
+      .time-blocks {
+        display: flex;
+        gap: 10px;
+        width: 100%;
+      }
+      .time-block {
+        flex: 1;
+        border-radius: 12px;
+        padding: 16px 8px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+        color: #1f2937;
+      }
+      .tb-morning {
+        background-color: #bae6fd;
+      }
+      .tb-afternoon {
+        background-color: #fde68a;
+      }
+      .tb-night {
+        background-color: #e9d5ff;
+      }
+      .tb-dawn {
+        background-color: #1e3a8a;
+        color: white;
+      }
+
+      .tb-label {
+        font-size: 13px;
+        font-weight: 600;
+        margin-bottom: 4px;
+      }
+      .tb-value {
+        font-size: 16px;
+        font-weight: 800;
+      }
+
+      .mini-list-item {
+        margin-bottom: 12px;
+        font-size: 14px;
+        border-bottom: 1px solid #f3f4f6;
+        padding-bottom: 8px;
+      }
+      .mini-list-item:last-child {
+        border: none;
+        margin: 0;
+        padding-bottom: 0;
+      }
+      .mini-title {
+        font-weight: 600;
+        color: var(--text-primary);
+      }
+      .mini-artist {
+        color: var(--text-secondary);
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <svg class="icon-svg" viewBox="0 0 24 24">
+        <path d="M9 18V5l12-2v13"></path>
+        <circle cx="6" cy="18" r="3"></circle>
+        <circle cx="18" cy="16" r="3"></circle>
+      </svg>
+      <h1>Seu Resumo Musical</h1>
+      <span class="header-suffix">— Esse mês</span>
+    </header>
+
+    <div class="card">
+      <div class="card-title">📊 Estatísticas Gerais</div>
+      <div class="stats-grid">
+        <div class="stat-item">
+          <div class="stat-value">{{total}}</div>
+          <div class="stat-icon">
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <path d="M9 18V5l12-2v13"></path>
+              <circle cx="6" cy="18" r="3"></circle>
+              <circle cx="18" cy="16" r="3"></circle>
+            </svg>
+          </div>
+          <div class="stat-label">Músicas</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-value">{{time}}</div>
+          <div class="stat-icon">
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <circle cx="12" cy="12" r="10"></circle>
+              <polyline points="12 6 12 12 16 14"></polyline>
+            </svg>
+          </div>
+          <div class="stat-label">Tempo de Escuta</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-value">{{unique}}</div>
+          <div class="stat-icon">
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+              <circle cx="12" cy="7" r="4"></circle>
+            </svg>
+          </div>
+          <div class="stat-label">Artistas Únicos</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">📈 Músicas ouvidas por dia — Esse mês</div>
+      <div class="chart-container">
+        {{#each bars}}
+        <div class="bar-wrapper">
+          <span class="bar-value-top">{{this.height}}</span>
+          <div class="bar" style="height: {{this.percent}}%;"></div>
+          <div class="day-label">{{this.label}}</div>
+        </div>
+        {{/each}}
+      </div>
+    </div>
+
+    <div class="split-section">
+      <div class="card">
+        <div class="card-title">🎤 Top artistas</div>
+        {{#each top3}}
+        <div class="list-item">
+          <div class="rank-badge">{{indexPlusOne @index}}</div>
+          <div class="item-info">
+            <span class="item-name">{{this.name}}</span>
+            <span class="item-sub">{{this.plays}} plays</span>
+          </div>
+        </div>
+        {{/each}}
+      </div>
+
+      <div class="card">
+        <div class="card-title">🔁 Em repeat</div>
+        {{#each repeat}}
+        <div class="list-item">
+          <div class="item-info">
+            <span class="item-name">"{{this.song}}"</span>
+            <span class="item-sub">{{this.artist}}</span>
+          </div>
+        </div>
+        {{/each}}
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">🕒 Seus horários de escuta</div>
+      <div class="time-blocks">
+        <div class="time-block tb-morning">
+          <span class="tb-label">Manhã</span>
+          <span class="tb-value">{{segments.morning}}%</span>
+        </div>
+        <div class="time-block tb-afternoon">
+          <span class="tb-label">Tarde</span>
+          <span class="tb-value">{{segments.afternoon}}%</span>
+        </div>
+        <div class="time-block tb-night">
+          <span class="tb-label">Noite</span>
+          <span class="tb-value">{{segments.night}}%</span>
+        </div>
+        <div class="time-block tb-dawn">
+          <span class="tb-label">Madrugada</span>
+          <span class="tb-value">{{segments.dawn}}%</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="split-section">
+      <div class="card">
+        <div class="card-title">✨ Descobertas</div>
+        {{#each discoveries}}
+        <div class="mini-list-item">
+          <div class="mini-title">{{this.title}}</div>
+          <div class="mini-artist">{{this.artist}}</div>
+        </div>
+        {{/each}}
+      </div>
+      <div class="card">
+        <div class="card-title">🎶 Últimas 3</div>
+        {{#each lastTracks}}
+        <div class="mini-list-item">
+          <div class="mini-title">{{this.title}}</div>
+          <div class="mini-artist">{{this.artist}}</div>
+        </div>
+        {{/each}}
+      </div>
+    </div>
+  </body>
+</html>

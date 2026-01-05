@@ -3,6 +3,7 @@ const fetch = require("node-fetch");
 const spotifyClient = require("../../../services/spotifyClient");
 const polls = require("../../poll");
 const backendClient = require("../../../services/backendClient");
+const { renderCard } = require("../../../services/statsCardService");
 const {
   sendTrackSticker,
   sendCompositeSticker,
@@ -647,7 +648,70 @@ const spotifyFlow = createFlow("spotify", {
         }
 
         const final = lines.join("\n");
-        await ctx.reply(final);
+
+        // Try to render and send an image card; fallback to text on error
+        try {
+          const maxActivityCount = Math.max(
+            ...(json.activity || []).map((x) => x.count),
+            1
+          );
+
+          const templateData = {
+            total: sum.totalPlays || 0,
+            unique: sum.uniqueTracks || 0,
+            time: fmtDuration(sum.totalListenMs || 0),
+            bars: (json.activity || []).map((d) => {
+              const percent = Math.round(
+                ((d.count || 0) / maxActivityCount) * 100
+              );
+              return {
+                label: d.day || d.label || "",
+                height: d.count || 0,
+                percent,
+              };
+            }),
+            top3: (json.topArtists || [])
+              .slice(0, 3)
+              .map((a) => ({ name: a.name, plays: a.count || 0 })),
+            repeat: (json.repeats || []).slice(0, 3).map((r) => ({
+              song: (r.track && r.track.name) || r.id || "Desconhecida",
+              artist:
+                r.track && Array.isArray(r.track.artists)
+                  ? r.track.artists.join(", ")
+                  : (r.track && r.track.artists) || "",
+            })),
+            segments: {
+              morning: json.timeOfDay?.morning || 0,
+              afternoon: json.timeOfDay?.afternoon || 0,
+              night: json.timeOfDay?.evening || 0,
+              dawn: json.timeOfDay?.night || 0,
+            },
+            discoveries: (json.discoveries || []).slice(0, 3).map((d) => ({
+              title: (d.track && d.track.name) || d.name || "Desconhecida",
+              artist:
+                d.track && Array.isArray(d.track.artists)
+                  ? d.track.artists.join(", ")
+                  : (d.track && d.track.artists) || "",
+            })),
+            lastTracks: (json.last3 || []).slice(0, 3).map((r) => ({
+              title: r.track?.name || r.name || "",
+              artist: Array.isArray(r.track?.artists)
+                ? r.track.artists.join(", ")
+                : r.track?.artists || "",
+            })),
+          };
+
+          const img = await renderCard(templateData, {
+            width: 800,
+            height: 1200,
+            outputWidth: 400,
+          });
+          const { MessageMedia } = require("whatsapp-web.js");
+          const media = new MessageMedia("image/png", img.toString("base64"));
+          await ctx.client.sendMessage(ctx.chatId, media, { caption: "" });
+        } catch (e) {
+          await ctx.reply(final);
+        }
       } catch (e) {
         await ctx.reply(
           "❌ Erro ao obter estatísticas: " + (e && e.message ? e.message : e)
