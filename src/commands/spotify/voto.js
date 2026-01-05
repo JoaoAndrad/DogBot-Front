@@ -520,12 +520,15 @@ async function handleAddVote(
       return;
     }
 
-    // Cast vote
+    // Cast vote - include pollId for backend validation
+    const pollId = voteData.messageId || voteData.poll?.id;
+
     const castRes = await backendClient.sendToBackend(
       `/api/groups/votes/${collaborativeVoteId}/cast`,
       {
         userId: userRes.userId,
         isFor,
+        pollId,
       }
     );
 
@@ -547,6 +550,14 @@ async function handleAddVote(
     logger.info(
       `[Voto] Voto registrado. Status: ${updatedVote.status}, Stats: ${stats.votesFor}/${stats.totalEligible}`
     );
+
+    // Se o voto já foi resolvido antes (por outro evento concorrente), não processar novamente
+    if (castRes.alreadyResolved) {
+      logger.debug(
+        `[Voto] Voto ${collaborativeVoteId} já foi resolvido anteriormente, ignorando`
+      );
+      return;
+    }
 
     // Get voter info for mention
     const voterContact = await client.getContactById(voter);
@@ -571,7 +582,8 @@ async function handleAddVote(
     }
 
     // Check if resolved
-    if (updatedVote.status === "passed") {
+    if (updatedVote.status === "passed" && !castRes.alreadyResolved) {
+      // Only add to playlist if this is the first resolution (not a duplicate event)
       // Add to playlist via backend API
       const playlistSpotifyId = group.playlist?.spotifyId;
 
