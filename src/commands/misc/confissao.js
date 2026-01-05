@@ -468,7 +468,6 @@ module.exports = {
     }
 
     // Build poll options (labels) and keep mapping to chat ids
-    const polls = require("../../components/poll");
     const optionLabels = candidateGroups.map((g) => g.name || g.id);
     const optionChatIds = candidateGroups.map((g) => g.id);
 
