@@ -92,6 +92,7 @@ module.exports = {
         }));
 
         templateData = {
+          period: json.period || "Este mês",
           total: sum.totalPlays || 0,
           unique: sum.uniqueTracks || 0,
           time: fmtDuration(sum.totalMs || sum.totalListenMs || 0),

@@ -657,6 +657,7 @@ const spotifyFlow = createFlow("spotify", {
           );
 
           const templateData = {
+            period: json.period || "Este mês",
             total: sum.totalPlays || 0,
             unique: sum.uniqueTracks || 0,
             time: fmtDuration(sum.totalListenMs || 0),
