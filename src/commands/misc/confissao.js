@@ -346,19 +346,18 @@ module.exports = {
 
             // If we completed selections, substitute tokens in text in order
             if (mentionMap.length === mentionTokens.length) {
-              let replacedText = text;
-              for (let i = 0; i < mentionTokens.length; i++) {
-                const tok = mentionTokens[i];
-                const entry = mentionMap[i];
+              // Replace each @-token in-order by using replace with a callback,
+              // which guarantees we consume mentionMap sequentially even when
+              // tokens are identical (eg. multiple lone "@" placeholders).
+              let idx = 0;
+              const replacedText = text.replace(/@\S*/g, (match) => {
+                const entry = mentionMap[idx++];
                 const jid = entry && entry.jid;
                 const phone = jid ? jid.split("@")[0] : null;
-                // Always use phone in text for reliable mention rendering
-                const mentionString = phone ? `@${phone}` : tok;
-                // replace first occurrence
-                replacedText = replacedText.replace(tok, mentionString);
-              }
+                return phone ? `@${phone}` : match;
+              });
 
-              // send to group with mentions list
+              // send to group with mentions list (preserve the same order)
               try {
                 const groupMsg = `*📩 Confissão:* ${replacedText}`;
                 await client.sendMessage(targetGroup.id, groupMsg, {
@@ -374,7 +373,7 @@ module.exports = {
                 );
                 return;
               }
-
+            }
               // consume balance
               try {
                 const res = await services.backend.sendToBackend(
