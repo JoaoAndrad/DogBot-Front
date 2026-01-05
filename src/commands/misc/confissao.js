@@ -111,6 +111,282 @@ module.exports = {
       return;
     }
 
+    // Helper: create a poll and await a single vote payload
+    const polls = require("../../components/poll");
+
+    const createPollPromise = (
+      clientOrSender,
+      chatId,
+      title,
+      options,
+      opts = {}
+    ) => {
+      return new Promise(async (resolve, reject) => {
+        try {
+          await polls.createPoll(
+            clientOrSender,
+            chatId,
+            title,
+            options,
+            Object.assign({}, opts, {
+              onVote: async (payload) => {
+                resolve(payload);
+              },
+            })
+          );
+        } catch (err) {
+          reject(err);
+        }
+      });
+    };
+
+    // Helper: pick a group (returns chosen group object or null)
+    const pickGroup = async () => {
+      if (candidateGroups.length === 1) return candidateGroups[0];
+      const labels = candidateGroups.map((g) => g.name || g.id);
+      try {
+        const payload = await createPollPromise(
+          client,
+          senderNumber,
+          "Escolha o grupo para enviar sua confissão",
+          labels,
+          {}
+        );
+        const idx =
+          (payload && payload.selectedIndexes && payload.selectedIndexes[0]) ||
+          0;
+        return candidateGroups[Number(idx)];
+      } catch (e) {
+        return null;
+      }
+    };
+
+    // Helper: present participants in pages and let user pick one (returns jid or null)
+    const pickParticipantFromGroup = async (
+      groupId,
+      participants,
+      prompt,
+      pageSize = 10
+    ) => {
+      if (!Array.isArray(participants) || participants.length === 0)
+        return null;
+      // map to objects
+      const items = participants.map((p) => {
+        const jid = p && p.id && p.id._serialized ? p.id._serialized : p;
+        const name =
+          (p && (p.name || (p.contact && p.contact.name))) ||
+          (jid && jid.split("@")[0]) ||
+          jid;
+        return { jid, name };
+      });
+
+      let page = 0;
+      const totalPages = Math.max(1, Math.ceil(items.length / pageSize));
+
+      while (true) {
+        const start = page * pageSize;
+        const slice = items.slice(start, start + pageSize);
+        const options = slice.map((s) => s.name || s.jid);
+        if (totalPages > 1) {
+          if (page > 0) options.push("◀️ Anterior");
+          if (page < totalPages - 1) options.push("▶️ Próxima");
+          options.push("✖️ Cancelar");
+        }
+
+        let payload;
+        try {
+          payload = await createPollPromise(
+            client,
+            senderNumber,
+            prompt,
+            options,
+            {}
+          );
+        } catch (err) {
+          return null;
+        }
+
+        if (!payload || !Array.isArray(payload.selectedNames)) return null;
+        const selName = payload.selectedNames[0];
+        if (!selName) return null;
+
+        if (selName === "◀️ Anterior") {
+          page = Math.max(0, page - 1);
+          continue;
+        }
+        if (selName === "▶️ Próxima") {
+          page = Math.min(totalPages - 1, page + 1);
+          continue;
+        }
+        if (selName === "✖️ Cancelar") {
+          return null;
+        }
+
+        // find selected item in current slice
+        const found =
+          slice.find((s) => s.name === selName) ||
+          slice[Number(payload.selectedIndexes && payload.selectedIndexes[0])];
+        if (found) return found.jid;
+        return null;
+      }
+    };
+
+    // Detect mention tokens in the text: occurrences of @ followed by non-space chars
+    const mentionTokens = [];
+    try {
+      const regex = /@\S*/g;
+      let m;
+      while ((m = regex.exec(text)) !== null) {
+        mentionTokens.push(m[0]);
+      }
+    } catch (e) {
+      // ignore
+    }
+
+    // If there are mention tokens, ask the user whether to treat as mentions
+    let mentionMap = []; // array of chosen jids in order
+    if (mentionTokens.length > 0) {
+      try {
+        const yn = await createPollPromise(
+          client,
+          senderNumber,
+          `Detectei ${mentionTokens.length} menção(ões) na sua mensagem. Deseja mencionar usuário(s)?`,
+          ["Sim", "Não"],
+          {}
+        );
+        const ynIdx =
+          yn && yn.selectedIndexes && yn.selectedIndexes[0]
+            ? yn.selectedIndexes[0]
+            : 0;
+        if (Number(ynIdx) === 0) {
+          // proceed with mention flow
+          const targetGroup = await pickGroup();
+          if (!targetGroup) {
+            await reply("Nenhum grupo selecionado. Enviando sem menções.");
+          } else {
+            // get participants from group
+            let fullChat = null;
+            try {
+              fullChat = await client.getChatById(targetGroup.id);
+            } catch (e) {
+              try {
+                fullChat = await client.getChatById(targetGroup.id);
+              } catch (ee) {
+                fullChat = null;
+              }
+            }
+
+            const participants = (fullChat && fullChat.participants) || [];
+
+            // For each mention token, let user pick one participant
+            for (let i = 0; i < mentionTokens.length; i++) {
+              const tok = mentionTokens[i];
+              const prompt = `Selecione o usuário para substituir ${tok} (menção ${
+                i + 1
+              }/${mentionTokens.length})`;
+              const chosen = await pickParticipantFromGroup(
+                targetGroup.id,
+                participants,
+                prompt,
+                10
+              );
+              if (!chosen) {
+                // user cancelled selection — abort mention flow
+                mentionMap = [];
+                break;
+              }
+              mentionMap.push(chosen);
+            }
+
+            // If we completed selections, substitute tokens in text in order
+            if (mentionMap.length === mentionTokens.length) {
+              let replacedText = text;
+              for (let i = 0; i < mentionTokens.length; i++) {
+                const tok = mentionTokens[i];
+                const jid = mentionMap[i];
+                const phone = jid ? jid.split("@")[0] : null;
+                const mentionString = phone ? `@${phone}` : tok;
+                // replace first occurrence
+                replacedText = replacedText.replace(tok, mentionString);
+              }
+
+              // send to group with mentions list
+              try {
+                const groupMsg = `*📩 Confissão:* ${replacedText}`;
+                await client.sendMessage(targetGroup.id, groupMsg, {
+                  mentions: mentionMap,
+                });
+              } catch (err) {
+                console.error(
+                  "Erro ao enviar confissão com menções:",
+                  err && err.message ? err.message : err
+                );
+                await reply(
+                  "Ocorreu um erro ao enviar a confissão ao grupo com menções. Tente novamente mais tarde."
+                );
+                return;
+              }
+
+              // consume balance
+              try {
+                const res = await services.backend.sendToBackend(
+                  "/api/confessions/consume",
+                  { senderNumber },
+                  "POST"
+                );
+                try {
+                  const remaining = res && res.remaining;
+                  const isVip =
+                    remaining === null ||
+                    remaining === Infinity ||
+                    String(remaining).toLowerCase() === "infinity";
+                  if (isVip) {
+                    await reply(
+                      "*🎉 Sua confissão foi enviada anonimamente com sucesso!* \n\n🙏 Você possui confissões vitalícias — não será debitado. 💸"
+                    );
+                  } else if (res && res.ok) {
+                    await reply(
+                      `*✅ Sua confissão foi enviada anonimamente com sucesso!* \n\n📩 *Enviada para:* ${
+                        targetGroup.name
+                      }\n*Saldo restante:* ${remaining} confissão${
+                        remaining === 1 ? "" : "ões"
+                      }`
+                    );
+                  } else if (res && res.reason === "insufficient_balance") {
+                    await reply(
+                      `⚠️ Sua confissão foi enviada ao grupo ${targetGroup.name}, porém seu saldo está insuficiente para futuras confissões.`
+                    );
+                  } else {
+                    await reply(
+                      `✅ Confissão enviada ao grupo ${targetGroup.name}. Não foi possível atualizar seu saldo no momento.`
+                    );
+                  }
+                } catch (e) {
+                  // ignore reply errors
+                }
+              } catch (err) {
+                console.error(
+                  "Erro ao notificar backend sobre consumo de confissão (menção):",
+                  err && err.message ? err.message : err
+                );
+                try {
+                  await reply(
+                    "Confissão enviada, porém ocorreu um erro ao atualizar seu saldo."
+                  );
+                } catch (e) {}
+              }
+
+              return;
+            }
+          }
+        }
+      } catch (e) {
+        // ignore askYesNo errors and continue to normal flow
+      }
+    }
+
+    // If no mentions or mention flow aborted, continue to regular group selection/send below
+
     // If there's exactly one group in common, skip the poll and send directly
     if (candidateGroups.length === 1) {
       const target = candidateGroups[0];
