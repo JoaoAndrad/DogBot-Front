@@ -46,20 +46,14 @@ module.exports = {
     const parts = raw.trim().split(/\s+/);
     let text = parts.slice(1).join(" ").trim();
 
-    if (!text) {
+    if (!text && !(message && message.hasMedia)) {
       await reply(
         "Uso: /confissao <sua mensagem>\nEx: /confissao confesso que..."
       );
       return;
     }
 
-    // only text supported for now
-    if (message && message.hasMedia) {
-      await reply(
-        "Envio de mídia em confissões não é suportado por enquanto. Envie apenas texto."
-      );
-      return;
-    }
+    // media helpers (images/videos) — implemented below
 
     // Find groups in common with the user by scanning bot chats and checking membership
     let chats = [];
@@ -123,6 +117,8 @@ module.exports = {
 
     // Helper: create a poll and await a single vote payload
     const polls = require("../../components/poll");
+    const mediaHelper = require("../../utils/mediaHelper");
+    const videoHelper = require("../../utils/videoHelper");
 
     const createPollPromise = (
       clientOrSender,
@@ -370,9 +366,78 @@ module.exports = {
               // send to group with mentions list (preserve the same order)
               try {
                 const groupMsg = `*📩 Confissão:* ${replacedText}`;
-                await client.sendMessage(targetGroup.id, groupMsg, {
-                  mentions: mentionMap.map((m) => m.jid),
-                });
+                if (message && message.hasMedia) {
+                  try {
+                    const media = await mediaHelper.obterMidiaDaMensagem(
+                      message
+                    );
+                    if (
+                      media &&
+                      media.mimetype &&
+                      media.mimetype.startsWith("image")
+                    ) {
+                      await client.sendMessage(targetGroup.id, {
+                        image: {
+                          data: media.buffer,
+                          mimetype: media.mimetype,
+                          filename: media.filename,
+                        },
+                        caption: groupMsg,
+                        mentions: mentionMap.map((m) => m.jid),
+                      });
+                    } else if (
+                      media &&
+                      media.mimetype &&
+                      media.mimetype.startsWith("video")
+                    ) {
+                      const tmpPath = await videoHelper.salvarVideoTemporario(
+                        media.buffer,
+                        media.filename || "confissao.mp4"
+                      );
+                      const comp = await videoHelper.comprimirVideoSeNecessario(
+                        tmpPath
+                      );
+                      const sendPath = (comp && comp.path) || tmpPath;
+                      await client.sendMessage(targetGroup.id, {
+                        video: { url: sendPath },
+                        caption: groupMsg,
+                        mentions: mentionMap.map((m) => m.jid),
+                      });
+                      // cleanup temp files
+                      try {
+                        const fsp = require("fs").promises;
+                        if (tmpPath) await fsp.unlink(tmpPath).catch(() => {});
+                        if (
+                          comp &&
+                          comp.wasCompressed &&
+                          comp.path &&
+                          comp.path !== tmpPath
+                        )
+                          await fsp.unlink(comp.path).catch(() => {});
+                      } catch (e) {}
+                    } else {
+                      // fallback: send as text
+                      await client.sendMessage(targetGroup.id, groupMsg, {
+                        mentions: mentionMap.map((m) => m.jid),
+                      });
+                    }
+                  } catch (e) {
+                    console.error(
+                      "[confissao] erro ao processar mídia para envio:",
+                      e && e.message ? e.message : e
+                    );
+                    await reply(
+                      "Não foi possível processar a mídia da sua confissão. Enviando sem mídia."
+                    );
+                    await client.sendMessage(targetGroup.id, groupMsg, {
+                      mentions: mentionMap.map((m) => m.jid),
+                    });
+                  }
+                } else {
+                  await client.sendMessage(targetGroup.id, groupMsg, {
+                    mentions: mentionMap.map((m) => m.jid),
+                  });
+                }
               } catch (err) {
                 console.error(
                   "Erro ao enviar confissão com menções:",
@@ -458,7 +523,59 @@ module.exports = {
       const target = candidateGroups[0];
       try {
         const groupMsg = `*📩 Confissão:* ${text}`;
-        await client.sendMessage(target.id, groupMsg);
+        if (message && message.hasMedia) {
+          try {
+            const media = await mediaHelper.obterMidiaDaMensagem(message);
+            if (media && media.mimetype && media.mimetype.startsWith("image")) {
+              await client.sendMessage(target.id, {
+                image: {
+                  data: media.buffer,
+                  mimetype: media.mimetype,
+                  filename: media.filename,
+                },
+                caption: groupMsg,
+              });
+            } else if (
+              media &&
+              media.mimetype &&
+              media.mimetype.startsWith("video")
+            ) {
+              const tmpPath = await videoHelper.salvarVideoTemporario(
+                media.buffer,
+                media.filename || "confissao.mp4"
+              );
+              const comp = await videoHelper.comprimirVideoSeNecessario(
+                tmpPath
+              );
+              const sendPath = (comp && comp.path) || tmpPath;
+              await client.sendMessage(target.id, {
+                video: { url: sendPath },
+                caption: groupMsg,
+              });
+              try {
+                const fsp = require("fs").promises;
+                if (tmpPath) await fsp.unlink(tmpPath).catch(() => {});
+                if (
+                  comp &&
+                  comp.wasCompressed &&
+                  comp.path &&
+                  comp.path !== tmpPath
+                )
+                  await fsp.unlink(comp.path).catch(() => {});
+              } catch (e) {}
+            } else {
+              await client.sendMessage(target.id, groupMsg);
+            }
+          } catch (e) {
+            console.error(
+              "[confissao] erro ao processar mídia (único grupo):",
+              e && e.message ? e.message : e
+            );
+            await client.sendMessage(target.id, groupMsg);
+          }
+        } else {
+          await client.sendMessage(target.id, groupMsg);
+        }
       } catch (err) {
         console.error(
           "Erro ao enviar confissão ao grupo (único grupo):",
@@ -548,7 +665,65 @@ module.exports = {
               // send confession to selected group (formatted)
               try {
                 const groupMsg = `*📩 Confissão:* ${text}`;
-                await client.sendMessage(targetChat, groupMsg);
+                if (message && message.hasMedia) {
+                  try {
+                    const media = await mediaHelper.obterMidiaDaMensagem(
+                      message
+                    );
+                    if (
+                      media &&
+                      media.mimetype &&
+                      media.mimetype.startsWith("image")
+                    ) {
+                      await client.sendMessage(targetChat, {
+                        image: {
+                          data: media.buffer,
+                          mimetype: media.mimetype,
+                          filename: media.filename,
+                        },
+                        caption: groupMsg,
+                      });
+                    } else if (
+                      media &&
+                      media.mimetype &&
+                      media.mimetype.startsWith("video")
+                    ) {
+                      const tmpPath = await videoHelper.salvarVideoTemporario(
+                        media.buffer,
+                        media.filename || "confissao.mp4"
+                      );
+                      const comp = await videoHelper.comprimirVideoSeNecessario(
+                        tmpPath
+                      );
+                      const sendPath = (comp && comp.path) || tmpPath;
+                      await client.sendMessage(targetChat, {
+                        video: { url: sendPath },
+                        caption: groupMsg,
+                      });
+                      try {
+                        const fsp = require("fs").promises;
+                        if (tmpPath) await fsp.unlink(tmpPath).catch(() => {});
+                        if (
+                          comp &&
+                          comp.wasCompressed &&
+                          comp.path &&
+                          comp.path !== tmpPath
+                        )
+                          await fsp.unlink(comp.path).catch(() => {});
+                      } catch (e) {}
+                    } else {
+                      await client.sendMessage(targetChat, groupMsg);
+                    }
+                  } catch (e) {
+                    console.error(
+                      "[confissao] erro ao processar mídia (enquete):",
+                      e && e.message ? e.message : e
+                    );
+                    await client.sendMessage(targetChat, groupMsg);
+                  }
+                } else {
+                  await client.sendMessage(targetChat, groupMsg);
+                }
               } catch (err) {
                 console.error(
                   "Erro ao enviar confissão ao grupo selecionado:",
