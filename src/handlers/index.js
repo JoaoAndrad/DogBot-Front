@@ -154,9 +154,12 @@ async function handle(context) {
     const raw = body.slice(1).split(/\s+/)[0];
     cmdName = normalizeCmdName(raw);
   } else if (body.length) {
+    // Special case: "confissao" works without prefix only in private chats
     const raw = body.split(/\s+/)[0];
     const normalized = normalizeCmdName(raw);
-    if (commands.commands.has(normalized)) {
+
+    if (normalized === "confissao" && !isGroup) {
+      // Allow "confissao" without prefix in private chats
       isCommand = true;
       cmdName = normalized;
     }
