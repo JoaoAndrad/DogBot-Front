@@ -18,21 +18,8 @@ module.exports = {
       }
     }
 
-    console.log(
-      "[confissao] Debug - message.isGroup:",
-      message?.isGroup,
-      "info.is_group:",
-      info?.is_group,
-      "chatId:",
-      (message && message.from) || (info && info.from),
-      "isGroup result:",
-      isGroup
-    );
-
     if (isGroup) {
-      await reply(
-        "Confissões só podem ser enviadas no privado. Por favor envie este comando em uma conversa privada comigo."
-      );
+      // Ignore invocations in group chats silently (do not reply)
       return;
     }
 
