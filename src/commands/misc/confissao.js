@@ -351,15 +351,9 @@ module.exports = {
                 const tok = mentionTokens[i];
                 const entry = mentionMap[i];
                 const jid = entry && entry.jid;
-                const name = entry && entry.name;
                 const phone = jid ? jid.split("@")[0] : null;
-                // prefer readable name if it's not purely numeric
-                const useName = name && !/^\d+$/.test(String(name));
-                const mentionString = useName
-                  ? `@${name}`
-                  : phone
-                  ? `@${phone}`
-                  : tok;
+                // Always use phone in text for reliable mention rendering
+                const mentionString = phone ? `@${phone}` : tok;
                 // replace first occurrence
                 replacedText = replacedText.replace(tok, mentionString);
               }
