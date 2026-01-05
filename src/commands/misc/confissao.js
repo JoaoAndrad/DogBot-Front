@@ -6,6 +6,15 @@ module.exports = {
     const { message, info, reply, client, services } = ctx;
 
     const isGroup = !!(message && message.isGroup) || !!(info && info.is_group);
+    console.log(
+      "[confissao] Debug - message.isGroup:",
+      message?.isGroup,
+      "info.is_group:",
+      info?.is_group,
+      "isGroup result:",
+      isGroup
+    );
+
     if (isGroup) {
       await reply(
         "Confissões só podem ser enviadas no privado. Por favor envie este comando em uma conversa privada comigo."
