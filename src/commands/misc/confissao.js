@@ -394,31 +394,67 @@ module.exports = {
                       media.mimetype &&
                       media.mimetype.startsWith("video")
                     ) {
-                      const tmpPath = await videoHelper.salvarVideoTemporario(
-                        media.buffer,
-                        media.filename || "confissao.mp4"
-                      );
-                      const comp = await videoHelper.comprimirVideoSeNecessario(
-                        tmpPath
-                      );
-                      const sendPath = (comp && comp.path) || tmpPath;
-                      await client.sendMessage(targetGroup.id, {
-                        video: { url: sendPath },
-                        caption: groupMsg,
-                        mentions: mentionMap.map((m) => m.jid),
-                      });
-                      // cleanup temp files
+                      // Videos may not be supported by the Chromium instance (codecs).
+                      // Ask the user if they want the original message forwarded to the target group instead.
                       try {
-                        const fsp = require("fs").promises;
-                        if (tmpPath) await fsp.unlink(tmpPath).catch(() => {});
-                        if (
-                          comp &&
-                          comp.wasCompressed &&
-                          comp.path &&
-                          comp.path !== tmpPath
-                        )
-                          await fsp.unlink(comp.path).catch(() => {});
-                      } catch (e) {}
+                        const yn = await createPollPromise(
+                          client,
+                          senderNumber,
+                          "Detectei um vídeo. Vídeos não são suportados neste ambiente. Deseja que eu encaminhe sua mensagem original para o grupo selecionado?",
+                          ["Sim", "Não"],
+                          {}
+                        );
+                        const ynIdx =
+                          yn && yn.selectedIndexes && yn.selectedIndexes[0]
+                            ? yn.selectedIndexes[0]
+                            : 0;
+                        if (Number(ynIdx) === 0) {
+                          // forward original message
+                          try {
+                            const mid =
+                              message &&
+                              message.id &&
+                              (message.id._serialized || message.id.id);
+                            if (
+                              client &&
+                              typeof client.forwardMessages === "function" &&
+                              mid
+                            ) {
+                              await client.forwardMessages(targetGroup.id, [
+                                mid,
+                              ]);
+                            } else if (typeof message.forward === "function") {
+                              await message.forward(targetGroup.id);
+                            } else {
+                              throw new Error("forward-not-supported");
+                            }
+                          } catch (fwdErr) {
+                            console.error(
+                              "[confissao] falha ao encaminhar vídeo:",
+                              fwdErr && fwdErr.message ? fwdErr.message : fwdErr
+                            );
+                            await reply(
+                              "Não consegui encaminhar a mensagem original. Enviando sem mídia."
+                            );
+                            await client.sendMessage(targetGroup.id, groupMsg, {
+                              mentions: mentionMap.map((m) => m.jid),
+                            });
+                          }
+                        } else {
+                          // user chose not to forward — send text only
+                          await client.sendMessage(targetGroup.id, groupMsg, {
+                            mentions: mentionMap.map((m) => m.jid),
+                          });
+                        }
+                      } catch (e) {
+                        console.error(
+                          "[confissao] erro ao perguntar sobre encaminhar vídeo:",
+                          e && e.message ? e.message : e
+                        );
+                        await client.sendMessage(targetGroup.id, groupMsg, {
+                          mentions: mentionMap.map((m) => m.jid),
+                        });
+                      }
                     } else {
                       // fallback: send as text
                       await client.sendMessage(targetGroup.id, groupMsg, {
@@ -543,29 +579,57 @@ module.exports = {
               media.mimetype &&
               media.mimetype.startsWith("video")
             ) {
-              const tmpPath = await videoHelper.salvarVideoTemporario(
-                media.buffer,
-                media.filename || "confissao.mp4"
-              );
-              const comp = await videoHelper.comprimirVideoSeNecessario(
-                tmpPath
-              );
-              const sendPath = (comp && comp.path) || tmpPath;
-              await client.sendMessage(target.id, {
-                video: { url: sendPath },
-                caption: groupMsg,
-              });
+              // Ask the user whether to forward original message because video sending
+              // may not be supported by the environment (Chromium codecs).
               try {
-                const fsp = require("fs").promises;
-                if (tmpPath) await fsp.unlink(tmpPath).catch(() => {});
-                if (
-                  comp &&
-                  comp.wasCompressed &&
-                  comp.path &&
-                  comp.path !== tmpPath
-                )
-                  await fsp.unlink(comp.path).catch(() => {});
-              } catch (e) {}
+                const yn = await createPollPromise(
+                  client,
+                  senderNumber,
+                  "Detectei um vídeo. Vídeos não são suportados neste ambiente. Deseja que eu encaminhe sua mensagem original para o grupo?",
+                  ["Sim", "Não"],
+                  {}
+                );
+                const ynIdx =
+                  yn && yn.selectedIndexes && yn.selectedIndexes[0]
+                    ? yn.selectedIndexes[0]
+                    : 0;
+                if (Number(ynIdx) === 0) {
+                  try {
+                    const mid =
+                      message &&
+                      message.id &&
+                      (message.id._serialized || message.id.id);
+                    if (
+                      client &&
+                      typeof client.forwardMessages === "function" &&
+                      mid
+                    ) {
+                      await client.forwardMessages(target.id, [mid]);
+                    } else if (typeof message.forward === "function") {
+                      await message.forward(target.id);
+                    } else {
+                      throw new Error("forward-not-supported");
+                    }
+                  } catch (fwdErr) {
+                    console.error(
+                      "[confissao] falha ao encaminhar vídeo (único grupo):",
+                      fwdErr && fwdErr.message ? fwdErr.message : fwdErr
+                    );
+                    await reply(
+                      "Não consegui encaminhar a mensagem original. Enviando sem mídia."
+                    );
+                    await client.sendMessage(target.id, groupMsg);
+                  }
+                } else {
+                  await client.sendMessage(target.id, groupMsg);
+                }
+              } catch (e) {
+                console.error(
+                  "[confissao] erro ao perguntar sobre encaminhar vídeo (único grupo):",
+                  e && e.message ? e.message : e
+                );
+                await client.sendMessage(target.id, groupMsg);
+              }
             } else {
               await client.sendMessage(target.id, groupMsg);
             }
@@ -693,29 +757,57 @@ module.exports = {
                       media.mimetype &&
                       media.mimetype.startsWith("video")
                     ) {
-                      const tmpPath = await videoHelper.salvarVideoTemporario(
-                        media.buffer,
-                        media.filename || "confissao.mp4"
-                      );
-                      const comp = await videoHelper.comprimirVideoSeNecessario(
-                        tmpPath
-                      );
-                      const sendPath = (comp && comp.path) || tmpPath;
-                      await client.sendMessage(targetChat, {
-                        video: { url: sendPath },
-                        caption: groupMsg,
-                      });
+                      // Ask the user whether to forward original message because video sending
+                      // may not be supported by the environment (Chromium codecs).
                       try {
-                        const fsp = require("fs").promises;
-                        if (tmpPath) await fsp.unlink(tmpPath).catch(() => {});
-                        if (
-                          comp &&
-                          comp.wasCompressed &&
-                          comp.path &&
-                          comp.path !== tmpPath
-                        )
-                          await fsp.unlink(comp.path).catch(() => {});
-                      } catch (e) {}
+                        const yn = await createPollPromise(
+                          client,
+                          senderNumber,
+                          "Detectei um vídeo. Vídeos não são suportados neste ambiente. Deseja que eu encaminhe sua mensagem original para o grupo selecionado?",
+                          ["Sim", "Não"],
+                          {}
+                        );
+                        const ynIdx =
+                          yn && yn.selectedIndexes && yn.selectedIndexes[0]
+                            ? yn.selectedIndexes[0]
+                            : 0;
+                        if (Number(ynIdx) === 0) {
+                          try {
+                            const mid =
+                              message &&
+                              message.id &&
+                              (message.id._serialized || message.id.id);
+                            if (
+                              client &&
+                              typeof client.forwardMessages === "function" &&
+                              mid
+                            ) {
+                              await client.forwardMessages(targetChat, [mid]);
+                            } else if (typeof message.forward === "function") {
+                              await message.forward(targetChat);
+                            } else {
+                              throw new Error("forward-not-supported");
+                            }
+                          } catch (fwdErr) {
+                            console.error(
+                              "[confissao] falha ao encaminhar vídeo (enquete):",
+                              fwdErr && fwdErr.message ? fwdErr.message : fwdErr
+                            );
+                            await reply(
+                              "Não consegui encaminhar a mensagem original. Enviando sem mídia."
+                            );
+                            await client.sendMessage(targetChat, groupMsg);
+                          }
+                        } else {
+                          await client.sendMessage(targetChat, groupMsg);
+                        }
+                      } catch (e) {
+                        console.error(
+                          "[confissao] erro ao perguntar sobre encaminhar vídeo (enquete):",
+                          e && e.message ? e.message : e
+                        );
+                        await client.sendMessage(targetChat, groupMsg);
+                      }
                     } else {
                       await client.sendMessage(targetChat, groupMsg);
                     }
