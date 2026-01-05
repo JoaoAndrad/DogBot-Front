@@ -5,12 +5,26 @@ module.exports = {
   async execute(ctx) {
     const { message, info, reply, client, services } = ctx;
 
-    const isGroup = !!(message && message.isGroup) || !!(info && info.is_group);
+    // Determine if this is a group message
+    // Primary: check message.isGroup or info.is_group
+    // Fallback: check if chat ID ends with @g.us (groups) vs @c.us (private)
+    let isGroup = !!(message && message.isGroup) || !!(info && info.is_group);
+
+    if (!isGroup) {
+      // Fallback: check chat ID pattern
+      const chatId = (message && message.from) || (info && info.from) || "";
+      if (chatId && String(chatId).endsWith("@g.us")) {
+        isGroup = true;
+      }
+    }
+
     console.log(
       "[confissao] Debug - message.isGroup:",
       message?.isGroup,
       "info.is_group:",
       info?.is_group,
+      "chatId:",
+      (message && message.from) || (info && info.from),
       "isGroup result:",
       isGroup
     );
