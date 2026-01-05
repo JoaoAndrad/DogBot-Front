@@ -161,7 +161,7 @@ module.exports = {
       }
     };
 
-    // Helper: present participants in pages and let user pick one (returns jid or null)
+    // Helper: present participants in pages and let user pick one (returns {jid,name} or null)
     const pickParticipantFromGroup = async (
       groupId,
       participants,
@@ -170,29 +170,58 @@ module.exports = {
     ) => {
       if (!Array.isArray(participants) || participants.length === 0)
         return null;
+      // attempt to detect the bot's own JID to exclude it from options
+      let botJid = null;
+      try {
+        if (client) {
+          if (client.info && client.info.me && client.info.me._serialized)
+            botJid = client.info.me._serialized;
+          else if (client.info && client.info.wid)
+            botJid = `${client.info.wid}@c.us`;
+          else if (typeof client.getMe === "function") {
+            try {
+              const me = await client.getMe();
+              if (me && me._serialized) botJid = me._serialized;
+              else if (me && me.id && me.id._serialized)
+                botJid = me.id._serialized;
+            } catch (ee) {
+              // ignore
+            }
+          }
+        }
+      } catch (e) {
+        // ignore
+      }
+
       // map to objects and try to resolve readable names via client.getContactById
       const items = await Promise.all(
-        participants.map(async (p) => {
-          const jid = p && p.id && p.id._serialized ? p.id._serialized : p;
-          let name =
-            (p && (p.name || (p.contact && p.contact.name))) ||
-            (jid && jid.split("@")[0]) ||
-            jid;
-          try {
-            if (client && typeof client.getContactById === "function") {
-              const contact = await client.getContactById(jid);
-              if (contact) {
-                // prefer pushname/notifyName if available
-                if (contact.pushname) name = contact.pushname;
-                else if (contact.name) name = contact.name;
-                else if (contact.shortName) name = contact.shortName;
+        participants
+          .filter((p) => {
+            const jid = p && p.id && p.id._serialized ? p.id._serialized : p;
+            if (!jid) return false;
+            if (botJid && jid === botJid) return false; // exclude bot itself
+            return true;
+          })
+          .map(async (p) => {
+            const jid = p && p.id && p.id._serialized ? p.id._serialized : p;
+            let name =
+              (p && (p.name || (p.contact && p.contact.name))) ||
+              (jid && jid.split("@")[0]) ||
+              jid;
+            try {
+              if (client && typeof client.getContactById === "function") {
+                const contact = await client.getContactById(jid);
+                if (contact) {
+                  if (contact.pushname) name = contact.pushname;
+                  else if (contact.name) name = contact.name;
+                  else if (contact.shortName) name = contact.shortName;
+                }
               }
+            } catch (e) {
+              // ignore contact resolution failure and keep fallback name
             }
-          } catch (e) {
-            // ignore contact resolution failure and keep fallback name
-          }
-          return { jid, name };
-        })
+            return { jid, name };
+          })
       );
 
       let page = 0;
@@ -241,7 +270,7 @@ module.exports = {
         const found =
           slice.find((s) => s.name === selName) ||
           slice[Number(payload.selectedIndexes && payload.selectedIndexes[0])];
-        if (found) return found.jid;
+        if (found) return { jid: found.jid, name: found.name };
         return null;
       }
     };
@@ -320,9 +349,17 @@ module.exports = {
               let replacedText = text;
               for (let i = 0; i < mentionTokens.length; i++) {
                 const tok = mentionTokens[i];
-                const jid = mentionMap[i];
+                const entry = mentionMap[i];
+                const jid = entry && entry.jid;
+                const name = entry && entry.name;
                 const phone = jid ? jid.split("@")[0] : null;
-                const mentionString = phone ? `@${phone}` : tok;
+                // prefer readable name if it's not purely numeric
+                const useName = name && !/^\d+$/.test(String(name));
+                const mentionString = useName
+                  ? `@${name}`
+                  : phone
+                  ? `@${phone}`
+                  : tok;
                 // replace first occurrence
                 replacedText = replacedText.replace(tok, mentionString);
               }
@@ -331,7 +368,7 @@ module.exports = {
               try {
                 const groupMsg = `*📩 Confissão:* ${replacedText}`;
                 await client.sendMessage(targetGroup.id, groupMsg, {
-                  mentions: mentionMap,
+                  mentions: mentionMap.map((m) => m.jid),
                 });
               } catch (err) {
                 console.error(
