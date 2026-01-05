@@ -425,7 +425,6 @@ module.exports = {
 
               return;
             }
-            }
           }
         }
       } catch (e) {
