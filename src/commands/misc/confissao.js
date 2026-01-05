@@ -162,20 +162,35 @@ module.exports = {
                 );
                 if (res && res.ok) {
                   try {
-                    await reply(
-                      `Confissão enviada com sucesso ao grupo ${candidateGroups[pick].name}. Saldo restante: ${res.remaining}`
-                    );
+                    const remaining = res.remaining;
+                    const isVip =
+                      remaining === null ||
+                      remaining === Infinity ||
+                      String(remaining).toLowerCase() === "infinity";
+                    if (isVip) {
+                      await reply(
+                        "*🎉 Sua confissão foi enviada anonimamente com sucesso!* \n\n🙏 Você possui confissões vitalícias — não será debitado. 💸"
+                      );
+                    } else {
+                      await reply(
+                        `*✅ Sua confissão foi enviada anonimamente para:* ${
+                          candidateGroups[pick].name
+                        }\n\n*Saldo restante:* ${remaining} confissão${
+                          remaining === 1 ? "" : "ões"
+                        }`
+                      );
+                    }
                   } catch (e) {}
                 } else if (res && res.reason === "insufficient_balance") {
                   try {
                     await reply(
-                      `Confissão enviada ao grupo ${candidateGroups[pick].name}, porém seu saldo está insuficiente para futuras confissões.`
+                      `⚠️ Sua confissão foi enviada ao grupo ${candidateGroups[pick].name}, porém seu saldo está insuficiente para futuras confissões.`
                     );
                   } catch (e) {}
                 } else {
                   try {
                     await reply(
-                      `Confissão enviada ao grupo ${candidateGroups[pick].name}. Não foi possível atualizar seu saldo no momento.`
+                      `✅ Confissão enviada ao grupo ${candidateGroups[pick].name}. Não foi possível atualizar seu saldo no momento.`
                     );
                   } catch (e) {}
                 }
