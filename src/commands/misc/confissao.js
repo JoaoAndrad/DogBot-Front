@@ -119,6 +119,7 @@ module.exports = {
     const polls = require("../../components/poll");
     const mediaHelper = require("../../utils/mediaHelper");
     const videoHelper = require("../../utils/videoHelper");
+    const { MessageMedia } = require("whatsapp-web.js");
 
     const createPollPromise = (
       clientOrSender,
@@ -376,12 +377,15 @@ module.exports = {
                       media.mimetype &&
                       media.mimetype.startsWith("image")
                     ) {
-                      await client.sendMessage(targetGroup.id, {
-                        image: {
-                          data: media.buffer,
-                          mimetype: media.mimetype,
-                          filename: media.filename,
-                        },
+                      // whatsapp-web.js expects a MessageMedia instance for binary images
+                      const base64 =
+                        media.base64 || media.buffer.toString("base64");
+                      const mm = new MessageMedia(
+                        media.mimetype || "image/jpeg",
+                        base64,
+                        media.filename || "image.jpg"
+                      );
+                      await client.sendMessage(targetGroup.id, mm, {
                         caption: groupMsg,
                         mentions: mentionMap.map((m) => m.jid),
                       });
@@ -527,14 +531,13 @@ module.exports = {
           try {
             const media = await mediaHelper.obterMidiaDaMensagem(message);
             if (media && media.mimetype && media.mimetype.startsWith("image")) {
-              await client.sendMessage(target.id, {
-                image: {
-                  data: media.buffer,
-                  mimetype: media.mimetype,
-                  filename: media.filename,
-                },
-                caption: groupMsg,
-              });
+              const base64 = media.base64 || media.buffer.toString("base64");
+              const mm = new MessageMedia(
+                media.mimetype || "image/jpeg",
+                base64,
+                media.filename || "image.jpg"
+              );
+              await client.sendMessage(target.id, mm, { caption: groupMsg });
             } else if (
               media &&
               media.mimetype &&
@@ -675,12 +678,14 @@ module.exports = {
                       media.mimetype &&
                       media.mimetype.startsWith("image")
                     ) {
-                      await client.sendMessage(targetChat, {
-                        image: {
-                          data: media.buffer,
-                          mimetype: media.mimetype,
-                          filename: media.filename,
-                        },
+                      const base64 =
+                        media.base64 || media.buffer.toString("base64");
+                      const mm = new MessageMedia(
+                        media.mimetype || "image/jpeg",
+                        base64,
+                        media.filename || "image.jpg"
+                      );
+                      await client.sendMessage(targetChat, mm, {
                         caption: groupMsg,
                       });
                     } else if (
