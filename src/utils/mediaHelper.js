@@ -5,20 +5,47 @@ async function tryDownloadMedia(message) {
   if (typeof message.downloadMedia === "function") {
     try {
       const media = await message.downloadMedia().catch(() => null);
-      if (media && (media.data || media.buffer)) {
-        const buffer = media.data
-          ? Buffer.from(media.data, "base64")
-          : media.buffer || null;
-        return {
-          buffer,
-          base64: media.data || null,
-          mimetype: media.mimetype || media.mimeType || null,
-          filename: media.filename || media.fileName || null,
-          filesize: buffer ? buffer.length : null,
-          origin: "downloadMedia",
-        };
+      if (media) {
+        // media may be an object with .data (base64 string), or .buffer (Buffer),
+        // or a data URI string. Normalize all cases to a Buffer.
+        let buffer = null;
+        let base64 = null;
+        if (typeof media === "string") {
+          const s = media;
+          base64 = s.includes("base64,") ? s.split("base64,").pop() : s;
+          try {
+            buffer = Buffer.from(base64.replace(/\s+/g, ""), "base64");
+          } catch (e) {
+            buffer = null;
+          }
+        } else if (media.data && typeof media.data === "string") {
+          base64 = media.data.includes("base64,")
+            ? media.data.split("base64,").pop()
+            : media.data;
+          try {
+            buffer = Buffer.from(base64.replace(/\s+/g, ""), "base64");
+          } catch (e) {
+            buffer = null;
+          }
+        } else if (media.buffer && Buffer.isBuffer(media.buffer)) {
+          buffer = media.buffer;
+        }
+        if (buffer && buffer.length > 0) {
+          return {
+            buffer,
+            base64: base64 || null,
+            mimetype: media.mimetype || media.mimeType || null,
+            filename: media.filename || media.fileName || null,
+            filesize: buffer.length,
+            origin: "downloadMedia",
+          };
+        }
       }
     } catch (e) {
+      console.warn(
+        "[mediaHelper] downloadMedia failed:",
+        e && e.message ? e.message : e
+      );
       return null;
     }
   }
