@@ -55,17 +55,17 @@ module.exports = {
           res.previousRating != null ? String(res.previousRating) : null;
         const prevDate = res.previousRatingDate || null;
 
-        // Send track artwork as sticker
+        // Prepare track sticker payload
         const trackWithImage = {
           trackId: res.trackId,
           trackName: trackName,
           image: imageUrl,
         };
-        await sendTrackSticker(ctx.client, msg.from, trackWithImage);
 
+        // Build confirmation text first
+        let confirmationText;
         if (prev) {
           // updated
-          // format previous date if present
           const prevDateStr = prevDate
             ? new Intl.DateTimeFormat("pt-BR", {
                 day: "2-digit",
@@ -74,21 +74,40 @@ module.exports = {
               }).format(new Date(prevDate))
             : null;
 
-          return reply(
-            `✅ Nota atualizada!\n🎶 ${trackName}\n👤 Artista: ${artist}\n💿 Álbum: ${
-              album || "Desconhecido"
-            }\n\n🔁 Sua nota anterior: ${prev}${
-              prevDateStr ? " — em " + prevDateStr : ""
-            }\n⭐ Nova nota: ${rating} / 10\n📈 Média: ${avg} — ${count} ${countLabel}`
+          confirmationText = `✅ Nota atualizada!\n🎶 ${trackName}\n👤 Artista: ${artist}\n💿 Álbum: ${
+            album || "Desconhecido"
+          }\n\n🔁 Sua nota anterior: ${prev}${
+            prevDateStr ? " — em " + prevDateStr : ""
+          }\n⭐ Nova nota: ${rating} / 10\n📈 Média: ${avg} — ${count} ${countLabel}`;
+        } else {
+          // first time
+          confirmationText = `✅ Nota registrada!\n🎶 ${trackName}\n👤 Artista: ${artist}\n💿 Álbum: ${
+            album || "Desconhecido"
+          }\n\n⭐ Sua nota: ${rating} / 10\n📈 Média: ${avg} — ${count} ${countLabel}`;
+        }
+
+        // Reply first, then send sticker (sticker errors shouldn't block the reply)
+        try {
+          await reply(confirmationText);
+        } catch (e) {
+          // if reply itself fails, still attempt sticker but log
+          console.error(
+            "Erro ao enviar confirmação de nota:",
+            e && e.message ? e.message : e
           );
         }
 
-        // first time
-        return reply(
-          `✅ Nota registrada!\n🎶 ${trackName}\n👤 Artista: ${artist}\n💿 Álbum: ${
-            album || "Desconhecido"
-          }\n\n⭐ Sua nota: ${rating} / 10\n📈 Média: ${avg} — ${count} ${countLabel}`
-        );
+        try {
+          await sendTrackSticker(ctx.client, msg.from, trackWithImage);
+        } catch (stErr) {
+          console.error(
+            "Erro ao enviar figurinha da faixa:",
+            stErr && stErr.message ? stErr.message : stErr
+          );
+        }
+
+        // We've already replied above
+        return;
       }
 
       if (res && res.error) {
