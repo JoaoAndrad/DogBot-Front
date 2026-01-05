@@ -64,12 +64,18 @@ const spotifyFlow = createFlow("spotify", {
         ctx.chatId &&
         String(ctx.chatId).endsWith("@g.us")
       );
-      const opts = [
-        {
+      const opts = [];
+
+      // Só mostrar opção Conectar no privado
+      if (!isGroup) {
+        opts.push({
           label: "🔗 Conectar / Reconectar",
           action: "exec",
           handler: "connect",
-        },
+        });
+      }
+
+      opts.push(
         {
           label: "🎧 Tocando agora",
           action: "exec",
@@ -79,8 +85,8 @@ const spotifyFlow = createFlow("spotify", {
           label: "📊 Estatísticas",
           action: "goto",
           target: "/stats",
-        },
-      ];
+        }
+      );
 
       if (isGroup) {
         opts.push({

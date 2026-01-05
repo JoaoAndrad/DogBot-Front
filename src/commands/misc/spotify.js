@@ -6,9 +6,10 @@ module.exports = {
   description: "Abrir menu Spotify",
 
   async execute(context) {
-    const { client, message } = context;
+    const { client, message, reply } = context;
     const msg = message;
     const chatId = msg.from;
+    const isGroup = chatId.endsWith("@g.us");
 
     // Usar getContact() para obter o número real (@c.us)
     let userId = msg.author || msg.from;
@@ -19,6 +20,27 @@ module.exports = {
       }
     } catch (err) {
       console.log("[Command:spotify] Error getting contact:", err.message);
+    }
+
+    // Se for grupo, verificar se usuário tem Spotify conectado
+    if (isGroup) {
+      try {
+        const backendClient = require("../../services/backendClient");
+        const lookupResult = await backendClient.sendToBackend(
+          `/api/users/lookup`,
+          { identifier: userId },
+          "POST"
+        );
+
+        if (!lookupResult || !lookupResult.found || !lookupResult.hasSpotify) {
+          return reply(
+            "❌ Você precisa conectar sua conta Spotify primeiro!\n\n" +
+              "💬 Envie */conectar* no *privado* para vincular sua conta."
+          );
+        }
+      } catch (err) {
+        console.log("[Command:spotify] Error checking Spotify:", err.message);
+      }
     }
 
     try {
