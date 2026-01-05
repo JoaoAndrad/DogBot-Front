@@ -92,6 +92,52 @@ module.exports = {
         );
       }
 
+      // Resolve all group members to user records and filter those with Spotify connected
+      let spotifyMembers = [];
+      try {
+        const lookups = await Promise.all(
+          memberIds.map((id) =>
+            backendClient
+              .sendToBackend(
+                `/api/users/lookup?identifier=${encodeURIComponent(id)}`,
+                null,
+                "GET"
+              )
+              .catch((err) => {
+                logger.warn(
+                  `[Voto] Falha lookup usuario ${id}: ${err.message}`
+                );
+                return null;
+              })
+          )
+        );
+
+        spotifyMembers = (lookups || [])
+          .filter((r) => r && r.found && r.hasSpotify)
+          .map((r, idx) => {
+            // keep identifier from original memberIds if backend didn't return it
+            const identifier = r.identifier || memberIds[idx];
+            return {
+              identifier,
+              userId: r.userId,
+              displayName: r.displayName || null,
+            };
+          });
+      } catch (err) {
+        logger.warn(
+          `[Voto] Erro ao resolver membros com Spotify: ${err.message}`
+        );
+        spotifyMembers = [];
+      }
+
+      logger.info(
+        `[Voto] Usuários do grupo com Spotify conectado: ${spotifyMembers.length}`
+      );
+
+      if (!spotifyMembers || spotifyMembers.length === 0) {
+        return reply("⚠️ Nenhum usuário do grupo tem conta Spotify conectada.");
+      }
+
       // Get the track being played
       const currentTrack = initiator.currentTrack;
       logger.debug(`[Voto] currentTrack:`, JSON.stringify(currentTrack));
@@ -215,7 +261,7 @@ module.exports = {
       // helper to create the actual group vote (called only after initiator confirms)
       async function createGroupVote() {
         // All Spotify-connected users in the group can vote on the actual group poll
-        const targetUserIds = listeners.map((l) => l.userId);
+        const targetUserIds = spotifyMembers.map((m) => m.userId);
 
         // Create vote in backend
         const voteRes = await backendClient.sendToBackend(
@@ -295,8 +341,8 @@ module.exports = {
         );
 
         // Enviar mensagem de contexto separada com menções
-        const otherListeners = listeners.filter(
-          (l) => l.userId !== initiator.userId
+        const otherMembers = spotifyMembers.filter(
+          (m) => m.userId !== initiator.userId
         );
 
         let contextMessage = playlistName
@@ -304,11 +350,11 @@ module.exports = {
           : `${initiatorName} deseja adicionar a música à playlist\n`;
         const mentionsList = [];
 
-        if (otherListeners.length > 0) {
-          const mentions = otherListeners
-            .map((l) => {
-              const phoneNumber = l.identifier.split("@")[0];
-              mentionsList.push(l.identifier);
+        if (otherMembers.length > 0) {
+          const mentions = otherMembers
+            .map((m) => {
+              const phoneNumber = m.identifier.split("@")[0];
+              mentionsList.push(m.identifier);
               return `@${phoneNumber}`;
             })
             .join(" ");
@@ -506,6 +552,32 @@ async function handleAddVote(
           chatId,
           `✅ Música adicionada à playlist! (${stats.votesFor}/${stats.totalEligible} votos)\n\n🎵 ${updatedVote.trackName}\n${updatedVote.trackArtists}`
         );
+
+        // Send playlist artwork as sticker
+        try {
+          const playlistRes = await backendClient.sendToBackend(
+            `/api/groups/playlists/${encodeURIComponent(playlistSpotifyId)}`,
+            null,
+            "GET"
+          );
+
+          if (
+            playlistRes &&
+            playlistRes.images &&
+            playlistRes.images.length > 0
+          ) {
+            const playlistSticker = {
+              trackId: playlistSpotifyId,
+              trackName: playlistRes.name || "Playlist",
+              image: playlistRes.images[0].url,
+            };
+            await sendTrackSticker(client, chatId, playlistSticker);
+          }
+        } catch (err) {
+          logger.warn(
+            `[Voto] Erro ao enviar figurinha da playlist: ${err.message}`
+          );
+        }
       } else {
         await client.sendMessage(
           chatId,

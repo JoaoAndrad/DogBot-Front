@@ -35,58 +35,93 @@ async function savePoll(msgId, poll) {
     vote_id: poll.voteId || poll.vote_id || null,
     group_id: poll.groupId || poll.group_id || null,
   };
-  const res = await _fetch(url.resolve(BACKEND_URL, "/api/polls/"), {
-    method: "POST",
-    headers: _headers(),
-    body: JSON.stringify(payload),
-  });
-  if (!res.ok) {
-    const txt = await res.text().catch(() => "");
-    throw new Error(`savePoll failed: ${res.status} ${txt}`);
+  try {
+    const res = await _fetch(url.resolve(BACKEND_URL, "/api/polls/"), {
+      method: "POST",
+      headers: _headers(),
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) {
+      const txt = await res.text().catch(() => "");
+      throw new Error(`savePoll failed: ${res.status} ${txt}`);
+    }
+    return res.json();
+  } catch (err) {
+    console.error(
+      "poll.storage.savePoll fetch failed",
+      err && err.message ? err.message : err
+    );
+    throw err;
   }
-  return res.json();
 }
 
 async function getPoll(msgId) {
-  const res = await _fetch(
-    url.resolve(BACKEND_URL, `/api/polls/${encodeURIComponent(msgId)}/`),
-    {
-      method: "GET",
-      headers: _headers(),
+  try {
+    const res = await _fetch(
+      url.resolve(BACKEND_URL, `/api/polls/${encodeURIComponent(msgId)}/`),
+      {
+        method: "GET",
+        headers: _headers(),
+      }
+    );
+    if (res.status === 404) return null;
+    if (!res.ok) {
+      const txt = await res.text().catch(() => "");
+      throw new Error(`getPoll failed: ${res.status} ${txt}`);
     }
-  );
-  if (res.status === 404) return null;
-  if (!res.ok) {
-    const txt = await res.text().catch(() => "");
-    throw new Error(`getPoll failed: ${res.status} ${txt}`);
+    return res.json();
+  } catch (err) {
+    console.error(
+      "poll.storage.getPoll fetch failed",
+      err && err.message ? err.message : err
+    );
+    // Backend unavailable — return null so poll component can fallback
+    return null;
   }
-  return res.json();
 }
 
 async function listPolls() {
-  const res = await _fetch(url.resolve(BACKEND_URL, "/api/polls/"), {
-    method: "GET",
-    headers: _headers(),
-  });
-  if (!res.ok) {
-    const txt = await res.text().catch(() => "");
-    throw new Error(`listPolls failed: ${res.status} ${txt}`);
+  try {
+    const res = await _fetch(url.resolve(BACKEND_URL, "/api/polls/"), {
+      method: "GET",
+      headers: _headers(),
+    });
+    if (!res.ok) {
+      const txt = await res.text().catch(() => "");
+      throw new Error(`listPolls failed: ${res.status} ${txt}`);
+    }
+    return res.json();
+  } catch (err) {
+    console.error(
+      "poll.storage.listPolls fetch failed",
+      err && err.message ? err.message : err
+    );
+    // Backend unavailable — return empty list
+    return [];
   }
-  return res.json();
 }
 
 async function findPollsByChat(chatId) {
   const u = new URL("/api/polls/", BACKEND_URL);
   u.searchParams.set("chat_id", chatId);
-  const res = await _fetch(u.toString(), {
-    method: "GET",
-    headers: _headers(),
-  });
-  if (!res.ok) {
-    const txt = await res.text().catch(() => "");
-    throw new Error(`findPollsByChat failed: ${res.status} ${txt}`);
+  try {
+    const res = await _fetch(u.toString(), {
+      method: "GET",
+      headers: _headers(),
+    });
+    if (!res.ok) {
+      const txt = await res.text().catch(() => "");
+      throw new Error(`findPollsByChat failed: ${res.status} ${txt}`);
+    }
+    return res.json();
+  } catch (err) {
+    console.error(
+      "poll.storage.findPollsByChat fetch failed",
+      err && err.message ? err.message : err
+    );
+    // Backend unavailable — return empty list
+    return [];
   }
-  return res.json();
 }
 
 async function removePoll(msgId) {

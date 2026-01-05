@@ -108,21 +108,20 @@ async function sendTrackSticker(client, chatId, track) {
 }
 
 /**
- * Download image and resize to PNG 512x512 (for embedding in SVG)
+ * Download image and resize to specified dimensions
  */
-async function downloadAndResizePng(imageUrl, id) {
+async function downloadAndResize(imageUrl, width, height) {
   try {
     if (!imageUrl) return null;
     const res = await fetch(imageUrl);
     if (!res.ok) return null;
     const buf = await res.buffer();
-    const png = await sharp(buf)
-      .resize(512, 512, { fit: "cover" })
-      .png()
+    const resized = await sharp(buf)
+      .resize(width, height, { fit: "cover", position: "center" })
       .toBuffer();
-    return png;
+    return resized;
   } catch (e) {
-    logger.error("[StickerHelper] downloadAndResizePng error: " + e.message);
+    logger.error("[StickerHelper] downloadAndResize error: " + e.message);
     return null;
   }
 }
@@ -130,121 +129,209 @@ async function downloadAndResizePng(imageUrl, id) {
 /**
  * Create a composite WebP buffer from multiple track images.
  * Layout rules:
- * - 1 image: full cover
+ * - 1 image: 100% (512x512)
  * - 2 images: diagonal split (two triangles)
- * - 3 images: diagonal into three slices
+ * - 3 images: 3 diagonal bands (equal width)
  * - 4+ images: square grid (NxM)
  */
 async function createCompositeWebp(tracks) {
   if (!tracks || tracks.length === 0) return null;
-  const W = 512,
-    H = 512;
+  const SIZE = 512;
 
-  // download PNGs
+  // Download and resize images
   const imgs = [];
-  for (let i = 0; i < tracks.length; i++) {
+  for (let i = 0; i < tracks.length && i < 9; i++) {
     const url = tracks[i].image;
-    const buf = await downloadAndResizePng(url, tracks[i].trackId || String(i));
-    if (buf) imgs.push({ buf, meta: tracks[i] });
-    if (imgs.length >= 9) break; // limit to 9 images
+    if (!url) {
+      logger.warn(`[StickerHelper] Track ${i} has no image URL`);
+      continue;
+    }
+
+    const buf = await downloadAndResize(url, SIZE, SIZE);
+    if (buf) {
+      imgs.push(buf);
+      logger.debug(`[StickerHelper] Successfully downloaded image ${i}`);
+    } else {
+      logger.warn(`[StickerHelper] Failed to download image ${i} from ${url}`);
+    }
   }
 
   const n = imgs.length;
-  if (n === 0) return null;
+  if (n === 0) {
+    logger.error("[StickerHelper] No images could be downloaded");
+    return null;
+  }
 
-  // helper to base64 encode PNG buffer
-  const b64 = (b) => b.toString("base64");
+  logger.info(`[StickerHelper] Creating composite with ${n} images`);
 
-  // build svg with clipPaths
-  let svgParts = [];
-  svgParts.push(
-    `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}">`
-  );
-  svgParts.push("<defs>");
-
-  if (n === 1) {
-    // single image — no clip needed
-    svgParts.push("</defs>");
-    svgParts.push(
-      `<image href="data:image/png;base64,${b64(
-        imgs[0].buf
-      )}" x="0" y="0" width="${W}" height="${H}" />`
-    );
-  } else if (n === 2) {
-    // two diagonal triangles
-    const poly0 = `0,${H} 0,0 ${W},${H}`;
-    const poly1 = `0,0 ${W},0 ${W},${H}`;
-    svgParts.push(`<clipPath id="c0"><polygon points="${poly0}"/></clipPath>`);
-    svgParts.push(`<clipPath id="c1"><polygon points="${poly1}"/></clipPath>`);
-    svgParts.push("</defs>");
-    svgParts.push(
-      `<image clip-path="url(#c0)" href="data:image/png;base64,${b64(
-        imgs[0].buf
-      )}" x="0" y="0" width="${W}" height="${H}" />`
-    );
-    svgParts.push(
-      `<image clip-path="url(#c1)" href="data:image/png;base64,${b64(
-        imgs[1].buf
-      )}" x="0" y="0" width="${W}" height="${H}" />`
-    );
-  } else if (n === 3) {
-    // three diagonal slices using parallel lines approximation
-    const slices = [];
-    for (let i = 0; i < 4; i++) {
-      const s = i / 3;
-      const A = { x: 0, y: Math.round(H * (1 - s)) };
-      const B = { x: Math.round(W * s), y: 0 };
-      slices.push({ A, B });
+  try {
+    if (n === 1) {
+      // Single image: full 512x512
+      return await sharp(imgs[0])
+        .resize(SIZE, SIZE, { fit: "cover" })
+        .webp({ quality: 80 })
+        .toBuffer();
     }
-    // polygons between successive A/B
-    for (let i = 0; i < 3; i++) {
-      const A1 = slices[i].A;
-      const B1 = slices[i].B;
-      const A2 = slices[i + 1].A;
-      const B2 = slices[i + 1].B;
-      const pts = `${A1.x},${A1.y} ${B1.x},${B1.y} ${B2.x},${B2.y} ${A2.x},${A2.y}`;
-      svgParts.push(
-        `<clipPath id="c${i}"><polygon points="${pts}"/></clipPath>`
+
+    if (n === 2) {
+      // Two images: diagonal split (bottom-left triangle + top-right triangle)
+      // Create SVG masks for the two triangles
+      const mask0 = Buffer.from(
+        `<svg width="${SIZE}" height="${SIZE}">
+          <polygon points="0,0 0,${SIZE} ${SIZE},${SIZE}" fill="white"/>
+        </svg>`
       );
-    }
-    svgParts.push("</defs>");
-    for (let i = 0; i < 3; i++) {
-      svgParts.push(
-        `<image clip-path="url(#c${i})" href="data:image/png;base64,${b64(
-          imgs[i].buf
-        )}" x="0" y="0" width="${W}" height="${H}" />`
+
+      const mask1 = Buffer.from(
+        `<svg width="${SIZE}" height="${SIZE}">
+          <polygon points="0,0 ${SIZE},0 ${SIZE},${SIZE}" fill="white"/>
+        </svg>`
       );
+
+      // Ensure images have alpha channel before applying masks
+      const [masked0, masked1] = await Promise.all([
+        sharp(imgs[0])
+          .resize(SIZE, SIZE, { fit: "cover" })
+          .ensureAlpha()
+          .composite([{ input: mask0, blend: "dest-in" }])
+          .png()
+          .toBuffer(),
+        sharp(imgs[1])
+          .resize(SIZE, SIZE, { fit: "cover" })
+          .ensureAlpha()
+          .composite([{ input: mask1, blend: "dest-in" }])
+          .png()
+          .toBuffer(),
+      ]);
+
+      // Combine both masked images on a black background
+      return await sharp({
+        create: {
+          width: SIZE,
+          height: SIZE,
+          channels: 4,
+          background: { r: 0, g: 0, b: 0, alpha: 1 },
+        },
+      })
+        .composite([
+          { input: masked0, blend: "over" },
+          { input: masked1, blend: "over" },
+        ])
+        .webp({ quality: 80 })
+        .toBuffer();
     }
-  } else {
-    // grid layout
+
+    if (n === 3) {
+      // Three images: 3 diagonal bands (equal width ~33.3% each)
+      // Create 3 parallel diagonal stripes with equal perpendicular width
+      const masks = [];
+
+      // For equal width bands parallel to the main diagonal (0,512)→(512,0)
+      // We need bands at 1/3 and 2/3 of the distance
+
+      // Band 1: bottom-left corner
+      masks.push(
+        Buffer.from(
+          `<svg width="${SIZE}" height="${SIZE}">
+            <polygon points="0,${SIZE} 0,${Math.floor(
+            (SIZE * 2) / 3
+          )} ${Math.floor(SIZE / 3)},${SIZE}" fill="white"/>
+          </svg>`
+        )
+      );
+
+      // Band 2: middle diagonal stripe
+      masks.push(
+        Buffer.from(
+          `<svg width="${SIZE}" height="${SIZE}">
+            <polygon points="0,${Math.floor((SIZE * 2) / 3)} 0,${Math.floor(
+            SIZE / 3
+          )} ${Math.floor(SIZE / 3)},0 ${Math.floor(
+            (SIZE * 2) / 3
+          )},0 ${SIZE},${Math.floor((SIZE * 2) / 3)} ${Math.floor(
+            (SIZE * 2) / 3
+          )},${SIZE} ${Math.floor(SIZE / 3)},${SIZE}" fill="white"/>
+          </svg>`
+        )
+      );
+
+      // Band 3: top-right corner
+      masks.push(
+        Buffer.from(
+          `<svg width="${SIZE}" height="${SIZE}">
+            <polygon points="${Math.floor(
+              (SIZE * 2) / 3
+            )},0 ${SIZE},0 ${SIZE},${Math.floor(SIZE / 3)} ${SIZE},${Math.floor(
+            (SIZE * 2) / 3
+          )} ${Math.floor((SIZE * 2) / 3)},${SIZE}" fill="white"/>
+          </svg>`
+        )
+      );
+
+      // Apply masks to images with alpha channel
+      const masked = await Promise.all(
+        imgs.slice(0, 3).map((img, idx) =>
+          sharp(img)
+            .resize(SIZE, SIZE, { fit: "cover" })
+            .ensureAlpha()
+            .composite([{ input: masks[idx], blend: "dest-in" }])
+            .png()
+            .toBuffer()
+        )
+      );
+
+      // Combine all three masked images on a black background
+      return await sharp({
+        create: {
+          width: SIZE,
+          height: SIZE,
+          channels: 4,
+          background: { r: 0, g: 0, b: 0, alpha: 1 },
+        },
+      })
+        .composite([
+          { input: masked[0], blend: "over" },
+          { input: masked[1], blend: "over" },
+          { input: masked[2], blend: "over" },
+        ])
+        .webp({ quality: 80 })
+        .toBuffer();
+    }
+
+    // 4+ images: square grid
     const cols = Math.ceil(Math.sqrt(n));
     const rows = Math.ceil(n / cols);
-    svgParts.push("</defs>");
-    const cellW = Math.floor(W / cols);
-    const cellH = Math.floor(H / rows);
+    const cellW = Math.floor(SIZE / cols);
+    const cellH = Math.floor(SIZE / rows);
+
+    const resized = await Promise.all(
+      imgs.map((img) =>
+        sharp(img).resize(cellW, cellH, { fit: "cover" }).toBuffer()
+      )
+    );
+
+    const composites = [];
     for (let idx = 0; idx < n; idx++) {
       const col = idx % cols;
       const row = Math.floor(idx / cols);
-      const x = col * cellW;
-      const y = row * cellH;
-      // place image scaled to cover cell
-      svgParts.push(
-        `<image href="data:image/png;base64,${b64(
-          imgs[idx].buf
-        )}" x="${x}" y="${y}" width="${cellW}" height="${cellH}" preserveAspectRatio="xMidYMid slice" />`
-      );
+      composites.push({
+        input: resized[idx],
+        left: col * cellW,
+        top: row * cellH,
+      });
     }
-  }
 
-  svgParts.push("</svg>");
-  const svg = svgParts.join("");
-
-  try {
-    const out = await sharp(Buffer.from(svg))
-      .resize(W, H)
+    return await sharp({
+      create: {
+        width: SIZE,
+        height: SIZE,
+        channels: 4,
+        background: { r: 0, g: 0, b: 0, alpha: 1 },
+      },
+    })
+      .composite(composites)
       .webp({ quality: 80 })
       .toBuffer();
-    return out;
   } catch (e) {
     logger.error("[StickerHelper] createCompositeWebp error: " + e.message);
     return null;
@@ -270,5 +357,5 @@ module.exports = {
   sendTrackSticker,
   downloadAndConvertToWebp,
   sendCompositeSticker,
-  downloadAndResizePng,
+  downloadAndResize,
 };

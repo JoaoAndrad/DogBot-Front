@@ -81,7 +81,7 @@ async function handle(context) {
     actualNumber = author ? author.replace(/@lid$/i, "") : null;
   }
 
-  logger.debug(`[Handler] Verificando fluxo ativo para: ${actualNumber}`);
+  //logger.debug(`[Handler] Verificando fluxo ativo para: ${actualNumber}`);
 
   if (actualNumber && conversationState.hasActiveFlow(actualNumber)) {
     const state = conversationState.getState(actualNumber);
@@ -133,14 +133,33 @@ async function handle(context) {
   }
 
   // detect command: prefix-based (! or /) or exact keyword fallback (e.g. 'ping')
+  // normalize by removing diacritics so 'confissão' or 'Confissao' match 'confissao'
   let isCommand = false;
   let cmdName = null;
+  function normalizeCmdName(s) {
+    if (!s) return "";
+    try {
+      return String(s)
+        .trim()
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .toLowerCase();
+    } catch (e) {
+      return String(s).trim().toLowerCase();
+    }
+  }
+
   if (body.startsWith("!") || body.startsWith("/")) {
     isCommand = true;
-    cmdName = body.slice(1).split(/\s+/)[0].toLowerCase();
-  } else if (body.length && commands.commands.has(body.toLowerCase())) {
-    isCommand = true;
-    cmdName = body.toLowerCase();
+    const raw = body.slice(1).split(/\s+/)[0];
+    cmdName = normalizeCmdName(raw);
+  } else if (body.length) {
+    const raw = body.split(/\s+/)[0];
+    const normalized = normalizeCmdName(raw);
+    if (commands.commands.has(normalized)) {
+      isCommand = true;
+      cmdName = normalized;
+    }
   }
 
   if (isCommand && cmdName) {
