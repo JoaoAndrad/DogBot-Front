@@ -242,7 +242,12 @@ async function handle(context) {
     try {
       await cmd.execute(ctx);
     } catch (err) {
-      logger.error("Erro ao executar comando", cmdName, err);
+      try {
+        const stack = err && err.stack ? err.stack : JSON.stringify(err);
+        logger.error(`Erro ao executar comando ${cmdName}: ${stack}`);
+      } catch (logErr) {
+        logger.error("Erro ao executar comando (e falha ao logar stack):", err);
+      }
       await reply("Ocorreu um erro ao executar o comando.");
     }
 
