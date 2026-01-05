@@ -170,15 +170,30 @@ module.exports = {
     ) => {
       if (!Array.isArray(participants) || participants.length === 0)
         return null;
-      // map to objects
-      const items = participants.map((p) => {
-        const jid = p && p.id && p.id._serialized ? p.id._serialized : p;
-        const name =
-          (p && (p.name || (p.contact && p.contact.name))) ||
-          (jid && jid.split("@")[0]) ||
-          jid;
-        return { jid, name };
-      });
+      // map to objects and try to resolve readable names via client.getContactById
+      const items = await Promise.all(
+        participants.map(async (p) => {
+          const jid = p && p.id && p.id._serialized ? p.id._serialized : p;
+          let name =
+            (p && (p.name || (p.contact && p.contact.name))) ||
+            (jid && jid.split("@")[0]) ||
+            jid;
+          try {
+            if (client && typeof client.getContactById === "function") {
+              const contact = await client.getContactById(jid);
+              if (contact) {
+                // prefer pushname/notifyName if available
+                if (contact.pushname) name = contact.pushname;
+                else if (contact.name) name = contact.name;
+                else if (contact.shortName) name = contact.shortName;
+              }
+            }
+          } catch (e) {
+            // ignore contact resolution failure and keep fallback name
+          }
+          return { jid, name };
+        })
+      );
 
       let page = 0;
       const totalPages = Math.max(1, Math.ceil(items.length / pageSize));
