@@ -545,9 +545,7 @@ const spotifyFlow = createFlow("spotify", {
         // Helpers
         function fmtDuration(ms) {
           const totalMin = Math.floor(ms / 60000);
-          const hours = Math.floor(totalMin / 60);
-          const mins = totalMin % 60;
-          return `${hours}h ${mins}min`;
+          return totalMin;
         }
 
         // Activity bars
