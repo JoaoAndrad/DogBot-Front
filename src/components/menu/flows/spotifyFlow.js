@@ -218,7 +218,9 @@ const spotifyFlow = createFlow("spotify", {
         )}`;
         const res = await fetch(url, { method: "GET" });
         const json = await res.json();
-        if (!json || !json.playing) {
+        if (json && json.notice) {
+          await ctx.reply(json.notice);
+        } else if (!json || !json.playing) {
           await ctx.reply("⏸️ Nenhuma faixa em reprodução no momento.");
         } else {
           const t = json.track || {};

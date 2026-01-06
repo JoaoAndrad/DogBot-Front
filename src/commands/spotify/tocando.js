@@ -84,6 +84,10 @@ module.exports = {
       }
       json = await res.json();
 
+      if (json && json.notice) {
+        await reply(json.notice);
+        return;
+      }
       if (!json || !json.playing) {
         await reply("⏸️ Nenhuma faixa em reprodução no momento.");
       } else {
