@@ -50,17 +50,43 @@ module.exports = {
         }
 
         const playlist = group.playlist;
-        let msg = `🎵 Playlist do Grupo\n\n`;
-        msg += `Nome: ${playlist.name || "Sem nome"}\n`;
-        if (playlist.description) msg += `Descrição: ${playlist.description}\n`;
-        msg += `ID Spotify: ${playlist.spotifyId || "Não configurado"}\n`;
-        msg += `Sincronizado: ${
-          playlist.syncedAt
-            ? new Date(playlist.syncedAt).toLocaleString()
-            : "Nunca"
-        }\n`;
 
-        return reply(msg);
+        if (!playlist || !playlist.spotifyId) {
+          return reply(
+            "⚠️ Este grupo ainda não tem uma playlist configurada. Use /playlist set <spotify_playlist_id>"
+          );
+        }
+
+        // Construct Spotify URL
+        const spotifyUrl = `https://open.spotify.com/playlist/${playlist.spotifyId}`;
+
+        // Send playlist cover as sticker (best-effort)
+        try {
+          const stickerHelper = require("../../utils/stickerHelper");
+          const trackLike = {
+            image: playlist.coverUrl,
+            trackName: playlist.name,
+            trackId: playlist.spotifyId,
+          };
+          // send sticker first (async) and ignore result
+          stickerHelper
+            .sendTrackSticker(ctx.client, chatId, trackLike)
+            .catch((e) => {
+              logger.warn(
+                "[Playlist] failed to send cover sticker:",
+                e && e.message
+              );
+            });
+        } catch (e) {
+          logger.warn(
+            "[Playlist] sticker helper not available:",
+            e && e.message
+          );
+        }
+
+        // Reply with minimal info: name and link
+        const out = `${playlist.name || "Sem nome"}\n${spotifyUrl}`;
+        return reply(out);
       }
 
       // Command: set <playlistId>
