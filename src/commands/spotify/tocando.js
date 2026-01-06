@@ -66,7 +66,23 @@ module.exports = {
         userParam
       )}`;
       const res = await fetch(url, { method: "GET" });
-      const json = await res.json();
+      const ct =
+        (res.headers && res.headers.get
+          ? res.headers.get("content-type")
+          : null) || "";
+      let json;
+      if (!ct.includes("application/json")) {
+        const text = await res.text().catch(() => "");
+        console.log(
+          "[Command:tocando] Non-JSON response from backend:",
+          text.slice(0, 1000)
+        );
+        await reply(
+          "❌ Resposta inválida do servidor ao consultar tocando agora."
+        );
+        return;
+      }
+      json = await res.json();
 
       if (!json || !json.playing) {
         await reply("⏸️ Nenhuma faixa em reprodução no momento.");
