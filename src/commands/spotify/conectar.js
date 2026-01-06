@@ -10,11 +10,23 @@ module.exports = {
     const reply =
       typeof ctx.reply === "function" ? ctx.reply : (t) => console.log(t);
 
-    // try to identify a user id to attach to the auth session
-    const userId =
-      (ctx.message && (ctx.message.from || ctx.message.author)) ||
-      ctx.sender ||
-      null;
+    // Usar getContact() para obter o número real (@c.us) em vez de @lid
+    let userId = null;
+    try {
+      const msg = ctx.message;
+      if (msg && typeof msg.getContact === "function") {
+        const contact = await msg.getContact();
+        userId = contact.id._serialized || contact.id;
+      } else {
+        userId = (msg && (msg.from || msg.author)) || ctx.sender || null;
+      }
+    } catch (err) {
+      console.log("[conectar] Failed to resolve contact:", err.message);
+      userId =
+        (ctx.message && (ctx.message.from || ctx.message.author)) ||
+        ctx.sender ||
+        null;
+    }
 
     try {
       const payload = {
