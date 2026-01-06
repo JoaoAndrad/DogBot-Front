@@ -60,7 +60,30 @@ module.exports = {
         // Construct Spotify URL
         const spotifyUrl = `https://open.spotify.com/playlist/${playlist.spotifyId}`;
 
-        // Send playlist cover as sticker (best-effort)
+        // Prepare minimal info: name and link
+        const out = `🎵 Playlist do Grupo:\n\nNome: ${
+          playlist.name || "Sem nome"
+        }\n🔗: ${spotifyUrl}`;
+
+        // Send message first (use client.sendMessage to ensure ordering)
+        try {
+          if (
+            ctx &&
+            ctx.client &&
+            typeof ctx.client.sendMessage === "function"
+          ) {
+            await ctx.client.sendMessage(chatId, out);
+          } else {
+            await reply(out);
+          }
+        } catch (e) {
+          logger.warn(
+            "[Playlist] failed to send message reply:",
+            e && e.message
+          );
+        }
+
+        // Then send playlist cover as sticker (best-effort)
         try {
           const stickerHelper = require("../../utils/stickerHelper");
           const trackLike = {
@@ -68,25 +91,15 @@ module.exports = {
             trackName: playlist.name,
             trackId: playlist.spotifyId,
           };
-          // send sticker first (async) and ignore result
-          stickerHelper
-            .sendTrackSticker(ctx.client, chatId, trackLike)
-            .catch((e) => {
-              logger.warn(
-                "[Playlist] failed to send cover sticker:",
-                e && e.message
-              );
-            });
+          await stickerHelper.sendTrackSticker(ctx.client, chatId, trackLike);
         } catch (e) {
           logger.warn(
-            "[Playlist] sticker helper not available:",
+            "[Playlist] failed to send cover sticker:",
             e && e.message
           );
         }
 
-        // Reply with minimal info: name and link
-        const out = `${playlist.name || "Sem nome"}\n${spotifyUrl}`;
-        return reply(out);
+        return;
       }
 
       // Command: set <playlistId>
