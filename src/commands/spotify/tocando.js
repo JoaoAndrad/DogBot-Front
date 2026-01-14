@@ -110,7 +110,27 @@ module.exports = {
         replyText += `\n${bar} ${percent}%\n${msToTime(
           positionMs
         )} / ${msToTime(durationMs)}\n`;
-        replyText += `Iniciado: ${new Date(json.startedAt).toLocaleString()}`;
+        // Format startedAt as DD/MM/YYYY HH:MM:SS in UTC-3 (24h)
+        try {
+          const started = new Date(json.startedAt);
+          // convert to UTC-3 by subtracting 3 hours
+          const startedUtcMinus3 = new Date(
+            started.getTime() - 3 * 60 * 60 * 1000
+          );
+          const pad = (n) => String(n).padStart(2, "0");
+          const startedStr = `${pad(startedUtcMinus3.getUTCDate())}/${pad(
+            startedUtcMinus3.getUTCMonth() + 1
+          )}/${startedUtcMinus3.getUTCFullYear()}, ${pad(
+            startedUtcMinus3.getUTCHours()
+          )}:${pad(startedUtcMinus3.getUTCMinutes())}:${pad(
+            startedUtcMinus3.getUTCSeconds()
+          )}`;
+
+          replyText += `Iniciado: ${startedStr}`;
+        } catch (e) {
+          // fallback to original representation if parsing fails
+          replyText += `Iniciado: ${new Date(json.startedAt).toLocaleString()}`;
+        }
 
         await reply(replyText);
 
