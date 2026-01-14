@@ -1,5 +1,6 @@
 const fetch = require("node-fetch");
 const { sendTrackSticker } = require("../../utils/stickerHelper");
+const { MessageMedia } = require("whatsapp-web.js");
 
 const BACKEND_URL = process.env.BACKEND_URL || "http://localhost:8000";
 
@@ -45,7 +46,7 @@ module.exports = {
   description: "Ver música tocando no Spotify agora",
 
   async execute(context) {
-    const { message, reply } = context;
+    const { message, reply, client } = context;
     const msg = message;
 
     // Usar getContact() para obter o número real (@c.us)
@@ -134,13 +135,40 @@ module.exports = {
 
         await reply(replyText);
 
+        // If preview URL available, try to download and send as audio
+        const previewUrl = t.previewUrl || t.preview_url || null;
+        if (previewUrl) {
+          try {
+            const pres = await fetch(previewUrl);
+            if (pres && pres.ok) {
+              const arrayBuffer = await pres.arrayBuffer();
+              const buffer = Buffer.from(arrayBuffer);
+              const base64 = buffer.toString("base64");
+              const media = new MessageMedia("audio/mpeg", base64);
+              // send as regular audio (not voice) with a caption
+              await client.sendMessage(msg.from, media, {
+                caption: `▶️ Prévia — ${t.name}`,
+              });
+            } else {
+              console.log(
+                `[tocando] preview fetch failed status=${pres && pres.status}`
+              );
+            }
+          } catch (e) {
+            console.log(
+              "[tocando] failed to fetch/send preview:",
+              e && e.message
+            );
+          }
+        }
+
         // Send track artwork as sticker
         const trackWithImage = {
           trackId: t.id,
           trackName: t.name,
           image: t.imageUrl,
         };
-        await sendTrackSticker(context.client, msg.from, trackWithImage);
+        await sendTrackSticker(client, msg.from, trackWithImage);
       }
     } catch (err) {
       console.log("[Command:tocando] Error:", err);
