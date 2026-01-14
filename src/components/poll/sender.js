@@ -57,80 +57,16 @@ function createSender(client) {
 
       const poll = new Poll(title, normalizedOptionNames, optionsObj || {});
 
-      // Send message without triggering sendSeen to avoid markedUnread error
-      // Use the internal sendMessage with options to skip the automatic read receipt
-      const sent = await client.sendMessage(chatId, poll, { sendSeen: false });
+      // sendSeen is disabled globally in the client wrapper (see bot/index.js)
+      const sent = await client.sendMessage(chatId, poll);
       const msgId =
         sent && sent.id && sent.id._serialized ? sent.id._serialized : sent.id;
       return { sent, msgId, type: "native", pollOptions };
     } catch (err) {
-      // Check if it's the specific markedUnread error
-      const errStr = err && (err.stack || err.message || String(err));
-      const isMarkedUnreadError = errStr.includes("markedUnread");
-
-      if (isMarkedUnreadError) {
-        console.log(
-          "sendPoll: encountered markedUnread error (non-fatal), sending via low-level API",
-          {
-            chatId,
-            title,
-          }
-        );
-        // Use Puppeteer directly to bypass sendSeen
-        try {
-          const poll = new Poll(title, normalizedOptionNames, optionsObj || {});
-
-          // Use the lower-level pupPage to send without calling sendSeen
-          const result = await client.pupPage.evaluate(
-            async (chatId, pollData) => {
-              const chat = await window.Store.Chat.get(chatId);
-              const poll = new window.Store.Poll({
-                name: pollData.title,
-                options: pollData.options.map((opt, idx) => ({
-                  name: opt,
-                  localId: idx,
-                })),
-                ...pollData.optionsObj,
-              });
-
-              // Send without calling sendSeen
-              const msg = await window.WWebJS.sendMessage(
-                chat,
-                poll,
-                { createChat: true },
-                false // sendSeen = false
-              );
-
-              return window.WWebJS.getMessageModel(msg);
-            },
-            chatId,
-            {
-              title,
-              options: normalizedOptionNames,
-              optionsObj: optionsObj || {},
-            }
-          );
-
-          if (result) {
-            const msgId =
-              result.id && result.id._serialized
-                ? result.id._serialized
-                : result.id;
-            return { sent: result, msgId, type: "native", pollOptions };
-          }
-        } catch (retryErr) {
-          console.log("sendPoll: low-level API also failed", {
-            chatId,
-            title,
-            err: retryErr && (retryErr.stack || retryErr.message || retryErr),
-          });
-        }
-      }
-
       console.log("sendPoll: failed to send native poll", {
         chatId,
         title,
-        err: errStr,
+        err: err && (err.stack || err.message || err),
       });
       return null;
     }

@@ -39,6 +39,14 @@ async function start() {
       });
   });
 
+  // Wrap sendMessage to automatically disable sendSeen and avoid markedUnread errors
+  const originalSendMessage = client.sendMessage.bind(client);
+  client.sendMessage = async function (chatId, content, options = {}) {
+    // Always disable sendSeen to prevent "Cannot read properties of undefined (reading 'markedUnread')" errors
+    const mergedOptions = { ...options, sendSeen: false };
+    return originalSendMessage(chatId, content, mergedOptions);
+  };
+
   client.on("ready", async () => {
     logger.info("WhatsApp client pronto");
     const config = require("../core/config");
