@@ -137,9 +137,13 @@ module.exports = {
 
         // If preview URL available, try to download and send as audio
         const previewUrl = t.previewUrl || t.preview_url || null;
+        console.log(`[tocando] previewUrl: ${previewUrl}`);
         if (previewUrl) {
           try {
             const pres = await fetch(previewUrl);
+            console.log(
+              `[tocando] preview fetch status: ${pres && pres.status}`
+            );
             if (pres && pres.ok) {
               const arrayBuffer = await pres.arrayBuffer();
               const buffer = Buffer.from(arrayBuffer);
@@ -157,9 +161,11 @@ module.exports = {
           } catch (e) {
             console.log(
               "[tocando] failed to fetch/send preview:",
-              e && e.message
+              e && e.stack ? e.stack : e
             );
           }
+        } else {
+          console.log("[tocando] preview not available for this track");
         }
 
         // Send track artwork as sticker
