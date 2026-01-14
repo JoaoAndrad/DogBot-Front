@@ -135,37 +135,49 @@ module.exports = {
 
         await reply(replyText);
 
-        // If preview URL available, try to download and send as audio
-        const previewUrl = t.previewUrl || t.preview_url || null;
-        console.log(`[tocando] previewUrl: ${previewUrl}`);
-        if (previewUrl) {
-          try {
-            const pres = await fetch(previewUrl);
-            console.log(
-              `[tocando] preview fetch status: ${pres && pres.status}`
-            );
-            if (pres && pres.ok) {
-              const arrayBuffer = await pres.arrayBuffer();
-              const buffer = Buffer.from(arrayBuffer);
-              const base64 = buffer.toString("base64");
-              const media = new MessageMedia("audio/mpeg", base64);
-              // send as regular audio (not voice) with a caption
-              await client.sendMessage(msg.from, media, {
-                caption: `▶️ Prévia — ${t.name}`,
-              });
-            } else {
+        // Use backend proxy to fetch cached preview (avoids CORS and centralizes rate-limits)
+        try {
+          const proxyUrl = `${BACKEND_URL.replace(
+            /\/$/,
+            ""
+          )}/api/spotify/preview?trackId=${encodeURIComponent(t.id)}`;
+          console.log(`[tocando] proxy preview url: ${proxyUrl}`);
+          const pres = await fetch(proxyUrl);
+          console.log(
+            `[tocando] proxy preview fetch status: ${pres && pres.status}`
+          );
+
+          const contentType =
+            (pres.headers && pres.headers.get
+              ? pres.headers.get("content-type")
+              : null) || "";
+          if (pres && pres.ok && contentType.includes("audio")) {
+            const arrayBuffer = await pres.arrayBuffer();
+            const buffer = Buffer.from(arrayBuffer);
+            const base64 = buffer.toString("base64");
+            const media = new MessageMedia("audio/mpeg", base64);
+            await client.sendMessage(msg.from, media, {
+              caption: `▶️ Prévia — ${t.name}`,
+            });
+          } else {
+            // When preview not available, backend returns JSON with error info
+            try {
+              const body = await pres.json().catch(() => null);
               console.log(
-                `[tocando] preview fetch failed status=${pres && pres.status}`
+                "[tocando] proxy preview response not audio, body:",
+                body
+              );
+            } catch (e) {
+              console.log(
+                "[tocando] proxy preview: non-audio response and failed to parse body"
               );
             }
-          } catch (e) {
-            console.log(
-              "[tocando] failed to fetch/send preview:",
-              e && e.stack ? e.stack : e
-            );
           }
-        } else {
-          console.log("[tocando] preview not available for this track");
+        } catch (e) {
+          console.log(
+            "[tocando] failed to fetch/send preview via proxy:",
+            e && e.stack ? e.stack : e
+          );
         }
 
         // Send track artwork as sticker
