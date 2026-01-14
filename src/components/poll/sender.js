@@ -49,8 +49,35 @@ function createSender(client) {
     try {
       await _openChatIfNeeded(chatId);
 
+      // Ensure chat is present in client's cache/store to avoid internal errors
+      try {
+        if (typeof client.getChatById === "function") {
+          await client.getChatById(chatId).catch(() => {});
+        }
+      } catch (e) {
+        // non-fatal
+      }
+
       const poll = new Poll(title, normalizedOptionNames, optionsObj || {});
-      const sent = await client.sendMessage(chatId, poll);
+
+      // Try sending once, and retry once if we hit the markedUnread DOM race
+      let sent = null;
+      try {
+        sent = await client.sendMessage(chatId, poll);
+      } catch (err1) {
+        const msg = err1 && (err1.message || err1.stack || "");
+        if (String(msg).includes("markedUnread")) {
+          // brief delay then retry
+          await new Promise((r) => setTimeout(r, 800));
+          try {
+            sent = await client.sendMessage(chatId, poll);
+          } catch (err2) {
+            throw err2;
+          }
+        } else {
+          throw err1;
+        }
+      }
       const msgId =
         sent && sent.id && sent.id._serialized ? sent.id._serialized : sent.id;
       return { sent, msgId, type: "native", pollOptions };
