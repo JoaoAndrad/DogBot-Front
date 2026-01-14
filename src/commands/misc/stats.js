@@ -66,6 +66,7 @@ module.exports = {
             r.track && Array.isArray(r.track.artists)
               ? r.track.artists.join(", ")
               : (r.track && r.track.artists) || "",
+          plays: r.count || r.plays || r.playCount || 0,
         }));
         const segments = {
           morning: json.timeOfDay?.morning || 0,
@@ -89,8 +90,43 @@ module.exports = {
             : r.track?.artists || "",
         }));
 
+        function formatPeriodLabel(p) {
+          if (!p) return "Esse mês";
+          const low = String(p).toLowerCase();
+          if (
+            low === "7d" ||
+            low.includes("7") ||
+            low.includes("7 dias") ||
+            low.includes("últimos 7")
+          )
+            return "Últimos 7 dias";
+          if (
+            low === "30d" ||
+            low.includes("30") ||
+            low.includes("30 dias") ||
+            low.includes("últimos 30")
+          )
+            return "Últimos 30 dias";
+          if (
+            low === "90d" ||
+            low.includes("90") ||
+            low.includes("90 dias") ||
+            low.includes("últimos 90")
+          )
+            return "Últimos 90 dias";
+          if (
+            low === "all" ||
+            low === "overall" ||
+            low.includes("geral") ||
+            low.includes("todos")
+          )
+            return "Geral";
+          if (/^\d{4}-\d{2}$/.test(String(p))) return "Esse mês";
+          return p;
+        }
+
         templateData = {
-          period: json.period || "Este mês",
+          period: formatPeriodLabel(json.period) || "Esse mês",
           total: sum.totalPlays || 0,
           unique: sum.uniqueTracks || 0,
           time: fmtDuration(sum.totalMs || sum.totalListenMs || 0),

@@ -343,12 +343,12 @@
       </div>
 
       <div class="card">
-        <div class="card-title">Em repeat</div>
+        <div class="card-title">Mais escutadas</div>
         {{#each repeat}}
         <div class="list-item">
           <div class="item-info">
             <span class="item-name">"{{this.song}}"</span>
-            <span class="item-sub">{{this.artist}}</span>
+            <span class="item-sub">{{this.artist}} — {{this.plays}} plays</span>
           </div>
         </div>
         {{/each}}
