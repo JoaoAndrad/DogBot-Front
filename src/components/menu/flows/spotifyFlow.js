@@ -537,6 +537,12 @@ const spotifyFlow = createFlow("spotify", {
 
         const res = await fetch(url, { method: "GET" });
         const json = await res.json();
+        console.log(`[spotifyFlow] Período selecionado: ${displayLabel}`);
+        console.log(
+          `[spotifyFlow] Período recebido (raw from backend): ${
+            json && json.period
+          }`
+        );
         if (!json) {
           await ctx.reply("❌ Erro ao obter estatísticas.");
           return { end: false };
@@ -698,8 +704,9 @@ const spotifyFlow = createFlow("spotify", {
             return p;
           }
 
+          // Use the display label derived from the selected option (no fallback to hardcoded "Esse mês")
           const templateData = {
-            period: formatPeriodLabel(json.period) || "Esse mês",
+            period: displayLabel,
             total: sum.totalPlays || 0,
             unique: sum.uniqueTracks || 0,
             time: fmtDuration(sum.totalListenMs || 0),

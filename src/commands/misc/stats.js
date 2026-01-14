@@ -13,6 +13,7 @@ module.exports = {
 
     try {
       // Fetch aggregated stats from backend for this group
+      console.log("[stats] Período selecionado: manual_command");
       let data = null;
       try {
         data = await backendClient.sendToBackend(
@@ -143,6 +144,9 @@ module.exports = {
         );
       }
 
+      console.log(
+        `[stats] Período recebido (raw from backend): ${data && data.period}`
+      );
       const img = await renderCard(templateData, {
         width: 800,
         height: 1200,
