@@ -535,6 +535,22 @@ const spotifyFlow = createFlow("spotify", {
 
         if (isGroup) url += `&scope=group`;
 
+        // Add a normalized period token so backend can echo it (or the frontend
+        // can rely on it). Tokens: '7d','30d','90d','all' or 'YYYY-MM' for months.
+        let periodToken = null;
+        if (period === "month") {
+          const now = new Date();
+          const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+          periodToken = `${monthStart.getFullYear()}-${String(
+            monthStart.getMonth() + 1
+          ).padStart(2, "0")}`;
+        } else {
+          const daysNum = days && Number(days) > 0 ? Number(days) : 0;
+          periodToken = daysNum === 0 ? "all" : `${daysNum}d`;
+        }
+
+        if (periodToken) url += `&period=${encodeURIComponent(periodToken)}`;
+
         const res = await fetch(url, { method: "GET" });
         const json = await res.json();
         console.log(`[spotifyFlow] Período selecionado: ${displayLabel}`);
