@@ -1,3 +1,5 @@
+const fetch = require("node-fetch");
+const { MessageMedia } = require("whatsapp-web.js");
 const backendClient = require("../../services/backendClient");
 const logger = require("../../utils/logger");
 const polls = require("../../components/poll");
@@ -424,6 +426,48 @@ module.exports = {
 
         // Send track artwork as sticker
         await sendTrackSticker(client, chatId, currentTrack);
+
+        // Fetch and send preview audio (after sticker) using backend proxy
+        try {
+          const BACKEND_URL =
+            process.env.BACKEND_URL || "http://localhost:8000";
+          const proxyUrl = `${BACKEND_URL.replace(
+            /\/$/,
+            ""
+          )}/api/spotify/preview?trackId=${encodeURIComponent(
+            currentTrack.trackId
+          )}`;
+          logger.debug(`[Voto] fetching preview from: ${proxyUrl}`);
+          const pres = await fetch(proxyUrl);
+          logger.debug(`[Voto] preview fetch status: ${pres && pres.status}`);
+          const contentType =
+            (pres.headers && pres.headers.get
+              ? pres.headers.get("content-type")
+              : null) || "";
+          if (pres && pres.ok && contentType.includes("audio")) {
+            const arrayBuffer = await pres.arrayBuffer();
+            const buffer = Buffer.from(arrayBuffer);
+            const base64 = buffer.toString("base64");
+            const media = new MessageMedia("audio/mpeg", base64);
+            await client.sendMessage(chatId, media, {
+              caption: `▶️ Prévia — ${currentTrack.trackName}`,
+            });
+          } else {
+            try {
+              const body = await pres.json().catch(() => null);
+              logger.debug("[Voto] preview not audio, body:", body);
+            } catch (e) {
+              logger.debug(
+                "[Voto] preview non-audio response and failed to parse body"
+              );
+            }
+          }
+        } catch (err) {
+          logger.warn(
+            "[Voto] failed to fetch/send preview:",
+            err && err.message
+          );
+        }
 
         if (pollResult && pollResult.msgId) {
           // Update vote with pollId and record initiator's auto-vote

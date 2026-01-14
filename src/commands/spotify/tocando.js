@@ -135,7 +135,15 @@ module.exports = {
 
         await reply(replyText);
 
-        // Use backend proxy to fetch cached preview (avoids CORS and centralizes rate-limits)
+        // Send track artwork as sticker first
+        const trackWithImage = {
+          trackId: t.id,
+          trackName: t.name,
+          image: t.imageUrl,
+        };
+        await sendTrackSticker(client, msg.from, trackWithImage);
+
+        // Then use backend proxy to fetch cached preview (avoids CORS and centralizes rate-limits)
         try {
           const proxyUrl = `${BACKEND_URL.replace(
             /\/$/,
@@ -179,14 +187,6 @@ module.exports = {
             e && e.stack ? e.stack : e
           );
         }
-
-        // Send track artwork as sticker
-        const trackWithImage = {
-          trackId: t.id,
-          trackName: t.name,
-          image: t.imageUrl,
-        };
-        await sendTrackSticker(client, msg.from, trackWithImage);
       }
     } catch (err) {
       console.log("[Command:tocando] Error:", err);
