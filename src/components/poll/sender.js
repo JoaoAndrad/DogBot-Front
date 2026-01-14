@@ -56,7 +56,10 @@ function createSender(client) {
       }
 
       const poll = new Poll(title, normalizedOptionNames, optionsObj || {});
-      const sent = await client.sendMessage(chatId, poll);
+
+      // Send message without triggering sendSeen to avoid markedUnread error
+      // Use the internal sendMessage with options to skip the automatic read receipt
+      const sent = await client.sendMessage(chatId, poll, { sendSeen: false });
       const msgId =
         sent && sent.id && sent.id._serialized ? sent.id._serialized : sent.id;
       return { sent, msgId, type: "native", pollOptions };
@@ -67,23 +70,56 @@ function createSender(client) {
 
       if (isMarkedUnreadError) {
         console.log(
-          "sendPoll: encountered markedUnread error (non-fatal), retrying without sendSeen",
+          "sendPoll: encountered markedUnread error (non-fatal), sending via low-level API",
           {
             chatId,
             title,
           }
         );
-        // Try sending again without relying on automatic chat state updates
+        // Use Puppeteer directly to bypass sendSeen
         try {
           const poll = new Poll(title, normalizedOptionNames, optionsObj || {});
-          const sent = await client.sendMessage(chatId, poll);
-          const msgId =
-            sent && sent.id && sent.id._serialized
-              ? sent.id._serialized
-              : sent.id;
-          return { sent, msgId, type: "native", pollOptions };
+
+          // Use the lower-level pupPage to send without calling sendSeen
+          const result = await client.pupPage.evaluate(
+            async (chatId, pollData) => {
+              const chat = await window.Store.Chat.get(chatId);
+              const poll = new window.Store.Poll({
+                name: pollData.title,
+                options: pollData.options.map((opt, idx) => ({
+                  name: opt,
+                  localId: idx,
+                })),
+                ...pollData.optionsObj,
+              });
+
+              // Send without calling sendSeen
+              const msg = await window.WWebJS.sendMessage(
+                chat,
+                poll,
+                { createChat: true },
+                false // sendSeen = false
+              );
+
+              return window.WWebJS.getMessageModel(msg);
+            },
+            chatId,
+            {
+              title,
+              options: normalizedOptionNames,
+              optionsObj: optionsObj || {},
+            }
+          );
+
+          if (result) {
+            const msgId =
+              result.id && result.id._serialized
+                ? result.id._serialized
+                : result.id;
+            return { sent: result, msgId, type: "native", pollOptions };
+          }
         } catch (retryErr) {
-          console.log("sendPoll: retry also failed", {
+          console.log("sendPoll: low-level API also failed", {
             chatId,
             title,
             err: retryErr && (retryErr.stack || retryErr.message || retryErr),
