@@ -42,11 +42,14 @@ module.exports = {
     }
 
     // parse command body to extract confession text (remove leading /confissao)
+    // Preserve original formatting (line breaks, quotes, spacing). Do not trim.
     const raw = (info && info.body) || (message && message.body) || "";
-    const parts = raw.trim().split(/\s+/);
-    let text = parts.slice(1).join(" ").trim();
+    // Remove only the leading command token '/confissao' (with optional leading slash
+    // and trailing punctuation/space) and keep the rest exactly as the user typed.
+    const cmdMatch = raw.match(/^\s*\/?confissao\b[:\s]*/i);
+    let text = cmdMatch ? raw.slice(cmdMatch[0].length) : raw;
 
-    if (!text && !(message && message.hasMedia)) {
+    if (!(text && text.trim().length) && !(message && message.hasMedia)) {
       await reply(
         "Uso: /confissao <sua mensagem>\nEx: /confissao confesso que..."
       );
@@ -366,7 +369,7 @@ module.exports = {
 
               // send to group with mentions list (preserve the same order)
               try {
-                const groupMsg = `*📩 Confissão:* ${replacedText}`;
+                const groupMsg = `📩 Confissão:\n\n${replacedText}`;
                 if (message && message.hasMedia) {
                   try {
                     const media = await mediaHelper.obterMidiaDaMensagem(
@@ -577,7 +580,7 @@ module.exports = {
     if (candidateGroups.length === 1) {
       const target = candidateGroups[0];
       try {
-        const groupMsg = `*📩 Confissão:* ${text}`;
+        const groupMsg = `📩 Confissão:\n\n${text}`;
         if (message && message.hasMedia) {
           try {
             const media = await mediaHelper.obterMidiaDaMensagem(message);
