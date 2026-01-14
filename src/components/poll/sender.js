@@ -49,43 +49,52 @@ function createSender(client) {
     try {
       await _openChatIfNeeded(chatId);
 
-      // Ensure chat is present in client's cache/store to avoid internal errors
-      try {
-        if (typeof client.getChatById === "function") {
-          await client.getChatById(chatId).catch(() => {});
-        }
-      } catch (e) {
-        // non-fatal
+      // Get chat object first to ensure it's properly loaded before sending
+      const chat = await client.getChatById(chatId);
+      if (!chat) {
+        throw new Error(`Chat not found: ${chatId}`);
       }
 
       const poll = new Poll(title, normalizedOptionNames, optionsObj || {});
-
-      // Try sending once, and retry once if we hit the markedUnread DOM race
-      let sent = null;
-      try {
-        sent = await client.sendMessage(chatId, poll);
-      } catch (err1) {
-        const msg = err1 && (err1.message || err1.stack || "");
-        if (String(msg).includes("markedUnread")) {
-          // brief delay then retry
-          await new Promise((r) => setTimeout(r, 800));
-          try {
-            sent = await client.sendMessage(chatId, poll);
-          } catch (err2) {
-            throw err2;
-          }
-        } else {
-          throw err1;
-        }
-      }
+      const sent = await client.sendMessage(chatId, poll);
       const msgId =
         sent && sent.id && sent.id._serialized ? sent.id._serialized : sent.id;
       return { sent, msgId, type: "native", pollOptions };
     } catch (err) {
+      // Check if it's the specific markedUnread error
+      const errStr = err && (err.stack || err.message || String(err));
+      const isMarkedUnreadError = errStr.includes("markedUnread");
+
+      if (isMarkedUnreadError) {
+        console.log(
+          "sendPoll: encountered markedUnread error (non-fatal), retrying without sendSeen",
+          {
+            chatId,
+            title,
+          }
+        );
+        // Try sending again without relying on automatic chat state updates
+        try {
+          const poll = new Poll(title, normalizedOptionNames, optionsObj || {});
+          const sent = await client.sendMessage(chatId, poll);
+          const msgId =
+            sent && sent.id && sent.id._serialized
+              ? sent.id._serialized
+              : sent.id;
+          return { sent, msgId, type: "native", pollOptions };
+        } catch (retryErr) {
+          console.log("sendPoll: retry also failed", {
+            chatId,
+            title,
+            err: retryErr && (retryErr.stack || retryErr.message || retryErr),
+          });
+        }
+      }
+
       console.log("sendPoll: failed to send native poll", {
         chatId,
         title,
-        err: err && (err.stack || err.message || err),
+        err: errStr,
       });
       return null;
     }
