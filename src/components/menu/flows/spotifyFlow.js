@@ -253,6 +253,52 @@ const spotifyFlow = createFlow("spotify", {
             image: t.imageUrl,
           };
           await sendTrackSticker(ctx.client, ctx.chatId, trackWithImage);
+
+          // Attempt to fetch and send preview audio via backend proxy
+          try {
+            const trackId = t.id;
+            if (trackId) {
+              const proxyUrl = `${BACKEND_URL}/api/spotify/preview?trackId=${encodeURIComponent(
+                trackId
+              )}`;
+              console.log(
+                `[spotifyFlow] fetching preview from proxy: ${proxyUrl}`
+              );
+              const ares = await fetch(proxyUrl, { method: "GET" });
+              if (ares && ares.ok) {
+                const contentType = ares.headers.get("content-type") || "";
+                if (
+                  contentType.includes("audio") ||
+                  contentType.includes("mpeg") ||
+                  contentType.includes("mp3")
+                ) {
+                  const buf = await ares.buffer();
+                  const { MessageMedia } = require("whatsapp-web.js");
+                  const media = new MessageMedia(
+                    "audio/mpeg",
+                    buf.toString("base64")
+                  );
+                  await ctx.client.sendMessage(ctx.chatId, media, {});
+                  console.log("[spotifyFlow] preview audio sent");
+                } else {
+                  console.log(
+                    "[spotifyFlow] preview proxy returned non-audio content-type:",
+                    contentType
+                  );
+                }
+              } else {
+                console.log(
+                  "[spotifyFlow] preview unavailable from proxy; status:",
+                  ares && ares.status
+                );
+              }
+            }
+          } catch (audioErr) {
+            console.warn(
+              "[spotifyFlow] error fetching/sending preview audio:",
+              audioErr && audioErr.message ? audioErr.message : audioErr
+            );
+          }
         }
       } catch (e) {
         await ctx.reply(
