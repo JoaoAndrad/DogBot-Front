@@ -44,10 +44,31 @@ module.exports = {
     // parse command body to extract confession text (remove leading /confissao)
     // Preserve original formatting (line breaks, quotes, spacing). Do not trim.
     const raw = (info && info.body) || (message && message.body) || "";
-    // Remove only the leading command token '/confissao' (with optional leading slash
-    // and trailing punctuation/space) and keep the rest exactly as the user typed.
-    const cmdMatch = raw.match(/^\s*\/?confissao\b[:\s]*/i);
-    let text = cmdMatch ? raw.slice(cmdMatch[0].length) : raw;
+    // Remove only the leading command token 'confissao' (with or without diacritics
+    // and optional leading slash) while preserving the rest of the original text.
+    let text = raw;
+    try {
+      const firstTokMatch = raw.match(/^\s*(\/?\S+)/);
+      if (firstTokMatch) {
+        const firstTok = firstTokMatch[1]; // includes optional leading slash
+        const deaccent = (s) =>
+          String(s || "")
+            .normalize("NFD")
+            .replace(/[\u0300-\u036f]/g, "")
+            .toLowerCase();
+        if (
+          deaccent(firstTok.replace(/^\//, "").replace(/[:\s]+$/, "")) ===
+          "confissao"
+        ) {
+          const start = raw.indexOf(firstTokMatch[1]) + firstTokMatch[1].length;
+          text = raw.slice(start).replace(/^[\s:]+/, "");
+        }
+      }
+    } catch (e) {
+      // fallback: previous simple regex if anything goes wrong
+      const cmdMatch = raw.match(/^\s*\/?confissao\b[:\s]*/i);
+      text = cmdMatch ? raw.slice(cmdMatch[0].length) : raw;
+    }
 
     if (!(text && text.trim().length) && !(message && message.hasMedia)) {
       await reply(
@@ -369,7 +390,7 @@ module.exports = {
 
               // send to group with mentions list (preserve the same order)
               try {
-                const groupMsg = `📩 Confissão:\n\n${replacedText}`;
+                const groupMsg = `*📩 Confissão:* ${replacedText}`;
                 if (message && message.hasMedia) {
                   try {
                     const media = await mediaHelper.obterMidiaDaMensagem(
@@ -580,7 +601,7 @@ module.exports = {
     if (candidateGroups.length === 1) {
       const target = candidateGroups[0];
       try {
-        const groupMsg = `📩 Confissão:\n\n${text}`;
+        const groupMsg = `*📩 Confissão:* ${text}`;
         if (message && message.hasMedia) {
           try {
             const media = await mediaHelper.obterMidiaDaMensagem(message);
