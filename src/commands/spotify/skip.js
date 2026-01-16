@@ -13,6 +13,9 @@ module.exports = {
     const msg = message;
     const chatId = msg.from;
 
+    // Comando temporariamente desativado
+    return reply("⚠️ O comando /skip está temporariamente desativado.");
+
     // Check if is group: either msg.isGroup or chatId ends with @g.us
     const isGroup =
       !!(msg && msg.isGroup) || (chatId && chatId.endsWith("@g.us"));
