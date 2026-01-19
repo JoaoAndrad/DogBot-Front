@@ -34,14 +34,14 @@ async function downloadAndConvertToWebp(imageUrl, trackId) {
     const response = await fetch(imageUrl);
     if (!response.ok) {
       logger.error(
-        `[StickerHelper] Failed to download image: ${response.status}`
+        `[StickerHelper] Failed to download image: ${response.status}`,
       );
       return null;
     }
 
     const buffer = await response.buffer();
     logger.debug(
-      `[StickerHelper] Downloaded ${buffer.length} bytes from ${imageUrl}`
+      `[StickerHelper] Downloaded ${buffer.length} bytes from ${imageUrl}`,
     );
 
     // Convert to WebP with fixed square size (512x512 is recommended for WhatsApp stickers)
@@ -54,7 +54,7 @@ async function downloadAndConvertToWebp(imageUrl, trackId) {
       .toBuffer();
 
     logger.info(
-      `[StickerHelper] Converted to WebP: ${webpBuffer.length} bytes`
+      `[StickerHelper] Converted to WebP: ${webpBuffer.length} bytes`,
     );
     return webpBuffer;
   } catch (error) {
@@ -78,13 +78,13 @@ async function sendTrackSticker(client, chatId, track) {
     }
 
     logger.info(
-      `[StickerHelper] Sending sticker for ${track.trackName} to ${chatId}`
+      `[StickerHelper] Sending sticker for ${track.trackName} to ${chatId}`,
     );
 
     // Download and convert
     const webpBuffer = await downloadAndConvertToWebp(
       track.image,
-      track.trackId
+      track.trackId,
     );
     if (!webpBuffer) {
       logger.warn("[StickerHelper] Failed to create WebP buffer");
@@ -94,13 +94,34 @@ async function sendTrackSticker(client, chatId, track) {
     // Create MessageMedia with base64 encoded WebP
     const media = new MessageMedia("image/webp", webpBuffer.toString("base64"));
 
-    // Send as sticker
-    await client.sendMessage(chatId, media, { sendMediaAsSticker: true });
-
-    logger.info(
-      `[StickerHelper] ✅ Sticker sent successfully for ${track.trackName}`
-    );
-    return true;
+    // Send as sticker. If it fails, log details and try a fallback (send as image)
+    try {
+      await client.sendMessage(chatId, media, { sendMediaAsSticker: true });
+      logger.info(
+        `[StickerHelper] ✅ Sticker sent successfully for ${track.trackName}`,
+      );
+      return true;
+    } catch (sendErr) {
+      // Log full error for debugging (stack and raw object if available)
+      logger.error(
+        `[StickerHelper] Error sending sticker (stack): ${sendErr && sendErr.stack ? sendErr.stack : String(sendErr)}`,
+      );
+      try {
+        logger.warn(
+          `[StickerHelper] Attempting fallback: send as regular image for ${track.trackName}`,
+        );
+        await client.sendMessage(chatId, media); // fallback: send as image
+        logger.info(
+          `[StickerHelper] ✅ Fallback image sent for ${track.trackName}`,
+        );
+        return true;
+      } catch (fallbackErr) {
+        logger.error(
+          `[StickerHelper] Fallback send failed: ${fallbackErr && fallbackErr.stack ? fallbackErr.stack : String(fallbackErr)}`,
+        );
+        return false;
+      }
+    }
   } catch (error) {
     logger.error(`[StickerHelper] Error sending sticker: ${error.message}`);
     return false;
@@ -179,13 +200,13 @@ async function createCompositeWebp(tracks) {
       const mask0 = Buffer.from(
         `<svg width="${SIZE}" height="${SIZE}">
           <polygon points="0,0 0,${SIZE} ${SIZE},${SIZE}" fill="white"/>
-        </svg>`
+        </svg>`,
       );
 
       const mask1 = Buffer.from(
         `<svg width="${SIZE}" height="${SIZE}">
           <polygon points="0,0 ${SIZE},0 ${SIZE},${SIZE}" fill="white"/>
-        </svg>`
+        </svg>`,
       );
 
       // Ensure images have alpha channel before applying masks
@@ -234,10 +255,10 @@ async function createCompositeWebp(tracks) {
         Buffer.from(
           `<svg width="${SIZE}" height="${SIZE}">
             <polygon points="0,${SIZE} 0,${Math.floor(
-            (SIZE * 2) / 3
-          )} ${Math.floor(SIZE / 3)},${SIZE}" fill="white"/>
-          </svg>`
-        )
+              (SIZE * 2) / 3,
+            )} ${Math.floor(SIZE / 3)},${SIZE}" fill="white"/>
+          </svg>`,
+        ),
       );
 
       // Band 2: middle diagonal stripe
@@ -245,14 +266,14 @@ async function createCompositeWebp(tracks) {
         Buffer.from(
           `<svg width="${SIZE}" height="${SIZE}">
             <polygon points="0,${Math.floor((SIZE * 2) / 3)} 0,${Math.floor(
-            SIZE / 3
-          )} ${Math.floor(SIZE / 3)},0 ${Math.floor(
-            (SIZE * 2) / 3
-          )},0 ${SIZE},${Math.floor((SIZE * 2) / 3)} ${Math.floor(
-            (SIZE * 2) / 3
-          )},${SIZE} ${Math.floor(SIZE / 3)},${SIZE}" fill="white"/>
-          </svg>`
-        )
+              SIZE / 3,
+            )} ${Math.floor(SIZE / 3)},0 ${Math.floor(
+              (SIZE * 2) / 3,
+            )},0 ${SIZE},${Math.floor((SIZE * 2) / 3)} ${Math.floor(
+              (SIZE * 2) / 3,
+            )},${SIZE} ${Math.floor(SIZE / 3)},${SIZE}" fill="white"/>
+          </svg>`,
+        ),
       );
 
       // Band 3: top-right corner
@@ -260,12 +281,12 @@ async function createCompositeWebp(tracks) {
         Buffer.from(
           `<svg width="${SIZE}" height="${SIZE}">
             <polygon points="${Math.floor(
-              (SIZE * 2) / 3
+              (SIZE * 2) / 3,
             )},0 ${SIZE},0 ${SIZE},${Math.floor(SIZE / 3)} ${SIZE},${Math.floor(
-            (SIZE * 2) / 3
-          )} ${Math.floor((SIZE * 2) / 3)},${SIZE}" fill="white"/>
-          </svg>`
-        )
+              (SIZE * 2) / 3,
+            )} ${Math.floor((SIZE * 2) / 3)},${SIZE}" fill="white"/>
+          </svg>`,
+        ),
       );
 
       // Apply masks to images with alpha channel
@@ -276,8 +297,8 @@ async function createCompositeWebp(tracks) {
             .ensureAlpha()
             .composite([{ input: masks[idx], blend: "dest-in" }])
             .png()
-            .toBuffer()
-        )
+            .toBuffer(),
+        ),
       );
 
       // Combine all three masked images on a black background
@@ -306,8 +327,8 @@ async function createCompositeWebp(tracks) {
 
     const resized = await Promise.all(
       imgs.map((img) =>
-        sharp(img).resize(cellW, cellH, { fit: "cover" }).toBuffer()
-      )
+        sharp(img).resize(cellW, cellH, { fit: "cover" }).toBuffer(),
+      ),
     );
 
     const composites = [];
