@@ -56,51 +56,51 @@ async function downloadAndConvertToWebp(imageUrl, trackId) {
     logger.info(
       `[StickerHelper] Converted to WebP: ${webpBuffer.length} bytes`,
     );
-    try {
-      // Try the minimal, most-compatible option first (no metadata)
-      await client.sendMessage(chatId, media, { sendMediaAsSticker: true });
-      logger.info(
-        `[StickerHelper] ✅ Sticker sent successfully for ${track.trackName}`,
-      );
-      return true;
-    } catch (sendErr) {
-      // Log full error for debugging (stack and raw object if available)
-      logger.error(
-        `[StickerHelper] Error sending sticker (first attempt): ${sendErr && sendErr.stack ? sendErr.stack : String(sendErr)}`,
-      );
+    return webpBuffer;
+  } catch (error) {
+    logger.error(`[StickerHelper] Error processing image: ${error.message}`);
+    return null;
+  }
+}
 
-      // Try again with explicit metadata (some client versions accept this)
-      try {
-        await client.sendMessage(chatId, media, {
-          sendMediaAsSticker: true,
-          stickerAuthor: "DogBot",
-          stickerName: track.trackName || "Sticker",
-        });
-        logger.info(
-          `[StickerHelper] ✅ Sticker sent successfully (with metadata) for ${track.trackName}`,
-        );
-        return true;
-      } catch (sendErr2) {
-        logger.error(
-          `[StickerHelper] Error sending sticker (with metadata): ${sendErr2 && sendErr2.stack ? sendErr2.stack : String(sendErr2)}`,
-        );
-        try {
-          logger.warn(
-            `[StickerHelper] Attempting fallback: send as regular image for ${track.trackName}`,
-          );
-          await client.sendMessage(chatId, media); // fallback: send as image
-          logger.info(
-            `[StickerHelper] ✅ Fallback image sent for ${track.trackName}`,
-          );
-          return true;
-        } catch (fallbackErr) {
-          logger.error(
-            `[StickerHelper] Fallback send failed: ${fallbackErr && fallbackErr.stack ? fallbackErr.stack : String(fallbackErr)}`,
-          );
-          return false;
-        }
-      }
+/**
+ * Send track artwork as a WhatsApp sticker
+ * @param {Object} client - WhatsApp Web client
+ * @param {string} chatId - Chat ID to send to
+ * @param {Object} track - Track object with image URL
+ * @returns {Promise<boolean>} Success status
+ */
+async function sendTrackSticker(client, chatId, track) {
+  try {
+    if (!track || !track.image) {
+      logger.warn("[StickerHelper] No track image available");
+      return false;
     }
+
+    logger.info(
+      `[StickerHelper] Sending sticker for ${track.trackName} to ${chatId}`,
+    );
+
+    // Download and convert
+    const webpBuffer = await downloadAndConvertToWebp(
+      track.image,
+      track.trackId,
+    );
+    if (!webpBuffer) {
+      logger.warn("[StickerHelper] Failed to create WebP buffer");
+      return false;
+    }
+
+    // Create MessageMedia with base64 encoded WebP and explicit filename
+    const media = new MessageMedia(
+      "image/webp",
+      webpBuffer.toString("base64"),
+      "sticker.webp",
+    );
+
+    // Send as sticker with explicit sticker metadata. If it fails, log details and try a fallback (send as image)
+    try {
+      await client.sendMessage(chatId, media, {
         sendMediaAsSticker: true,
         stickerAuthor: "DogBot",
         stickerName: track.trackName || "Sticker",
@@ -378,36 +378,12 @@ async function sendCompositeSticker(client, chatId, tracks) {
       webpBuf.toString("base64"),
       "sticker.webp",
     );
-
-    try {
-      await client.sendMessage(chatId, media, { sendMediaAsSticker: true });
-      return true;
-    } catch (sendErr) {
-      logger.error(
-        `[StickerHelper] Error sending composite sticker (first attempt): ${sendErr && sendErr.stack ? sendErr.stack : String(sendErr)}`,
-      );
-      try {
-        await client.sendMessage(chatId, media, {
-          sendMediaAsSticker: true,
-          stickerAuthor: "DogBot",
-          stickerName: "Composite",
-        });
-        return true;
-      } catch (sendErr2) {
-        logger.error(
-          `[StickerHelper] Error sending composite sticker (with metadata): ${sendErr2 && sendErr2.stack ? sendErr2.stack : String(sendErr2)}`,
-        );
-        try {
-          await client.sendMessage(chatId, media); // fallback
-          return true;
-        } catch (fallbackErr) {
-          logger.error(
-            `[StickerHelper] Composite fallback send failed: ${fallbackErr && fallbackErr.stack ? fallbackErr.stack : String(fallbackErr)}`,
-          );
-          return false;
-        }
-      }
-    }
+    await client.sendMessage(chatId, media, {
+      sendMediaAsSticker: true,
+      stickerAuthor: "DogBot",
+      stickerName: "Composite",
+    });
+    return true;
   } catch (e) {
     logger.error("[StickerHelper] sendCompositeSticker error: " + e.message);
     return false;
