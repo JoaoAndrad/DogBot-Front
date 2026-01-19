@@ -91,12 +91,20 @@ async function sendTrackSticker(client, chatId, track) {
       return false;
     }
 
-    // Create MessageMedia with base64 encoded WebP
-    const media = new MessageMedia("image/webp", webpBuffer.toString("base64"));
+    // Create MessageMedia with base64 encoded WebP and explicit filename
+    const media = new MessageMedia(
+      "image/webp",
+      webpBuffer.toString("base64"),
+      "sticker.webp",
+    );
 
-    // Send as sticker. If it fails, log details and try a fallback (send as image)
+    // Send as sticker with explicit sticker metadata. If it fails, log details and try a fallback (send as image)
     try {
-      await client.sendMessage(chatId, media, { sendMediaAsSticker: true });
+      await client.sendMessage(chatId, media, {
+        sendMediaAsSticker: true,
+        stickerAuthor: "DogBot",
+        stickerName: track.trackName || "Sticker",
+      });
       logger.info(
         `[StickerHelper] ✅ Sticker sent successfully for ${track.trackName}`,
       );
@@ -365,8 +373,16 @@ async function sendCompositeSticker(client, chatId, tracks) {
     // Build composite webp
     const webpBuf = await createCompositeWebp(tracks.slice(0, 9));
     if (!webpBuf) return false;
-    const media = new MessageMedia("image/webp", webpBuf.toString("base64"));
-    await client.sendMessage(chatId, media, { sendMediaAsSticker: true });
+    const media = new MessageMedia(
+      "image/webp",
+      webpBuf.toString("base64"),
+      "sticker.webp",
+    );
+    await client.sendMessage(chatId, media, {
+      sendMediaAsSticker: true,
+      stickerAuthor: "DogBot",
+      stickerName: "Composite",
+    });
     return true;
   } catch (e) {
     logger.error("[StickerHelper] sendCompositeSticker error: " + e.message);
