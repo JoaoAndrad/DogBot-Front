@@ -102,8 +102,6 @@ async function sendTrackSticker(client, chatId, track) {
     try {
       await client.sendMessage(chatId, media, {
         sendMediaAsSticker: true,
-        stickerAuthor: "DogBot",
-        stickerName: track.trackName || "Sticker",
       });
       logger.info(
         `[StickerHelper] ✅ Sticker sent successfully for ${track.trackName}`,
@@ -380,8 +378,6 @@ async function sendCompositeSticker(client, chatId, tracks) {
     );
     await client.sendMessage(chatId, media, {
       sendMediaAsSticker: true,
-      stickerAuthor: "DogBot",
-      stickerName: "Composite",
     });
     return true;
   } catch (e) {
