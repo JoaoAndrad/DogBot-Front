@@ -26,15 +26,82 @@ async function ensureUploadQpl(client) {
     try {
       const ok = await p.evaluate(() => {
         try {
-          if (!window.Store || !window.Store.MediaUploadQpl) return false;
-          if (!window.__uploadQplInitialized) {
-            window.__uploadQpl =
-              window.Store.MediaUploadQpl.startMediaUploadQpl({
-                entryPoint: "SyncdNetCallbacks",
-              });
-            window.__uploadQplInitialized = true;
+          if (!window.Store) return false;
+
+          // Ensure Store.MediaUpload includes WAWebStartMediaUploadQpl when available
+          try {
+            if (
+              !window.Store.MediaUpload &&
+              typeof window.require === "function"
+            ) {
+              const modA = window.require("WAWebMediaMmsV4Upload");
+              const modB = window.require("WAWebStartMediaUploadQpl");
+              window.Store.MediaUpload = Object.assign(
+                {},
+                modA || {},
+                modB || {},
+              );
+            }
+          } catch (e) {
+            // ignore if modules aren't available
           }
-          return true;
+
+          // Find a starter function for the QPL
+          const starter =
+            (window.Store.MediaUpload &&
+              window.Store.MediaUpload.startMediaUploadQpl) ||
+            (window.Store.MediaUploadQpl &&
+              window.Store.MediaUploadQpl.startMediaUploadQpl) ||
+            (window.Store.MediaUploadQpl &&
+              window.Store.MediaUploadQpl.startMediaUploadQpl);
+          if (!starter) return false;
+
+          if (!window.__uploadQplInitialized) {
+            try {
+              window.__uploadQpl = starter({ entryPoint: "MediaUpload" });
+            } catch (e) {
+              try {
+                window.__uploadQpl = starter({
+                  entryPoint: "SyncdNetCallbacks",
+                });
+              } catch (e2) {
+                try {
+                  window.__uploadQpl = starter();
+                } catch (e3) {
+                  // failed to start QPL
+                }
+              }
+            }
+            window.__uploadQplInitialized = !!window.__uploadQpl;
+          }
+
+          // Patch UploadUtils.encryptAndUpload to inject uploadQpl when missing
+          try {
+            if (
+              window.Store &&
+              window.Store.UploadUtils &&
+              !window.Store.UploadUtils.__patchedInjectUploadQpl
+            ) {
+              const orig = window.Store.UploadUtils.encryptAndUpload;
+              if (typeof orig === "function") {
+                window.Store.UploadUtils.encryptAndUpload = async function (
+                  opts,
+                ) {
+                  try {
+                    if (!opts) opts = {};
+                    if (!opts.uploadQpl && window.__uploadQpl)
+                      opts.uploadQpl = window.__uploadQpl;
+                  } catch (e) {}
+                  return orig.apply(this, arguments);
+                };
+                window.Store.UploadUtils.__patchedInjectUploadQpl = true;
+              }
+            }
+          } catch (e) {
+            // ignore
+          }
+
+          return !!window.__uploadQpl;
         } catch (e) {
           return false;
         }
