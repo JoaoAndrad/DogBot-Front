@@ -9,6 +9,52 @@ const sharp = require("sharp");
 const { MessageMedia } = require("whatsapp-web.js");
 const logger = require("./logger");
 
+// Attempt to ensure the browser page has MediaUploadQpl initialized.
+// Some whatsapp-web.js versions expose the Puppeteer page as `pupPage`, `page`, or `_page`.
+async function ensureUploadQpl(client) {
+  const candidates = [client.pupPage, client.page, client._page];
+  // also try a getter if present
+  if (typeof client.getPage === "function") {
+    try {
+      const p = await client.getPage();
+      candidates.push(p);
+    } catch (e) {}
+  }
+
+  for (const p of candidates) {
+    if (!p || typeof p.evaluate !== "function") continue;
+    try {
+      const ok = await p.evaluate(() => {
+        try {
+          if (!window.Store || !window.Store.MediaUploadQpl) return false;
+          if (!window.__uploadQplInitialized) {
+            window.__uploadQpl =
+              window.Store.MediaUploadQpl.startMediaUploadQpl({
+                entryPoint: "SyncdNetCallbacks",
+              });
+            window.__uploadQplInitialized = true;
+          }
+          return true;
+        } catch (e) {
+          return false;
+        }
+      });
+      if (ok) {
+        logger.debug("[StickerHelper] MediaUploadQpl initialized on page");
+        return true;
+      }
+    } catch (e) {
+      logger.debug(
+        "[StickerHelper] ensureUploadQpl evaluate failed: " + e.message,
+      );
+    }
+  }
+  logger.warn(
+    "[StickerHelper] Could not initialize MediaUploadQpl on any known page handle",
+  );
+  return false;
+}
+
 // Create temp directory if it doesn't exist
 const TEMP_DIR = path.join(__dirname, "../../temp/stickers");
 if (!fs.existsSync(TEMP_DIR)) {
@@ -97,6 +143,16 @@ async function sendTrackSticker(client, chatId, track) {
       webpBuffer.toString("base64"),
       "sticker.webp",
     );
+
+    // Ensure MediaUploadQpl is initialized on the page (fixes encryptAndUpload failures)
+    try {
+      await ensureUploadQpl(client);
+    } catch (e) {
+      logger.debug(
+        "[StickerHelper] ensureUploadQpl threw: " +
+          (e && e.message ? e.message : String(e)),
+      );
+    }
 
     // Send as sticker with explicit sticker metadata. If it fails, log details and try a fallback (send as image)
     try {
@@ -376,6 +432,15 @@ async function sendCompositeSticker(client, chatId, tracks) {
       webpBuf.toString("base64"),
       "sticker.webp",
     );
+    try {
+      await ensureUploadQpl(client);
+    } catch (e) {
+      logger.debug(
+        "[StickerHelper] ensureUploadQpl threw: " +
+          (e && e.message ? e.message : String(e)),
+      );
+    }
+
     await client.sendMessage(chatId, media, {
       sendMediaAsSticker: true,
     });
