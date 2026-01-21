@@ -31,7 +31,9 @@ module.exports = {
       }
 
       // Ask backend to perform shuffle
-      //await reply("⏳ Buscando recomendações e preparando reprodução...");
+      await reply(
+        "⏳ Verificando a playlist do grupo e preparando músicas recomendadas...",
+      );
 
       const shuffleRes = await backendClient.sendToBackend(
         `/api/groups/${encodeURIComponent(chatId)}/playlist/shuffle`,
@@ -43,9 +45,8 @@ module.exports = {
       if (shuffleRes.error) return reply(`❌ Erro: ${shuffleRes.error}`);
 
       // Provide a brief summary to group
-      const out =
-        "✅ Aleatório disparado! Verifique seu dispositivo Spotify para confirmar a reprodução.";
-      //await reply(out);
+      const out = "✅ Fila de indicações criada! Verifique seu Spotify";
+      await reply(out);
     } catch (err) {
       logger.error("[aleatorio] erro:", err && err.message);
       return reply(
