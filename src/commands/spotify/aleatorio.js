@@ -35,7 +35,7 @@ module.exports = {
 
       const shuffleRes = await backendClient.sendToBackend(
         `/api/groups/${encodeURIComponent(chatId)}/playlist/shuffle`,
-        { playNow: true, limit: 6 },
+        { playNow: true, limit: 6, replaceQueue: true },
         "POST",
       );
 
