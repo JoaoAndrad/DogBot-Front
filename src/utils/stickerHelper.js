@@ -374,32 +374,35 @@ async function createCompositeWebp(tracks) {
     if (n === 3) {
       // Three images: 3 diagonal bands (equal width ~33.3% each)
       // Create 3 parallel diagonal stripes from top-left to bottom-right
+      // Lines: y = x + 171 and y = x - 171
       const masks = [];
 
-      // Divide into 3 equal diagonal bands
-      // Band 1: top-left (0,0 to ~170px diagonal)
+      // Band 1 (top-left): region where y >= x + 171
+      // Intersects at (0, 171) and (341, 512)
       masks.push(
         Buffer.from(
           `<svg width="${SIZE}" height="${SIZE}">
-            <polygon points="0,0 170,0 ${SIZE},342 ${SIZE},${SIZE} 0,${SIZE}" fill="white"/>
+            <polygon points="0,0 0,512 341,512 0,171" fill="white"/>
           </svg>`,
         ),
       );
 
-      // Band 2: middle diagonal stripe (~170px to ~342px)
+      // Band 2 (middle): region where x - 171 < y < x + 171
+      // Bounded by lines from (171,0)→(512,341) and (0,171)→(341,512)
       masks.push(
         Buffer.from(
           `<svg width="${SIZE}" height="${SIZE}">
-            <polygon points="170,0 342,0 ${SIZE},170 ${SIZE},342 342,${SIZE} 0,${SIZE} 0,170" fill="white"/>
+            <polygon points="0,171 171,0 512,341 512,512 341,512" fill="white"/>
           </svg>`,
         ),
       );
 
-      // Band 3: bottom-right (~342px to 512px)
+      // Band 3 (bottom-right): region where y <= x - 171
+      // Intersects at (171, 0) and (512, 341)
       masks.push(
         Buffer.from(
           `<svg width="${SIZE}" height="${SIZE}">
-            <polygon points="342,0 ${SIZE},0 ${SIZE},170 0,170 0,0" fill="white"/>
+            <polygon points="171,0 512,0 512,341" fill="white"/>
           </svg>`,
         ),
       );
