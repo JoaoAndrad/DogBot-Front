@@ -10,6 +10,15 @@ module.exports = {
     const reply =
       typeof ctx.reply === "function" ? ctx.reply : (t) => console.log(t);
 
+    // Check if it's a group chat
+    const chatId = ctx.message?.from || null;
+    const isGroup = chatId && chatId.includes("@g.us");
+
+    if (isGroup) {
+      await reply("❌ O comando */conectar* só funciona no privado.");
+      return;
+    }
+
     // Usar getContact() para obter o número real (@c.us) em vez de @lid
     let userId = null;
     try {
