@@ -149,8 +149,13 @@ module.exports = {
         let successCount = 0;
         let errorCount = 0;
 
-        for (const recipientId of recipients) {
+        for (let recipientId of recipients) {
           try {
+            // Ensure recipient ID has @c.us suffix for WhatsApp
+            if (!recipientId.includes("@")) {
+              recipientId = `${recipientId}@c.us`;
+            }
+
             await ctx.client.sendMessage(recipientId, text);
             successCount++;
 
