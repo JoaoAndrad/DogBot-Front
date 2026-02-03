@@ -65,8 +65,7 @@ module.exports = {
           }
         }
 
-        out += `👥 Usuários ouvindo: ${names.join(", ")}\n`;
-        out += `\n`;
+        out += `\n👥 Usuários ouvindo: ${names.join(", ")}\n`;
       }
 
       await reply(out);
