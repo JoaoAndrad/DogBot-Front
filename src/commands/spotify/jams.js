@@ -123,7 +123,7 @@ module.exports = {
         const names = [];
         for (const l of activeListeners) {
           try {
-            const n = l.user?.push_name || l.user?.display_name || null;
+            const n = l.user?.display_name || l.user?.push_name || null;
             if (n && n !== hostName) names.push(n);
           } catch (e) {
             // ignore

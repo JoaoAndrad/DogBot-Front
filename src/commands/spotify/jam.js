@@ -102,7 +102,7 @@ module.exports = {
         const listenerNamesPromises = activeListeners
           .slice(0, 5)
           .map(async (l) => {
-            let name = l.user.push_name || l.user.display_name;
+            let name = l.user.display_name || l.user.push_name;
             if (!name && l.user.sender_number && ctx.client) {
               try {
                 const whatsappId = l.user.sender_number.includes("@")
