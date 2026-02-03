@@ -390,23 +390,152 @@ module.exports = {
 
       pollMessage += `*O que você quer fazer?*`;
 
-      // Create poll using WhatsApp poll feature
-      const pollReply = await ctx.message.reply(pollMessage, null, {
-        poll: {
-          name: "Escolha uma opção:",
-          options: pollOptions,
-          selectableCount: 1,
-        },
-      });
+      // Create poll using helper and register onVote to handle join/create
+      try {
+        const createRes = await polls.createPoll(
+          ctx.client,
+          chatId,
+          pollMessage,
+          pollOptions,
+          {
+            onVote: async (voteData) => {
+              try {
+                const voter = voteData.voter;
+                const selIdxRaw =
+                  voteData.selectedIndexes && voteData.selectedIndexes[0];
+                const selIdx = selIdxRaw != null ? Number(selIdxRaw) : null;
+                const selName =
+                  (voteData.selectedNames && voteData.selectedNames[0]) || "";
 
-      // Store poll context for later handling
-      const pollBuilder = require("../../pollBuilder");
-      pollBuilder.storePollContext(pollReply.id._serialized, {
-        type: "jam-decision",
-        userId: userUuid, // Store the UUID, not the WhatsApp identifier
-        chatId,
-        jamIdMap, // Maps option index to jam ID or "create"
-      });
+                // Determine selected index by name if index missing
+                let chosenIndex = selIdx;
+                if (chosenIndex == null && selName) {
+                  const match = pollOptions.findIndex(
+                    (o) => o === selName || o.includes(selName),
+                  );
+                  chosenIndex = match >= 0 ? match : null;
+                }
+
+                if (chosenIndex == null) return;
+
+                const selectedJamId = jamIdMap[chosenIndex];
+
+                // If user chose to create a new jam
+                if (selectedJamId === "create") {
+                  // Resolve voter to UUID
+                  const lookup = await backend.sendToBackend(
+                    `/api/users/lookup?identifier=${encodeURIComponent(voter)}`,
+                    null,
+                    "GET",
+                  );
+
+                  if (!lookup || !lookup.found || !lookup.userId) {
+                    await ctx.client.sendMessage(
+                      voter,
+                      "❌ Você precisa estar registrado no sistema para criar ou entrar em jams.",
+                    );
+                    return;
+                  }
+
+                  const voterUuid = lookup.userId;
+                  const createResult = await backend.sendToBackend(
+                    "/api/jam/create",
+                    { userId: voterUuid, chatId },
+                    "POST",
+                  );
+
+                  if (!createResult.success) {
+                    await ctx.client.sendMessage(
+                      voter,
+                      `❌ Erro ao criar jam: ${createResult.message || createResult.error}`,
+                    );
+                    return;
+                  }
+
+                  const jam = createResult.jam;
+                  let msg = `🎵 *Jam criada com sucesso!*\n\n`;
+                  msg += `Você está transmitindo sua música para outros usuários.\n`;
+                  if (jam.currentTrackName) {
+                    msg += `🎶 Tocando agora: *${jam.currentTrackName}*\n`;
+                    if (jam.currentArtists) msg += `👤 ${jam.currentArtists}\n`;
+                  } else {
+                    msg += `⚠️ Nenhuma música tocando no momento. Inicie uma música no Spotify!\n`;
+                  }
+                  msg += `\nEnvie */sair* para encerrar a jam.`;
+                  await ctx.client.sendMessage(voter, msg);
+                  return;
+                }
+
+                // Otherwise, join existing jam
+                const joinRes = await (async () => {
+                  // Resolve voter to UUID
+                  const lookup = await backend.sendToBackend(
+                    `/api/users/lookup?identifier=${encodeURIComponent(voter)}`,
+                    null,
+                    "GET",
+                  );
+                  if (!lookup || !lookup.found || !lookup.userId) {
+                    await ctx.client.sendMessage(
+                      voter,
+                      "❌ Você precisa estar registrado no sistema para entrar em jams.",
+                    );
+                    return { success: false };
+                  }
+                  const voterUuid = lookup.userId;
+                  return await backend.sendToBackend(
+                    `/api/jam/${selectedJamId}/join`,
+                    { userId: voterUuid },
+                    "POST",
+                  );
+                })();
+
+                if (!joinRes || !joinRes.success) {
+                  if (joinRes && joinRes.error === "NO_ACTIVE_DEVICE") {
+                    await ctx.client.sendMessage(
+                      voter,
+                      "⚠️ Não foi possível sincronizar — abra o Spotify em qualquer dispositivo e tente novamente.",
+                    );
+                    return;
+                  }
+                  // Generic failure
+                  if (joinRes && joinRes.message) {
+                    await ctx.client.sendMessage(
+                      voter,
+                      `❌ Erro ao entrar na jam: ${joinRes.message || joinRes.error}`,
+                    );
+                  }
+                  return;
+                }
+
+                const joinedJam = joinRes.jam;
+                const hostName =
+                  joinedJam.host?.push_name ||
+                  joinedJam.host?.display_name ||
+                  "Anônimo";
+                let confirmMsg = `🎧 Você entrou na jam de ${hostName}!\n\n`;
+                if (joinedJam.currentTrackName) {
+                  confirmMsg += `🎶 Tocando: *${joinedJam.currentTrackName}*\n`;
+                  if (joinedJam.currentArtists)
+                    confirmMsg += `👤 ${joinedJam.currentArtists}\n`;
+                }
+                confirmMsg += `\nEnvie */sair* para sair da jam.`;
+                await ctx.client.sendMessage(voter, confirmMsg);
+              } catch (cbErr) {
+                console.error(
+                  "[jam] unified poll onVote error:",
+                  cbErr && cbErr.message,
+                );
+              }
+            },
+          },
+        );
+        console.log("Unified poll sent:", createRes && createRes.msgId);
+      } catch (pollErr) {
+        console.error(
+          "[jam] Failed to send unified poll:",
+          pollErr && pollErr.message,
+        );
+      }
     } catch (err) {
       console.error("[jam] Error:", err);
       await reply(`❌ Erro ao processar comando /jam: ${err.message}`);
