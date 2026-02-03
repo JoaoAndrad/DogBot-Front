@@ -32,9 +32,32 @@ module.exports = {
     }
 
     try {
+      // Resolve WhatsApp identifier to User UUID
+      const userLookup = await backend.sendToBackend(
+        `/api/users/lookup?identifier=${encodeURIComponent(userId)}`,
+        null,
+        "GET",
+      );
+
+      if (
+        !userLookup ||
+        !userLookup.found ||
+        !userLookup.user ||
+        !userLookup.user.id
+      ) {
+        await reply(
+          "❌ Usuário não encontrado no sistema.\n\n" +
+            "Você precisa estar registrado para usar jams.",
+        );
+        return;
+      }
+
+      // Use the actual User UUID from database
+      const userUuid = userLookup.user.id;
+
       // Check user's current jam status
       const statusResult = await backend.sendToBackend(
-        `/api/jam/user/${userId}/status`,
+        `/api/jam/user/${userUuid}/status`,
         null,
         "GET",
       );
@@ -56,7 +79,7 @@ module.exports = {
         // Host is ending the jam
         const endResult = await backend.sendToBackend(
           `/api/jam/${jam.id}`,
-          { userId },
+          { userId: userUuid },
           "DELETE",
         );
 
@@ -84,7 +107,7 @@ module.exports = {
         // Listener is leaving the jam
         const leaveResult = await backend.sendToBackend(
           `/api/jam/${jam.id}/leave`,
-          { userId },
+          { userId: userUuid },
           "POST",
         );
 

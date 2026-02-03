@@ -32,9 +32,32 @@ module.exports = {
     }
 
     try {
+      // Resolve WhatsApp identifier to User UUID
+      const userLookup = await backend.sendToBackend(
+        `/api/users/lookup?identifier=${encodeURIComponent(userId)}`,
+        null,
+        "GET",
+      );
+
+      if (
+        !userLookup ||
+        !userLookup.found ||
+        !userLookup.user ||
+        !userLookup.user.id
+      ) {
+        await reply(
+          "❌ Usuário não encontrado no sistema.\n\n" +
+            "Você precisa estar registrado para usar jams.",
+        );
+        return;
+      }
+
+      // Use the actual User UUID from database
+      const userUuid = userLookup.user.id;
+
       // Check if user already has an active jam (as host or listener)
       const statusResult = await backend.sendToBackend(
-        `/api/jam/user/${userId}/status`,
+        `/api/jam/user/${userUuid}/status`,
         null,
         "GET",
       );
@@ -119,7 +142,7 @@ module.exports = {
       if (activeJams.length === 0) {
         const createResult = await backend.sendToBackend(
           "/api/jam/create",
-          { userId, chatId },
+          { userId: userUuid, chatId },
           "POST",
         );
 
@@ -221,7 +244,7 @@ module.exports = {
       const pollBuilder = require("../../pollBuilder");
       pollBuilder.storePollContext(pollReply.id._serialized, {
         type: "jam-decision",
-        userId,
+        userId: userUuid, // Store the UUID, not the WhatsApp identifier
         chatId,
         jamIdMap, // Maps option index to jam ID or "create"
       });
