@@ -51,13 +51,13 @@ async function restoreCallbacksFromDatabase() {
       if (voteType && voteHandlers[voteType]) {
         callbacks.set(msgId, voteHandlers[voteType]);
         logger.info(
-          `[PollComponent] Callback restaurado: msgId=${msgId}, voteType=${voteType}, voteId=${voteId}`
+          `[PollComponent] Callback restaurado: msgId=${msgId}, voteType=${voteType}, voteId=${voteId}`,
         );
       }
     }
 
     logger.info(
-      `[PollComponent] Callbacks restaurados: ${callbacks.size} polls ativas`
+      `[PollComponent] Callbacks restaurados: ${callbacks.size} polls ativas`,
     );
   } catch (err) {
     logger.error(`[PollComponent] Erro ao restaurar callbacks: ${err.message}`);
@@ -76,7 +76,7 @@ async function saveFallbackPoll(chatId, title, options, opts = {}) {
     title && String(title).normalize ? String(title).normalize("NFC") : title;
   const normOptions = Array.isArray(options)
     ? options.map((o) =>
-        o && String(o).normalize ? String(o).normalize("NFC") : o
+        o && String(o).normalize ? String(o).normalize("NFC") : o,
       )
     : [];
   const record = {
@@ -209,7 +209,7 @@ async function handleVoteUpdate(vote) {
       "[handleVoteUpdate] Direct lookup result:",
       poll ? "found" : "not found",
       "for msgId:",
-      messageId
+      messageId,
     );
 
     // If not found and we have parentMsgKey with id parts, try to find by matching
@@ -221,7 +221,7 @@ async function handleVoteUpdate(vote) {
     ) {
       console.log(
         "[handleVoteUpdate] Trying to find poll by chat_id:",
-        vote.parentMsgKey.remote
+        vote.parentMsgKey.remote,
       );
       try {
         const allPolls = await storage.listPolls();
@@ -229,13 +229,13 @@ async function handleVoteUpdate(vote) {
 
         // Try to match by chat_id only - get most recent poll from this chat
         const pollsInChat = allPolls.filter(
-          (p) => p.chat_id === vote.parentMsgKey.remote
+          (p) => p.chat_id === vote.parentMsgKey.remote,
         );
         console.log(
           "[handleVoteUpdate] Found",
           pollsInChat.length,
           "polls in chat:",
-          vote.parentMsgKey.remote
+          vote.parentMsgKey.remote,
         );
 
         if (pollsInChat.length > 0) {
@@ -251,13 +251,13 @@ async function handleVoteUpdate(vote) {
             "[handleVoteUpdate] Using most recent poll from chat:",
             messageId,
             "title:",
-            poll.title
+            poll.title,
           );
         }
       } catch (err) {
         console.log(
           "[handleVoteUpdate] Failed to search polls for match",
-          err.message
+          err.message,
         );
       }
     }
@@ -284,14 +284,14 @@ async function handleVoteUpdate(vote) {
         if (contact && contact.id && contact.id._serialized) {
           const resolvedVoter = contact.id._serialized;
           logger.debug(
-            `[PollComponent] Voter resolvido: ${voter} → ${resolvedVoter}`
+            `[PollComponent] Voter resolvido: ${voter} → ${resolvedVoter}`,
           );
           voter = resolvedVoter;
         }
       } catch (err) {
         logger.debug(
           `[PollComponent] Não foi possível resolver voter ${voter}:`,
-          err.message
+          err.message,
         );
         // Keep original voter if resolution fails
       }
@@ -332,7 +332,7 @@ async function handleVoteUpdate(vote) {
       } else {
         selectedIndexes = rawSelected.map((n) => Number(n));
         selectedNames = selectedIndexes.map(
-          (i) => (optsArr && optsArr[i] && optsArr[i].name) || String(i)
+          (i) => (optsArr && optsArr[i] && optsArr[i].name) || String(i),
         );
       }
     }
@@ -342,7 +342,7 @@ async function handleVoteUpdate(vote) {
       voter,
       rawSelected,
       selectedIndexes,
-      selectedNames
+      selectedNames,
     );
 
     // Log resumido do voto
@@ -350,8 +350,8 @@ async function handleVoteUpdate(vote) {
     const pollTitle = (storedPoll && storedPoll.title) || "Poll";
     console.log(
       `🗳️ Voto | ${pollTitle} | 👤 ${voterName} | ✅ ${selectedNames.join(
-        ", "
-      )}`
+        ", ",
+      )}`,
     );
 
     const payload = {
@@ -382,7 +382,7 @@ async function handleVoteUpdate(vote) {
       // Fallback: If callback not in memory but we have voteId (e.g., after bot restart),
       // send vote directly to backend
       logger.info(
-        `[PollComponent] Callback não encontrado em memória, enviando voto ao backend`
+        `[PollComponent] Callback não encontrado em memória, enviando voto ao backend`,
       );
       try {
         const backendClient = require("../../services/backendClient");
@@ -401,7 +401,7 @@ async function handleVoteUpdate(vote) {
       } catch (err) {
         logger.error(
           "[PollComponent] Erro ao enviar voto ao backend:",
-          err.message
+          err.message,
         );
       }
     }
