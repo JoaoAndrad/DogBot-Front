@@ -5,6 +5,54 @@ module.exports = {
   async execute(ctx) {
     const { message, info, reply, client, services } = ctx;
 
+    // Array to collect poll messages for cleanup
+    const pollMessages = [];
+
+    // Helper function to delete messages and polls after confession is sent
+    const cleanupAfterConfession = async (originalMsg, confirmationMsg) => {
+      try {
+        // Wait 2 seconds so user can see confirmation
+        await new Promise((resolve) => setTimeout(resolve, 2000));
+
+        // Delete all poll messages
+        for (const pollMsg of pollMessages) {
+          try {
+            if (pollMsg && typeof pollMsg.delete === "function") {
+              await pollMsg.delete(true, true); // delete for everyone, clear media
+            }
+          } catch (err) {
+            console.error("[confissao] erro ao apagar enquete:", err?.message);
+          }
+        }
+
+        // Delete confirmation message
+        if (confirmationMsg && typeof confirmationMsg.delete === "function") {
+          try {
+            await confirmationMsg.delete(true, true);
+          } catch (err) {
+            console.error(
+              "[confissao] erro ao apagar confirmação:",
+              err?.message,
+            );
+          }
+        }
+
+        // Delete original message
+        if (originalMsg && typeof originalMsg.delete === "function") {
+          try {
+            await originalMsg.delete(true, true);
+          } catch (err) {
+            console.error(
+              "[confissao] erro ao apagar mensagem original:",
+              err?.message,
+            );
+          }
+        }
+      } catch (err) {
+        console.error("[confissao] erro ao limpar mensagens:", err?.message);
+      }
+    };
+
     // Determine if this is a group message
     // Primary: check message.isGroup or info.is_group
     // Fallback: check if chat ID ends with @g.us (groups) vs @c.us (private)
@@ -72,7 +120,7 @@ module.exports = {
 
     if (!(text && text.trim().length) && !(message && message.hasMedia)) {
       await reply(
-        "Uso: /confissao <sua mensagem>\nEx: /confissao confesso que..."
+        "Uso: /confissao <sua mensagem>\nEx: /confissao confesso que...",
       );
       return;
     }
@@ -87,10 +135,10 @@ module.exports = {
     } catch (err) {
       console.error(
         "Erro ao listar chats do cliente:",
-        err && err.message ? err.message : err
+        err && err.message ? err.message : err,
       );
       await reply(
-        "Não foi possível recuperar a lista de grupos no momento. Tente novamente mais tarde."
+        "Não foi possível recuperar a lista de grupos no momento. Tente novamente mais tarde.",
       );
       return;
     }
@@ -134,7 +182,7 @@ module.exports = {
 
     if (!candidateGroups.length) {
       await reply(
-        "Não encontrei nenhum grupo em comum com você onde eu esteja presente. Peça ao administrador para adicionar o bot no grupo desejado."
+        "Não encontrei nenhum grupo em comum com você onde eu esteja presente. Peça ao administrador para adicionar o bot no grupo desejado.",
       );
       return;
     }
@@ -150,11 +198,11 @@ module.exports = {
       chatId,
       title,
       options,
-      opts = {}
+      opts = {},
     ) => {
       return new Promise(async (resolve, reject) => {
         try {
-          await polls.createPoll(
+          const pollMsg = await polls.createPoll(
             clientOrSender,
             chatId,
             title,
@@ -163,8 +211,10 @@ module.exports = {
               onVote: async (payload) => {
                 resolve(payload);
               },
-            })
+            }),
           );
+          // Collect poll message for cleanup
+          if (pollMsg) pollMessages.push(pollMsg);
         } catch (err) {
           reject(err);
         }
@@ -181,7 +231,7 @@ module.exports = {
           senderNumber,
           "Escolha o grupo para enviar sua confissão",
           labels,
-          {}
+          {},
         );
         const idx =
           (payload && payload.selectedIndexes && payload.selectedIndexes[0]) ||
@@ -197,7 +247,7 @@ module.exports = {
       groupId,
       participants,
       prompt,
-      pageSize = 10
+      pageSize = 10,
     ) => {
       if (!Array.isArray(participants) || participants.length === 0)
         return null;
@@ -252,7 +302,7 @@ module.exports = {
               // ignore contact resolution failure and keep fallback name
             }
             return { jid, name };
-          })
+          }),
       );
 
       let page = 0;
@@ -275,7 +325,7 @@ module.exports = {
             senderNumber,
             prompt,
             options,
-            {}
+            {},
           );
         } catch (err) {
           return null;
@@ -329,7 +379,7 @@ module.exports = {
           senderNumber,
           `Detectei ${mentionTokens.length} menção(ões) na sua mensagem. Deseja mencionar usuário(s)?`,
           ["Sim", "Não"],
-          {}
+          {},
         );
         const ynIdx =
           yn && yn.selectedIndexes && yn.selectedIndexes[0]
@@ -365,7 +415,7 @@ module.exports = {
                 targetGroup.id,
                 participants,
                 prompt,
-                10
+                10,
               );
               if (!chosen) {
                 // user cancelled selection — abort mention flow
@@ -393,9 +443,8 @@ module.exports = {
                 const groupMsg = `*📩 Confissão:* ${replacedText}`;
                 if (message && message.hasMedia) {
                   try {
-                    const media = await mediaHelper.obterMidiaDaMensagem(
-                      message
-                    );
+                    const media =
+                      await mediaHelper.obterMidiaDaMensagem(message);
                     if (
                       media &&
                       media.mimetype &&
@@ -407,7 +456,7 @@ module.exports = {
                       const mm = new MessageMedia(
                         media.mimetype || "image/jpeg",
                         base64,
-                        media.filename || "image.jpg"
+                        media.filename || "image.jpg",
                       );
                       await client.sendMessage(targetGroup.id, mm, {
                         caption: groupMsg,
@@ -426,7 +475,7 @@ module.exports = {
                           senderNumber,
                           "Detectei um vídeo. Vídeos não são suportados neste ambiente. Deseja que eu encaminhe sua mensagem original para o grupo selecionado?",
                           ["Sim", "Não"],
-                          {}
+                          {},
                         );
                         const ynIdx =
                           yn && yn.selectedIndexes && yn.selectedIndexes[0]
@@ -453,7 +502,7 @@ module.exports = {
                                 groupMsg,
                                 {
                                   mentions: mentionMap.map((m) => m.jid),
-                                }
+                                },
                               );
                             } else if (typeof message.forward === "function") {
                               await message.forward(targetGroup.id);
@@ -462,7 +511,7 @@ module.exports = {
                                 groupMsg,
                                 {
                                   mentions: mentionMap.map((m) => m.jid),
-                                }
+                                },
                               );
                             } else {
                               throw new Error("forward-not-supported");
@@ -470,10 +519,12 @@ module.exports = {
                           } catch (fwdErr) {
                             console.error(
                               "[confissao] falha ao encaminhar vídeo:",
-                              fwdErr && fwdErr.message ? fwdErr.message : fwdErr
+                              fwdErr && fwdErr.message
+                                ? fwdErr.message
+                                : fwdErr,
                             );
                             await reply(
-                              "Não consegui encaminhar a mensagem original. Enviando sem mídia."
+                              "Não consegui encaminhar a mensagem original. Enviando sem mídia.",
                             );
                             await client.sendMessage(targetGroup.id, groupMsg, {
                               mentions: mentionMap.map((m) => m.jid),
@@ -488,7 +539,7 @@ module.exports = {
                       } catch (e) {
                         console.error(
                           "[confissao] erro ao perguntar sobre encaminhar vídeo:",
-                          e && e.message ? e.message : e
+                          e && e.message ? e.message : e,
                         );
                         await client.sendMessage(targetGroup.id, groupMsg, {
                           mentions: mentionMap.map((m) => m.jid),
@@ -503,10 +554,10 @@ module.exports = {
                   } catch (e) {
                     console.error(
                       "[confissao] erro ao processar mídia para envio:",
-                      e && e.message ? e.message : e
+                      e && e.message ? e.message : e,
                     );
                     await reply(
-                      "Não foi possível processar a mídia da sua confissão. Enviando sem mídia."
+                      "Não foi possível processar a mídia da sua confissão. Enviando sem mídia.",
                     );
                     await client.sendMessage(targetGroup.id, groupMsg, {
                       mentions: mentionMap.map((m) => m.jid),
@@ -520,10 +571,10 @@ module.exports = {
               } catch (err) {
                 console.error(
                   "Erro ao enviar confissão com menções:",
-                  err && err.message ? err.message : err
+                  err && err.message ? err.message : err,
                 );
                 await reply(
-                  "Ocorreu um erro ao enviar a confissão ao grupo com menções. Tente novamente mais tarde."
+                  "Ocorreu um erro ao enviar a confissão ao grupo com menções. Tente novamente mais tarde.",
                 );
                 return;
               }
@@ -533,7 +584,7 @@ module.exports = {
                 const res = await services.backend.sendToBackend(
                   "/api/confessions/consume",
                   { senderNumber },
-                  "POST"
+                  "POST",
                 );
                 try {
                   const remaining = res && res.remaining;
@@ -541,38 +592,41 @@ module.exports = {
                     remaining === null ||
                     remaining === Infinity ||
                     String(remaining).toLowerCase() === "infinity";
+                  let confirmMsg;
                   if (isVip) {
-                    await reply(
-                      "*🎉 Sua confissão foi enviada anonimamente com sucesso!* \n\n🙏 Você possui confissões vitalícias — não será debitado. 💸"
+                    confirmMsg = await reply(
+                      "*🎉 Sua confissão foi enviada anonimamente com sucesso!* \n\n🙏 Você possui confissões vitalícias — não será debitado. 💸",
                     );
                   } else if (res && res.ok) {
-                    await reply(
+                    confirmMsg = await reply(
                       `*✅ Sua confissão foi enviada anonimamente com sucesso!* \n\n📩 *Enviada para:* ${
                         targetGroup.name
                       }\n*Saldo restante:* ${remaining} confissão${
                         remaining === 1 ? "" : "ões"
-                      }`
+                      }`,
                     );
                   } else if (res && res.reason === "insufficient_balance") {
-                    await reply(
-                      `⚠️ Sua confissão foi enviada ao grupo ${targetGroup.name}, porém seu saldo está insuficiente para futuras confissões.`
+                    confirmMsg = await reply(
+                      `⚠️ Sua confissão foi enviada ao grupo ${targetGroup.name}, porém seu saldo está insuficiente para futuras confissões.`,
                     );
                   } else {
-                    await reply(
-                      `✅ Confissão enviada ao grupo ${targetGroup.name}. Não foi possível atualizar seu saldo no momento.`
+                    confirmMsg = await reply(
+                      `✅ Confissão enviada ao grupo ${targetGroup.name}. Não foi possível atualizar seu saldo no momento.`,
                     );
                   }
+                  // Cleanup messages after successful send
+                  await cleanupAfterConfession(message, confirmMsg);
                 } catch (e) {
                   // ignore reply errors
                 }
               } catch (err) {
                 console.error(
                   "Erro ao notificar backend sobre consumo de confissão (menção):",
-                  err && err.message ? err.message : err
+                  err && err.message ? err.message : err,
                 );
                 try {
                   await reply(
-                    "Confissão enviada, porém ocorreu um erro ao atualizar seu saldo."
+                    "Confissão enviada, porém ocorreu um erro ao atualizar seu saldo.",
                   );
                 } catch (e) {}
               }
@@ -584,11 +638,11 @@ module.exports = {
       } catch (e) {
         console.error(
           "[confissao] erro ao criar enquete de menção:",
-          e && e.message ? e.message : e
+          e && e.message ? e.message : e,
         );
         try {
           await reply(
-            "Não foi possível criar a enquete para menções. Enviando sem menções."
+            "Não foi possível criar a enquete para menções. Enviando sem menções.",
           );
         } catch (repErr) {}
         // continue to normal flow
@@ -610,7 +664,7 @@ module.exports = {
               const mm = new MessageMedia(
                 media.mimetype || "image/jpeg",
                 base64,
-                media.filename || "image.jpg"
+                media.filename || "image.jpg",
               );
               await client.sendMessage(target.id, mm, { caption: groupMsg });
             } else if (
@@ -626,7 +680,7 @@ module.exports = {
                   senderNumber,
                   "Detectei um vídeo. Vídeos não são suportados neste ambiente. Deseja que eu encaminhe sua mensagem original para o grupo?",
                   ["Sim", "Não"],
-                  {}
+                  {},
                 );
                 const ynIdx =
                   yn && yn.selectedIndexes && yn.selectedIndexes[0]
@@ -655,10 +709,10 @@ module.exports = {
                   } catch (fwdErr) {
                     console.error(
                       "[confissao] falha ao encaminhar vídeo (único grupo):",
-                      fwdErr && fwdErr.message ? fwdErr.message : fwdErr
+                      fwdErr && fwdErr.message ? fwdErr.message : fwdErr,
                     );
                     await reply(
-                      "Não consegui encaminhar a mensagem original. Enviando sem mídia."
+                      "Não consegui encaminhar a mensagem original. Enviando sem mídia.",
                     );
                     await client.sendMessage(target.id, groupMsg);
                   }
@@ -668,7 +722,7 @@ module.exports = {
               } catch (e) {
                 console.error(
                   "[confissao] erro ao perguntar sobre encaminhar vídeo (único grupo):",
-                  e && e.message ? e.message : e
+                  e && e.message ? e.message : e,
                 );
                 await client.sendMessage(target.id, groupMsg);
               }
@@ -678,7 +732,7 @@ module.exports = {
           } catch (e) {
             console.error(
               "[confissao] erro ao processar mídia (único grupo):",
-              e && e.message ? e.message : e
+              e && e.message ? e.message : e,
             );
             await client.sendMessage(target.id, groupMsg);
           }
@@ -688,10 +742,10 @@ module.exports = {
       } catch (err) {
         console.error(
           "Erro ao enviar confissão ao grupo (único grupo):",
-          err && err.message ? err.message : err
+          err && err.message ? err.message : err,
         );
         await reply(
-          "Ocorreu um erro ao enviar a confissão ao grupo. Tente novamente mais tarde."
+          "Ocorreu um erro ao enviar a confissão ao grupo. Tente novamente mais tarde.",
         );
         return;
       }
@@ -701,7 +755,7 @@ module.exports = {
         const res = await services.backend.sendToBackend(
           "/api/confessions/consume",
           { senderNumber },
-          "POST"
+          "POST",
         );
         try {
           const remaining = res && res.remaining;
@@ -709,38 +763,41 @@ module.exports = {
             remaining === null ||
             remaining === Infinity ||
             String(remaining).toLowerCase() === "infinity";
+          let confirmMsg;
           if (isVip) {
-            await reply(
-              "*🎉 Sua confissão foi enviada anonimamente com sucesso!* \n\n🙏 Você possui confissões vitalícias — não será debitado. 💸"
+            confirmMsg = await reply(
+              "*🎉 Sua confissão foi enviada anonimamente com sucesso!* \n\n🙏 Você possui confissões vitalícias — não será debitado. 💸",
             );
           } else if (res && res.ok) {
-            await reply(
+            confirmMsg = await reply(
               `*✅ Sua confissão foi enviada anonimamente com sucesso!* \n\n📩 *Enviada para:* ${
                 target.name
               }\n*Saldo restante:* ${remaining} confissão${
                 remaining === 1 ? "" : "ões"
-              }`
+              }`,
             );
           } else if (res && res.reason === "insufficient_balance") {
-            await reply(
-              `⚠️ Sua confissão foi enviada ao grupo ${target.name}, porém seu saldo está insuficiente para futuras confissões.`
+            confirmMsg = await reply(
+              `⚠️ Sua confissão foi enviada ao grupo ${target.name}, porém seu saldo está insuficiente para futuras confissões.`,
             );
           } else {
-            await reply(
-              `✅ Confissão enviada ao grupo ${target.name}. Não foi possível atualizar seu saldo no momento.`
+            confirmMsg = await reply(
+              `✅ Confissão enviada ao grupo ${target.name}. Não foi possível atualizar seu saldo no momento.`,
             );
           }
+          // Cleanup messages after successful send
+          await cleanupAfterConfession(message, confirmMsg);
         } catch (e) {
           // ignore reply errors
         }
       } catch (err) {
         console.error(
           "Erro ao notificar backend sobre consumo de confissão (único grupo):",
-          err && err.message ? err.message : err
+          err && err.message ? err.message : err,
         );
         try {
           await reply(
-            "Confissão enviada, porém ocorreu um erro ao atualizar seu saldo."
+            "Confissão enviada, porém ocorreu um erro ao atualizar seu saldo.",
           );
         } catch (e) {}
       }
@@ -776,9 +833,8 @@ module.exports = {
                 const groupMsg = `*📩 Confissão:* ${text}`;
                 if (message && message.hasMedia) {
                   try {
-                    const media = await mediaHelper.obterMidiaDaMensagem(
-                      message
-                    );
+                    const media =
+                      await mediaHelper.obterMidiaDaMensagem(message);
                     if (
                       media &&
                       media.mimetype &&
@@ -789,7 +845,7 @@ module.exports = {
                       const mm = new MessageMedia(
                         media.mimetype || "image/jpeg",
                         base64,
-                        media.filename || "image.jpg"
+                        media.filename || "image.jpg",
                       );
                       await client.sendMessage(targetChat, mm, {
                         caption: groupMsg,
@@ -807,7 +863,7 @@ module.exports = {
                           senderNumber,
                           "Detectei um vídeo. Vídeos não são suportados neste ambiente. Deseja que eu encaminhe sua mensagem original para o grupo selecionado?",
                           ["Sim", "Não"],
-                          {}
+                          {},
                         );
                         const ynIdx =
                           yn && yn.selectedIndexes && yn.selectedIndexes[0]
@@ -836,10 +892,12 @@ module.exports = {
                           } catch (fwdErr) {
                             console.error(
                               "[confissao] falha ao encaminhar vídeo (enquete):",
-                              fwdErr && fwdErr.message ? fwdErr.message : fwdErr
+                              fwdErr && fwdErr.message
+                                ? fwdErr.message
+                                : fwdErr,
                             );
                             await reply(
-                              "Não consegui encaminhar a mensagem original. Enviando sem mídia."
+                              "Não consegui encaminhar a mensagem original. Enviando sem mídia.",
                             );
                             await client.sendMessage(targetChat, groupMsg);
                           }
@@ -849,7 +907,7 @@ module.exports = {
                       } catch (e) {
                         console.error(
                           "[confissao] erro ao perguntar sobre encaminhar vídeo (enquete):",
-                          e && e.message ? e.message : e
+                          e && e.message ? e.message : e,
                         );
                         await client.sendMessage(targetChat, groupMsg);
                       }
@@ -859,7 +917,7 @@ module.exports = {
                   } catch (e) {
                     console.error(
                       "[confissao] erro ao processar mídia (enquete):",
-                      e && e.message ? e.message : e
+                      e && e.message ? e.message : e,
                     );
                     await client.sendMessage(targetChat, groupMsg);
                   }
@@ -869,12 +927,12 @@ module.exports = {
               } catch (err) {
                 console.error(
                   "Erro ao enviar confissão ao grupo selecionado:",
-                  err && err.message ? err.message : err
+                  err && err.message ? err.message : err,
                 );
                 // notify user privately about failure
                 try {
                   await reply(
-                    "Ocorreu um erro ao enviar a confissão ao grupo selecionado."
+                    "Ocorreu um erro ao enviar a confissão ao grupo selecionado.",
                   );
                 } catch (e) {}
                 return;
@@ -885,7 +943,7 @@ module.exports = {
                 const res = await services.backend.sendToBackend(
                   "/api/confessions/consume",
                   { senderNumber },
-                  "POST"
+                  "POST",
                 );
                 if (res && res.ok) {
                   try {
@@ -894,60 +952,63 @@ module.exports = {
                       remaining === null ||
                       remaining === Infinity ||
                       String(remaining).toLowerCase() === "infinity";
+                    let confirmMsg;
                     if (isVip) {
-                      await reply(
-                        "*🎉 Sua confissão foi enviada anonimamente com sucesso!* \n\n🙏 Você possui confissões vitalícias — não será debitado. 💸"
+                      confirmMsg = await reply(
+                        "*🎉 Sua confissão foi enviada anonimamente com sucesso!* \n\n🙏 Você possui confissões vitalícias — não será debitado. 💸",
                       );
                     } else {
-                      await reply(
+                      confirmMsg = await reply(
                         `*✅ Sua confissão foi enviada anonimamente com sucesso!* \n\n📩 *Enviada para:* ${
                           candidateGroups[pick].name
                         }\n*Saldo restante:* ${remaining} confissão${
                           remaining === 1 ? "" : "ões"
-                        }`
+                        }`,
                       );
                     }
+                    // Cleanup messages after successful send
+                    await cleanupAfterConfession(message, confirmMsg);
                   } catch (e) {}
                 } else if (res && res.reason === "insufficient_balance") {
                   try {
                     await reply(
-                      `⚠️ Sua confissão foi enviada ao grupo ${candidateGroups[pick].name}, porém seu saldo está insuficiente para futuras confissões.`
+                      `⚠️ Sua confissão foi enviada ao grupo ${candidateGroups[pick].name}, porém seu saldo está insuficiente para futuras confissões.`,
                     );
                   } catch (e) {}
                 } else {
                   try {
                     await reply(
-                      `✅ Confissão enviada ao grupo ${candidateGroups[pick].name}. Não foi possível atualizar seu saldo no momento.`
+                      `✅ Confissão enviada ao grupo ${candidateGroups[pick].name}. Não foi possível atualizar seu saldo no momento.`,
                     );
                   } catch (e) {}
                 }
               } catch (err) {
                 console.error(
                   "Erro ao notificar backend sobre consumo de confissão:",
-                  err && err.message ? err.message : err
+                  err && err.message ? err.message : err,
                 );
                 try {
                   await reply(
-                    "Confissão enviada, porém ocorreu um erro ao atualizar seu saldo."
+                    "Confissão enviada, porém ocorreu um erro ao atualizar seu saldo.",
                   );
                 } catch (e) {}
               }
             } catch (err) {
               console.error(
                 "Erro no callback de votação da confissão:",
-                err && err.message ? err.message : err
+                err && err.message ? err.message : err,
               );
             }
           },
-        }
+        },
       );
     } catch (err) {
       console.error(
         "Erro ao criar enquete para seleção de grupo:",
-        err && err.message ? err.message : err
+        err && err.message ? err.message : err,
       );
       await reply(
-        "Não foi possível criar a enquete de seleção de grupo. Tente novamente mais tarde."
+        "Não foi possível criar a enquete de seleção de grupo. Tente novamente mais tarde.",
       );
     }
   },
