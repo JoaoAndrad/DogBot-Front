@@ -1,6 +1,34 @@
 const backend = require("../../services/backendClient");
 const polls = require("../../components/poll");
 
+/**
+ * Resolve host name with WhatsApp fallback
+ * @param {Object} jam - Jam object with host data
+ * @param {Object} client - WhatsApp client instance
+ * @returns {Promise<string>} Resolved host name
+ */
+async function resolveHostName(jam, client) {
+  // Try database fields first
+  let name = jam.host?.push_name || jam.host?.display_name;
+
+  // If empty, try to fetch from WhatsApp
+  if (!name && jam.host?.sender_number && client) {
+    try {
+      const whatsappId = jam.host.sender_number.includes("@")
+        ? jam.host.sender_number
+        : `${jam.host.sender_number}@c.us`;
+
+      const contact = await client.getContactById(whatsappId);
+      name = contact?.pushname || contact?.name;
+    } catch (err) {
+      // Silently fail and use fallback
+    }
+  }
+
+  // Final fallbacks: phone number or "Anônimo"
+  return name || jam.host?.sender_number || "Anônimo";
+}
+
 module.exports = {
   name: "jam",
   aliases: ["radio", "jam.criar"],
@@ -68,17 +96,47 @@ module.exports = {
         const jam = statusResult.jam;
         const listenerCount =
           (jam.listeners?.filter((l) => l.isActive)?.length || 0) + 1;
-        const listenerNames = jam.listeners
-          ?.filter((l) => l.isActive)
-          ?.map((l) => l.user.push_name || l.user.display_name || "Anônimo")
-          ?.slice(0, 5)
-          ?.join(", ");
+
+        // Resolve listener names with WhatsApp fallback
+        const activeListeners = jam.listeners?.filter((l) => l.isActive) || [];
+        const listenerNamesPromises = activeListeners
+          .slice(0, 5)
+          .map(async (l) => {
+            let name = l.user.push_name || l.user.display_name;
+            if (!name && l.user.sender_number && ctx.client) {
+              try {
+                const whatsappId = l.user.sender_number.includes("@")
+                  ? l.user.sender_number
+                  : `${l.user.sender_number}@c.us`;
+                const contact = await ctx.client.getContactById(whatsappId);
+                name = contact?.pushname || contact?.name;
+              } catch (err) {
+                // Silently fail
+              }
+            }
+            return name || l.user.sender_number || "Anônimo";
+          });
+
+        const listenerNames = (await Promise.all(listenerNamesPromises)).join(
+          ", ",
+        );
 
         let msg = `🎵 *Você já está hospedando uma jam!*\n\n`;
         msg += `👥 Ouvintes: ${listenerCount}\n`;
         if (listenerNames) {
           msg += `${listenerNames}${listenerCount > 5 ? " e outros..." : ""}\n`;
         }
+        
+        // Show current track or "nothing playing"
+        if (jam.currentTrackName) {
+          msg += `\n🎶 Tocando agora: *${jam.currentTrackName}*\n`;
+          if (jam.currentArtists) {
+            msg += `👤 ${jam.currentArtists}\n`;
+          }
+        } else {
+          msg += `\n⏸️ Nada tocando no momento\n`;
+        }
+        
         msg += `\nEnvie */sair* para encerrar a jam.`;
 
         await reply(msg);
@@ -88,11 +146,21 @@ module.exports = {
       // User is already listening to a jam
       if (statusResult.role === "listener") {
         const jam = statusResult.jam;
-        const hostName =
-          jam.host?.push_name || jam.host?.display_name || "Anônimo";
+        const hostName = await resolveHostName(jam, ctx.client);
 
         let msg = `🎧 *Você já está ouvindo a jam de ${hostName}*\n\n`;
-        msg += `Envie */sair* para sair da jam.`;
+        
+        // Show current track or "nothing playing"
+        if (jam.currentTrackName) {
+          msg += `🎶 Tocando: *${jam.currentTrackName}*\n`;
+          if (jam.currentArtists) {
+            msg += `👤 ${jam.currentArtists}\n`;
+          }
+        } else {
+          msg += `⏸️ Nada tocando no momento\n`;
+        }
+        
+        msg += `\nEnvie */sair* para sair da jam.`;
 
         await reply(msg);
         return;
@@ -217,10 +285,11 @@ module.exports = {
 
                   // After creating, send invite poll to let others join
                   try {
+                    const hostName = await resolveHostName(jam, ctx.client);
                     const inviteRes = await polls.createPoll(
                       ctx.client,
                       chatId,
-                      `🎵 Jam de ${jam.host?.push_name || jam.host?.display_name || "Anônimo"} — Deseja entrar?`,
+                      `🎵 Jam de ${hostName} — Deseja entrar?`,
                       ["✅ Entrar", "❌ Ignorar"],
                       {
                         onVote: async (inviteVote) => {
@@ -276,21 +345,37 @@ module.exports = {
                               return;
                             }
 
-                            // Success — send private confirmation with current track
+                            // Success — announce in GROUP that user joined
                             const joinedJam = joinRes.jam || jam;
-                            const hostName =
-                              joinedJam.host?.push_name ||
-                              joinedJam.host?.display_name ||
-                              "Anônimo";
-                            let confirmMsg = `🎧 Você entrou na jam de ${hostName}!\n\n`;
-                            if (joinedJam.currentTrackName) {
-                              confirmMsg += `🎶 Tocando: *${joinedJam.currentTrackName}*\n`;
-                              if (joinedJam.currentArtists)
-                                confirmMsg += `👤 ${joinedJam.currentArtists}\n`;
-                            }
-                            confirmMsg += `\nEnvie */sair* para sair da jam.`;
+                            const hostName = await resolveHostName(
+                              joinedJam,
+                              ctx.client,
+                            );
 
-                            await ctx.client.sendMessage(voterId, confirmMsg);
+                            // Get voter name for mention
+                            let voterName = voterId.split("@")[0];
+                            try {
+                              const voterContact =
+                                await ctx.client.getContactById(voterId);
+                              voterName =
+                                voterContact?.pushname ||
+                                voterContact?.name ||
+                                voterName;
+                            } catch (err) {
+                              // fallback
+                            }
+
+                            let announceMsg = `🎧 @${voterId.split("@")[0]} entrou na jam de *${hostName}*!\n\n`;
+                            if (joinedJam.currentTrackName) {
+                              announceMsg += `🎶 Tocando: *${joinedJam.currentTrackName}*\n`;
+                              if (joinedJam.currentArtists)
+                                announceMsg += `👤 ${joinedJam.currentArtists}\n`;
+                            }
+                            announceMsg += `\n💡 *Quer ouvir junto?* Envie */jam* e escolha a jam de ${hostName}!`;
+
+                            await ctx.client.sendMessage(chatId, announceMsg, {
+                              mentions: [voterId],
+                            });
                           } catch (ivErr) {
                             console.error(
                               "[jam] invite onVote error:",
@@ -343,10 +428,17 @@ module.exports = {
 
       // Add option for each active jam (limit to 10 to not overflow poll)
       const maxJams = Math.min(activeJams.length, 10);
+
+      // Resolve all host names first
+      const hostNames = await Promise.all(
+        activeJams
+          .slice(0, maxJams)
+          .map((jam) => resolveHostName(jam, ctx.client)),
+      );
+
       for (let i = 0; i < maxJams; i++) {
         const jam = activeJams[i];
-        const hostName =
-          jam.host?.push_name || jam.host?.display_name || "Anônimo";
+        const hostName = hostNames[i];
         const listenerCount =
           (jam.listeners?.filter((l) => l.isActive)?.length || 0) + 1;
 
@@ -368,8 +460,7 @@ module.exports = {
 
       for (let i = 0; i < maxJams; i++) {
         const jam = activeJams[i];
-        const hostName =
-          jam.host?.push_name || jam.host?.display_name || "Anônimo";
+        const hostName = hostNames[i];
         const listenerCount =
           (jam.listeners?.filter((l) => l.isActive)?.length || 0) + 1;
 
@@ -380,6 +471,8 @@ module.exports = {
           if (jam.currentArtists) {
             pollMessage += `👤 ${jam.currentArtists}\n`;
           }
+        } else {
+          pollMessage += `⏸️ Nada tocando no momento\n`;
         }
         pollMessage += `\n`;
       }
@@ -453,16 +546,31 @@ module.exports = {
                   }
 
                   const jam = createResult.jam;
-                  let msg = `🎵 *Jam criada com sucesso!*\n\n`;
-                  msg += `Você está transmitindo sua música para outros usuários.\n`;
+
+                  // Get voter contact for mention
+                  let voterName = voter.split("@")[0];
+                  try {
+                    const voterContact = await ctx.client.getContactById(voter);
+                    voterName =
+                      voterContact?.pushname || voterContact?.name || voterName;
+                  } catch (err) {
+                    // fallback to phone number
+                  }
+
+                  // Announce jam created in GROUP (not private)
+                  let msg = `🎵 *Jam criada!*\n\n`;
+                  msg += `@${voter.split("@")[0]} está transmitindo sua música!\n\n`;
                   if (jam.currentTrackName) {
                     msg += `🎶 Tocando agora: *${jam.currentTrackName}*\n`;
                     if (jam.currentArtists) msg += `👤 ${jam.currentArtists}\n`;
                   } else {
-                    msg += `⚠️ Nenhuma música tocando no momento. Inicie uma música no Spotify!\n`;
+                    msg += `⚠️ Nenhuma música tocando no momento.\n`;
                   }
-                  msg += `\nEnvie */sair* para encerrar a jam.`;
-                  await ctx.client.sendMessage(voter, msg);
+                  msg += `\n💡 *Quer ouvir junto?* Envie */jam* e escolha a jam de ${voterName}!`;
+
+                  await ctx.client.sendMessage(chatId, msg, {
+                    mentions: [voter],
+                  });
                   return;
                 }
 
@@ -508,18 +616,30 @@ module.exports = {
                 }
 
                 const joinedJam = joinRes.jam;
-                const hostName =
-                  joinedJam.host?.push_name ||
-                  joinedJam.host?.display_name ||
-                  "Anônimo";
-                let confirmMsg = `🎧 Você entrou na jam de ${hostName}!\n\n`;
-                if (joinedJam.currentTrackName) {
-                  confirmMsg += `🎶 Tocando: *${joinedJam.currentTrackName}*\n`;
-                  if (joinedJam.currentArtists)
-                    confirmMsg += `👤 ${joinedJam.currentArtists}\n`;
+                const hostName = await resolveHostName(joinedJam, ctx.client);
+
+                // Get voter contact for mention
+                let voterName = voter.split("@")[0];
+                try {
+                  const voterContact = await ctx.client.getContactById(voter);
+                  voterName =
+                    voterContact?.pushname || voterContact?.name || voterName;
+                } catch (err) {
+                  // fallback
                 }
-                confirmMsg += `\nEnvie */sair* para sair da jam.`;
-                await ctx.client.sendMessage(voter, confirmMsg);
+
+                // Announce in GROUP that user joined
+                let announceMsg = `🎧 @${voter.split("@")[0]} entrou na jam de *${hostName}*!\n\n`;
+                if (joinedJam.currentTrackName) {
+                  announceMsg += `🎶 Tocando: *${joinedJam.currentTrackName}*\n`;
+                  if (joinedJam.currentArtists)
+                    announceMsg += `👤 ${joinedJam.currentArtists}\n`;
+                }
+                announceMsg += `\n💡 *Quer ouvir junto?* Envie */jam* e escolha a jam de ${hostName}!`;
+
+                await ctx.client.sendMessage(chatId, announceMsg, {
+                  mentions: [voter],
+                });
               } catch (cbErr) {
                 console.error(
                   "[jam] unified poll onVote error:",
@@ -615,8 +735,7 @@ module.exports = {
       }
 
       const jam = joinResult.jam;
-      const hostName =
-        jam.host?.push_name || jam.host?.display_name || "Anônimo";
+      const hostName = await resolveHostName(jam, ctx.client);
 
       let msg = `🎧 *Você entrou na jam de ${hostName}!*\n\n`;
 

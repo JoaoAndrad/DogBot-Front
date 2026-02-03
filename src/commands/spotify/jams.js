@@ -87,16 +87,21 @@ module.exports = {
         const activeListeners = jam.listeners?.filter((l) => l.isActive) || [];
         const listenerCount = (activeListeners.length || 0) + 1; // include host
 
-        const track = jam.currentTrackName || "—";
-        const artists = jam.currentArtists || "—";
+        const track = jam.currentTrackName || null;
+        const artists = jam.currentArtists || null;
         // Album is not always available on jam model; attempt to use jam.currentAlbum if present
-        const album = jam.currentAlbum || jam.currentTrackAlbum || "—";
+        const album = jam.currentAlbum || jam.currentTrackAlbum || null;
 
         out += `🎙️ *${hostName}*\n`;
         out += `👥 Ouvintes: ${listenerCount}\n`;
-        out += `🎶 Música: ${track}\n`;
-        out += `💿 Álbum: ${album}\n`;
-        out += `👤 Artista(s): ${artists}\n`;
+
+        if (track) {
+          out += `🎶 Música: ${track}\n`;
+          if (album) out += `💿 Álbum: ${album}\n`;
+          if (artists) out += `👤 Artista(s): ${artists}\n`;
+        } else {
+          out += `⏸️ Nada tocando no momento\n`;
+        }
 
         // List listener names (host first)
         const names = [hostName];
