@@ -101,11 +101,7 @@ module.exports = {
     // If dryrun, get count and show preview
     if (isDryRun) {
       try {
-        const countResp = await backendClient.get("/api/broadcasts/count");
-        const count = countResp?.count || 0;
-
-        await reply(
-          `📊 *Preview do Broadcast*\n\n` +sendToBackend(
+        const countResp = await backendClient.sendToBackend(
           "/api/broadcasts/count",
           null,
           "GET",
@@ -135,7 +131,11 @@ module.exports = {
           createdBy: senderNumber,
         },
         "POST",
-       const recipientCount = createResp.recipientCount || 0;
+      );
+
+      if (createResp && createResp.id) {
+        const broadcastId = createResp.id;
+        const recipientCount = createResp.recipientCount || 0;
 
         await reply(
           `✅ *Broadcast criado com sucesso!*\n\n` +
