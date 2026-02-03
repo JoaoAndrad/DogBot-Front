@@ -156,15 +156,22 @@ module.exports = {
                     return;
                   }
 
+                  const selectedIndexRaw =
+                    voteData.selectedIndexes && voteData.selectedIndexes[0];
+                  const selectedNames = voteData.selectedNames || [];
                   const selectedIndex =
-                    (voteData.selectedIndexes && voteData.selectedIndexes[0]) ||
-                    null;
+                    selectedIndexRaw != null ? Number(selectedIndexRaw) : null;
 
-                  if (selectedIndex !== 0) {
+                  const nameChoice = (selectedNames && selectedNames[0]) || "";
+                  const confirmedByName = /sim|iniciar|yes|confirm/i.test(
+                    nameChoice,
+                  );
+
+                  if (!(selectedIndex === 0 || confirmedByName)) {
                     // User cancelled
                     await ctx.client.sendMessage(
                       chatId,
-                      "Operação cancelada pelo usuário.",
+                      "Certo! Foi só um alarme falso então. 😉",
                     );
                     return;
                   }
@@ -204,7 +211,7 @@ module.exports = {
                   } else {
                     announce += `⚠️ Nenhuma música tocando no momento. Inicie uma música no Spotify!\n`;
                   }
-                  announce += `\nEnvie */sair* para encerrar a jam.`;
+                  announce += `\nEnvie */sair* a qualquer momento para encerrar a jam.`;
 
                   await ctx.client.sendMessage(chatId, announce);
 
@@ -258,7 +265,7 @@ module.exports = {
                               if (joinRes.error === "NO_ACTIVE_DEVICE") {
                                 await ctx.client.sendMessage(
                                   voterId,
-                                  "⚠️ Não foi possível sincronizar — abra o Spotify em qualquer dispositivo e tente novamente.",
+                                  "⚠️ Não foi possível sincronizar, primeiro inicie o Spotify em qualquer dispositivo e tente novamente.",
                                 );
                                 return;
                               }
