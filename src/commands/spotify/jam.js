@@ -126,7 +126,7 @@ module.exports = {
         if (listenerNames) {
           msg += `${listenerNames}${listenerCount > 5 ? " e outros..." : ""}\n`;
         }
-        
+
         // Show current track or "nothing playing"
         if (jam.currentTrackName) {
           msg += `\n🎶 Tocando agora: *${jam.currentTrackName}*\n`;
@@ -136,7 +136,7 @@ module.exports = {
         } else {
           msg += `\n⏸️ Nada tocando no momento\n`;
         }
-        
+
         msg += `\nEnvie */sair* para encerrar a jam.`;
 
         await reply(msg);
@@ -149,7 +149,7 @@ module.exports = {
         const hostName = await resolveHostName(jam, ctx.client);
 
         let msg = `🎧 *Você já está ouvindo a jam de ${hostName}*\n\n`;
-        
+
         // Show current track or "nothing playing"
         if (jam.currentTrackName) {
           msg += `🎶 Tocando: *${jam.currentTrackName}*\n`;
@@ -159,7 +159,7 @@ module.exports = {
         } else {
           msg += `⏸️ Nada tocando no momento\n`;
         }
-        
+
         msg += `\nEnvie */sair* para sair da jam.`;
 
         await reply(msg);
@@ -185,20 +185,66 @@ module.exports = {
       let activeJams = activeJamsResult.jams || [];
 
       // Filter jams by group members if in a group
-      if (isGroup && activeJams.length > 0 && ctx.message?.getChat) {
+      if (isGroup && ctx.message?.getChat) {
         try {
           const chat = await ctx.message.getChat();
           const participants = chat.participants || [];
-          const participantIds = participants.map((p) => p.id._serialized);
 
-          // Filter jams where host is a member of this group
-          activeJams = activeJams.filter(
-            (jam) =>
-              participantIds.includes(jam.hostUserId) || jam.chatId === chatId,
+          // Get WhatsApp IDs and resolve to UUIDs
+          const participantWhatsAppIds = participants.map(
+            (p) => p.id._serialized,
           );
+          const participantUuids = new Set();
+
+          // Resolve each WhatsApp ID to UUID
+          for (const whatsappId of participantWhatsAppIds) {
+            try {
+              const lookup = await backend.sendToBackend(
+                `/api/users/lookup?identifier=${encodeURIComponent(whatsappId)}`,
+                null,
+                "GET",
+              );
+              if (lookup && lookup.found && lookup.userId) {
+                participantUuids.add(lookup.userId);
+              }
+            } catch (err) {
+              // Ignore individual lookup failures
+            }
+          }
+
+          // Get all active jams (not filtered by chatId)
+          const allJamsResult = await backend.sendToBackend(
+            `/api/jam/active`,
+            null,
+            "GET",
+          );
+
+          if (allJamsResult.success && allJamsResult.jams) {
+            // Filter jams where:
+            // 1. Host is a member of this group OR
+            // 2. Any listener is a member of this group OR
+            // 3. Jam was created in this chat
+            activeJams = allJamsResult.jams.filter((jam) => {
+              // Check if host is in group
+              if (participantUuids.has(jam.hostUserId)) return true;
+
+              // Check if jam was created in this chat
+              if (jam.chatId === chatId) return true;
+
+              // Check if any listener is in group
+              if (jam.listeners && jam.listeners.length > 0) {
+                return jam.listeners.some(
+                  (listener) =>
+                    listener.isActive && participantUuids.has(listener.userId),
+                );
+              }
+
+              return false;
+            });
+          }
         } catch (err) {
           console.log("[jam] Could not filter by group members:", err.message);
-          // Continue with unfiltered jams
+          // Continue with original jams
         }
       }
 
