@@ -83,17 +83,17 @@ module.exports = {
         const hostName =
           jam.host?.push_name || jam.host?.display_name || "Anônimo";
 
-        // Count listeners and include host as listener per request
+        // Count listeners (excluding host)
         const activeListeners = jam.listeners?.filter((l) => l.isActive) || [];
-        const listenerCount = (activeListeners.length || 0) + 1; // include host
+        const listenerCount = activeListeners.length;
 
         const track = jam.currentTrackName || null;
         const artists = jam.currentArtists || null;
         // Album is not always available on jam model; attempt to use jam.currentAlbum if present
         const album = jam.currentAlbum || jam.currentTrackAlbum || null;
 
-        // List listener names (host first)
-        const names = [hostName];
+        // List listener names (excluding host)
+        const names = [];
         for (const l of activeListeners) {
           try {
             const n = l.user?.push_name || l.user?.display_name || null;
@@ -104,14 +104,18 @@ module.exports = {
         }
 
         out += `━━━━━━━━━━━━━━━━━━\n`;
-        out += `🎙️ *${hostName}* (${listenerCount} ${listenerCount === 1 ? "ouvinte" : "ouvintes"})\n`;
+        if (listenerCount === 0) {
+          out += `🎙️ *${hostName}* (Sem ouvintes)\n`;
+        } else {
+          out += `🎙️ *${hostName}* (${listenerCount} ${listenerCount === 1 ? "ouvinte" : "ouvintes"})\n`;
+        }
         out += `\n`;
 
         if (track) {
           out += `🎶 *${track}*\n`;
           if (artists) out += `👤 ${artists}\n`;
           if (album) out += `💿 ${album}\n`;
-          if (listenerCount > 1) {
+          if (names.length > 0) {
             out += `👥 ${names.join(", ")}\n`;
           }
         } else {
