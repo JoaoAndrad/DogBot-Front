@@ -1,217 +1,4 @@
-const backendClient = require("../../services/backendClient");
-const logger = require("../../utils/logger");
-const polls = require("../../components/poll");
-const { sendTrackSticker } = require("../../utils/stickerHelper");
 
-module.exports = {
-  name: "skip",
-  aliases: ["pular", "next"],
-  description: "Votação colaborativa para pular música (grupos Spotify Jam)",
-
-  async execute(ctx) {
-    const { message, reply, client } = ctx;
-    const msg = message;
-    const chatId = msg.from;
-
-    // Comando temporariamente desativado
-    return reply("⚠️ O comando /skip está temporariamente desativado.");
-
-    // Check if is group: either msg.isGroup or chatId ends with @g.us
-    const isGroup =
-      !!(msg && msg.isGroup) || (chatId && chatId.endsWith("@g.us"));
-
-    if (!isGroup) {
-      return reply(
-        "⚠️ Este comando só funciona em grupos onde pessoas estão ouvindo Spotify juntas."
-      );
-    }
-
-    try {
-      // Get user info
-      const author = msg.author || msg.from;
-      let userId = null;
-
-      try {
-        const contact = await msg.getContact();
-        if (contact && contact.id && contact.id._serialized) {
-          userId = contact.id._serialized;
-        }
-      } catch (err) {
-        userId = author;
-      }
-
-      logger.info(`[Skip] Iniciando votação de skip no grupo ${chatId}`);
-
-      // Get group members from WhatsApp
-      const chat = await msg.getChat();
-      const memberIds = chat.participants.map((p) => p.id._serialized);
-
-      logger.info(`[Skip] 👥 Membros do grupo: ${memberIds.length}`);
-
-      // Get active listeners in this group
-      const listenersRes = await backendClient.sendToBackend(
-        `/api/groups/${encodeURIComponent(chatId)}/active-listeners`,
-        { memberIds },
-        "POST"
-      );
-
-      if (
-        !listenersRes ||
-        !listenersRes.listeners ||
-        listenersRes.listeners.length === 0
-      ) {
-        logger.info(`[Skip] 🎵 Conectados ao Spotify: 0`);
-        return reply(
-          "⚠️ Nenhum usuário conectado ao Spotify está tocando música no momento neste grupo."
-        );
-      }
-
-      const listeners = listenersRes.listeners;
-      logger.info(`[Skip] 🎵 Conectados ao Spotify: ${listeners.length}`);
-
-      // Check if initiator is listening
-      const initiator = listeners.find(
-        (l) => l.identifier === userId || l.userId === userId
-      );
-
-      if (!initiator) {
-        return reply(
-          "⚠️ Você precisa estar ouvindo música no Spotify para iniciar uma votação de skip."
-        );
-      }
-
-      // Get the track being played
-      const currentTrack = initiator.currentTrack;
-      if (!currentTrack) {
-        return reply("⚠️ Não consegui identificar a música atual.");
-      }
-
-      // Find all listeners playing the same track (Jam session)
-      const jamListeners = listeners.filter(
-        (l) =>
-          l.currentTrack &&
-          l.currentTrack.trackId === currentTrack.trackId &&
-          l.currentTrack.contextId === currentTrack.contextId
-      );
-
-      if (jamListeners.length < 2) {
-        return reply(
-          "⚠️ Você parece ser o único ouvindo esta música. Votação de skip é para sessões colaborativas (Jam)."
-        );
-      }
-
-      const targetUserIds = jamListeners.map((l) => l.userId);
-
-      // Create vote in backend
-      const voteRes = await backendClient.sendToBackend(
-        `/api/groups/${encodeURIComponent(chatId)}/vote`,
-        {
-          voteType: "skip",
-          trackId: currentTrack.trackId,
-          trackName: currentTrack.trackName,
-          trackArtists: currentTrack.artists,
-          initiatorUserId: initiator.userId,
-          targetUserIds,
-          threshold: 0.5, // 50% needed
-        }
-      );
-
-      if (!voteRes || !voteRes.vote) {
-        return reply("❌ Erro ao criar votação. Tente novamente.");
-      }
-
-      const vote = voteRes.vote;
-      const stats = voteRes.stats;
-
-      // Get initiator info (já definido anteriormente, apenas reusar)
-      const initiatorName = initiator
-        ? initiator.displayName || initiator.identifier
-        : "Alguém";
-
-      // Create poll (apenas título e opções)
-      const pollTitle = `⏭️ Skip: ${currentTrack.trackName}\nDe: ${currentTrack.artists}`;
-      const pollOptions = ["✅ Sim, pular", "❌ Não, continuar"];
-
-      // Create poll with callback
-      const pollResult = await polls.createPoll(
-        client,
-        chatId,
-        pollTitle,
-        pollOptions,
-        {
-          voteType: "skip",
-          voteId: vote.id,
-          groupId: chatId,
-          onVote: async (voteData) => {
-            await handleSkipVote(
-              voteData,
-              vote.id,
-              client,
-              chatId,
-              userId,
-              initiator.userId
-            );
-          },
-        }
-      );
-
-      // Enviar mensagem de contexto separada com menções
-      const otherListeners = jamListeners.filter(
-        (l) => l.userId !== initiator.userId
-      );
-
-      let contextMessage = `${initiatorName} deseja pular a música\n`;
-      const mentionsList = [];
-
-      if (otherListeners.length > 0) {
-        const mentions = otherListeners
-          .map((l) => {
-            const phoneNumber = l.identifier.split("@")[0];
-            mentionsList.push(l.identifier);
-            return `@${phoneNumber}`;
-          })
-          .join(" ");
-        contextMessage += `\n${mentions}\n`;
-      }
-
-      contextMessage += `\nVotos: ${stats.votesFor}/${stats.totalEligible} (${stats.needed} necessários)`;
-
-      await client.sendMessage(chatId, contextMessage, {
-        mentions: mentionsList,
-      });
-
-      // Send track artwork as sticker
-      await sendTrackSticker(client, chatId, currentTrack);
-
-      if (pollResult && pollResult.msgId) {
-        // Update vote with pollId
-        await backendClient.sendToBackend(`/api/groups/votes/${vote.id}/cast`, {
-          userId: initiator.userId,
-          isFor: true,
-          pollId: pollResult.msgId,
-        });
-      }
-
-      logger.info(`[Skip] Poll criada para votação ${vote.id}`);
-    } catch (err) {
-      logger.error("[Skip] Erro:", err);
-      return reply(
-        "❌ Erro ao iniciar votação de skip. Tente novamente mais tarde."
-      );
-    }
-  },
-};
-
-/**
- * Handle vote on skip poll
- */
-async function handleSkipVote(
-  voteData,
-  collaborativeVoteId,
-  client,
-  chatId,
-  creatorId
-) {
   try {
     const voter = voteData.voter; // Já vem resolvido para @c.us pelo pollComponent
     const selectedOptions = voteData.selectedOptions || [];
@@ -225,12 +12,10 @@ async function handleSkipVote(
       return;
     }
 
-    logger.debug(`[Skip] VoteData completo:`, voteData);
-    logger.debug(
-      `[Skip] SelectedIndexes:`,
-      selectedIndexes,
-      `Type: ${typeof selectedIndexes}`
-    );
+    if (voter === creatorWhatsAppId) {
+      logger.debug(`[Skip] Voto do criador ignorado: ${voter} é o criador da votação`);
+      return;
+    }
 
     // 0 = Sim, 1 = Não
     const isFor = selectedIndexes.includes(0);
@@ -323,25 +108,24 @@ async function handleSkipVote(
 
     // Check if resolved
     if (updatedVote.status === "passed") {
-      // Execute skip via backend API
-      // Sempre usar a conta Spotify do desenvolvedor (Developer Account)
-      const skipRes = await backendClient.sendToBackend(
-        "/api/spotify/skip",
-        {}
-      );
+      // Execute skip for this jam via backend
+      if (!jamId) {
+        logger.error("[Skip] jamId missing when trying to execute skip");
+        await client.sendMessage(chatId, `⚠️ Votação aprovada, mas falha ao identificar a jam.`);
+        return;
+      }
+
+      const skipRes = await backendClient.sendToBackend(`/api/jam/${jamId}/skip`, { userId: creatorUserId }, "POST");
 
       if (skipRes && skipRes.success) {
-        await client.sendMessage(
-          chatId,
-          `✅ Votação aprovada! Pulando música... (${stats.votesFor}/${stats.totalEligible} votos)`
-        );
+        await client.sendMessage(chatId, `✅ Votação aprovada! Pulando música e sincronizando ouvintes... (${stats.votesFor}/${stats.totalEligible} votos)`);
       } else {
-        await client.sendMessage(
-          chatId,
-          `⚠️ Votação aprovada, mas erro ao executar skip: ${
-            skipRes?.error || "Erro desconhecido"
-          }`
-        );
+        const errText = skipRes?.error || skipRes?.details || "Erro desconhecido";
+        if (errText === "NO_ACTIVE_DEVICE" || (skipRes && skipRes.error === "NO_ACTIVE_DEVICE")) {
+          await client.sendMessage(chatId, `⚠️ Votação aprovada, mas o host não possui um dispositivo Spotify ativo. Peça para ele abrir o Spotify.`);
+        } else {
+          await client.sendMessage(chatId, `⚠️ Votação aprovada, mas erro ao executar skip: ${errText}`);
+        }
       }
     } else if (updatedVote.status === "failed") {
       await client.sendMessage(
