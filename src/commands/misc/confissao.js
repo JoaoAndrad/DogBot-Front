@@ -281,6 +281,15 @@ module.exports = {
               },
             }),
           );
+
+          console.log("[confissao] createPoll retornou:", {
+            pollMsg: pollMsg,
+            type: typeof pollMsg,
+            hasSent: !!pollMsg?.sent,
+            hasMsgId: !!pollMsg?.msgId,
+            msgId: pollMsg?.msgId,
+          });
+
           // Collect poll message for cleanup
           if (pollMsg) {
             console.log(
@@ -295,8 +304,22 @@ module.exports = {
               },
             );
             pollMessages.push(pollMsg);
+            console.log(
+              "[confissao] Array pollMessages agora tem:",
+              pollMessages.length,
+              "polls",
+            );
+          } else {
+            console.log(
+              "[confissao] pollMsg é null/undefined, não adicionando ao array",
+            );
           }
         } catch (err) {
+          console.error(
+            "[confissao] Erro em createPollPromise:",
+            err?.message,
+            err?.stack,
+          );
           reject(err);
         }
       });
