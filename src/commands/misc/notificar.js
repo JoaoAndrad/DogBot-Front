@@ -136,13 +136,40 @@ module.exports = {
       if (createResp && createResp.id) {
         const broadcastId = createResp.id;
         const recipientCount = createResp.recipientCount || 0;
+        const recipients = createResp.recipients || [];
 
         await reply(
-          `✅ *Broadcast criado com sucesso!*\n\n` +
+          `✅ *Broadcast criado!*\n\n` +
             `ID: ${broadcastId}\n` +
-            `Destinatários: ${recipientCount} usuários\n` +
-            `Status: Processando\n\n` +
-            `As mensagens serão enviadas em breve.`,
+            `Destinatários: ${recipientCount} usuários\n\n` +
+            `Enviando mensagens...`,
+        );
+
+        // Send messages to all recipients (temporary implementation until worker is ready)
+        let successCount = 0;
+        let errorCount = 0;
+
+        for (const recipientId of recipients) {
+          try {
+            await ctx.client.sendMessage(recipientId, text);
+            successCount++;
+
+            // Add small delay to avoid rate limiting
+            await new Promise((resolve) => setTimeout(resolve, 500));
+          } catch (err) {
+            console.error(
+              `[Broadcast] Erro ao enviar para ${recipientId}:`,
+              err?.message,
+            );
+            errorCount++;
+          }
+        }
+
+        await reply(
+          `✅ *Broadcast concluído!*\n\n` +
+            `Enviadas: ${successCount}\n` +
+            `Erros: ${errorCount}\n` +
+            `Total: ${recipientCount}`,
         );
       } else {
         await reply("✅ Broadcast criado, mas sem detalhes de confirmação.");
