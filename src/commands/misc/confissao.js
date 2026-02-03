@@ -11,45 +11,89 @@ module.exports = {
     // Helper function to delete messages and polls after confession is sent
     const cleanupAfterConfession = async (originalMsg, confirmationMsg) => {
       try {
+        console.log("[confissao] Iniciando limpeza de mensagens...");
+        console.log(
+          `[confissao] Total de polls para apagar: ${pollMessages.length}`,
+        );
+
         // Wait 2 seconds so user can see confirmation
         await new Promise((resolve) => setTimeout(resolve, 2000));
 
         // Delete all poll messages
-        for (const pollMsg of pollMessages) {
+        for (let i = 0; i < pollMessages.length; i++) {
+          const pollMsg = pollMessages[i];
           try {
-            if (pollMsg && typeof pollMsg.delete === "function") {
-              await pollMsg.delete(true, true); // delete for everyone, clear media
+            // createPoll returns { sent, msgId }, so we need to access sent property
+            const messageToDelete =
+              pollMsg && pollMsg.sent ? pollMsg.sent : pollMsg;
+            if (
+              messageToDelete &&
+              typeof messageToDelete.delete === "function"
+            ) {
+              console.log(
+                `[confissao] Apagando poll ${i + 1}/${pollMessages.length}`,
+              );
+              await messageToDelete.delete(true, true); // delete for everyone, clear media
+              console.log(`[confissao] Poll ${i + 1} apagada com sucesso`);
+            } else {
+              console.log(`[confissao] Poll ${i + 1} não tem método delete`);
             }
           } catch (err) {
-            console.error("[confissao] erro ao apagar enquete:", err?.message);
+            console.error(
+              `[confissao] erro ao apagar enquete ${i + 1}:`,
+              err?.message,
+              err?.stack,
+            );
           }
         }
 
-        // Delete confirmation message
+        // Delete confirmation message (only for sender, not for everyone)
         if (confirmationMsg && typeof confirmationMsg.delete === "function") {
           try {
-            await confirmationMsg.delete(true, true);
+            console.log(
+              "[confissao] Apagando mensagem de confirmação (apenas para remetente)...",
+            );
+            await confirmationMsg.delete(false); // delete only for sender
+            console.log("[confissao] Mensagem de confirmação apagada");
           } catch (err) {
             console.error(
               "[confissao] erro ao apagar confirmação:",
               err?.message,
+              err?.stack,
             );
           }
+        } else {
+          console.log(
+            "[confissao] Confirmação não tem método delete ou é null",
+          );
         }
 
         // Delete original message
         if (originalMsg && typeof originalMsg.delete === "function") {
           try {
+            console.log("[confissao] Apagando mensagem original...");
             await originalMsg.delete(true, true);
+            console.log("[confissao] Mensagem original apagada");
           } catch (err) {
             console.error(
               "[confissao] erro ao apagar mensagem original:",
               err?.message,
+              err?.stack,
             );
           }
+        } else {
+          console.log(
+            "[confissao] Mensagem original não tem método delete ou é null",
+          );
         }
+
+        console.log("[confissao] Limpeza concluída");
       } catch (err) {
-        console.error("[confissao] erro ao limpar mensagens:", err?.message);
+        console.error(
+          "[confissao] erro ao limpar mensagens:",
+          err?.message,
+          err?.stack,
+        );
       }
     };
 
