@@ -39,12 +39,7 @@ module.exports = {
         "GET",
       );
 
-      if (
-        !userLookup ||
-        !userLookup.found ||
-        !userLookup.user ||
-        !userLookup.user.id
-      ) {
+      if (!userLookup || !userLookup.found || !userLookup.userId) {
         await reply(
           "❌ Usuário não encontrado no sistema.\n\n" +
             "Você precisa estar registrado para usar jams.",
@@ -53,7 +48,7 @@ module.exports = {
       }
 
       // Use the actual User UUID from database
-      const userUuid = userLookup.user.id;
+      const userUuid = userLookup.userId;
 
       // Check user's current jam status
       const statusResult = await backend.sendToBackend(
