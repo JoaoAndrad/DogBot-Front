@@ -1,5 +1,33 @@
 const backend = require("../../services/backendClient");
 
+/**
+ * Resolve host name with WhatsApp fallback
+ * @param {Object} jam - Jam object with host data
+ * @param {Object} client - WhatsApp client instance
+ * @returns {Promise<string>} Resolved host name
+ */
+async function resolveHostName(jam, client) {
+  // Try database fields first
+  let name = jam.host?.push_name || jam.host?.display_name;
+
+  // If empty, try to fetch from WhatsApp
+  if (!name && jam.host?.sender_number && client) {
+    try {
+      const whatsappId = jam.host.sender_number.includes("@")
+        ? jam.host.sender_number
+        : `${jam.host.sender_number}@c.us`;
+
+      const contact = await client.getContactById(whatsappId);
+      name = contact?.pushname || contact?.name;
+    } catch (err) {
+      // Silently fail and use fallback
+    }
+  }
+
+  // Final fallbacks: phone number or "Anônimo"
+  return name || jam.host?.sender_number || "Anônimo";
+}
+
 module.exports = {
   name: "jams",
   aliases: ["jam.list", "jam.info"],
@@ -80,8 +108,7 @@ module.exports = {
       // Build output listing each jam
       let out = "🎧 Jams ativas:\n\n";
       for (const jam of jams) {
-        const hostName =
-          jam.host?.push_name || jam.host?.display_name || "Anônimo";
+        const hostName = await resolveHostName(jam, ctx.client);
 
         // Count listeners (excluding host)
         const activeListeners = jam.listeners?.filter((l) => l.isActive) || [];
