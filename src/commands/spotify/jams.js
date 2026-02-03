@@ -92,17 +92,6 @@ module.exports = {
         // Album is not always available on jam model; attempt to use jam.currentAlbum if present
         const album = jam.currentAlbum || jam.currentTrackAlbum || null;
 
-        out += `🎙️ *${hostName}*\n`;
-        out += `👥 Ouvintes: ${listenerCount}\n`;
-
-        if (track) {
-          out += `🎶 Música: ${track}\n`;
-          if (album) out += `💿 Álbum: ${album}\n`;
-          if (artists) out += `👤 Artista(s): ${artists}\n`;
-        } else {
-          out += `⏸️ Nada tocando no momento\n`;
-        }
-
         // List listener names (host first)
         const names = [hostName];
         for (const l of activeListeners) {
@@ -114,7 +103,24 @@ module.exports = {
           }
         }
 
-        out += `\n👥 Usuários ouvindo: ${names.join(", ")}\n`;
+        out += `━━━━━━━━━━━━━━━━━━\n`;
+        out += `🎙️ *${hostName}* (${listenerCount} ${listenerCount === 1 ? "ouvinte" : "ouvintes"})\n`;
+
+        if (listenerCount > 1) {
+          out += `👥 ${names.join(", ")}\n`;
+        }
+
+        out += `\n`;
+
+        if (track) {
+          out += `🎶 *${track}*\n`;
+          if (artists) out += `👤 ${artists}\n`;
+          if (album) out += `💿 ${album}\n`;
+        } else {
+          out += `⏸️ _Nada tocando no momento_\n`;
+        }
+
+        out += `\n`;
       }
 
       await reply(out);
