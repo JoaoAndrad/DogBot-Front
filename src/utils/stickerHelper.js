@@ -382,7 +382,7 @@ async function createCompositeWebp(tracks) {
       masks.push(
         Buffer.from(
           `<svg width="${SIZE}" height="${SIZE}">
-            <polygon points="0,0 0,512 341,512 0,171" fill="white"/>
+            <polygon points="0,171 0,512 341,512" fill="white"/>
           </svg>`,
         ),
       );
