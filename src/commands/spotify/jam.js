@@ -79,12 +79,13 @@ module.exports = {
         return;
       }
 
-      // Get chat ID if in group
+      // Get chat ID and check if it's a group
       const chatId = ctx.message?.from || null;
+      const isGroup = chatId && chatId.includes("@g.us");
 
-      // Check for active jams in this chat/global
+      // Check for active jams (filtered by chat if in group)
       const activeJamsResult = await backend.sendToBackend(
-        `/api/jam/active?chatId=${chatId || ""}`,
+        `/api/jam/active${isGroup ? `?chatId=${chatId}` : ""}`,
         null,
         "GET",
       );
@@ -94,7 +95,25 @@ module.exports = {
         return;
       }
 
-      const activeJams = activeJamsResult.jams || [];
+      let activeJams = activeJamsResult.jams || [];
+
+      // Filter jams by group members if in a group
+      if (isGroup && activeJams.length > 0 && ctx.message?.getChat) {
+        try {
+          const chat = await ctx.message.getChat();
+          const participants = chat.participants || [];
+          const participantIds = participants.map((p) => p.id._serialized);
+
+          // Filter jams where host is a member of this group
+          activeJams = activeJams.filter(
+            (jam) =>
+              participantIds.includes(jam.hostUserId) || jam.chatId === chatId,
+          );
+        } catch (err) {
+          console.log("[jam] Could not filter by group members:", err.message);
+          // Continue with unfiltered jams
+        }
+      }
 
       // No active jams, create new one
       if (activeJams.length === 0) {
@@ -135,43 +154,76 @@ module.exports = {
         return;
       }
 
-      // There are active jams, show poll to user
-      const jam = activeJams[0]; // For now, use first active jam
-      const hostName =
-        jam.host?.push_name || jam.host?.display_name || "Anônimo";
-      const listenerCount =
-        jam.listeners?.filter((l) => l.isActive)?.length || 0;
+      // There are active jams, show unified poll with all options
+      // Build poll options: one for each active jam + create new option
+      const pollOptions = [];
+      const jamIdMap = {}; // Map option index to jam ID or "create"
+
+      // Add option for each active jam (limit to 10 to not overflow poll)
+      const maxJams = Math.min(activeJams.length, 10);
+      for (let i = 0; i < maxJams; i++) {
+        const jam = activeJams[i];
+        const hostName =
+          jam.host?.push_name || jam.host?.display_name || "Anônimo";
+        const listenerCount =
+          jam.listeners?.filter((l) => l.isActive)?.length || 0;
+
+        let optionText = `🎧 Entrar na jam de ${hostName}`;
+        if (listenerCount > 0) {
+          optionText += ` (${listenerCount} ${listenerCount === 1 ? "ouvinte" : "ouvintes"})`;
+        }
+
+        pollOptions.push(optionText);
+        jamIdMap[i] = jam.id;
+      }
+
+      // Add "create new" option at the end
+      pollOptions.push("🎵 Criar minha própria jam");
+      jamIdMap[pollOptions.length - 1] = "create";
+
+      // Build message with jam details
+      let pollMessage = `🎵 *${activeJams.length === 1 ? "Há uma jam ativa!" : `Há ${activeJams.length} jams ativas!`}*\n\n`;
+
+      for (let i = 0; i < maxJams; i++) {
+        const jam = activeJams[i];
+        const hostName =
+          jam.host?.push_name || jam.host?.display_name || "Anônimo";
+        const listenerCount =
+          jam.listeners?.filter((l) => l.isActive)?.length || 0;
+
+        pollMessage += `🎙️ *${hostName}*\n`;
+        pollMessage += `👥 ${listenerCount} ${listenerCount === 1 ? "ouvinte" : "ouvintes"}\n`;
+        if (jam.currentTrackName) {
+          pollMessage += `🎶 ${jam.currentTrackName}\n`;
+          if (jam.currentArtists) {
+            pollMessage += `👤 ${jam.currentArtists}\n`;
+          }
+        }
+        pollMessage += `\n`;
+      }
+
+      if (activeJams.length > maxJams) {
+        pollMessage += `_...e mais ${activeJams.length - maxJams} ${activeJams.length - maxJams === 1 ? "jam" : "jams"}_\n\n`;
+      }
+
+      pollMessage += `*O que você quer fazer?*`;
 
       // Create poll using WhatsApp poll feature
-      const pollMessage = await ctx.message.reply(
-        `🎵 *Já existe uma jam ativa!*\n\n` +
-          `🎙️ Host: ${hostName}\n` +
-          `👥 Ouvintes: ${listenerCount}\n` +
-          (jam.currentTrackName
-            ? `🎶 Tocando: ${jam.currentTrackName}\n`
-            : "") +
-          `\n*O que você quer fazer?*`,
-        null,
-        {
-          poll: {
-            name: "Escolha uma opção:",
-            options: [
-              "✅ Entrar na jam existente",
-              "🎵 Criar minha própria jam",
-            ],
-            selectableCount: 1,
-          },
+      const pollReply = await ctx.message.reply(pollMessage, null, {
+        poll: {
+          name: "Escolha uma opção:",
+          options: pollOptions,
+          selectableCount: 1,
         },
-      );
+      });
 
       // Store poll context for later handling
       const pollBuilder = require("../../pollBuilder");
-      pollBuilder.storePollContext(pollMessage.id._serialized, {
+      pollBuilder.storePollContext(pollReply.id._serialized, {
         type: "jam-decision",
         userId,
         chatId,
-        existingJamId: jam.id,
-        options: ["join", "create"],
+        jamIdMap, // Maps option index to jam ID or "create"
       });
     } catch (err) {
       console.error("[jam] Error:", err);
@@ -186,60 +238,11 @@ module.exports = {
     const reply =
       typeof ctx.reply === "function" ? ctx.reply : (t) => console.log(t);
 
-    const { userId, existingJamId, options } = pollContext;
-    const choice = options[selectedOption];
+    const { userId, jamIdMap } = pollContext;
+    const selectedJamId = jamIdMap[selectedOption];
 
-    if (choice === "join") {
-      // Join existing jam
-      try {
-        const joinResult = await backend.sendToBackend(
-          `/api/jam/${existingJamId}/join`,
-          { userId },
-          "POST",
-        );
-
-        if (!joinResult.success) {
-          if (joinResult.error === "NO_ACTIVE_DEVICE") {
-            await reply(
-              "❌ *Não foi possível sincronizar*\n\n" +
-                "Você precisa ter o Spotify aberto em qualquer dispositivo para entrar na jam.\n\n" +
-                "📱 Abra o Spotify e tente novamente.",
-            );
-            return;
-          }
-          await reply(
-            `❌ Erro ao entrar na jam: ${joinResult.message || joinResult.error}`,
-          );
-          return;
-        }
-
-        const jam = joinResult.jam;
-        const hostName =
-          jam.host?.push_name || jam.host?.display_name || "Anônimo";
-
-        let msg = `🎧 *Você entrou na jam de ${hostName}!*\n\n`;
-
-        if (joinResult.synced) {
-          msg += `✅ Sua música foi sincronizada\n`;
-          if (jam.currentTrackName) {
-            msg += `🎶 Tocando: *${jam.currentTrackName}*\n`;
-            if (jam.currentArtists) {
-              msg += `👤 ${jam.currentArtists}\n`;
-            }
-          }
-        } else {
-          msg += `⚠️ Não foi possível sincronizar automaticamente.\n`;
-          msg += `Certifique-se de que o Spotify está aberto.\n`;
-        }
-
-        msg += `\nEnvie */sair* para sair da jam.`;
-
-        await reply(msg);
-      } catch (err) {
-        console.error("[jam] Error joining:", err);
-        await reply(`❌ Erro ao entrar na jam: ${err.message}`);
-      }
-    } else if (choice === "create") {
+    // User chose to create new jam
+    if (selectedJamId === "create") {
       // Create new jam
       try {
         const chatId = ctx.message?.from || null;
@@ -274,6 +277,57 @@ module.exports = {
         console.error("[jam] Error creating:", err);
         await reply(`❌ Erro ao criar jam: ${err.message}`);
       }
+      return;
+    }
+
+    // User chose to join an existing jam
+    try {
+      const joinResult = await backend.sendToBackend(
+        `/api/jam/${selectedJamId}/join`,
+        { userId },
+        "POST",
+      );
+
+      if (!joinResult.success) {
+        if (joinResult.error === "NO_ACTIVE_DEVICE") {
+          await reply(
+            "❌ *Não foi possível sincronizar*\n\n" +
+              "Você precisa ter o Spotify aberto em qualquer dispositivo para entrar na jam.\n\n" +
+              "📱 Abra o Spotify e tente novamente.",
+          );
+          return;
+        }
+        await reply(
+          `❌ Erro ao entrar na jam: ${joinResult.message || joinResult.error}`,
+        );
+        return;
+      }
+
+      const jam = joinResult.jam;
+      const hostName =
+        jam.host?.push_name || jam.host?.display_name || "Anônimo";
+
+      let msg = `🎧 *Você entrou na jam de ${hostName}!*\n\n`;
+
+      if (joinResult.synced) {
+        msg += `✅ Sua música foi sincronizada\n`;
+        if (jam.currentTrackName) {
+          msg += `🎶 Tocando: *${jam.currentTrackName}*\n`;
+          if (jam.currentArtists) {
+            msg += `👤 ${jam.currentArtists}\n`;
+          }
+        }
+      } else {
+        msg += `⚠️ Não foi possível sincronizar automaticamente.\n`;
+        msg += `Certifique-se de que o Spotify está aberto.\n`;
+      }
+
+      msg += `\nEnvie */sair* para sair da jam.`;
+
+      await reply(msg);
+    } catch (err) {
+      console.error("[jam] Error joining:", err);
+      await reply(`❌ Erro ao entrar na jam: ${err.message}`);
     }
   },
 };
