@@ -105,17 +105,15 @@ module.exports = {
 
         out += `━━━━━━━━━━━━━━━━━━\n`;
         out += `🎙️ *${hostName}* (${listenerCount} ${listenerCount === 1 ? "ouvinte" : "ouvintes"})\n`;
-
-        if (listenerCount > 1) {
-          out += `👥 ${names.join(", ")}\n`;
-        }
-
         out += `\n`;
 
         if (track) {
           out += `🎶 *${track}*\n`;
           if (artists) out += `👤 ${artists}\n`;
           if (album) out += `💿 ${album}\n`;
+          if (listenerCount > 1) {
+            out += `👥 ${names.join(", ")}\n`;
+          }
         } else {
           out += `⏸️ _Nada tocando no momento_\n`;
         }
