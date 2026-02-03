@@ -32,14 +32,14 @@ module.exports = {
       const payload = {
         userId,
         scopes:
-          "user-read-private user-read-email user-read-playback-state user-read-currently-playing",
+          "user-read-private user-read-email user-read-playback-state user-read-currently-playing user-modify-playback-state",
         show_dialog: true,
       };
 
       const res = await backend.sendToBackend("/spotify/start", payload);
       if (!res || !res.auth_url) {
         await reply(
-          "Erro ao iniciar conexão com o Spotify. Tente novamente mais tarde."
+          "Erro ao iniciar conexão com o Spotify. Tente novamente mais tarde.",
         );
         return;
       }
@@ -60,14 +60,14 @@ module.exports = {
             const lookupResult = await backend.sendToBackend(
               `/api/users/lookup`,
               { identifier: userId },
-              "POST"
+              "POST",
             );
 
             if (lookupResult && lookupResult.found && lookupResult.hasSpotify) {
               clearInterval(interval);
               await reply(
                 "✅ *Conta Spotify conectada com sucesso!*\\n\\n" +
-                  "Agora você pode usar todos os recursos do Spotify. Envie */spotify* para começar!"
+                  "Agora você pode usar todos os recursos do Spotify. Envie */spotify* para começar!",
               );
             }
           } catch (err) {
