@@ -373,36 +373,36 @@ async function createCompositeWebp(tracks) {
 
     if (n === 3) {
       // Three images: 3 diagonal bands (equal width ~33.3% each)
-      // Create 3 parallel diagonal stripes from top-left to bottom-right
-      // Lines: y = x + 171 and y = x - 171
+      // Create 3 parallel diagonal stripes from top-right to bottom-left
+      // Lines: x + y = 341 and x + y = 683
       const masks = [];
 
-      // Band 1 (top-left): region where y >= x + 171
-      // Intersects at (0, 171) and (341, 512)
+      // Band 1 (top-right): region where x + y <= 341
+      // Triangle from (0,0) to (341,0) to (0,341)
       masks.push(
         Buffer.from(
           `<svg width="${SIZE}" height="${SIZE}">
-            <polygon points="0,171 0,512 341,512" fill="white"/>
+            <polygon points="0,0 341,0 0,341" fill="white"/>
           </svg>`,
         ),
       );
 
-      // Band 2 (middle): region where x - 171 < y < x + 171
-      // Bounded by lines from (171,0)→(512,341) and (0,171)→(341,512)
+      // Band 2 (middle): region where 341 < x + y < 683
+      // Hexagon bounded by the two parallel lines
       masks.push(
         Buffer.from(
           `<svg width="${SIZE}" height="${SIZE}">
-            <polygon points="0,0 171,0 512,341 512,512 341,512 0,171" fill="white"/>
+            <polygon points="341,0 512,0 512,171 171,512 0,512 0,341" fill="white"/>
           </svg>`,
         ),
       );
 
-      // Band 3 (bottom-right): region where y <= x - 171
-      // Intersects at (171, 0) and (512, 341)
+      // Band 3 (bottom-left): region where x + y >= 683
+      // Triangle from (512,171) to (512,512) to (171,512)
       masks.push(
         Buffer.from(
           `<svg width="${SIZE}" height="${SIZE}">
-            <polygon points="171,0 512,0 512,341" fill="white"/>
+            <polygon points="512,171 512,512 171,512" fill="white"/>
           </svg>`,
         ),
       );
