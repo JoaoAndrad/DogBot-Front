@@ -1,10 +1,48 @@
 const logger = require("../utils/logger");
 const storage = require("./storage");
 const pipeline = require("./pipeline");
+const fs = require("fs");
+const path = require("path");
 
 async function runCatchup(client, options = {}) {
   const limitPerChat = options.limitPerChat || 200;
   const chats = await client.getChats();
+
+  // Verificar se a pasta data está vazia (primeira execução)
+  const dataDir = path.join(__dirname, "..", "..", "data");
+  const checkpointsFile = path.join(dataDir, "checkpoints.json");
+  const processedFile = path.join(dataDir, "processed.json");
+
+  const isFirstRun =
+    !fs.existsSync(checkpointsFile) && !fs.existsSync(processedFile);
+
+  if (isFirstRun) {
+    console.log(
+      "Catchup: primeira execução detectada - marcando todas as mensagens antigas como processadas",
+    );
+    // Criar checkpoints com timestamp atual para todos os chats
+    for (const chat of chats) {
+      try {
+        const chatId =
+          chat.id && chat.id._serialized
+            ? chat.id._serialized
+            : chat.id || chat.name || "unknown";
+
+        // Buscar a última mensagem do chat
+        const messages = await chat.fetchMessages({ limit: 1 });
+        if (messages.length > 0 && messages[0].timestamp) {
+          storage.setLastTs(chatId, messages[0].timestamp);
+        }
+      } catch (err) {
+        console.log(
+          `Catchup: erro ao marcar chat ${chat.id?._serialized}: ${err?.message}`,
+        );
+      }
+    }
+    console.log("Catchup: todos os chats marcados como atualizados");
+    return;
+  }
+
   console.log(`Catchup: iniciando para ${chats.length} chats`);
 
   for (const chat of chats) {
@@ -37,7 +75,7 @@ async function runCatchup(client, options = {}) {
           console.log(
             `Catchup: erro processando mensagem ${
               msg.id ? msg.id._serialized : "?"
-            } em ${chatId}: ${err && err.message}`
+            } em ${chatId}: ${err && err.message}`,
           );
         }
       }
@@ -45,7 +83,7 @@ async function runCatchup(client, options = {}) {
       console.log(
         `Catchup: erro no chat ${chat.id && chat.id._serialized}: ${
           err && err.message
-        }`
+        }`,
       );
     }
   }
