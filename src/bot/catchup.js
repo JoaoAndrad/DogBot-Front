@@ -13,11 +13,34 @@ async function runCatchup(client, options = {}) {
   const checkpointsFile = path.join(dataDir, "checkpoints.json");
   const processedFile = path.join(dataDir, "processed.json");
 
-  const isFirstRun =
-    !fs.existsSync(checkpointsFile) && !fs.existsSync(processedFile);
+  // Verificar se é primeira execução: arquivos não existem OU estão vazios
+  let isFirstRun = false;
+  try {
+    const checkpointsExist = fs.existsSync(checkpointsFile);
+    const processedExist = fs.existsSync(processedFile);
+
+    if (!checkpointsExist && !processedExist) {
+      isFirstRun = true;
+    } else if (checkpointsExist || processedExist) {
+      // Verificar se os arquivos existem mas estão vazios
+      const checkpointsData = checkpointsExist
+        ? JSON.parse(fs.readFileSync(checkpointsFile, "utf8") || "{}")
+        : {};
+      const processedData = processedExist
+        ? JSON.parse(fs.readFileSync(processedFile, "utf8") || "{}")
+        : {};
+
+      isFirstRun =
+        Object.keys(checkpointsData).length === 0 &&
+        Object.keys(processedData).length === 0;
+    }
+  } catch (err) {
+    logger.warn("Erro ao verificar primeira execução:", err);
+    isFirstRun = false;
+  }
 
   if (isFirstRun) {
-    console.log(
+    logger.info(
       "Catchup: primeira execução detectada - marcando todas as mensagens antigas como processadas",
     );
     // Criar checkpoints com timestamp atual para todos os chats
@@ -34,16 +57,16 @@ async function runCatchup(client, options = {}) {
           storage.setLastTs(chatId, messages[0].timestamp);
         }
       } catch (err) {
-        console.log(
+        logger.warn(
           `Catchup: erro ao marcar chat ${chat.id?._serialized}: ${err?.message}`,
         );
       }
     }
-    console.log("Catchup: todos os chats marcados como atualizados");
+    logger.info("Catchup: todos os chats marcados como atualizados");
     return;
   }
 
-  console.log(`Catchup: iniciando para ${chats.length} chats`);
+  logger.info(`Catchup: iniciando para ${chats.length} chats`);
 
   for (const chat of chats) {
     try {
@@ -62,7 +85,7 @@ async function runCatchup(client, options = {}) {
 
       if (newMsgs.length === 0) continue;
 
-      console.log(`Catchup: ${newMsgs.length} mensagens novas em ${chatId}`);
+      logger.info(`Catchup: ${newMsgs.length} mensagens novas em ${chatId}`);
 
       for (const msg of newMsgs) {
         try {
@@ -72,7 +95,7 @@ async function runCatchup(client, options = {}) {
             storage.markProcessed(msg.id._serialized);
           if (msg.timestamp) storage.setLastTs(chatId, msg.timestamp);
         } catch (err) {
-          console.log(
+          logger.warn(
             `Catchup: erro processando mensagem ${
               msg.id ? msg.id._serialized : "?"
             } em ${chatId}: ${err && err.message}`,
@@ -80,7 +103,7 @@ async function runCatchup(client, options = {}) {
         }
       }
     } catch (err) {
-      console.log(
+      logger.warn(
         `Catchup: erro no chat ${chat.id && chat.id._serialized}: ${
           err && err.message
         }`,
@@ -88,7 +111,7 @@ async function runCatchup(client, options = {}) {
     }
   }
 
-  console.log("Catchup: concluído");
+  logger.info("Catchup: concluído");
 }
 
 module.exports = { runCatchup };
