@@ -384,6 +384,13 @@ module.exports = {
                                 );
                                 return;
                               }
+                              // Silently ignore if user is already in jam
+                              if (
+                                joinRes.error === "ALREADY_LISTENING" ||
+                                joinRes.error === "USER_IS_HOST"
+                              ) {
+                                return;
+                              }
                               await ctx.client.sendMessage(
                                 voterId,
                                 `❌ Erro ao entrar na jam: ${joinRes.message || joinRes.error}`,
@@ -617,6 +624,121 @@ module.exports = {
                   await ctx.client.sendMessage(chatId, msg, {
                     mentions: [voter],
                   });
+
+                  // Send invite poll
+                  try {
+                    const hostName = await resolveHostName(jam, ctx.client);
+                    await polls.createPoll(
+                      ctx.client,
+                      chatId,
+                      `🎵 Jam de ${hostName} — Deseja entrar?`,
+                      ["✅ Entrar", "❌ Ignorar"],
+                      {
+                        onVote: async (inviteVote) => {
+                          try {
+                            const voterId = inviteVote.voter;
+                            // Ignore creator's votes
+                            if (voterId === voter) return;
+
+                            // Only consider 'Entrar' (index 0)
+                            const sel =
+                              (inviteVote.selectedIndexes &&
+                                inviteVote.selectedIndexes[0]) ||
+                              null;
+                            if (sel !== 0) return;
+
+                            // Resolve voter to UUID
+                            const lookup = await backend.sendToBackend(
+                              `/api/users/lookup?identifier=${encodeURIComponent(voterId)}`,
+                              null,
+                              "GET",
+                            );
+
+                            if (!lookup || !lookup.found || !lookup.userId) {
+                              await ctx.client.sendMessage(
+                                voterId,
+                                "❌ Você precisa estar registrado no sistema para entrar em jams.",
+                              );
+                              return;
+                            }
+
+                            const voterUuid = lookup.userId;
+
+                            // Join jam
+                            const joinRes = await backend.sendToBackend(
+                              `/api/jam/${jam.id}/join`,
+                              { userId: voterUuid },
+                              "POST",
+                            );
+
+                            if (!joinRes.success) {
+                              if (joinRes.error === "NO_ACTIVE_DEVICE") {
+                                await ctx.client.sendMessage(
+                                  voterId,
+                                  "⚠️ Não foi possível sincronizar, primeiro inicie o Spotify em qualquer dispositivo e tente novamente.",
+                                );
+                                return;
+                              }
+                              // Silently ignore if already in jam
+                              if (
+                                joinRes.error === "ALREADY_LISTENING" ||
+                                joinRes.error === "USER_IS_HOST"
+                              ) {
+                                return;
+                              }
+                              await ctx.client.sendMessage(
+                                voterId,
+                                `❌ Erro ao entrar na jam: ${joinRes.message || joinRes.error}`,
+                              );
+                              return;
+                            }
+
+                            // Success - announce in group
+                            const joinedJam = joinRes.jam || jam;
+                            const hostName = await resolveHostName(
+                              joinedJam,
+                              ctx.client,
+                            );
+
+                            let voterDisplayName = voterId.split("@")[0];
+                            try {
+                              const voterContact =
+                                await ctx.client.getContactById(voterId);
+                              voterDisplayName =
+                                voterContact?.pushname ||
+                                voterContact?.name ||
+                                voterDisplayName;
+                            } catch (err) {
+                              // fallback
+                            }
+
+                            let announceMsg = `🎧 @${voterId.split("@")[0]} entrou na jam de *${hostName}*!\n\n`;
+                            if (joinedJam.currentTrackName) {
+                              announceMsg += `🎶 Tocando: *${joinedJam.currentTrackName}*\n`;
+                              if (joinedJam.currentArtists)
+                                announceMsg += `👤 ${joinedJam.currentArtists}\n`;
+                            }
+                            announceMsg += `\n💡 *Quer ouvir junto?* Envie */jam* e escolha a jam de ${hostName}!`;
+
+                            await ctx.client.sendMessage(chatId, announceMsg, {
+                              mentions: [voterId],
+                            });
+                          } catch (err) {
+                            console.error(
+                              "[jam] invite vote error:",
+                              err && err.message,
+                            );
+                          }
+                        },
+                      },
+                    );
+                  } catch (invErr) {
+                    console.error(
+                      "[jam] Failed to send invite poll:",
+                      invErr && invErr.message,
+                    );
+                  }
+
                   return;
                 }
 
