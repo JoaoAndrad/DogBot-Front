@@ -67,7 +67,7 @@ module.exports = {
       if (statusResult.role === "host") {
         const jam = statusResult.jam;
         const listenerCount =
-          jam.listeners?.filter((l) => l.isActive)?.length || 0;
+          (jam.listeners?.filter((l) => l.isActive)?.length || 0) + 1;
         const listenerNames = jam.listeners
           ?.filter((l) => l.isActive)
           ?.map((l) => l.user.push_name || l.user.display_name || "Anônimo")
@@ -348,7 +348,7 @@ module.exports = {
         const hostName =
           jam.host?.push_name || jam.host?.display_name || "Anônimo";
         const listenerCount =
-          jam.listeners?.filter((l) => l.isActive)?.length || 0;
+          (jam.listeners?.filter((l) => l.isActive)?.length || 0) + 1;
 
         let optionText = `🎧 Entrar na jam de ${hostName}`;
         if (listenerCount > 0) {
@@ -371,7 +371,7 @@ module.exports = {
         const hostName =
           jam.host?.push_name || jam.host?.display_name || "Anônimo";
         const listenerCount =
-          jam.listeners?.filter((l) => l.isActive)?.length || 0;
+          (jam.listeners?.filter((l) => l.isActive)?.length || 0) + 1;
 
         pollMessage += `🎙️ *${hostName}*\n`;
         pollMessage += `👥 ${listenerCount} ${listenerCount === 1 ? "ouvinte" : "ouvintes"}\n`;
