@@ -373,47 +373,33 @@ async function createCompositeWebp(tracks) {
 
     if (n === 3) {
       // Three images: 3 diagonal bands (equal width ~33.3% each)
-      // Create 3 parallel diagonal stripes with equal perpendicular width
+      // Create 3 parallel diagonal stripes from top-left to bottom-right
       const masks = [];
 
-      // For equal width bands parallel to the main diagonal (0,512)→(512,0)
-      // We need bands at 1/3 and 2/3 of the distance
-
-      // Band 1: bottom-left corner
+      // Divide into 3 equal diagonal bands
+      // Band 1: top-left (0,0 to ~170px diagonal)
       masks.push(
         Buffer.from(
           `<svg width="${SIZE}" height="${SIZE}">
-            <polygon points="0,${SIZE} 0,${Math.floor(
-              (SIZE * 2) / 3,
-            )} ${Math.floor(SIZE / 3)},${SIZE}" fill="white"/>
+            <polygon points="0,0 170,0 ${SIZE},342 ${SIZE},${SIZE} 0,${SIZE}" fill="white"/>
           </svg>`,
         ),
       );
 
-      // Band 2: middle diagonal stripe
+      // Band 2: middle diagonal stripe (~170px to ~342px)
       masks.push(
         Buffer.from(
           `<svg width="${SIZE}" height="${SIZE}">
-            <polygon points="0,${Math.floor((SIZE * 2) / 3)} 0,${Math.floor(
-              SIZE / 3,
-            )} ${Math.floor(SIZE / 3)},0 ${Math.floor(
-              (SIZE * 2) / 3,
-            )},0 ${SIZE},${Math.floor((SIZE * 2) / 3)} ${Math.floor(
-              (SIZE * 2) / 3,
-            )},${SIZE} ${Math.floor(SIZE / 3)},${SIZE}" fill="white"/>
+            <polygon points="170,0 342,0 ${SIZE},170 ${SIZE},342 342,${SIZE} 0,${SIZE} 0,170" fill="white"/>
           </svg>`,
         ),
       );
 
-      // Band 3: top-right corner
+      // Band 3: bottom-right (~342px to 512px)
       masks.push(
         Buffer.from(
           `<svg width="${SIZE}" height="${SIZE}">
-            <polygon points="${Math.floor(
-              (SIZE * 2) / 3,
-            )},0 ${SIZE},0 ${SIZE},${Math.floor(SIZE / 3)} ${SIZE},${Math.floor(
-              (SIZE * 2) / 3,
-            )} ${Math.floor((SIZE * 2) / 3)},${SIZE}" fill="white"/>
+            <polygon points="342,0 ${SIZE},0 ${SIZE},170 0,170 0,0" fill="white"/>
           </svg>`,
         ),
       );
