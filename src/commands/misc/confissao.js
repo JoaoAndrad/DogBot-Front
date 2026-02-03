@@ -23,9 +23,33 @@ module.exports = {
         for (let i = 0; i < pollMessages.length; i++) {
           const pollMsg = pollMessages[i];
           try {
+            console.log(
+              `[confissao] Processando poll ${i + 1}/${pollMessages.length}:`,
+              {
+                pollMsgType: typeof pollMsg,
+                hasSent: !!pollMsg?.sent,
+                hasMsgId: !!pollMsg?.msgId,
+                msgId: pollMsg?.msgId,
+                sentType: typeof pollMsg?.sent,
+                hasDeleteOnSent: !!(
+                  pollMsg?.sent && typeof pollMsg.sent.delete === "function"
+                ),
+                hasDeleteOnPollMsg: !!(
+                  pollMsg && typeof pollMsg.delete === "function"
+                ),
+              },
+            );
+
             // createPoll returns { sent, msgId }, so we need to access sent property
             const messageToDelete =
               pollMsg && pollMsg.sent ? pollMsg.sent : pollMsg;
+
+            console.log(`[confissao] messageToDelete para poll ${i + 1}:`, {
+              type: typeof messageToDelete,
+              hasDelete: typeof messageToDelete.delete === "function",
+              id: messageToDelete?.id?._serialized || messageToDelete?.id,
+            });
+
             if (
               messageToDelete &&
               typeof messageToDelete.delete === "function"
@@ -258,7 +282,20 @@ module.exports = {
             }),
           );
           // Collect poll message for cleanup
-          if (pollMsg) pollMessages.push(pollMsg);
+          if (pollMsg) {
+            console.log(
+              "[confissao] Poll criada, adicionando ao array para limpeza:",
+              {
+                hasSent: !!pollMsg.sent,
+                hasMsgId: !!pollMsg.msgId,
+                hasDeleteMethod: !!(
+                  pollMsg.sent && typeof pollMsg.sent.delete === "function"
+                ),
+                type: typeof pollMsg,
+              },
+            );
+            pollMessages.push(pollMsg);
+          }
         } catch (err) {
           reject(err);
         }
