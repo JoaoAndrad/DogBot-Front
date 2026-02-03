@@ -1,9 +1,11 @@
+const backendClient = require("../../services/backendClient");
+
 module.exports = {
   name: "notificar",
   description:
     "Enviar uma notificação em massa para todos os usuários registrados (apenas admin, privado apenas).",
   async execute(ctx) {
-    const { message, info, reply, services } = ctx;
+    const { message, info, reply } = ctx;
 
     // Check if this is a group message - ignore silently if in group
     let isGroup = !!(message && message.isGroup) || !!(info && info.is_group);
@@ -43,16 +45,12 @@ module.exports = {
     }
 
     // Check if user is admin via backend
-    const backendClient = services?.backendClient;
-    if (!backendClient) {
-      await reply("❌ Serviço de backend não disponível.");
-      return;
-    }
-
     let isAdmin = false;
     try {
-      const userResp = await backendClient.get(
+      const userResp = await backendClient.sendToBackend(
         `/api/users/by-whatsapp/${encodeURIComponent(senderNumber)}`,
+        null,
+        "GET",
       );
       if (userResp && userResp.isAdmin) {
         isAdmin = true;
@@ -107,6 +105,14 @@ module.exports = {
         const count = countResp?.count || 0;
 
         await reply(
+          `📊 *Preview do Broadcast*\n\n` +sendToBackend(
+          "/api/broadcasts/count",
+          null,
+          "GET",
+        );
+        const count = countResp?.count || 0;
+
+        await reply(
           `📊 *Preview do Broadcast*\n\n` +
             `O Broadcast será feito para *${count} usuários*\n\n` +
             `Corpo da mensagem:\n\n${text}`,
@@ -122,14 +128,14 @@ module.exports = {
     try {
       await reply("⏳ Criando broadcast...");
 
-      const createResp = await backendClient.post("/api/broadcasts", {
-        message: text,
-        createdBy: senderNumber,
-      });
-
-      if (createResp && createResp.id) {
-        const broadcastId = createResp.id;
-        const recipientCount = createResp.recipientCount || 0;
+      const createResp = await backendClient.sendToBackend(
+        "/api/broadcasts",
+        {
+          message: text,
+          createdBy: senderNumber,
+        },
+        "POST",
+       const recipientCount = createResp.recipientCount || 0;
 
         await reply(
           `✅ *Broadcast criado com sucesso!*\n\n` +
