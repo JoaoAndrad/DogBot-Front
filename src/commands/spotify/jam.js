@@ -346,9 +346,8 @@ module.exports = {
 
                             // Only consider 'Entrar' (index 0)
                             const sel =
-                              (inviteVote.selectedIndexes &&
-                                inviteVote.selectedIndexes[0]) ||
-                              null;
+                              inviteVote.selectedIndexes &&
+                              inviteVote.selectedIndexes[0];
                             if (sel !== 0) return;
 
                             // Resolve voter to user UUID via backend lookup
@@ -642,9 +641,8 @@ module.exports = {
 
                             // Only consider 'Entrar' (index 0)
                             const sel =
-                              (inviteVote.selectedIndexes &&
-                                inviteVote.selectedIndexes[0]) ||
-                              null;
+                              inviteVote.selectedIndexes &&
+                              inviteVote.selectedIndexes[0];
                             if (sel !== 0) return;
 
                             // Resolve voter to UUID
