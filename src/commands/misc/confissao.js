@@ -290,7 +290,7 @@ module.exports = {
             msgId: pollMsg?.msgId,
           });
 
-          // Collect poll message for cleanup
+          // Collect poll message for cleanup IMMEDIATELY after creation
           if (pollMsg) {
             console.log(
               "[confissao] Poll criada, adicionando ao array para limpeza:",
@@ -314,6 +314,8 @@ module.exports = {
               "[confissao] pollMsg é null/undefined, não adicionando ao array",
             );
           }
+
+          // Don't resolve here - wait for vote in onVote callback above
         } catch (err) {
           console.error(
             "[confissao] Erro em createPollPromise:",
