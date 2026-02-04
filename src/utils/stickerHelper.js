@@ -479,15 +479,28 @@ async function createCompositeWebp(tracks) {
 
 async function sendCompositeSticker(client, chatId, tracks) {
   try {
-    if (!tracks || tracks.length === 0) return false;
+    if (!tracks || tracks.length === 0) {
+      logger.warn("[StickerHelper] No tracks provided for composite sticker");
+      return false;
+    }
+
+    logger.info(
+      `[StickerHelper] Building composite sticker with ${tracks.length} tracks`,
+    );
+
     // Build composite webp
     const webpBuf = await createCompositeWebp(tracks.slice(0, 9));
-    if (!webpBuf) return false;
+    if (!webpBuf) {
+      logger.error("[StickerHelper] Failed to create composite WebP buffer");
+      return false;
+    }
+
     const media = new MessageMedia(
       "image/webp",
       webpBuf.toString("base64"),
       "sticker.webp",
     );
+
     try {
       await ensureUploadQpl(client);
     } catch (e) {
@@ -497,12 +510,36 @@ async function sendCompositeSticker(client, chatId, tracks) {
       );
     }
 
-    await client.sendMessage(chatId, media, {
-      sendMediaAsSticker: true,
-    });
-    return true;
+    // Try to send as sticker
+    try {
+      await client.sendMessage(chatId, media, {
+        sendMediaAsSticker: true,
+      });
+      logger.info(`[StickerHelper] ✅ Composite sticker sent successfully`);
+      return true;
+    } catch (sendErr) {
+      logger.error(
+        `[StickerHelper] Error sending composite sticker (stack): ${sendErr && sendErr.stack ? sendErr.stack : String(sendErr)}`,
+      );
+
+      // Fallback: try sending as regular image
+      try {
+        logger.warn(
+          `[StickerHelper] Attempting fallback: send as regular image`,
+        );
+        await client.sendMessage(chatId, media);
+        logger.info(`[StickerHelper] ✅ Fallback image sent successfully`);
+        return true;
+      } catch (fallbackErr) {
+        logger.error(
+          `[StickerHelper] Fallback send failed: ${fallbackErr && fallbackErr.stack ? fallbackErr.stack : String(fallbackErr)}`,
+        );
+        return false;
+      }
+    }
   } catch (e) {
-    logger.error("[StickerHelper] sendCompositeSticker error: " + e.message);
+    logger.error(`[StickerHelper] sendCompositeSticker error: ${e.message}`);
+    logger.error(`[StickerHelper] Stack trace: ${e.stack}`);
     return false;
   }
 }

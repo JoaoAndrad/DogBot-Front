@@ -109,7 +109,8 @@ module.exports = {
 
       // Build output listing each jam
       let out = "🎧 Jams ativas:\n\n";
-      for (const jam of jams) {
+      for (let i = 0; i < jams.length; i++) {
+        const jam = jams[i];
         const hostName = await resolveHostName(jam, ctx.client);
 
         // Count listeners (excluding host)
@@ -132,7 +133,10 @@ module.exports = {
           }
         }
 
-        out += `━━━━━━━━━━━━━━━━━━\n`;
+        // Only add separator between jams, not before the first one
+        if (i > 0) {
+          out += `━━━━━━━━━━━━━━━━━━\n`;
+        }
         if (listenerCount === 0) {
           out += `🎙️ *${hostName}* (Sem ouvintes)\n`;
         } else {
@@ -172,18 +176,38 @@ module.exports = {
           }))
           .slice(0, 9); // Max 9 tracks for composite
 
-        if (tracksForSticker.length > 0 && ctx.client) {
-          const ok = await sendCompositeSticker(
-            ctx.client,
-            chatId || ctx.message?.from,
-            tracksForSticker,
-          );
-          if (!ok) {
-            logger.info("[Jams] sendCompositeSticker failed");
+        logger.info(
+          `[Jams] Found ${tracksForSticker.length} tracks with images for sticker`,
+        );
+
+        if (tracksForSticker.length > 0) {
+          if (!ctx.client) {
+            logger.error("[Jams] No client available for sending sticker");
+          } else {
+            logger.info(
+              `[Jams] Attempting to send composite sticker to ${chatId}`,
+            );
+            const ok = await sendCompositeSticker(
+              ctx.client,
+              chatId || ctx.message?.from,
+              tracksForSticker,
+            );
+            if (!ok) {
+              logger.warn(
+                "[Jams] sendCompositeSticker returned false - sticker may not have been sent",
+              );
+            } else {
+              logger.info("[Jams] Composite sticker sent successfully");
+            }
           }
+        } else {
+          logger.info(
+            "[Jams] No tracks with valid images found, skipping sticker",
+          );
         }
       } catch (err) {
         logger.error("[Jams] Error sending composite sticker: " + err.message);
+        logger.error("[Jams] Stack trace: " + err.stack);
       }
     } catch (err) {
       console.error("[jams] Error:", err);

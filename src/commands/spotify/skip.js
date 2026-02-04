@@ -186,6 +186,7 @@ module.exports = {
             {
               userId: voterUserRes.userId,
               isFor,
+              pollId: voteData.messageId || voteData.poll?.id,
             },
             "POST",
           );
@@ -208,6 +209,14 @@ module.exports = {
           logger.info(
             `[Skip] Voto registrado. Status: ${updatedVote.status}, Stats: ${stats.votesFor}/${stats.totalEligible}`,
           );
+
+          // Se o voto já foi resolvido antes (por outro evento concorrente), não processar novamente
+          if (voteCastRes.alreadyResolved) {
+            logger.debug(
+              `[Skip] Votação ${collaborativeVoteId} já foi resolvida anteriormente, ignorando`,
+            );
+            return;
+          }
 
           // Get voter info for mention
           const voterContact = await client.getContactById(voter);
@@ -232,7 +241,7 @@ module.exports = {
           }
 
           // Check if resolved
-          if (updatedVote.status === "passed") {
+          if (updatedVote.status === "passed" && !voteCastRes.alreadyResolved) {
             // Execute skip for this jam via backend
             if (!jamId) {
               logger.error("[Skip] jamId missing when trying to execute skip");
@@ -284,22 +293,84 @@ module.exports = {
       };
 
       // Create poll for voting
-      const pollId = await polls.createPoll(
+      const pollResult = await polls.createPoll(
         client,
         chatId,
         `Pular ${jam.currentTrackName || "música atual"}?`,
         ["Sim", "Não"],
-        handleSkipVote,
+        {
+          voteType: "skip",
+          voteId: collaborativeVoteId,
+          groupId: chatId,
+          onVote: handleSkipVote,
+        },
       );
 
-      logger.info(`[Skip] Poll criado: ${pollId}`);
+      logger.info(`[Skip] Poll criado: ${pollResult?.msgId || pollResult}`);
 
-      // Send context message
-      await reply(
-        `🎵 Votação iniciada para pular *${jam.currentTrackName || "música atual"}*\n\n` +
-          `Votantes elegíveis: ${eligibleUserIds.length} (host + ouvintes ativos)\n` +
-          `Maioria necessária: ${Math.ceil(eligibleUserIds.length * 0.5)} votos`,
+      // Register initiator's automatic YES vote
+      if (pollResult && pollResult.msgId) {
+        try {
+          await backendClient.sendToBackend(
+            `/api/groups/votes/${collaborativeVoteId}/cast`,
+            {
+              userId: creatorUserId,
+              isFor: true,
+              pollId: pollResult.msgId,
+            },
+            "POST",
+          );
+          logger.info(`[Skip] Voto automático do iniciador registrado`);
+        } catch (err) {
+          logger.warn(`[Skip] Erro ao registrar voto automático:`, err);
+        }
+      }
+
+      // Get initiator display name
+      let initiatorDisplayName = null;
+      try {
+        const contact = await client.getContactById(creatorWhatsAppId);
+        initiatorDisplayName = contact?.pushname || contact?.name || null;
+      } catch (err) {
+        logger.debug(`[Skip] Erro ao obter nome do iniciador:`, err);
+      }
+
+      if (!initiatorDisplayName) {
+        initiatorDisplayName = creatorWhatsAppId.split("@")[0];
+      }
+
+      // Build mentions list (all eligible voters except initiator)
+      const mentionsList = [];
+      const otherVoters = eligibleWhatsAppIds.filter(
+        (num) => num !== creatorWhatsAppId.replace("@c.us", ""),
       );
+
+      let contextMessage = `🎵 *${initiatorDisplayName}* iniciou votação para pular:\n*${jam.currentTrackName || "música atual"}*\n\n`;
+
+      if (otherVoters.length > 0) {
+        const mentions = otherVoters
+          .map((num) => {
+            const whatsappId = `${num}@c.us`;
+            mentionsList.push(whatsappId);
+            return `@${num}`;
+          })
+          .join(" ");
+        contextMessage += `${mentions}\n\n`;
+      }
+
+      contextMessage += `Votantes elegíveis: ${eligibleUserIds.length} (host + ouvintes)\n`;
+      // Se tem 2 pessoas, precisa dos 2 votos (100%)
+      // Se tem 3+, precisa de maioria estrita (50% + 1)
+      const votesNeeded =
+        eligibleUserIds.length === 2
+          ? 2
+          : Math.floor(eligibleUserIds.length / 2) + 1;
+      contextMessage += `Maioria necessária: ${votesNeeded} votos`;
+
+      // Send context message with mentions
+      await client.sendMessage(chatId, contextMessage, {
+        mentions: mentionsList,
+      });
 
       // Send track sticker if available
       try {
