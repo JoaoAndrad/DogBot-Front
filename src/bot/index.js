@@ -110,7 +110,6 @@ async function start() {
 
     client.on("vote_update", async (vote) => {
       try {
-        logger.debug("vote_update event fired");
         await polls.handleVoteUpdate(vote);
       } catch (err) {
         logger.error("Erro ao processar vote_update:", err);

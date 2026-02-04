@@ -318,16 +318,21 @@ async function handleVoteUpdate(vote) {
         const contact = await whatsappClient.getContactById(voter);
         if (contact && contact.id && contact.id._serialized) {
           const resolvedVoter = contact.id._serialized;
-          logger.debug(
-            `[PollComponent] Voter resolvido: ${voter} → ${resolvedVoter}`,
-          );
+          // Only log if not a confissão poll
+          if (!isConfissaoPoll) {
+            logger.debug(
+              `[PollComponent] Voter resolvido: ${voter} → ${resolvedVoter}`,
+            );
+          }
           voter = resolvedVoter;
         }
       } catch (err) {
-        logger.debug(
-          `[PollComponent] Não foi possível resolver voter ${voter}:`,
-          err.message,
-        );
+        if (!isConfissaoPoll) {
+          logger.debug(
+            `[PollComponent] Não foi possível resolver voter ${voter}:`,
+            err.message,
+          );
+        }
         // Keep original voter if resolution fails
       }
     }
