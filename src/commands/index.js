@@ -15,7 +15,17 @@ function loadCommands(dir = __dirname) {
     if (!entry.endsWith(".js") || entry === "index.js") continue;
     try {
       const mod = require(full);
-      if (mod && mod.name) commands.set(mod.name, mod);
+      if (mod && mod.name) {
+        commands.set(mod.name, mod);
+        // Register aliases if present
+        if (Array.isArray(mod.aliases)) {
+          for (const alias of mod.aliases) {
+            if (alias && typeof alias === "string") {
+              commands.set(alias, mod);
+            }
+          }
+        }
+      }
     } catch (err) {
       console.log("Failed to load command", full, err && err.message);
     }
