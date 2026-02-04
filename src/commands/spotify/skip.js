@@ -74,7 +74,7 @@ module.exports = {
       const eligibleVoters = [];
 
       // Add host
-      const hostWhatsappId = jam.host?.whatsappId || jam.hostWhatsAppId;
+      const hostWhatsappId = jam.host?.sender_number;
       if (hostWhatsappId) {
         eligibleVoters.push(hostWhatsappId);
       }
@@ -82,8 +82,8 @@ module.exports = {
       // Add active listeners
       if (jam.listeners && Array.isArray(jam.listeners)) {
         for (const listener of jam.listeners) {
-          if (listener.isActive && listener.user?.whatsappId) {
-            eligibleVoters.push(listener.user.whatsappId);
+          if (listener.isActive && listener.user?.sender_number) {
+            eligibleVoters.push(listener.user.sender_number);
           }
         }
       }
