@@ -151,10 +151,16 @@ async function createPoll(clientOrSender, chatId, title, options, opts = {}) {
     createdAt: Date.now(),
   };
 
-  console.log("[createPoll] Saving poll with msgId:", msgId);
+  const isConfissaoPoll = payload.title && /confiss[aã]o/i.test(payload.title);
+
+  if (!isConfissaoPoll) {
+    console.log("[createPoll] Saving poll with msgId:", msgId);
+  }
   try {
     await storage.savePoll(msgId, record);
-    console.log("[createPoll] Poll saved successfully:", msgId);
+    if (!isConfissaoPoll) {
+      console.log("[createPoll] Poll saved successfully:", msgId);
+    }
   } catch (err) {
     console.error("[createPoll] Failed to save poll:", err.message);
     throw err;
@@ -163,11 +169,13 @@ async function createPoll(clientOrSender, chatId, title, options, opts = {}) {
   // register callback
   if (typeof opts.onVote === "function") callbacks.set(msgId, opts.onVote);
 
-  logger.info("Poll enviada", {
-    chatId: payload.chatId,
-    msgId,
-    title: payload.title,
-  });
+  if (!isConfissaoPoll) {
+    logger.info("Poll enviada", {
+      chatId: payload.chatId,
+      msgId,
+      title: payload.title,
+    });
+  }
   return { sent, msgId };
 }
 
@@ -205,12 +213,18 @@ async function handleVoteUpdate(vote) {
     // Try direct lookup first
     let poll = await storage.getPoll(messageId);
 
-    console.log(
-      "[handleVoteUpdate] Direct lookup result:",
-      poll ? "found" : "not found",
-      "for msgId:",
-      messageId,
-    );
+    // Check if it's a confissão poll to skip logs
+    const isConfissaoPoll =
+      poll && poll.title && /confiss[aã]o/i.test(poll.title);
+
+    if (!isConfissaoPoll) {
+      console.log(
+        "[handleVoteUpdate] Direct lookup result:",
+        poll ? "found" : "not found",
+        "for msgId:",
+        messageId,
+      );
+    }
 
     // If not found and we have parentMsgKey with id parts, try to find by matching
     if (
@@ -219,24 +233,40 @@ async function handleVoteUpdate(vote) {
       vote.parentMsgKey.id &&
       vote.parentMsgKey.remote
     ) {
-      console.log(
-        "[handleVoteUpdate] Trying to find poll by chat_id:",
-        vote.parentMsgKey.remote,
-      );
+      if (!isConfissaoPoll) {
+        console.log(
+          "[handleVoteUpdate] Trying to find poll by chat_id:",
+          vote.parentMsgKey.remote,
+        );
+      }
       try {
         const allPolls = await storage.listPolls();
-        console.log("[handleVoteUpdate] Found", allPolls.length, "total polls");
+        if (!isConfissaoPoll) {
+          console.log(
+            "[handleVoteUpdate] Found",
+            allPolls.length,
+            "total polls",
+          );
+        }
 
         // Try to match by chat_id only - get most recent poll from this chat
         const pollsInChat = allPolls.filter(
           (p) => p.chat_id === vote.parentMsgKey.remote,
         );
-        console.log(
-          "[handleVoteUpdate] Found",
-          pollsInChat.length,
-          "polls in chat:",
-          vote.parentMsgKey.remote,
+
+        // Update isConfissaoPoll based on found polls
+        const foundConfissao = pollsInChat.some(
+          (p) => p.title && /confiss[aã]o/i.test(p.title),
         );
+
+        if (!foundConfissao) {
+          console.log(
+            "[handleVoteUpdate] Found",
+            pollsInChat.length,
+            "polls in chat:",
+            vote.parentMsgKey.remote,
+          );
+        }
 
         if (pollsInChat.length > 0) {
           // Get most recent poll
@@ -247,12 +277,17 @@ async function handleVoteUpdate(vote) {
           });
           poll = sorted[0];
           messageId = poll.id;
-          console.log(
-            "[handleVoteUpdate] Using most recent poll from chat:",
-            messageId,
-            "title:",
-            poll.title,
-          );
+
+          const isPollConfissao =
+            poll.title && /confiss[aã]o/i.test(poll.title);
+          if (!isPollConfissao) {
+            console.log(
+              "[handleVoteUpdate] Using most recent poll from chat:",
+              messageId,
+              "title:",
+              poll.title,
+            );
+          }
         }
       } catch (err) {
         console.log(
@@ -345,14 +380,18 @@ async function handleVoteUpdate(vote) {
       selectedNames,
     );
 
-    // Log resumido do voto
+    // Log resumido do voto (skip if confissão poll)
     const voterName = (voter && voter.split("@")[0]) || "unknown";
     const pollTitle = (storedPoll && storedPoll.title) || "Poll";
-    console.log(
-      `🗳️ Voto | ${pollTitle} | 👤 ${voterName} | ✅ ${selectedNames.join(
-        ", ",
-      )}`,
-    );
+    const isConfissaoPoll = pollTitle && /confiss[aã]o/i.test(pollTitle);
+
+    if (!isConfissaoPoll) {
+      console.log(
+        `🗳️ Voto | ${pollTitle} | 👤 ${voterName} | ✅ ${selectedNames.join(
+          ", ",
+        )}`,
+      );
+    }
 
     const payload = {
       messageId,

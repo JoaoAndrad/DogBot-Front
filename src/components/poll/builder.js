@@ -17,11 +17,15 @@ function buildPollPayload(chatId, title, options, opts = {}) {
     },
   };
 
-  console.log("pollBuilder: built payload", {
-    chatId,
-    title,
-    optionsCount: payload.options.length,
-  });
+  const isConfissaoPoll = title && /confiss[aã]o/i.test(title);
+
+  if (!isConfissaoPoll) {
+    console.log("pollBuilder: built payload", {
+      chatId,
+      title,
+      optionsCount: payload.options.length,
+    });
+  }
   return payload;
 }
 
