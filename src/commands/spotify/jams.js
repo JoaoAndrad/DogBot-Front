@@ -176,7 +176,7 @@ module.exports = {
               logger.info(
                 `[Jams] Fetching album art for track ${jam.currentTrackId}`,
               );
-              const trackRes = await backendClient.sendToBackend(
+              const trackRes = await backend.sendToBackend(
                 `/api/spotify/track/${encodeURIComponent(jam.currentTrackId)}`,
                 null,
                 "GET",
