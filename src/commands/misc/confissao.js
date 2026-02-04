@@ -139,8 +139,15 @@ module.exports = {
         if (originalMsg && typeof originalMsg.delete === "function") {
           try {
             console.log("[confissao] Apagando mensagem original...");
+            console.log("[confissao] originalMsg:", {
+              type: typeof originalMsg,
+              hasDelete: typeof originalMsg.delete === "function",
+              id: originalMsg?.id?._serialized || originalMsg?.id,
+              from: originalMsg?.from,
+              body: originalMsg?.body?.substring(0, 50),
+            });
             await originalMsg.delete(true, true);
-            console.log("[confissao] Mensagem original apagada");
+            console.log("[confissao] Mensagem original apagada com sucesso");
           } catch (err) {
             console.error(
               "[confissao] erro ao apagar mensagem original:",
