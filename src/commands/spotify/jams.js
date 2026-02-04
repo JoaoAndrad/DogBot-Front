@@ -159,15 +159,16 @@ module.exports = {
       // Send composite sticker with album art from playing jams
       try {
         const tracksForSticker = jams
-          .filter((jam) => jam.currentTrackName) // Only jams with tracks playing
+          .filter(
+            (jam) =>
+              jam.currentTrackName &&
+              (jam.currentTrackImage || jam.currentAlbumImage),
+          ) // Only jams with tracks playing AND valid images
           .map((jam) => ({
             trackId: jam.currentTrackId,
             trackName: jam.currentTrackName,
             artists: jam.currentArtists,
-            image:
-              jam.currentTrackImage ||
-              jam.currentAlbumImage ||
-              "https://via.placeholder.com/512", // fallback
+            image: jam.currentTrackImage || jam.currentAlbumImage,
           }))
           .slice(0, 9); // Max 9 tracks for composite
 
