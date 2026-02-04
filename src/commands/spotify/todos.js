@@ -7,7 +7,7 @@ const {
 
 module.exports = {
   name: "todos",
-  aliases: ["tocando-todos"],
+  aliases: ["tocando-todos", "todes"],
   description: "Mostra o que todo mundo do grupo está ouvindo (Spotify)",
 
   async execute(ctx) {
@@ -28,7 +28,7 @@ module.exports = {
       const listenersRes = await backendClient.sendToBackend(
         `/api/groups/${encodeURIComponent(chatId)}/active-listeners`,
         { memberIds },
-        "POST"
+        "POST",
       );
 
       if (!listenersRes || !Array.isArray(listenersRes.listeners)) {
@@ -39,7 +39,7 @@ module.exports = {
 
       // If no listeners connected or none playing, inform the group
       const anyPlaying = (listeners || []).some(
-        (l) => l && l.currentTrack && l.currentTrack.isPlaying
+        (l) => l && l.currentTrack && l.currentTrack.isPlaying,
       );
       if (!anyPlaying) {
         return reply("Nenhum usuário do grupo está ouvindo músicas no momento");
@@ -83,7 +83,7 @@ module.exports = {
           lines.push(
             `   ${t.trackName} - ${
               Array.isArray(t.artists) ? t.artists.join(", ") : t.artists || ""
-            }`
+            }`,
           );
           lines.push(`   ${percent !== null ? `⏱️ ${percent}%` : ""}`);
           lines.push("");
@@ -100,7 +100,7 @@ module.exports = {
           if (validPercs.length > 0) {
             // compute average and show ~avg%
             const avg = Math.round(
-              validPercs.reduce((a, b) => a + b, 0) / validPercs.length
+              validPercs.reduce((a, b) => a + b, 0) / validPercs.length,
             );
             approx = `\n   ⏱️ ~${avg}%`;
           }
@@ -114,7 +114,7 @@ module.exports = {
           lines.push(
             `   ${t.trackName} - ${
               Array.isArray(t.artists) ? t.artists.join(", ") : t.artists || ""
-            }${approx}`
+            }${approx}`,
           );
           lines.push("");
         }
@@ -142,7 +142,7 @@ module.exports = {
         }
       } catch (e) {
         logger.error(
-          "[Todos] error sending composite sticker after text: " + e.message
+          "[Todos] error sending composite sticker after text: " + e.message,
         );
       }
 
@@ -150,7 +150,7 @@ module.exports = {
     } catch (err) {
       logger.error("[Todos] erro:", err);
       return reply(
-        "❌ Erro ao gerar a lista de ouvintes. Tente novamente mais tarde."
+        "❌ Erro ao gerar a lista de ouvintes. Tente novamente mais tarde.",
       );
     }
   },

@@ -5,7 +5,7 @@ const BACKEND_URL = process.env.BACKEND_URL || "http://localhost:8000";
 
 module.exports = {
   name: "limpar-fila",
-  aliases: ["limparfila", "clear-queue"],
+  aliases: ["limparfila", "clear-queue", "clear"],
   description: "Limpa a fila colaborativa (apenas host)",
   category: "spotify",
   requiredArgs: 0,

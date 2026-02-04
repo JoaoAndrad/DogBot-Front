@@ -5,7 +5,7 @@ const BACKEND_URL = process.env.BACKEND_URL || "http://localhost:8000";
 
 module.exports = {
   name: "democratizar",
-  aliases: ["colaborativo", "colab"],
+  aliases: ["colaborativo", "colab", "democratica", "colaborativa"],
   description: "Alterna entre modo clássico e colaborativo da jam",
   category: "spotify",
   requiredArgs: 0,
