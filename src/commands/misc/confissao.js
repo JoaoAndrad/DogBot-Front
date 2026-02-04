@@ -64,10 +64,27 @@ module.exports = {
         // Delete original message
         if (originalMsg && typeof originalMsg.delete === "function") {
           try {
-            await originalMsg.delete(true, true);
+            console.log("[confissao] Tentando deletar mensagem original:", {
+              id: originalMsg?.id?._serialized || originalMsg?.id,
+              fromMe: originalMsg?.fromMe,
+              hasDelete: typeof originalMsg.delete === "function",
+              type: originalMsg?.type,
+            });
+            const deleteResult = await originalMsg.delete(true, true);
+            console.log("[confissao] Resultado delete:", deleteResult);
           } catch (err) {
-            // Silently fail original message deletion
+            console.error("[confissao] ERRO ao deletar mensagem original:", {
+              error: err?.message || err,
+              stack: err?.stack,
+            });
           }
+        } else {
+          console.log("[confissao] Mensagem original não pode ser deletada:", {
+            exists: !!originalMsg,
+            hasDeleteMethod: !!(
+              originalMsg && typeof originalMsg.delete === "function"
+            ),
+          });
         }
       } catch (err) {
         // Silently fail cleanup
