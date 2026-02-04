@@ -306,20 +306,35 @@ module.exports = {
 
               const queueEntry = addData.queueEntry;
 
-              // Create voting poll
-              const requesterName = await resolveUserName(senderNumber, client);
-              await chat.sendMessage(
-                `🎵 *${requesterName}* quer adicionar:\n\n` +
-                  `🎵 *${selectedTrack.name}*\n` +
-                  `🎤 ${selectedTrack.artists.map((a) => a.name).join(", ")}\n\n` +
-                  `Vote para aprovar ou rejeitar:`,
-              );
-
               // Get all jam participants for voting
               const eligibleVoters = [
                 jam.host.sender_number,
                 ...jam.listeners.map((l) => l.user.sender_number),
               ].map((num) => `${num}@c.us`);
+
+              // Create mentions for all participants except the requester
+              const mentions = eligibleVoters.filter(
+                (voter) => voter !== whatsappId,
+              );
+
+              // Create voting poll
+              const requesterName = await resolveUserName(senderNumber, client);
+
+              // Build message with mentions
+              let messageText =
+                `🎵 *${requesterName}* quer adicionar:\n\n` +
+                `🎵 *${selectedTrack.name}*\n` +
+                `🎤 ${selectedTrack.artists.map((a) => a.name).join(", ")}\n\n` +
+                `Vote para aprovar ou rejeitar: `;
+
+              // Add mention tags for participants
+              for (const mentionId of mentions) {
+                messageText += `@${mentionId.replace("@c.us", "")} `;
+              }
+
+              await chat.sendMessage(messageText, {
+                mentions: mentions,
+              });
 
               const votePoll = await polls.createPoll(
                 client,

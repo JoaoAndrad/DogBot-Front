@@ -7,7 +7,7 @@ const { sendTrackSticker } = require("../../utils/stickerHelper");
 
 module.exports = {
   name: "voto",
-  aliases: ["adicionar", "add"],
+  aliases: ["votar", "vote"],
   description:
     "Votação colaborativa para adicionar música atual à playlist do grupo",
 
@@ -22,7 +22,7 @@ module.exports = {
 
     if (!isGroup) {
       return reply(
-        "⚠️ Este comando só funciona em grupos com playlist compartilhada."
+        "⚠️ Este comando só funciona em grupos com playlist compartilhada.",
       );
     }
 
@@ -44,18 +44,18 @@ module.exports = {
       const initiatorLookup = await backendClient.sendToBackend(
         `/api/users/lookup?identifier=${encodeURIComponent(whatsappId)}`,
         null,
-        "GET"
+        "GET",
       );
 
       if (!initiatorLookup || !initiatorLookup.found) {
         return reply(
-          "⚠️ Você precisa ter uma conta cadastrada. Envie /cadastro no meu privado."
+          "⚠️ Você precisa ter uma conta cadastrada. Envie /cadastro no meu privado.",
         );
       }
 
       if (!initiatorLookup.hasSpotify) {
         return reply(
-          "⚠️ Você precisa conectar sua conta do Spotify. Use /conectar."
+          "⚠️ Você precisa conectar sua conta do Spotify. Use /conectar.",
         );
       }
 
@@ -74,19 +74,19 @@ module.exports = {
       }
 
       logger.info(
-        `[Voto] Iniciador: ${initiatorDisplayName} (${initiatorUserId})`
+        `[Voto] Iniciador: ${initiatorDisplayName} (${initiatorUserId})`,
       );
 
       // Check if group has a playlist
       const groupRes = await backendClient.sendToBackend(
         `/api/groups/${encodeURIComponent(chatId)}`,
         null,
-        "GET"
+        "GET",
       );
 
       if (!groupRes || !groupRes.group || !groupRes.group.playlistId) {
         return reply(
-          "⚠️ Este grupo não tem uma playlist configurada. Use /playlist para configurar."
+          "⚠️ Este grupo não tem uma playlist configurada. Use /playlist para configurar.",
         );
       }
 
@@ -102,7 +102,7 @@ module.exports = {
       const listenersRes = await backendClient.sendToBackend(
         `/api/groups/${encodeURIComponent(chatId)}/active-listeners`,
         { memberIds },
-        "POST"
+        "POST",
       );
 
       const listeners = (listenersRes && listenersRes.listeners) || [];
@@ -123,10 +123,10 @@ module.exports = {
 
       if (!initiatorTrack) {
         logger.warn(
-          `[Voto] Iniciador ${initiatorDisplayName} não está tocando música no momento`
+          `[Voto] Iniciador ${initiatorDisplayName} não está tocando música no momento`,
         );
         return reply(
-          "⚠️ Você precisa estar ouvindo música no Spotify para iniciar uma votação."
+          "⚠️ Você precisa estar ouvindo música no Spotify para iniciar uma votação.",
         );
       }
 
@@ -140,26 +140,26 @@ module.exports = {
               const res = await backendClient.sendToBackend(
                 `/api/users/lookup?identifier=${encodeURIComponent(id)}`,
                 null,
-                "GET"
+                "GET",
               );
               return { id, res };
             } catch (err) {
               logger.warn(`[Voto] Falha lookup usuario ${id}: ${err.message}`);
               return { id, res: null };
             }
-          })
+          }),
         );
 
         // Helpful debug: log small sample of memberIds and listener identifiers
         try {
           logger.debug(
-            `[Voto] amostra memberIds: ${JSON.stringify(memberIds.slice(0, 5))}`
+            `[Voto] amostra memberIds: ${JSON.stringify(memberIds.slice(0, 5))}`,
           );
           if (listeners && listeners.length > 0) {
             logger.debug(
               `[Voto] amostra listeners: ${JSON.stringify(
-                listeners.slice(0, 5).map((l) => l.identifier)
-              )}`
+                listeners.slice(0, 5).map((l) => l.identifier),
+              )}`,
             );
           }
         } catch (e) {
@@ -178,13 +178,13 @@ module.exports = {
           });
       } catch (err) {
         logger.warn(
-          `[Voto] Erro ao resolver membros com Spotify: ${err.message}`
+          `[Voto] Erro ao resolver membros com Spotify: ${err.message}`,
         );
         spotifyMembers = [];
       }
 
       logger.info(
-        `[Voto] Usuários do grupo com Spotify conectado: ${spotifyMembers.length}`
+        `[Voto] Usuários do grupo com Spotify conectado: ${spotifyMembers.length}`,
       );
 
       if (!spotifyMembers || spotifyMembers.length === 0) {
@@ -197,13 +197,13 @@ module.exports = {
 
       if (!currentTrack || !currentTrack.trackName) {
         logger.error(
-          `[Voto] Track inválido. currentTrack: ${JSON.stringify(currentTrack)}`
+          `[Voto] Track inválido. currentTrack: ${JSON.stringify(currentTrack)}`,
         );
         return reply("⚠️ Não consegui identificar a música atual.");
       }
 
       logger.info(
-        `[Voto] Música: ${currentTrack.trackName} (${currentTrack.trackId})`
+        `[Voto] Música: ${currentTrack.trackName} (${currentTrack.trackId})`,
       );
 
       // Check playlist for exact or similar tracks first
@@ -211,17 +211,17 @@ module.exports = {
       try {
         checkRes = await backendClient.sendToBackend(
           `/api/groups/playlists/${encodeURIComponent(
-            group.playlistId
+            group.playlistId,
           )}/check-track?trackId=${encodeURIComponent(
-            currentTrack.trackId
+            currentTrack.trackId,
           )}&trackName=${encodeURIComponent(currentTrack.trackName)}`,
           null,
-          "GET"
+          "GET",
         );
       } catch (err) {
         logger.warn(
           "[Voto] Falha ao checar playlist para duplicatas:",
-          err.message
+          err.message,
         );
       }
 
@@ -250,7 +250,7 @@ module.exports = {
         } catch (err) {
           logger.debug(
             "[Voto] Falha ao enviar mensagem de similaridade:",
-            err.message
+            err.message,
           );
         }
         // Before creating a full group vote, ask the initiator for confirmation.
@@ -272,7 +272,7 @@ module.exports = {
                 const voterLookup = await backendClient.sendToBackend(
                   `/api/users/lookup?identifier=${encodeURIComponent(voter)}`,
                   null,
-                  "GET"
+                  "GET",
                 );
 
                 // Only accept confirmation vote from initiator
@@ -282,7 +282,7 @@ module.exports = {
                   voterLookup.userId !== initiatorUserId
                 ) {
                   logger.debug(
-                    `[Voto] Ignorando confirmação de ${voter}; apenas iniciador pode confirmar.`
+                    `[Voto] Ignorando confirmação de ${voter}; apenas iniciador pode confirmar.`,
                   );
                   return;
                 }
@@ -296,7 +296,7 @@ module.exports = {
                 if (!confirmed) {
                   await client.sendMessage(
                     chatId,
-                    `🚫 ${initiatorDisplayName} cancelou a votação.`
+                    `🚫 ${initiatorDisplayName} cancelou a votação.`,
                   );
                   return;
                 }
@@ -307,7 +307,7 @@ module.exports = {
                 logger.error("[Voto] Erro no handler de confirmação:", err);
               }
             },
-          }
+          },
         );
 
         // If confirmation poll wasn't created, abort
@@ -336,13 +336,13 @@ module.exports = {
             initiatorUserId,
             targetUserIds,
             threshold: 0.5, // 50% needed
-          }
+          },
         );
 
         if (!voteRes || !voteRes.vote) {
           await client.sendMessage(
             chatId,
-            "❌ Erro ao criar votação. Tente novamente."
+            "❌ Erro ao criar votação. Tente novamente.",
           );
           return;
         }
@@ -358,14 +358,14 @@ module.exports = {
             const playlistRes = await backendClient.sendToBackend(
               `/api/groups/playlists/${encodeURIComponent(group.playlistId)}`,
               null,
-              "GET"
+              "GET",
             );
             if (playlistRes && playlistRes.name) {
               playlistName = playlistRes.name;
             }
           } catch (err) {
             logger.warn(
-              `[Voto] Erro ao buscar nome da playlist: ${err.message}`
+              `[Voto] Erro ao buscar nome da playlist: ${err.message}`,
             );
           }
         }
@@ -391,15 +391,15 @@ module.exports = {
                 group,
                 client,
                 chatId,
-                whatsappId
+                whatsappId,
               );
             },
-          }
+          },
         );
 
         // Enviar mensagem de contexto separada com menções
         const otherMembers = spotifyMembers.filter(
-          (m) => m.userId !== initiatorUserId
+          (m) => m.userId !== initiatorUserId,
         );
 
         let contextMessage = playlistName
@@ -433,9 +433,9 @@ module.exports = {
             process.env.BACKEND_URL || "http://localhost:8000";
           const proxyUrl = `${BACKEND_URL.replace(
             /\/$/,
-            ""
+            "",
           )}/api/spotify/preview?trackId=${encodeURIComponent(
-            currentTrack.trackId
+            currentTrack.trackId,
           )}`;
           logger.debug(`[Voto] fetching preview from: ${proxyUrl}`);
           const pres = await fetch(proxyUrl);
@@ -458,14 +458,14 @@ module.exports = {
               logger.debug("[Voto] preview not audio, body:", body);
             } catch (e) {
               logger.debug(
-                "[Voto] preview non-audio response and failed to parse body"
+                "[Voto] preview non-audio response and failed to parse body",
               );
             }
           }
         } catch (err) {
           logger.warn(
             "[Voto] failed to fetch/send preview:",
-            err && err.message
+            err && err.message,
           );
         }
 
@@ -477,7 +477,7 @@ module.exports = {
               userId: initiatorUserId,
               isFor: true,
               pollId: pollResult.msgId,
-            }
+            },
           );
         }
 
@@ -499,7 +499,7 @@ async function handleAddVote(
   group,
   client,
   chatId,
-  creatorId
+  creatorId,
 ) {
   try {
     const voter = voteData.voter; // Já vem resolvido para @c.us pelo pollComponent
@@ -513,7 +513,7 @@ async function handleAddVote(
     // Ignorar voto se for do criador da votação
     if (voter === creatorId) {
       logger.debug(
-        `[Voto] Voto do criador ignorado: ${voter} é o criador da votação`
+        `[Voto] Voto do criador ignorado: ${voter} é o criador da votação`,
       );
       return;
     }
@@ -522,21 +522,21 @@ async function handleAddVote(
     logger.debug(
       `[Voto] SelectedIndexes:`,
       selectedIndexes,
-      `Type: ${typeof selectedIndexes}`
+      `Type: ${typeof selectedIndexes}`,
     );
 
     // 0 = Sim, 1 = Não
     const isFor = selectedIndexes.includes(0);
 
     logger.info(
-      `[Voto] Voto recebido: voter=${voter} isFor=${isFor} voteId=${collaborativeVoteId}`
+      `[Voto] Voto recebido: voter=${voter} isFor=${isFor} voteId=${collaborativeVoteId}`,
     );
 
     // Get voter's userId by looking up in database
     const userRes = await backendClient.sendToBackend(
       `/api/users/lookup?identifier=${encodeURIComponent(voter)}`,
       null,
-      "GET"
+      "GET",
     );
 
     if (!userRes || !userRes.found) {
@@ -546,7 +546,7 @@ async function handleAddVote(
         `⚠️ @${
           voter.split("@")[0]
         }, envie /cadastro no meu privado para criar sua conta.`,
-        { mentions: [voter] }
+        { mentions: [voter] },
       );
       return;
     }
@@ -559,7 +559,7 @@ async function handleAddVote(
         `⚠️ @${
           voter.split("@")[0]
         }, envie /conectar para vincular sua conta no Spotify.`,
-        { mentions: [voter] }
+        { mentions: [voter] },
       );
       return;
     }
@@ -573,7 +573,7 @@ async function handleAddVote(
         userId: userRes.userId,
         isFor,
         pollId,
-      }
+      },
     );
 
     logger.debug(`[Voto] Cast response:`, castRes);
@@ -592,13 +592,13 @@ async function handleAddVote(
     const stats = castRes.stats;
 
     logger.info(
-      `[Voto] Voto registrado. Status: ${updatedVote.status}, Stats: ${stats.votesFor}/${stats.totalEligible}`
+      `[Voto] Voto registrado. Status: ${updatedVote.status}, Stats: ${stats.votesFor}/${stats.totalEligible}`,
     );
 
     // Se o voto já foi resolvido antes (por outro evento concorrente), não processar novamente
     if (castRes.alreadyResolved) {
       logger.debug(
-        `[Voto] Voto ${collaborativeVoteId} já foi resolvido anteriormente, ignorando`
+        `[Voto] Voto ${collaborativeVoteId} já foi resolvido anteriormente, ignorando`,
       );
       return;
     }
@@ -621,7 +621,7 @@ async function handleAddVote(
             ? "precisa de 1 voto"
             : `precisam de ${votesNeeded} votos`
         }. Mais alguém?`,
-        { mentions: [voter] }
+        { mentions: [voter] },
       );
     }
 
@@ -634,7 +634,7 @@ async function handleAddVote(
       if (!playlistSpotifyId) {
         await client.sendMessage(
           chatId,
-          "⚠️ Votação aprovada, mas playlist não tem ID do Spotify configurado."
+          "⚠️ Votação aprovada, mas playlist não tem ID do Spotify configurado.",
         );
         return;
       }
@@ -645,7 +645,7 @@ async function handleAddVote(
       if (!accountId) {
         await client.sendMessage(
           chatId,
-          "⚠️ Votação aprovada, mas não há conta Spotify configurada para gerenciar a playlist."
+          "⚠️ Votação aprovada, mas não há conta Spotify configurada para gerenciar a playlist.",
         );
         return;
       }
@@ -655,13 +655,13 @@ async function handleAddVote(
         {
           trackUri: updatedVote.trackId,
           accountId,
-        }
+        },
       );
 
       if (addRes.success) {
         await client.sendMessage(
           chatId,
-          `✅ Música adicionada à playlist! (${stats.votesFor}/${stats.totalEligible} votos)\n\n🎵 ${updatedVote.trackName}\n${updatedVote.trackArtists}`
+          `✅ Música adicionada à playlist! (${stats.votesFor}/${stats.totalEligible} votos)\n\n🎵 ${updatedVote.trackName}\n${updatedVote.trackArtists}`,
         );
 
         // Send playlist artwork as sticker
@@ -669,7 +669,7 @@ async function handleAddVote(
           const playlistRes = await backendClient.sendToBackend(
             `/api/groups/playlists/${encodeURIComponent(playlistSpotifyId)}`,
             null,
-            "GET"
+            "GET",
           );
 
           if (
@@ -686,19 +686,19 @@ async function handleAddVote(
           }
         } catch (err) {
           logger.warn(
-            `[Voto] Erro ao enviar figurinha da playlist: ${err.message}`
+            `[Voto] Erro ao enviar figurinha da playlist: ${err.message}`,
           );
         }
       } else {
         await client.sendMessage(
           chatId,
-          `⚠️ Votação aprovada, mas erro ao adicionar à playlist: ${addRes.error}`
+          `⚠️ Votação aprovada, mas erro ao adicionar à playlist: ${addRes.error}`,
         );
       }
     } else if (updatedVote.status === "failed") {
       await client.sendMessage(
         chatId,
-        `❌ Votação rejeitada. Música não foi adicionada. (${stats.votesFor}/${stats.totalEligible} votos)`
+        `❌ Votação rejeitada. Música não foi adicionada. (${stats.votesFor}/${stats.totalEligible} votos)`,
       );
     }
   } catch (err) {
