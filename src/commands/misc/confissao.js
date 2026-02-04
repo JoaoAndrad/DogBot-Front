@@ -21,12 +21,16 @@ module.exports = {
 
         // Delete all poll messages
         for (let i = 0; i < pollMessages.length; i++) {
-          const pollMsg = pollMessages[i];
+          const entry = pollMessages[i];
+          // entry is { pollMsg, chatId }
+          const pollMsg = entry && entry.pollMsg ? entry.pollMsg : entry;
+          const entryChatId = entry && entry.chatId ? entry.chatId : null;
           try {
             console.log(
               `[confissao] Processando poll ${i + 1}/${pollMessages.length}:`,
               {
-                pollMsgType: typeof pollMsg,
+                entryType: typeof entry,
+                hasPollMsg: !!entry?.pollMsg,
                 hasSent: !!pollMsg?.sent,
                 hasMsgId: !!pollMsg?.msgId,
                 msgId: pollMsg?.msgId,
@@ -37,6 +41,7 @@ module.exports = {
                 hasDeleteOnPollMsg: !!(
                   pollMsg && typeof pollMsg.delete === "function"
                 ),
+                entryChatId,
               },
             );
 
@@ -59,8 +64,43 @@ module.exports = {
               );
               await messageToDelete.delete(true, true); // delete for everyone, clear media
               console.log(`[confissao] Poll ${i + 1} apagada com sucesso`);
+            } else if (pollMsg && pollMsg.msgId && entryChatId) {
+              // Fallback: attempt to delete by msgId via chat.deleteMessage
+              try {
+                console.log(
+                  `[confissao] Tentando fallback de deleção por msgId: ${pollMsg.msgId} (chat ${entryChatId})`,
+                );
+                const chat = await client.getChatById(entryChatId);
+                if (chat && typeof chat.deleteMessage === "function") {
+                  await chat.deleteMessage(pollMsg.msgId);
+                  console.log(
+                    `[confissao] Poll ${i + 1} deletada por msgId com sucesso`,
+                  );
+                } else if (
+                  client &&
+                  typeof client.deleteMessage === "function"
+                ) {
+                  // some client wrappers expose deleteMessage(chatId, msgId)
+                  await client.deleteMessage(entryChatId, pollMsg.msgId);
+                  console.log(
+                    `[confissao] Poll ${i + 1} deletada por client.deleteMessage com sucesso`,
+                  );
+                } else {
+                  console.log(
+                    `[confissao] Não há API disponível para deletar por msgId`,
+                  );
+                }
+              } catch (err) {
+                console.error(
+                  `[confissao] Fallback de deleção por msgId falhou:`,
+                  err?.message,
+                  err?.stack,
+                );
+              }
             } else {
-              console.log(`[confissao] Poll ${i + 1} não tem método delete`);
+              console.log(
+                `[confissao] Poll ${i + 1} não tem método delete nem msgId para fallback`,
+              );
             }
           } catch (err) {
             console.error(
@@ -303,7 +343,8 @@ module.exports = {
                 type: typeof pollMsg,
               },
             );
-            pollMessages.push(pollMsg);
+            // store poll message and chatId for later cleanup
+            pollMessages.push({ pollMsg, chatId });
             console.log(
               "[confissao] Array pollMessages agora tem:",
               pollMessages.length,
@@ -332,13 +373,15 @@ module.exports = {
       if (candidateGroups.length === 1) return candidateGroups[0];
       const labels = candidateGroups.map((g) => g.name || g.id);
       try {
-        const payload = await createPollPromise(
+        const _res = await createPollPromise(
           client,
           senderNumber,
           "Escolha o grupo para enviar sua confissão",
           labels,
           {},
         );
+        const payload = _res && _res.payload ? _res.payload : _res;
+        const pollMsgForPickGroup = _res && _res.pollMsg;
         const idx =
           (payload && payload.selectedIndexes && payload.selectedIndexes[0]) ||
           0;
@@ -426,13 +469,15 @@ module.exports = {
 
         let payload;
         try {
-          payload = await createPollPromise(
+          const _res = await createPollPromise(
             client,
             senderNumber,
             prompt,
             options,
             {},
           );
+          payload = _res && _res.payload ? _res.payload : _res;
+          const pollMsgForPage = _res && _res.pollMsg;
         } catch (err) {
           return null;
         }
@@ -480,13 +525,15 @@ module.exports = {
     if (mentionTokens.length > 0) {
       console.log("[confissao] menções detectadas:", mentionTokens);
       try {
-        const yn = await createPollPromise(
+        const _res = await createPollPromise(
           client,
           senderNumber,
           `Detectei ${mentionTokens.length} menção(ões) na sua mensagem. Deseja mencionar usuário(s)?`,
           ["Sim", "Não"],
           {},
         );
+        const yn = _res && _res.payload ? _res.payload : _res;
+        const pollMsgForMentions = _res && _res.pollMsg;
         const ynIdx =
           yn && yn.selectedIndexes && yn.selectedIndexes[0]
             ? yn.selectedIndexes[0]
@@ -576,13 +623,15 @@ module.exports = {
                       // Videos may not be supported by the Chromium instance (codecs).
                       // Ask the user if they want the original message forwarded to the target group instead.
                       try {
-                        const yn = await createPollPromise(
+                        const _res = await createPollPromise(
                           client,
                           senderNumber,
                           "Detectei um vídeo. Vídeos não são suportados neste ambiente. Deseja que eu encaminhe sua mensagem original para o grupo selecionado?",
                           ["Sim", "Não"],
                           {},
                         );
+                        const yn = _res && _res.payload ? _res.payload : _res;
+                        const pollMsgForVideo = _res && _res.pollMsg;
                         const ynIdx =
                           yn && yn.selectedIndexes && yn.selectedIndexes[0]
                             ? yn.selectedIndexes[0]
@@ -781,13 +830,15 @@ module.exports = {
               // Ask the user whether to forward original message because video sending
               // may not be supported by the environment (Chromium codecs).
               try {
-                const yn = await createPollPromise(
+                const _res = await createPollPromise(
                   client,
                   senderNumber,
                   "Detectei um vídeo. Vídeos não são suportados neste ambiente. Deseja que eu encaminhe sua mensagem original para o grupo?",
                   ["Sim", "Não"],
                   {},
                 );
+                const yn = _res && _res.payload ? _res.payload : _res;
+                const pollMsgForVideo2 = _res && _res.pollMsg;
                 const ynIdx =
                   yn && yn.selectedIndexes && yn.selectedIndexes[0]
                     ? yn.selectedIndexes[0]
@@ -964,13 +1015,15 @@ module.exports = {
                       // Ask the user whether to forward original message because video sending
                       // may not be supported by the environment (Chromium codecs).
                       try {
-                        const yn = await createPollPromise(
+                        const _res = await createPollPromise(
                           client,
                           senderNumber,
                           "Detectei um vídeo. Vídeos não são suportados neste ambiente. Deseja que eu encaminhe sua mensagem original para o grupo selecionado?",
                           ["Sim", "Não"],
                           {},
                         );
+                        const yn = _res && _res.payload ? _res.payload : _res;
+                        const pollMsgForVideo3 = _res && _res.pollMsg;
                         const ynIdx =
                           yn && yn.selectedIndexes && yn.selectedIndexes[0]
                             ? yn.selectedIndexes[0]
