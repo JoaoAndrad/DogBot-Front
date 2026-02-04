@@ -69,9 +69,20 @@ module.exports = {
               fromMe: originalMsg?.fromMe,
               hasDelete: typeof originalMsg.delete === "function",
               type: originalMsg?.type,
+              from: originalMsg?.from,
+              to: originalMsg?.to,
+              author: originalMsg?.author,
             });
             const deleteResult = await originalMsg.delete(true, true);
             console.log("[confissao] Resultado delete:", deleteResult);
+
+            // Alternative: try without parameters if first attempt returned undefined
+            if (deleteResult === undefined || deleteResult === false) {
+              console.log(
+                "[confissao] Primeira tentativa falhou, tentando sem parâmetros...",
+              );
+              await originalMsg.delete();
+            }
           } catch (err) {
             console.error("[confissao] ERRO ao deletar mensagem original:", {
               error: err?.message || err,
