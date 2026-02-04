@@ -214,7 +214,7 @@ async function handleVoteUpdate(vote) {
     let poll = await storage.getPoll(messageId);
 
     // Check if it's a confissão poll to skip logs
-    const isConfissaoPoll =
+    let isConfissaoPoll =
       poll && poll.title && /confiss[aã]o/i.test(poll.title);
 
     if (!isConfissaoPoll) {
@@ -383,7 +383,7 @@ async function handleVoteUpdate(vote) {
     // Log resumido do voto (skip if confissão poll)
     const voterName = (voter && voter.split("@")[0]) || "unknown";
     const pollTitle = (storedPoll && storedPoll.title) || "Poll";
-    const isConfissaoPoll = pollTitle && /confiss[aã]o/i.test(pollTitle);
+    isConfissaoPoll = pollTitle && /confiss[aã]o/i.test(pollTitle);
 
     if (!isConfissaoPoll) {
       console.log(
