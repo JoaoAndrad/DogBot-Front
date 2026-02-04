@@ -1,6 +1,6 @@
-const logger = require("../../../../backend/src/lib/logger");
-const { getConfig } = require("../../../core/config");
-const { JamMonitor } = require("../../../services/jamMonitor");
+const logger = require("../../utils/logger");
+const { getConfig } = require("../../core/config");
+const { JamMonitor } = require("../../services/jamMonitor");
 
 const config = getConfig();
 const BACKEND_URL = process.env.BACKEND_URL || "http://localhost:8000";
