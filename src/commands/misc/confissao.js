@@ -317,7 +317,8 @@ module.exports = {
             options,
             Object.assign({}, opts, {
               onVote: async (payload) => {
-                resolve(payload);
+                // Resolve with both payload and pollMsg reference
+                resolve({ payload, pollMsg });
               },
             }),
           );
