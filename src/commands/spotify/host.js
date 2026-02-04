@@ -114,9 +114,15 @@ module.exports = {
           try {
             const voter = voteData.voter;
 
+            logger.info(
+              `[Host] Voto recebido - Voter: ${voter}, Host esperado: ${whatsappId}`,
+            );
+
             // Only current host can vote
             if (voter !== whatsappId) {
-              logger.debug(`[Host] Voto ignorado: ${voter} não é o host atual`);
+              logger.debug(
+                `[Host] Voto ignorado: ${voter} não é o host atual (esperado: ${whatsappId})`,
+              );
               return;
             }
 
@@ -125,7 +131,13 @@ module.exports = {
             const selectedIndex =
               selectedIndexRaw != null ? Number(selectedIndexRaw) : null;
 
+            logger.info(
+              `[Host] Índice selecionado: ${selectedIndex}, voteData completo:`,
+              JSON.stringify(voteData),
+            );
+
             if (selectedIndex == null) {
+              logger.warn(`[Host] Nenhum índice selecionado no voto`);
               return;
             }
 
