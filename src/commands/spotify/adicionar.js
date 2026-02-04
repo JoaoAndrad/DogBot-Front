@@ -263,6 +263,9 @@ module.exports = {
                       }
 
                       const isFor = voteData.selectedIndexes[0] === 0;
+                      const voterNumber = voteData.voter.replace("@c.us", "");
+
+                      // Get voter user ID
                       const voterResponse = await fetch(
                         `${BACKEND_URL}/api/users/by-sender-number/${voterNumber}`,
                       );
