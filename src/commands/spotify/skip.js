@@ -100,14 +100,14 @@ module.exports = {
 
       // Create collaborative vote
       const castRes = await backendClient.sendToBackend(
-        `/api/groups/votes`,
+        `/api/groups/${encodeURIComponent(chatId)}/vote`,
         {
-          chatId,
-          creatorUserId,
+          voteType: "skip",
           trackId: jam.currentTrack,
           trackName: jam.currentTrackName || "música atual",
-          voteType: "skip",
-          eligibleVoters,
+          trackArtists: jam.currentArtists || "",
+          initiatorUserId: creatorUserId,
+          targetUserIds: eligibleVoters,
           threshold: 0.5,
         },
         "POST",
