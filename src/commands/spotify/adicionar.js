@@ -151,7 +151,7 @@ module.exports = {
       const pollTitle = `Qual música adicionar?`;
 
       const poll = await polls.createPoll(
-        chat,
+        client,
         chatId,
         pollTitle,
         pollOptions,
@@ -249,7 +249,7 @@ module.exports = {
               ].map((num) => `${num}@c.us`);
 
               const votePoll = await polls.createPoll(
-                chat,
+                client,
                 chatId,
                 "Aprovar esta música?",
                 ["✅ Sim", "❌ Não"],
