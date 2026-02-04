@@ -110,106 +110,108 @@ module.exports = {
         chatId,
         "Quem será o novo host da jam?",
         listenerOptions,
-        async (voteData) => {
-          try {
-            const voter = voteData.voter;
+        {
+          onVote: async (voteData) => {
+            try {
+              const voter = voteData.voter;
 
-            logger.info(
-              `[Host] Voto recebido - Voter: ${voter}, Host esperado: ${whatsappId}`,
-            );
-
-            // Only current host can vote
-            if (voter !== whatsappId) {
-              logger.debug(
-                `[Host] Voto ignorado: ${voter} não é o host atual (esperado: ${whatsappId})`,
+              logger.info(
+                `[Host] Voto recebido - Voter: ${voter}, Host esperado: ${whatsappId}`,
               );
-              return;
-            }
 
-            const selectedIndexRaw =
-              voteData.selectedIndexes && voteData.selectedIndexes[0];
-            const selectedIndex =
-              selectedIndexRaw != null ? Number(selectedIndexRaw) : null;
+              // Only current host can vote
+              if (voter !== whatsappId) {
+                logger.debug(
+                  `[Host] Voto ignorado: ${voter} não é o host atual (esperado: ${whatsappId})`,
+                );
+                return;
+              }
 
-            logger.info(
-              `[Host] Índice selecionado: ${selectedIndex}, voteData completo:`,
-              JSON.stringify(voteData),
-            );
+              const selectedIndexRaw =
+                voteData.selectedIndexes && voteData.selectedIndexes[0];
+              const selectedIndex =
+                selectedIndexRaw != null ? Number(selectedIndexRaw) : null;
 
-            if (selectedIndex == null) {
-              logger.warn(`[Host] Nenhum índice selecionado no voto`);
-              return;
-            }
-
-            // Check if canceled
-            if (selectedIndex === listenerOptions.length - 1) {
-              await client.sendMessage(chatId, "❌ Transferência cancelada.");
-              return;
-            }
-
-            const newHostUserId = listenerMap[selectedIndex];
-            if (!newHostUserId) {
-              logger.error(
-                "[Host] userId não encontrado para índice selecionado",
+              logger.info(
+                `[Host] Índice selecionado: ${selectedIndex}, voteData completo:`,
+                JSON.stringify(voteData),
               );
-              return;
-            }
 
-            logger.info(
-              `[Host] Transferindo jam ${jam.id} para usuário ${newHostUserId}`,
-            );
+              if (selectedIndex == null) {
+                logger.warn(`[Host] Nenhum índice selecionado no voto`);
+                return;
+              }
 
-            // Call backend to transfer host
-            const transferRes = await backendClient.sendToBackend(
-              `/api/jam/${jam.id}/transfer-host`,
-              {
-                currentHostUserId: currentUserId,
-                newHostUserId,
-              },
-              "POST",
-            );
+              // Check if canceled
+              if (selectedIndex === listenerOptions.length - 1) {
+                await client.sendMessage(chatId, "❌ Transferência cancelada.");
+                return;
+              }
 
-            if (!transferRes || !transferRes.success) {
-              const errorMsg =
-                transferRes?.message ||
-                transferRes?.error ||
-                "Erro desconhecido";
-              logger.error("[Host] Erro ao transferir:", errorMsg);
+              const newHostUserId = listenerMap[selectedIndex];
+              if (!newHostUserId) {
+                logger.error(
+                  "[Host] userId não encontrado para índice selecionado",
+                );
+                return;
+              }
+
+              logger.info(
+                `[Host] Transferindo jam ${jam.id} para usuário ${newHostUserId}`,
+              );
+
+              // Call backend to transfer host
+              const transferRes = await backendClient.sendToBackend(
+                `/api/jam/${jam.id}/transfer-host`,
+                {
+                  currentHostUserId: currentUserId,
+                  newHostUserId,
+                },
+                "POST",
+              );
+
+              if (!transferRes || !transferRes.success) {
+                const errorMsg =
+                  transferRes?.message ||
+                  transferRes?.error ||
+                  "Erro desconhecido";
+                logger.error("[Host] Erro ao transferir:", errorMsg);
+                await client.sendMessage(
+                  chatId,
+                  `❌ Erro ao transferir controle: ${errorMsg}`,
+                );
+                return;
+              }
+
+              const newHost = transferRes.jam?.host;
+              const newHostName =
+                newHost?.display_name ||
+                newHost?.push_name ||
+                activeListeners.find((l) => l.user?.id === newHostUserId)?.user
+                  ?.display_name ||
+                "Novo host";
+
+              // Get current host name
+              const currentHostName =
+                jam.host?.display_name || jam.host?.push_name || "você";
+
+              // Announce transfer
               await client.sendMessage(
                 chatId,
-                `❌ Erro ao transferir controle: ${errorMsg}`,
+                `🎧 *Controle da jam transferido!*\n\n` +
+                  `${currentHostName} passou o controle para *${newHostName}*\n\n` +
+                  `Agora ${newHostName} controla a música e pode gerenciar a jam.`,
               );
-              return;
+
+              logger.info(`[Host] Transferência concluída com sucesso`);
+            } catch (err) {
+              logger.error("[Host] Erro no callback de votação:", err);
+              await client.sendMessage(
+                chatId,
+                "❌ Erro ao processar transferência.",
+              );
             }
-
-            const newHost = transferRes.jam?.host;
-            const newHostName =
-              newHost?.display_name ||
-              newHost?.push_name ||
-              activeListeners.find((l) => l.user?.id === newHostUserId)?.user
-                ?.display_name ||
-              "Novo host";
-
-            // Get current host name
-            const currentHostName =
-              jam.host?.display_name || jam.host?.push_name || "você";
-
-            // Announce transfer
-            await client.sendMessage(
-              chatId,
-              `🎧 *Controle da jam transferido!*\n\n` +
-                `${currentHostName} passou o controle para *${newHostName}*\n\n` +
-                `Agora ${newHostName} controla a música e pode gerenciar a jam.`,
-            );
-
-            logger.info(`[Host] Transferência concluída com sucesso`);
-          } catch (err) {
-            logger.error("[Host] Erro no callback de votação:", err);
-            await client.sendMessage(
-              chatId,
-              "❌ Erro ao processar transferência.",
-            );
-          }
+          },
         },
       );
 
