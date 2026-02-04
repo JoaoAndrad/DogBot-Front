@@ -71,28 +71,37 @@ module.exports = {
       );
 
       // Build list of eligible voters (host + active listeners)
-      const eligibleVoters = [];
+      // Store both UUIDs (for backend) and WhatsApp IDs (for display)
+      const eligibleUserIds = []; // UUIDs for backend
+      const eligibleWhatsAppIds = []; // WhatsApp IDs for logging
 
       // Add host
+      const hostUserId = jam.host?.id;
       const hostWhatsappId = jam.host?.sender_number;
-      if (hostWhatsappId) {
-        eligibleVoters.push(hostWhatsappId);
+      if (hostUserId && hostWhatsappId) {
+        eligibleUserIds.push(hostUserId);
+        eligibleWhatsAppIds.push(hostWhatsappId);
       }
 
       // Add active listeners
       if (jam.listeners && Array.isArray(jam.listeners)) {
         for (const listener of jam.listeners) {
-          if (listener.isActive && listener.user?.sender_number) {
-            eligibleVoters.push(listener.user.sender_number);
+          if (
+            listener.isActive &&
+            listener.user?.id &&
+            listener.user?.sender_number
+          ) {
+            eligibleUserIds.push(listener.user.id);
+            eligibleWhatsAppIds.push(listener.user.sender_number);
           }
         }
       }
 
       logger.info(
-        `[Skip] Votantes elegíveis (${eligibleVoters.length}): ${eligibleVoters.join(", ")}`,
+        `[Skip] Votantes elegíveis (${eligibleUserIds.length}): ${eligibleWhatsAppIds.join(", ")}`,
       );
 
-      if (eligibleVoters.length < 2) {
+      if (eligibleUserIds.length < 2) {
         return reply(
           "⚠️ Não há votantes suficientes na jam para criar uma votação de skip.",
         );
@@ -107,7 +116,7 @@ module.exports = {
           trackName: jam.currentTrackName || "música atual",
           trackArtists: jam.currentArtists || "",
           initiatorUserId: creatorUserId,
-          targetUserIds: eligibleVoters,
+          targetUserIds: eligibleUserIds,
           threshold: 0.5,
         },
         "POST",
@@ -296,8 +305,8 @@ module.exports = {
       // Send context message
       await reply(
         `🎵 Votação iniciada para pular *${jam.currentTrackName || "música atual"}*\n\n` +
-          `Votantes elegíveis: ${eligibleVoters.length} (host + ouvintes ativos)\n` +
-          `Maioria necessária: ${Math.ceil(eligibleVoters.length * 0.5)} votos`,
+          `Votantes elegíveis: ${eligibleUserIds.length} (host + ouvintes ativos)\n` +
+          `Maioria necessária: ${Math.ceil(eligibleUserIds.length * 0.5)} votos`,
       );
 
       // Send track sticker if available
