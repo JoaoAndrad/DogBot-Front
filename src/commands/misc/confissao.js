@@ -63,9 +63,9 @@ module.exports = {
               typeof messageToDelete.delete === "function"
             ) {
               console.log(
-                `[confissao] Apagando poll ${i + 1}/${pollMessages.length}`,
+                `[confissao] Apagando poll ${i + 1}/${pollMessages.length} (apenas para remetente)`,
               );
-              await messageToDelete.delete(true, true); // delete for everyone, clear media
+              await messageToDelete.delete(false); // delete only for sender, not for everyone
               console.log(`[confissao] Poll ${i + 1} apagada com sucesso`);
             } else if (pollMsg && pollMsg.msgId && entryChatId) {
               // Fallback: attempt to delete by msgId via chat.deleteMessage
