@@ -106,10 +106,29 @@ module.exports = {
 
       const jam = jamsRes.jams[0];
 
-      // Check if jam is collaborative
-      if (jam.jamType !== "collaborative") {
+      // Get user ID from backend
+      const userResponse = await fetch(
+        `${BACKEND_URL}/api/users/by-sender-number/${senderNumber}`,
+      );
+
+      if (!userResponse.ok) {
+        return reply("❌ Erro ao verificar usuário.");
+      }
+
+      const userData = await userResponse.json();
+      if (!userData.success) {
+        return reply("❌ Erro ao verificar usuário.");
+      }
+
+      const userId = userData.user.id;
+
+      // Check if user is the host
+      const isHost = jam.hostUserId === userId;
+
+      // If user is NOT the host, check if jam is collaborative
+      if (!isHost && jam.jamType !== "collaborative") {
         return reply(
-          "❌ Esta jam não está no modo colaborativo. Use */democratizar* para ativar.",
+          "❌ Esta jam não está no modo colaborativo. Peça ao host para usar */democratizar* primeiro.",
         );
       }
 
@@ -179,25 +198,7 @@ module.exports = {
                 return;
               }
 
-              // Get user ID from backend
-              const userResponse = await fetch(
-                `${BACKEND_URL}/api/users/by-sender-number/${senderNumber}`,
-              );
-
-              if (!userResponse.ok) {
-                await chat.sendMessage("❌ Erro ao buscar usuário.");
-                return;
-              }
-
-              const userData = await userResponse.json();
-              if (!userData.success) {
-                await chat.sendMessage("❌ Erro ao buscar usuário.");
-                return;
-              }
-
-              const userId = userData.user.id;
-
-              // Add to queue
+              // Add to queue (userId already obtained earlier in execution)
               const trackData = {
                 trackUri: selectedTrack.uri,
                 trackId: selectedTrack.id,
