@@ -3,9 +3,6 @@ module.exports = {
   description:
     "Enviar uma confissão anonimamente para o grupo configurado (privado apenas).",
   async execute(ctx) {
-    console.log(
-      "[confissao] COMANDO INICIADO - versão atualizada com logs de debug",
-    );
     const { message, info, reply, client, services } = ctx;
 
     // Array to collect poll messages for cleanup
@@ -14,11 +11,6 @@ module.exports = {
     // Helper function to delete messages and polls after confession is sent
     const cleanupAfterConfession = async (originalMsg, confirmationMsg) => {
       try {
-        console.log("[confissao] Iniciando limpeza de mensagens...");
-        console.log(
-          `[confissao] Total de polls para apagar: ${pollMessages.length}`,
-        );
-
         // Wait 2 seconds so user can see confirmation
         await new Promise((resolve) => setTimeout(resolve, 2000));
 
@@ -29,145 +21,56 @@ module.exports = {
           const pollMsg = entry && entry.pollMsg ? entry.pollMsg : entry;
           const entryChatId = entry && entry.chatId ? entry.chatId : null;
           try {
-            console.log(
-              `[confissao] Processando poll ${i + 1}/${pollMessages.length}:`,
-              {
-                entryType: typeof entry,
-                hasPollMsg: !!entry?.pollMsg,
-                hasSent: !!pollMsg?.sent,
-                hasMsgId: !!pollMsg?.msgId,
-                msgId: pollMsg?.msgId,
-                sentType: typeof pollMsg?.sent,
-                hasDeleteOnSent: !!(
-                  pollMsg?.sent && typeof pollMsg.sent.delete === "function"
-                ),
-                hasDeleteOnPollMsg: !!(
-                  pollMsg && typeof pollMsg.delete === "function"
-                ),
-                entryChatId,
-              },
-            );
-
             // createPoll returns { sent, msgId }, so we need to access sent property
             const messageToDelete =
               pollMsg && pollMsg.sent ? pollMsg.sent : pollMsg;
-
-            console.log(`[confissao] messageToDelete para poll ${i + 1}:`, {
-              type: typeof messageToDelete,
-              hasDelete: typeof messageToDelete.delete === "function",
-              id: messageToDelete?.id?._serialized || messageToDelete?.id,
-            });
 
             if (
               messageToDelete &&
               typeof messageToDelete.delete === "function"
             ) {
-              console.log(
-                `[confissao] Apagando poll ${i + 1}/${pollMessages.length} (apenas para remetente)`,
-              );
               await messageToDelete.delete(false); // delete only for sender, not for everyone
-              console.log(`[confissao] Poll ${i + 1} apagada com sucesso`);
             } else if (pollMsg && pollMsg.msgId && entryChatId) {
               // Fallback: attempt to delete by msgId via chat.deleteMessage
               try {
-                console.log(
-                  `[confissao] Tentando fallback de deleção por msgId: ${pollMsg.msgId} (chat ${entryChatId})`,
-                );
                 const chat = await client.getChatById(entryChatId);
                 if (chat && typeof chat.deleteMessage === "function") {
                   await chat.deleteMessage(pollMsg.msgId);
-                  console.log(
-                    `[confissao] Poll ${i + 1} deletada por msgId com sucesso`,
-                  );
                 } else if (
                   client &&
                   typeof client.deleteMessage === "function"
                 ) {
                   // some client wrappers expose deleteMessage(chatId, msgId)
                   await client.deleteMessage(entryChatId, pollMsg.msgId);
-                  console.log(
-                    `[confissao] Poll ${i + 1} deletada por client.deleteMessage com sucesso`,
-                  );
-                } else {
-                  console.log(
-                    `[confissao] Não há API disponível para deletar por msgId`,
-                  );
                 }
               } catch (err) {
-                console.error(
-                  `[confissao] Fallback de deleção por msgId falhou:`,
-                  err?.message,
-                  err?.stack,
-                );
+                // Silently fail fallback deletion
               }
-            } else {
-              console.log(
-                `[confissao] Poll ${i + 1} não tem método delete nem msgId para fallback`,
-              );
             }
           } catch (err) {
-            console.error(
-              `[confissao] erro ao apagar enquete ${i + 1}:`,
-              err?.message,
-              err?.stack,
-            );
+            // Silently fail poll deletion
           }
         }
 
         // Delete confirmation message (only for sender, not for everyone)
         if (confirmationMsg && typeof confirmationMsg.delete === "function") {
           try {
-            console.log(
-              "[confissao] Apagando mensagem de confirmação (apenas para remetente)...",
-            );
             await confirmationMsg.delete(false); // delete only for sender
-            console.log("[confissao] Mensagem de confirmação apagada");
           } catch (err) {
-            console.error(
-              "[confissao] erro ao apagar confirmação:",
-              err?.message,
-              err?.stack,
-            );
+            // Silently fail confirmation deletion
           }
-        } else {
-          console.log(
-            "[confissao] Confirmação não tem método delete ou é null",
-          );
         }
 
         // Delete original message
         if (originalMsg && typeof originalMsg.delete === "function") {
           try {
-            console.log("[confissao] Apagando mensagem original...");
-            console.log("[confissao] originalMsg:", {
-              type: typeof originalMsg,
-              hasDelete: typeof originalMsg.delete === "function",
-              id: originalMsg?.id?._serialized || originalMsg?.id,
-              from: originalMsg?.from,
-              body: originalMsg?.body?.substring(0, 50),
-            });
             await originalMsg.delete(true, true);
-            console.log("[confissao] Mensagem original apagada com sucesso");
           } catch (err) {
-            console.error(
-              "[confissao] erro ao apagar mensagem original:",
-              err?.message,
-              err?.stack,
-            );
+            // Silently fail original message deletion
           }
-        } else {
-          console.log(
-            "[confissao] Mensagem original não tem método delete ou é null",
-          );
         }
-
-        console.log("[confissao] Limpeza concluída");
       } catch (err) {
-        console.error(
-          "[confissao] erro ao limpar mensagens:",
-          err?.message,
-          err?.stack,
-        );
+        // Silently fail cleanup
       }
     };
 
@@ -320,12 +223,6 @@ module.exports = {
     ) => {
       return new Promise(async (resolve, reject) => {
         try {
-          console.log("[confissao] createPollPromise chamado:", {
-            chatId,
-            title: title?.substring(0, 50),
-            optionsCount: options?.length,
-          });
-
           const pollMsg = await polls.createPoll(
             clientOrSender,
             chatId,
@@ -333,55 +230,19 @@ module.exports = {
             options,
             Object.assign({}, opts, {
               onVote: async (payload) => {
-                console.log("[confissao] onVote disparado, resolvendo Promise");
                 // Resolve with both payload and pollMsg reference
                 resolve({ payload, pollMsg });
               },
             }),
           );
 
-          console.log("[confissao] createPoll retornou:", {
-            pollMsg: pollMsg,
-            type: typeof pollMsg,
-            hasSent: !!pollMsg?.sent,
-            hasMsgId: !!pollMsg?.msgId,
-            msgId: pollMsg?.msgId,
-          });
-
           // Collect poll message for cleanup IMMEDIATELY after creation
           if (pollMsg) {
-            console.log(
-              "[confissao] Poll criada, adicionando ao array para limpeza:",
-              {
-                hasSent: !!pollMsg.sent,
-                hasMsgId: !!pollMsg.msgId,
-                hasDeleteMethod: !!(
-                  pollMsg.sent && typeof pollMsg.sent.delete === "function"
-                ),
-                type: typeof pollMsg,
-              },
-            );
             // store poll message and chatId for later cleanup
             pollMessages.push({ pollMsg, chatId });
-            console.log(
-              "[confissao] Array pollMessages agora tem:",
-              pollMessages.length,
-              "polls",
-            );
-          } else {
-            console.log(
-              "[confissao] pollMsg é null/undefined, não adicionando ao array",
-            );
           }
-
-          console.log("[confissao] createPollPromise: aguardando voto...");
           // Don't resolve here - wait for vote in onVote callback above
         } catch (err) {
-          console.error(
-            "[confissao] Erro em createPollPromise:",
-            err?.message,
-            err?.stack,
-          );
           reject(err);
         }
       });
@@ -526,7 +387,6 @@ module.exports = {
       }
     };
 
-    console.log("[confissao] texto recebido:", text);
     // Detect mention tokens in the text: occurrences of @ followed by non-space chars
     const mentionTokens = [];
     try {
@@ -542,7 +402,6 @@ module.exports = {
     // If there are mention tokens, ask the user whether to treat as mentions
     let mentionMap = []; // array of chosen jids in order
     if (mentionTokens.length > 0) {
-      console.log("[confissao] menções detectadas:", mentionTokens);
       try {
         const _res = await createPollPromise(
           client,
@@ -986,9 +845,6 @@ module.exports = {
     const optionChatIds = candidateGroups.map((g) => g.id);
 
     try {
-      console.log(
-        "[confissao] Criando poll de seleção de grupo com createPollPromise",
-      );
       // create a poll in the user's private chat to choose target group
       const pollResult = await createPollPromise(
         client,
