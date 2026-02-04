@@ -63,7 +63,7 @@ module.exports = {
   usage: "/adicionar <nome da música>",
 
   async execute(ctx) {
-    const { message, reply, client, args } = ctx;
+    const { message, reply, client, args = [] } = ctx;
     const msg = message;
     const chatId = msg.from;
 
