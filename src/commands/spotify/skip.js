@@ -139,14 +139,6 @@ module.exports = {
           const selectedOptions = voteData.selectedOptions || [];
           const selectedIndexes = voteData.selectedIndexes || [];
 
-          // Ignorar voto se for do criador da votação
-          if (voter === creatorWhatsAppId) {
-            logger.debug(
-              `[Skip] Voto do criador ignorado: ${voter} é o criador da votação`,
-            );
-            return;
-          }
-
           // 0 = Sim, 1 = Não
           const isFor = selectedIndexes.includes(0);
 

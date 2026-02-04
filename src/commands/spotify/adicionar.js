@@ -312,6 +312,23 @@ module.exports = {
                 ...jam.listeners.map((l) => l.user.sender_number),
               ].map((num) => `${num}@c.us`);
 
+              // Automatically cast YES vote from requester
+              try {
+                await fetch(
+                  `${BACKEND_URL}/api/jam/queue/${queueEntry.id}/vote`,
+                  {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ userId, isFor: true }),
+                  },
+                );
+                logger.info(
+                  `[AdicionarCommand] Auto-voted YES for requester: ${userId}`,
+                );
+              } catch (err) {
+                logger.error("[AdicionarCommand] Error auto-voting:", err);
+              }
+
               // Create mentions for all participants except the requester
               const mentions = eligibleVoters.filter(
                 (voter) => voter !== whatsappId,
