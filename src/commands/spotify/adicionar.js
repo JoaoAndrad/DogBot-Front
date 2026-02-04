@@ -164,7 +164,7 @@ module.exports = {
                 return; // Only track selection by requester
               }
 
-              const selectedIndex = vote.selectedOptions[0];
+              const selectedIndex = vote.selectedIndexes[0];
 
               // Check if canceled
               if (selectedIndex === pollOptions.length - 1) {
@@ -262,10 +262,7 @@ module.exports = {
                         return;
                       }
 
-                      const isFor = voteData.selectedOptions[0] === 0;
-                      const voterNumber = voteData.voter.replace("@c.us", "");
-
-                      // Get voter user ID
+                      const isFor = voteData.selectedIndexes[0] === 0;
                       const voterResponse = await fetch(
                         `${BACKEND_URL}/api/users/by-sender-number/${voterNumber}`,
                       );
