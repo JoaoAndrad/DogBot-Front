@@ -310,6 +310,12 @@ module.exports = {
     ) => {
       return new Promise(async (resolve, reject) => {
         try {
+          console.log("[confissao] createPollPromise chamado:", {
+            chatId,
+            title: title?.substring(0, 50),
+            optionsCount: options?.length,
+          });
+
           const pollMsg = await polls.createPoll(
             clientOrSender,
             chatId,
@@ -317,6 +323,7 @@ module.exports = {
             options,
             Object.assign({}, opts, {
               onVote: async (payload) => {
+                console.log("[confissao] onVote disparado, resolvendo Promise");
                 // Resolve with both payload and pollMsg reference
                 resolve({ payload, pollMsg });
               },
@@ -357,6 +364,7 @@ module.exports = {
             );
           }
 
+          console.log("[confissao] createPollPromise: aguardando voto...");
           // Don't resolve here - wait for vote in onVote callback above
         } catch (err) {
           console.error(
