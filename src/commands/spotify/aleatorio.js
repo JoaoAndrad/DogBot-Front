@@ -30,6 +30,34 @@ module.exports = {
         );
       }
 
+      // Get user WhatsApp identifier
+      let whatsappId = null;
+      try {
+        const contact = await msg.getContact();
+        whatsappId = contact.id._serialized || msg.author || msg.from;
+      } catch (e) {
+        whatsappId = msg.author || msg.from;
+      }
+
+      // Lookup user UUID
+      const userLookup = await backendClient.sendToBackend(
+        `/api/users/lookup?identifier=${encodeURIComponent(whatsappId)}`,
+        null,
+        "GET",
+      );
+
+      if (!userLookup || !userLookup.found || !userLookup.userId) {
+        return reply(
+          "⚠️ Você precisa estar cadastrado. Use /cadastro para se registrar.",
+        );
+      }
+
+      if (!userLookup.hasSpotify) {
+        return reply(
+          "⚠️ Você precisa conectar sua conta do Spotify. Use /conectar para vincular.",
+        );
+      }
+
       // Ask backend to perform shuffle
       await reply(
         "⏳ Verificando a playlist do grupo e preparando músicas recomendadas...",
@@ -37,7 +65,12 @@ module.exports = {
 
       const shuffleRes = await backendClient.sendToBackend(
         `/api/groups/${encodeURIComponent(chatId)}/playlist/shuffle`,
-        { playNow: true, limit: 6, replaceQueue: true },
+        {
+          playNow: true,
+          limit: 6,
+          replaceQueue: true,
+          userId: userLookup.userId, // Pass user ID to create playlist in their account
+        },
         "POST",
       );
 

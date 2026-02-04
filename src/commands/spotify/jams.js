@@ -162,19 +162,58 @@ module.exports = {
 
       // Send composite sticker with album art from playing jams
       try {
-        const tracksForSticker = jams
-          .filter(
-            (jam) =>
-              jam.currentTrackName &&
-              (jam.currentTrackImage || jam.currentAlbumImage),
-          ) // Only jams with tracks playing AND valid images
-          .map((jam) => ({
-            trackId: jam.currentTrackId,
-            trackName: jam.currentTrackName,
-            artists: jam.currentArtists,
-            image: jam.currentTrackImage || jam.currentAlbumImage,
-          }))
-          .slice(0, 9); // Max 9 tracks for composite
+        // Build tracks for sticker, fetching missing images from Spotify
+        const tracksForSticker = [];
+
+        for (const jam of jams) {
+          if (!jam.currentTrackName) continue; // Skip jams not playing anything
+
+          let image = jam.currentTrackImage || jam.currentAlbumImage;
+
+          // If no image in jam data, fetch from Spotify API
+          if (!image && jam.currentTrackId) {
+            try {
+              logger.info(
+                `[Jams] Fetching album art for track ${jam.currentTrackId}`,
+              );
+              const trackRes = await backendClient.sendToBackend(
+                `/api/spotify/track/${encodeURIComponent(jam.currentTrackId)}`,
+                null,
+                "GET",
+              );
+
+              if (trackRes && trackRes.track) {
+                // Try to get image from album
+                if (
+                  trackRes.track.album &&
+                  trackRes.track.album.images &&
+                  trackRes.track.album.images.length > 0
+                ) {
+                  // Get largest image (first one is usually largest)
+                  image = trackRes.track.album.images[0].url;
+                  logger.info(
+                    `[Jams] Found album art from Spotify API: ${image}`,
+                  );
+                }
+              }
+            } catch (fetchErr) {
+              logger.warn(
+                `[Jams] Failed to fetch album art for ${jam.currentTrackId}: ${fetchErr.message}`,
+              );
+            }
+          }
+
+          if (image) {
+            tracksForSticker.push({
+              trackId: jam.currentTrackId,
+              trackName: jam.currentTrackName,
+              artists: jam.currentArtists,
+              image,
+            });
+          }
+
+          if (tracksForSticker.length >= 9) break; // Max 9 tracks for composite
+        }
 
         logger.info(
           `[Jams] Found ${tracksForSticker.length} tracks with images for sticker`,
