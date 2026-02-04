@@ -313,5 +313,12 @@ module.exports = {
   category: "spotify",
   requiredArgs: 1,
   usage: "/adicionar <nome da música>",
-  execute: adicionarCommand,
+
+  async execute(ctx) {
+    const { reply } = ctx;
+    return reply(
+      "⚠️ Este comando está temporariamente desabilitado durante refatoração.\n\n" +
+        "Em breve você poderá adicionar músicas à fila colaborativa!",
+    );
+  },
 };
