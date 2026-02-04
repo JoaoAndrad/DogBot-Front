@@ -23,6 +23,51 @@ async function resolveUserName(senderNumber, client) {
 }
 
 /**
+ * Extract Spotify playlist ID from URL
+ */
+function extractPlaylistId(url) {
+  try {
+    // Match patterns like:
+    // https://open.spotify.com/playlist/3xthKP3TSHuDHN1tg50OFf
+    // https://open.spotify.com/playlist/3xthKP3TSHuDHN1tg50OFf?si=...
+    const match = url.match(/playlist[\/:]([a-zA-Z0-9]+)/);
+    return match ? match[1] : null;
+  } catch (err) {
+    return null;
+  }
+}
+
+/**
+ * Get tracks from Spotify playlist
+ */
+async function getPlaylistTracks(playlistId) {
+  try {
+    const response = await fetch(
+      `${BACKEND_URL}/api/spotify/playlist/${playlistId}/tracks`,
+    );
+
+    if (!response.ok) {
+      return { success: false, error: "FETCH_FAILED" };
+    }
+
+    const data = await response.json();
+
+    if (!data.success) {
+      return { success: false, error: data.error };
+    }
+
+    return {
+      success: true,
+      tracks: data.tracks,
+      playlistName: data.playlistName,
+    };
+  } catch (err) {
+    logger.error("[AdicionarCommand] Error fetching playlist:", err);
+    return { success: false, error: err.message };
+  }
+}
+
+/**
  * Search Spotify tracks
  */
 async function searchSpotifyTrack(query) {
@@ -60,7 +105,7 @@ module.exports = {
   description: "Adiciona música à fila colaborativa com votação",
   category: "spotify",
   requiredArgs: 1,
-  usage: "/adicionar <nome da música>",
+  usage: "/adicionar <nome da música ou link da playlist>",
 
   async execute(ctx) {
     const { message, reply, client, args = [] } = ctx;
@@ -137,24 +182,51 @@ module.exports = {
 
       if (!query || query.trim().length === 0) {
         return reply(
-          "❌ Por favor, especifique o nome da música.\n\nExemplo: */adicionar bohemian rhapsody*",
+          "❌ Por favor, especifique o nome da música ou link da playlist.\n\nExemplos:\n*/adicionar bohemian rhapsody*\n*/adicionar https://open.spotify.com/playlist/...*",
         );
       }
 
-      // Search Spotify
-      await reply(`🔍 Buscando "${query}" no Spotify...`);
+      // Check if query is a Spotify playlist URL
+      const playlistId = extractPlaylistId(query);
 
-      const searchResult = await searchSpotifyTrack(query);
+      let tracks = [];
+      let searchContext = "";
 
-      if (
-        !searchResult.success ||
-        !searchResult.tracks ||
-        searchResult.tracks.length === 0
-      ) {
-        return reply("❌ Nenhuma música encontrada. Tente outro termo.");
+      if (playlistId) {
+        // Fetch playlist tracks
+        await reply(`🔍 Buscando músicas da playlist...`);
+
+        const playlistResult = await getPlaylistTracks(playlistId);
+
+        if (
+          !playlistResult.success ||
+          !playlistResult.tracks ||
+          playlistResult.tracks.length === 0
+        ) {
+          return reply(
+            "❌ Não foi possível carregar a playlist. Verifique o link.",
+          );
+        }
+
+        tracks = playlistResult.tracks.slice(0, 5);
+        searchContext = `da playlist "${playlistResult.playlistName}"`;
+      } else {
+        // Search Spotify
+        await reply(`🔍 Buscando "${query}" no Spotify...`);
+
+        const searchResult = await searchSpotifyTrack(query);
+
+        if (
+          !searchResult.success ||
+          !searchResult.tracks ||
+          searchResult.tracks.length === 0
+        ) {
+          return reply("❌ Nenhuma música encontrada. Tente outro termo.");
+        }
+
+        tracks = searchResult.tracks.slice(0, 5);
+        searchContext = `para "${query}"`;
       }
-
-      const tracks = searchResult.tracks.slice(0, 5);
 
       // Get chat for sending polls
       const chat = await msg.getChat();
