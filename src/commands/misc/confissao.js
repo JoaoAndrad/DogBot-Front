@@ -3,6 +3,9 @@ module.exports = {
   description:
     "Enviar uma confissão anonimamente para o grupo configurado (privado apenas).",
   async execute(ctx) {
+    console.log(
+      "[confissao] COMANDO INICIADO - versão atualizada com logs de debug",
+    );
     const { message, info, reply, client, services } = ctx;
 
     // Array to collect poll messages for cleanup
@@ -976,200 +979,199 @@ module.exports = {
     const optionChatIds = candidateGroups.map((g) => g.id);
 
     try {
+      console.log(
+        "[confissao] Criando poll de seleção de grupo com createPollPromise",
+      );
       // create a poll in the user's private chat to choose target group
-      await polls.createPoll(
+      const pollResult = await createPollPromise(
         client,
         senderNumber,
         "Escolha o grupo para enviar sua confissão",
         optionLabels,
-        {
-          onVote: async (payload) => {
-            try {
-              const idxs =
-                payload && payload.selectedIndexes
-                  ? payload.selectedIndexes
-                  : [];
-              if (!idxs || !idxs.length) return;
-              const pick = Number(idxs[0]);
-              const targetChat = optionChatIds[pick];
-              if (!targetChat) return;
+        {},
+      );
 
-              // send confession to selected group (formatted)
-              try {
-                const groupMsg = `*📩 Confissão:* ${text}`;
-                if (message && message.hasMedia) {
-                  try {
-                    const media =
-                      await mediaHelper.obterMidiaDaMensagem(message);
-                    if (
-                      media &&
-                      media.mimetype &&
-                      media.mimetype.startsWith("image")
-                    ) {
-                      const base64 =
-                        media.base64 || media.buffer.toString("base64");
-                      const mm = new MessageMedia(
-                        media.mimetype || "image/jpeg",
-                        base64,
-                        media.filename || "image.jpg",
-                      );
-                      await client.sendMessage(targetChat, mm, {
-                        caption: groupMsg,
-                      });
-                    } else if (
-                      media &&
-                      media.mimetype &&
-                      media.mimetype.startsWith("video")
-                    ) {
-                      // Ask the user whether to forward original message because video sending
-                      // may not be supported by the environment (Chromium codecs).
-                      try {
-                        const _res = await createPollPromise(
-                          client,
-                          senderNumber,
-                          "Detectei um vídeo. Vídeos não são suportados neste ambiente. Deseja que eu encaminhe sua mensagem original para o grupo selecionado?",
-                          ["Sim", "Não"],
-                          {},
-                        );
-                        const yn = _res && _res.payload ? _res.payload : _res;
-                        const pollMsgForVideo3 = _res && _res.pollMsg;
-                        const ynIdx =
-                          yn && yn.selectedIndexes && yn.selectedIndexes[0]
-                            ? yn.selectedIndexes[0]
-                            : 0;
-                        if (Number(ynIdx) === 0) {
-                          try {
-                            const mid =
-                              message &&
-                              message.id &&
-                              (message.id._serialized || message.id.id);
-                            if (
-                              client &&
-                              typeof client.forwardMessages === "function" &&
-                              mid
-                            ) {
-                              await client.forwardMessages(targetChat, [mid]);
-                              // send confession text separately after forward
-                              await client.sendMessage(targetChat, groupMsg);
-                            } else if (typeof message.forward === "function") {
-                              await message.forward(targetChat);
-                              await client.sendMessage(targetChat, groupMsg);
-                            } else {
-                              throw new Error("forward-not-supported");
-                            }
-                          } catch (fwdErr) {
-                            console.error(
-                              "[confissao] falha ao encaminhar vídeo (enquete):",
-                              fwdErr && fwdErr.message
-                                ? fwdErr.message
-                                : fwdErr,
-                            );
-                            await reply(
-                              "Não consegui encaminhar a mensagem original. Enviando sem mídia.",
-                            );
-                            await client.sendMessage(targetChat, groupMsg);
-                          }
-                        } else {
-                          await client.sendMessage(targetChat, groupMsg);
-                        }
-                      } catch (e) {
-                        console.error(
-                          "[confissao] erro ao perguntar sobre encaminhar vídeo (enquete):",
-                          e && e.message ? e.message : e,
-                        );
+      // Extract payload from result
+      const payload =
+        pollResult && pollResult.payload ? pollResult.payload : pollResult;
+
+      try {
+        const idxs =
+          payload && payload.selectedIndexes ? payload.selectedIndexes : [];
+        if (!idxs || !idxs.length) return;
+        const pick = Number(idxs[0]);
+        const targetChat = optionChatIds[pick];
+        if (!targetChat) return;
+
+        // send confession to selected group (formatted)
+        try {
+          const groupMsg = `*📩 Confissão:* ${text}`;
+          if (message && message.hasMedia) {
+            try {
+              const media = await mediaHelper.obterMidiaDaMensagem(message);
+              if (
+                media &&
+                media.mimetype &&
+                media.mimetype.startsWith("image")
+              ) {
+                const base64 = media.base64 || media.buffer.toString("base64");
+                const mm = new MessageMedia(
+                  media.mimetype || "image/jpeg",
+                  base64,
+                  media.filename || "image.jpg",
+                );
+                await client.sendMessage(targetChat, mm, {
+                  caption: groupMsg,
+                });
+              } else if (
+                media &&
+                media.mimetype &&
+                media.mimetype.startsWith("video")
+              ) {
+                // Ask the user whether to forward original message because video sending
+                // may not be supported by the environment (Chromium codecs).
+                try {
+                  const _res = await createPollPromise(
+                    client,
+                    senderNumber,
+                    "Detectei um vídeo. Vídeos não são suportados neste ambiente. Deseja que eu encaminhe sua mensagem original para o grupo selecionado?",
+                    ["Sim", "Não"],
+                    {},
+                  );
+                  const yn = _res && _res.payload ? _res.payload : _res;
+                  const pollMsgForVideo3 = _res && _res.pollMsg;
+                  const ynIdx =
+                    yn && yn.selectedIndexes && yn.selectedIndexes[0]
+                      ? yn.selectedIndexes[0]
+                      : 0;
+                  if (Number(ynIdx) === 0) {
+                    try {
+                      const mid =
+                        message &&
+                        message.id &&
+                        (message.id._serialized || message.id.id);
+                      if (
+                        client &&
+                        typeof client.forwardMessages === "function" &&
+                        mid
+                      ) {
+                        await client.forwardMessages(targetChat, [mid]);
+                        // send confession text separately after forward
                         await client.sendMessage(targetChat, groupMsg);
+                      } else if (typeof message.forward === "function") {
+                        await message.forward(targetChat);
+                        await client.sendMessage(targetChat, groupMsg);
+                      } else {
+                        throw new Error("forward-not-supported");
                       }
-                    } else {
+                    } catch (fwdErr) {
+                      console.error(
+                        "[confissao] falha ao encaminhar vídeo (enquete):",
+                        fwdErr && fwdErr.message ? fwdErr.message : fwdErr,
+                      );
+                      await reply(
+                        "Não consegui encaminhar a mensagem original. Enviando sem mídia.",
+                      );
                       await client.sendMessage(targetChat, groupMsg);
                     }
-                  } catch (e) {
-                    console.error(
-                      "[confissao] erro ao processar mídia (enquete):",
-                      e && e.message ? e.message : e,
-                    );
+                  } else {
                     await client.sendMessage(targetChat, groupMsg);
                   }
-                } else {
+                } catch (e) {
+                  console.error(
+                    "[confissao] erro ao perguntar sobre encaminhar vídeo (enquete):",
+                    e && e.message ? e.message : e,
+                  );
                   await client.sendMessage(targetChat, groupMsg);
                 }
-              } catch (err) {
-                console.error(
-                  "Erro ao enviar confissão ao grupo selecionado:",
-                  err && err.message ? err.message : err,
-                );
-                // notify user privately about failure
-                try {
-                  await reply(
-                    "Ocorreu um erro ao enviar a confissão ao grupo selecionado.",
-                  );
-                } catch (e) {}
-                return;
+              } else {
+                await client.sendMessage(targetChat, groupMsg);
               }
-
-              // notify backend to consume balance
-              try {
-                const res = await services.backend.sendToBackend(
-                  "/api/confessions/consume",
-                  { senderNumber },
-                  "POST",
-                );
-                if (res && res.ok) {
-                  try {
-                    const remaining = res.remaining;
-                    const isVip =
-                      remaining === null ||
-                      remaining === Infinity ||
-                      String(remaining).toLowerCase() === "infinity";
-                    let confirmMsg;
-                    if (isVip) {
-                      confirmMsg = await reply(
-                        "*🎉 Sua confissão foi enviada anonimamente com sucesso!* \n\n🙏 Você possui confissões vitalícias — não será debitado. 💸",
-                      );
-                    } else {
-                      confirmMsg = await reply(
-                        `*✅ Sua confissão foi enviada anonimamente com sucesso!* \n\n📩 *Enviada para:* ${
-                          candidateGroups[pick].name
-                        }\n*Saldo restante:* ${remaining} confissão${
-                          remaining === 1 ? "" : "ões"
-                        }`,
-                      );
-                    }
-                    // Cleanup messages after successful send
-                    await cleanupAfterConfession(message, confirmMsg);
-                  } catch (e) {}
-                } else if (res && res.reason === "insufficient_balance") {
-                  try {
-                    await reply(
-                      `⚠️ Sua confissão foi enviada ao grupo ${candidateGroups[pick].name}, porém seu saldo está insuficiente para futuras confissões.`,
-                    );
-                  } catch (e) {}
-                } else {
-                  try {
-                    await reply(
-                      `✅ Confissão enviada ao grupo ${candidateGroups[pick].name}. Não foi possível atualizar seu saldo no momento.`,
-                    );
-                  } catch (e) {}
-                }
-              } catch (err) {
-                console.error(
-                  "Erro ao notificar backend sobre consumo de confissão:",
-                  err && err.message ? err.message : err,
-                );
-                try {
-                  await reply(
-                    "Confissão enviada, porém ocorreu um erro ao atualizar seu saldo.",
-                  );
-                } catch (e) {}
-              }
-            } catch (err) {
+            } catch (e) {
               console.error(
-                "Erro no callback de votação da confissão:",
-                err && err.message ? err.message : err,
+                "[confissao] erro ao processar mídia (enquete):",
+                e && e.message ? e.message : e,
               );
+              await client.sendMessage(targetChat, groupMsg);
             }
-          },
-        },
-      );
+          } else {
+            await client.sendMessage(targetChat, groupMsg);
+          }
+        } catch (err) {
+          console.error(
+            "Erro ao enviar confissão ao grupo selecionado:",
+            err && err.message ? err.message : err,
+          );
+          // notify user privately about failure
+          try {
+            await reply(
+              "Ocorreu um erro ao enviar a confissão ao grupo selecionado.",
+            );
+          } catch (e) {}
+          return;
+        }
+
+        // notify backend to consume balance
+        try {
+          const res = await services.backend.sendToBackend(
+            "/api/confessions/consume",
+            { senderNumber },
+            "POST",
+          );
+          if (res && res.ok) {
+            try {
+              const remaining = res.remaining;
+              const isVip =
+                remaining === null ||
+                remaining === Infinity ||
+                String(remaining).toLowerCase() === "infinity";
+              let confirmMsg;
+              if (isVip) {
+                confirmMsg = await reply(
+                  "*🎉 Sua confissão foi enviada anonimamente com sucesso!* \n\n🙏 Você possui confissões vitalícias — não será debitado. 💸",
+                );
+              } else {
+                confirmMsg = await reply(
+                  `*✅ Sua confissão foi enviada anonimamente com sucesso!* \n\n📩 *Enviada para:* ${
+                    candidateGroups[pick].name
+                  }\n*Saldo restante:* ${remaining} confissão${
+                    remaining === 1 ? "" : "ões"
+                  }`,
+                );
+              }
+              // Cleanup messages after successful send
+              await cleanupAfterConfession(message, confirmMsg);
+            } catch (e) {}
+          } else if (res && res.reason === "insufficient_balance") {
+            try {
+              await reply(
+                `⚠️ Sua confissão foi enviada ao grupo ${candidateGroups[pick].name}, porém seu saldo está insuficiente para futuras confissões.`,
+              );
+            } catch (e) {}
+          } else {
+            try {
+              await reply(
+                `✅ Confissão enviada ao grupo ${candidateGroups[pick].name}. Não foi possível atualizar seu saldo no momento.`,
+              );
+            } catch (e) {}
+          }
+        } catch (err) {
+          console.error(
+            "Erro ao notificar backend sobre consumo de confissão:",
+            err && err.message ? err.message : err,
+          );
+          try {
+            await reply(
+              "Confissão enviada, porém ocorreu um erro ao atualizar seu saldo.",
+            );
+          } catch (e) {}
+        }
+      } catch (err) {
+        console.error(
+          "Erro ao processar voto da confissão:",
+          err && err.message ? err.message : err,
+        );
+      }
     } catch (err) {
       console.error(
         "Erro ao criar enquete para seleção de grupo:",
