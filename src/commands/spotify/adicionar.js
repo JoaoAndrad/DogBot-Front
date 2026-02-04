@@ -1,4 +1,3 @@
-const axios = require("axios");
 const logger = require("../../../../backend/src/lib/logger");
 const { getConfig } = require("../../../core/config");
 const getPushName = require("../../../utils/getPushName");
@@ -6,30 +5,33 @@ const { JamMonitor } = require("../../../services/jamMonitor");
 const { createPoll } = require("../../../components/poll");
 
 const config = getConfig();
+const BACKEND_URL = process.env.BACKEND_URL || "http://localhost:8000";
 
 /**
  * Search Spotify tracks
  */
 async function searchSpotifyTrack(query) {
   try {
-    const response = await axios.get(
-      `${config.BACKEND_URL}/api/spotify/search`,
-      {
-        params: {
-          query,
-          type: "track",
-          limit: 5,
-        },
-      },
-    );
+    const url = new URL(`${BACKEND_URL}/api/spotify/search`);
+    url.searchParams.set("query", query);
+    url.searchParams.set("type", "track");
+    url.searchParams.set("limit", "5");
 
-    if (!response.data.success) {
-      return { success: false, error: response.data.error };
+    const response = await fetch(url.toString());
+
+    if (!response.ok) {
+      return { success: false, error: "FETCH_FAILED" };
+    }
+
+    const data = await response.json();
+
+    if (!data.success) {
+      return { success: false, error: data.error };
     }
 
     return {
       success: true,
-      tracks: response.data.tracks,
+      tracks: data.tracks,
     };
   } catch (err) {
     logger.error("[AdicionarCommand] Error searching Spotify:", err);
@@ -123,16 +125,22 @@ async function adicionarCommand(msg, args) {
           }
 
           // Get user ID from backend
-          const userResponse = await axios.get(
-            `${config.BACKEND_URL}/api/users/by-sender-number/${senderNumber}`,
+          const userResponse = await fetch(
+            `${BACKEND_URL}/api/users/by-sender-number/${senderNumber}`,
           );
 
-          if (!userResponse.data.success) {
+          if (!userResponse.ok) {
             await msg.reply("❌ Erro ao buscar usuário.");
             return;
           }
 
-          const userId = userResponse.data.user.id;
+          const userData = await userResponse.json();
+          if (!userData.success) {
+            await msg.reply("❌ Erro ao buscar usuário.");
+            return;
+          }
+
+          const userId = userData.user.id;
 
           // Add to queue
           const trackData = {
@@ -144,22 +152,27 @@ async function adicionarCommand(msg, args) {
             trackImage: selectedTrack.album.images[0]?.url || null,
           };
 
-          const addResponse = await axios.post(
-            `${config.BACKEND_URL}/api/jam/${jamState.jamId}/queue`,
+          const addResponse = await fetch(
+            `${BACKEND_URL}/api/jam/${jamState.jamId}/queue`,
             {
-              userId,
-              trackData,
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ userId, trackData }),
             },
           );
 
-          if (!addResponse.data.success) {
-            await msg.reply(
-              `❌ ${addResponse.data.message || addResponse.data.error}`,
-            );
+          if (!addResponse.ok) {
+            await msg.reply("❌ Erro ao adicionar música.");
             return;
           }
 
-          const queueEntry = addResponse.data.queueEntry;
+          const addData = await addResponse.json();
+          if (!addData.success) {
+            await msg.reply(`❌ ${addData.message || addData.error}`);
+            return;
+          }
+
+          const queueEntry = addData.queueEntry;
 
           // Create voting poll
           await chat.sendMessage(
@@ -170,16 +183,22 @@ async function adicionarCommand(msg, args) {
           );
 
           // Get all jam participants for voting
-          const jamResponse = await axios.get(
-            `${config.BACKEND_URL}/api/jam/${jamState.jamId}`,
+          const jamResponse = await fetch(
+            `${BACKEND_URL}/api/jam/${jamState.jamId}`,
           );
 
-          if (!jamResponse.data.success) {
+          if (!jamResponse.ok) {
             await msg.reply("❌ Erro ao buscar jam para votação.");
             return;
           }
 
-          const jam = jamResponse.data.jam;
+          const jamData = await jamResponse.json();
+          if (!jamData.success) {
+            await msg.reply("❌ Erro ao buscar jam para votação.");
+            return;
+          }
+
+          const jam = jamData.jam;
           const eligibleVoters = [
             jam.host.sender_number,
             ...jam.listeners.map((l) => l.user.sender_number),
@@ -202,30 +221,41 @@ async function adicionarCommand(msg, args) {
                   const voterNumber = voteData.voter.replace("@c.us", "");
 
                   // Get voter user ID
-                  const voterResponse = await axios.get(
-                    `${config.BACKEND_URL}/api/users/by-sender-number/${voterNumber}`,
+                  const voterResponse = await fetch(
+                    `${BACKEND_URL}/api/users/by-sender-number/${voterNumber}`,
                   );
 
-                  if (!voterResponse.data.success) {
+                  if (!voterResponse.ok) {
                     return;
                   }
 
-                  const voterUserId = voterResponse.data.user.id;
+                  const voterData = await voterResponse.json();
+                  if (!voterData.success) {
+                    return;
+                  }
+
+                  const voterUserId = voterData.user.id;
 
                   // Cast vote
-                  const voteResponse = await axios.post(
-                    `${config.BACKEND_URL}/api/jam/queue/${queueEntry.id}/vote`,
+                  const voteResponse = await fetch(
+                    `${BACKEND_URL}/api/jam/queue/${queueEntry.id}/vote`,
                     {
-                      userId: voterUserId,
-                      isFor,
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ userId: voterUserId, isFor }),
                     },
                   );
 
-                  if (!voteResponse.data.success) {
+                  if (!voteResponse.ok) {
                     return;
                   }
 
-                  const result = voteResponse.data;
+                  const voteData = await voteResponse.json();
+                  if (!voteData.success) {
+                    return;
+                  }
+
+                  const result = voteData;
 
                   // Check if approved/rejected
                   if (result.status === "approved") {

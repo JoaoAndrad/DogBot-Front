@@ -1,10 +1,10 @@
-const axios = require("axios");
 const logger = require("../../../../backend/src/lib/logger");
 const { getConfig } = require("../../../core/config");
 const getPushName = require("../../../utils/getPushName");
 const { JamMonitor } = require("../../../services/jamMonitor");
 
 const config = getConfig();
+const BACKEND_URL = process.env.BACKEND_URL || "http://localhost:8000";
 
 /**
  * /democratizar - Toggle jam between classic and collaborative mode
@@ -23,28 +23,38 @@ async function democratizarCommand(msg) {
     }
 
     // Get user ID
-    const userResponse = await axios.get(
-      `${config.BACKEND_URL}/api/users/by-sender-number/${senderNumber}`,
+    const userResponse = await fetch(
+      `${BACKEND_URL}/api/users/by-sender-number/${senderNumber}`,
     );
 
-    if (!userResponse.data.success) {
+    if (!userResponse.ok) {
       await msg.reply("❌ Erro ao buscar usuário.");
       return;
     }
 
-    const userId = userResponse.data.user.id;
+    const userData = await userResponse.json();
+    if (!userData.success) {
+      await msg.reply("❌ Erro ao buscar usuário.");
+      return;
+    }
+
+    const userId = userData.user.id;
 
     // Get jam details to check if user is host
-    const jamResponse = await axios.get(
-      `${config.BACKEND_URL}/api/jam/${jamState.jamId}`,
-    );
+    const jamResponse = await fetch(`${BACKEND_URL}/api/jam/${jamState.jamId}`);
 
-    if (!jamResponse.data.success) {
+    if (!jamResponse.ok) {
       await msg.reply("❌ Erro ao buscar jam.");
       return;
     }
 
-    const jam = jamResponse.data.jam;
+    const jamData = await jamResponse.json();
+    if (!jamData.success) {
+      await msg.reply("❌ Erro ao buscar jam.");
+      return;
+    }
+
+    const jam = jamData.jam;
 
     // Check if user is host
     if (jam.hostUserId !== userId) {
@@ -56,16 +66,24 @@ async function democratizarCommand(msg) {
     const newType =
       jam.jamType === "collaborative" ? "classic" : "collaborative";
 
-    const updateResponse = await axios.patch(
-      `${config.BACKEND_URL}/api/jam/${jamState.jamId}`,
+    const updateResponse = await fetch(
+      `${BACKEND_URL}/api/jam/${jamState.jamId}`,
       {
-        jamType: newType,
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ jamType: newType }),
       },
     );
 
-    if (!updateResponse.data.success) {
+    if (!updateResponse.ok) {
+      await msg.reply("❌ Erro ao atualizar jam.");
+      return;
+    }
+
+    const updateData = await updateResponse.json();
+    if (!updateData.success) {
       await msg.reply(
-        `❌ Erro ao atualizar jam: ${updateResponse.data.message || updateResponse.data.error}`,
+        `❌ Erro ao atualizar jam: ${updateData.message || updateData.error}`,
       );
       return;
     }

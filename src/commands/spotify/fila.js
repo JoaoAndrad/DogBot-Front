@@ -1,10 +1,10 @@
-const axios = require("axios");
 const logger = require("../../../../backend/src/lib/logger");
 const { getConfig } = require("../../../core/config");
 const getPushName = require("../../../utils/getPushName");
 const { JamMonitor } = require("../../../services/jamMonitor");
 
 const config = getConfig();
+const BACKEND_URL = process.env.BACKEND_URL || "http://localhost:8000";
 
 /**
  * /fila - Show collaborative jam queue
@@ -23,18 +23,23 @@ async function filaCommand(msg) {
     }
 
     // Get queue from backend
-    const response = await axios.get(
-      `${config.BACKEND_URL}/api/jam/${jamState.jamId}/queue`,
+    const response = await fetch(
+      `${BACKEND_URL}/api/jam/${jamState.jamId}/queue`,
     );
 
-    if (!response.data.success) {
-      await msg.reply(
-        `❌ Erro ao buscar fila: ${response.data.message || response.data.error}`,
-      );
+    if (!response.ok) {
+      await msg.reply("❌ Erro ao buscar fila.");
       return;
     }
 
-    const queue = response.data.queue;
+    const data = await response.json();
+
+    if (!data.success) {
+      await msg.reply(`❌ Erro ao buscar fila: ${data.message || data.error}`);
+      return;
+    }
+
+    const queue = data.queue;
 
     if (!queue || queue.length === 0) {
       await msg.reply("📋 A fila está vazia no momento.");

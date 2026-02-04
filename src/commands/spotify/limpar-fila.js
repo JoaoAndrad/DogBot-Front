@@ -1,9 +1,9 @@
-const axios = require("axios");
 const logger = require("../../../../backend/src/lib/logger");
 const { getConfig } = require("../../../core/config");
 const { JamMonitor } = require("../../../services/jamMonitor");
 
 const config = getConfig();
+const BACKEND_URL = process.env.BACKEND_URL || "http://localhost:8000";
 
 /**
  * /limpar-fila - Clear collaborative queue (host only)
@@ -22,31 +22,45 @@ async function limparFilaCommand(msg) {
     }
 
     // Get user ID
-    const userResponse = await axios.get(
-      `${config.BACKEND_URL}/api/users/by-sender-number/${senderNumber}`,
+    const userResponse = await fetch(
+      `${BACKEND_URL}/api/users/by-sender-number/${senderNumber}`,
     );
 
-    if (!userResponse.data.success) {
+    if (!userResponse.ok) {
       await msg.reply("❌ Erro ao buscar usuário.");
       return;
     }
 
-    const userId = userResponse.data.user.id;
-
-    // Clear queue
-    const response = await axios.delete(
-      `${config.BACKEND_URL}/api/jam/${jamState.jamId}/queue`,
-      {
-        data: { userId },
-      },
-    );
-
-    if (!response.data.success) {
-      await msg.reply(`❌ ${response.data.message || response.data.error}`);
+    const userData = await userResponse.json();
+    if (!userData.success) {
+      await msg.reply("❌ Erro ao buscar usuário.");
       return;
     }
 
-    const deletedCount = response.data.deletedCount;
+    const userId = userData.user.id;
+
+    // Clear queue
+    const response = await fetch(
+      `${BACKEND_URL}/api/jam/${jamState.jamId}/queue`,
+      {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId }),
+      },
+    );
+
+    if (!response.ok) {
+      await msg.reply("❌ Erro ao limpar fila.");
+      return;
+    }
+
+    const data = await response.json();
+    if (!data.success) {
+      await msg.reply(`❌ ${data.message || data.error}`);
+      return;
+    }
+
+    const deletedCount = data.deletedCount;
 
     await msg.reply(
       `✅ *Fila limpa!*\n\n` +
