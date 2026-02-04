@@ -1,4 +1,6 @@
 const backend = require("../../services/backendClient");
+const { sendCompositeSticker } = require("../../utils/stickerHelper");
+const logger = require("../../utils/logger");
 
 /**
  * Resolve host name with WhatsApp fallback
@@ -153,6 +155,35 @@ module.exports = {
       }
 
       await reply(out);
+
+      // Send composite sticker with album art from playing jams
+      try {
+        const tracksForSticker = jams
+          .filter((jam) => jam.currentTrackName) // Only jams with tracks playing
+          .map((jam) => ({
+            trackId: jam.currentTrackId,
+            trackName: jam.currentTrackName,
+            artists: jam.currentArtists,
+            image:
+              jam.currentTrackImage ||
+              jam.currentAlbumImage ||
+              "https://via.placeholder.com/512", // fallback
+          }))
+          .slice(0, 9); // Max 9 tracks for composite
+
+        if (tracksForSticker.length > 0 && ctx.client) {
+          const ok = await sendCompositeSticker(
+            ctx.client,
+            chatId || ctx.message?.from,
+            tracksForSticker,
+          );
+          if (!ok) {
+            logger.info("[Jams] sendCompositeSticker failed");
+          }
+        }
+      } catch (err) {
+        logger.error("[Jams] Error sending composite sticker: " + err.message);
+      }
     } catch (err) {
       console.error("[jams] Error:", err);
       await reply(`❌ Erro ao listar jams: ${err.message}`);
