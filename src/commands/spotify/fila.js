@@ -58,8 +58,10 @@ module.exports = {
       }
 
       // Get active jam for this group
-      const jamsRes = await backendClient.get(
+      const jamsRes = await backendClient.sendToBackend(
         `/api/jam/active?chatId=${chatId}`,
+        null,
+        "GET",
       );
 
       if (!jamsRes.success || !jamsRes.jams || jamsRes.jams.length === 0) {
