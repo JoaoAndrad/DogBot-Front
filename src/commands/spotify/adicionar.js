@@ -27,10 +27,19 @@ async function resolveUserName(senderNumber, client) {
  */
 function extractPlaylistId(url) {
   try {
-    // Match patterns like:
-    // https://open.spotify.com/playlist/3xthKP3TSHuDHN1tg50OFf
-    // https://open.spotify.com/playlist/3xthKP3TSHuDHN1tg50OFf?si=...
     const match = url.match(/playlist[\/:]([a-zA-Z0-9]+)/);
+    return match ? match[1] : null;
+  } catch (err) {
+    return null;
+  }
+}
+
+/**
+ * Extract Spotify album ID from URL
+ */
+function extractAlbumId(url) {
+  try {
+    const match = url.match(/album[\/:]([a-zA-Z0-9]+)/);
     return match ? match[1] : null;
   } catch (err) {
     return null;
@@ -63,6 +72,36 @@ async function getPlaylistTracks(playlistId) {
     };
   } catch (err) {
     logger.error("[AdicionarCommand] Error fetching playlist:", err);
+    return { success: false, error: err.message };
+  }
+}
+
+/**
+ * Get tracks from Spotify album
+ */
+async function getAlbumTracks(albumId) {
+  try {
+    const response = await fetch(
+      `${BACKEND_URL}/api/spotify/album/${albumId}`,
+    );
+
+    if (!response.ok) {
+      return { success: false, error: "FETCH_FAILED" };
+    }
+
+    const data = await response.json();
+
+    if (!data.success || !data.album) {
+      return { success: false, error: data.error };
+    }
+
+    return {
+      success: true,
+      tracks: data.album.tracks.items || [],
+      albumName: data.album.name,
+    };
+  } catch (err) {
+    logger.error("[AdicionarCommand] Error fetching album:", err);
     return { success: false, error: err.message };
   }
 }
@@ -105,7 +144,7 @@ module.exports = {
   description: "Adiciona música à fila colaborativa com votação",
   category: "spotify",
   requiredArgs: 1,
-  usage: "/adicionar <nome da música ou link da playlist>",
+  usage: "/adicionar <nome da música, link da playlist ou álbum>",
 
   async execute(ctx) {
     const { message, reply, client, args = [] } = ctx;
@@ -182,18 +221,18 @@ module.exports = {
 
       if (!query || query.trim().length === 0) {
         return reply(
-          "❌ Por favor, especifique o nome da música ou link da playlist.\n\nExemplos:\n*/adicionar bohemian rhapsody*\n*/adicionar https://open.spotify.com/playlist/...*",
+          "❌ Por favor, especifique o nome da música, link da playlist ou álbum.\n\nExemplos:\n*/adicionar bohemian rhapsody*\n*/adicionar https://open.spotify.com/playlist/...*\n*/adicionar https://open.spotify.com/album/...*",
         );
       }
 
-      // Check if query is a Spotify playlist URL
+      // Check if query is a Spotify URL (playlist or album)
       const playlistId = extractPlaylistId(query);
+      const albumId = extractAlbumId(query);
 
       let tracks = [];
       let searchContext = "";
 
       if (playlistId) {
-        // Fetch playlist tracks
         await reply(`🔍 Buscando músicas da playlist...`);
 
         const playlistResult = await getPlaylistTracks(playlistId);
@@ -210,8 +249,24 @@ module.exports = {
 
         tracks = playlistResult.tracks.slice(0, 5);
         searchContext = `da playlist "${playlistResult.playlistName}"`;
+      } else if (albumId) {
+        await reply(`🔍 Buscando músicas do álbum...`);
+
+        const albumResult = await getAlbumTracks(albumId);
+
+        if (
+          !albumResult.success ||
+          !albumResult.tracks ||
+          albumResult.tracks.length === 0
+        ) {
+          return reply(
+            "❌ Não foi possível carregar o álbum. Verifique o link.",
+          );
+        }
+
+        tracks = albumResult.tracks.slice(0, 5);
+        searchContext = `do álbum "${albumResult.albumName}"`;
       } else {
-        // Search Spotify
         await reply(`🔍 Buscando "${query}" no Spotify...`);
 
         const searchResult = await searchSpotifyTrack(query);
