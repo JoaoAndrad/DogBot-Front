@@ -114,7 +114,7 @@ async function searchSpotifyTrack(query) {
     const url = new URL(`${BACKEND_URL}/api/spotify/search`);
     url.searchParams.set("query", query);
     url.searchParams.set("type", "track");
-    url.searchParams.set("limit", "5");
+    url.searchParams.set("limit", "20");
 
     const response = await fetch(url.toString());
 
@@ -247,7 +247,7 @@ module.exports = {
           );
         }
 
-        tracks = playlistResult.tracks.slice(0, 5);
+        tracks = playlistResult.tracks;
         searchContext = `da playlist "${playlistResult.playlistName}"`;
       } else if (albumId) {
         await reply(`🔍 Buscando músicas do álbum...`);
@@ -264,7 +264,7 @@ module.exports = {
           );
         }
 
-        tracks = albumResult.tracks.slice(0, 5);
+        tracks = albumResult.tracks;
         searchContext = `do álbum "${albumResult.albumName}"`;
       } else {
         await reply(`🔍 Buscando "${query}" no Spotify...`);
@@ -279,234 +279,490 @@ module.exports = {
           return reply("❌ Nenhuma música encontrada. Tente outro termo.");
         }
 
-        tracks = searchResult.tracks.slice(0, 5);
+        tracks = searchResult.tracks;
         searchContext = `para "${query}"`;
       }
 
       // Get chat for sending polls
       const chat = await msg.getChat();
 
-      // Create poll for track selection
-      const pollOptions = tracks.map((track, index) => {
-        const artists = track.artists.map((a) => a.name).join(", ");
-        return `${index + 1}. ${track.name} - ${artists}`;
-      });
+      // Helper function to add track with voting
+      const addTrackWithVoting = async (selectedTrack) => {
+        try {
+          // Add to queue
+          const trackData = {
+            trackUri: selectedTrack.uri,
+            trackId: selectedTrack.id,
+            trackName: selectedTrack.name,
+            trackArtists: selectedTrack.artists.map((a) => a.name).join(", "),
+            trackAlbum: selectedTrack.album.name,
+            trackImage: selectedTrack.album.images[0]?.url || null,
+          };
 
-      pollOptions.push("❌ Cancelar");
+          const addResponse = await fetch(
+            `${BACKEND_URL}/api/jam/${jam.id}/queue`,
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ userId, trackData }),
+            },
+          );
 
-      const pollTitle = `Qual música adicionar?`;
+          if (!addResponse.ok) {
+            await chat.sendMessage("❌ Erro ao adicionar música.");
+            return;
+          }
 
-      const poll = await polls.createPoll(
-        client,
-        chatId,
-        pollTitle,
-        pollOptions,
-        {
-          allowMultiple: false,
-          onVote: async (vote) => {
-            try {
-              // Check if voter is the requester
-              if (vote.voter !== whatsappId) {
-                return; // Only track selection by requester
-              }
+          const addData = await addResponse.json();
+          if (!addData.success) {
+            await chat.sendMessage(`❌ ${addData.message || addData.error}`);
+            return;
+          }
 
-              const selectedIndex = vote.selectedIndexes[0];
+          const queueEntry = addData.queueEntry;
 
-              // Check if canceled
-              if (selectedIndex === pollOptions.length - 1) {
-                await chat.sendMessage("❌ Adição cancelada.");
-                return;
-              }
+          // Get all jam participants for voting
+          const eligibleVoters = [
+            jam.host.sender_number,
+            ...jam.listeners.map((l) => l.user.sender_number),
+          ].map((num) => `${num}@c.us`);
 
-              const selectedTrack = tracks[selectedIndex];
+          // Automatically cast YES vote from requester
+          try {
+            await fetch(
+              `${BACKEND_URL}/api/jam/queue/${queueEntry.id}/vote`,
+              {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ userId, isFor: true }),
+              },
+            );
+            logger.info(
+              `[AdicionarCommand] Auto-voted YES for requester: ${userId}`,
+            );
+          } catch (err) {
+            logger.error("[AdicionarCommand] Error auto-voting:", err);
+          }
 
-              if (!selectedTrack) {
-                await chat.sendMessage("❌ Opção inválida.");
-                return;
-              }
+          // Create mentions for all participants except the requester
+          const mentions = eligibleVoters.filter(
+            (voter) => voter !== whatsappId,
+          );
 
-              // Add to queue (userId already obtained earlier in execution)
-              const trackData = {
-                trackUri: selectedTrack.uri,
-                trackId: selectedTrack.id,
-                trackName: selectedTrack.name,
-                trackArtists: selectedTrack.artists
-                  .map((a) => a.name)
-                  .join(", "),
-                trackAlbum: selectedTrack.album.name,
-                trackImage: selectedTrack.album.images[0]?.url || null,
-              };
+          // Create voting poll
+          const requesterName = await resolveUserName(senderNumber, client);
 
-              const addResponse = await fetch(
-                `${BACKEND_URL}/api/jam/${jam.id}/queue`,
-                {
-                  method: "POST",
-                  headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({ userId, trackData }),
-                },
-              );
+          // Build message with mentions
+          let messageText =
+            `🎵 *${requesterName}* quer adicionar:\n\n` +
+            `🎵 *${selectedTrack.name}*\n` +
+            `🎤 ${selectedTrack.artists.map((a) => a.name).join(", ")}\n\n` +
+            `Vote para aprovar ou rejeitar: `;
 
-              if (!addResponse.ok) {
-                await chat.sendMessage("❌ Erro ao adicionar música.");
-                return;
-              }
+          // Add mention tags for participants
+          for (const mentionId of mentions) {
+            messageText += `@${mentionId.replace("@c.us", "")} `;
+          }
 
-              const addData = await addResponse.json();
-              if (!addData.success) {
-                await chat.sendMessage(
-                  `❌ ${addData.message || addData.error}`,
-                );
-                return;
-              }
+          await chat.sendMessage(messageText, {
+            mentions: mentions,
+          });
 
-              const queueEntry = addData.queueEntry;
+          const votePoll = await polls.createPoll(
+            client,
+            chatId,
+            "Aprovar esta música?",
+            ["✅ Sim", "❌ Não"],
+            {
+              allowMultiple: false,
+              onVote: async (voteData) => {
+                try {
+                  // Only count votes from jam participants
+                  if (!eligibleVoters.includes(voteData.voter)) {
+                    return;
+                  }
 
-              // Get all jam participants for voting
-              const eligibleVoters = [
-                jam.host.sender_number,
-                ...jam.listeners.map((l) => l.user.sender_number),
-              ].map((num) => `${num}@c.us`);
+                  const isFor = voteData.selectedIndexes[0] === 0;
+                  const voterNumber = voteData.voter.replace("@c.us", "");
 
-              // Automatically cast YES vote from requester
-              try {
-                await fetch(
-                  `${BACKEND_URL}/api/jam/queue/${queueEntry.id}/vote`,
-                  {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ userId, isFor: true }),
-                  },
-                );
-                logger.info(
-                  `[AdicionarCommand] Auto-voted YES for requester: ${userId}`,
-                );
-              } catch (err) {
-                logger.error("[AdicionarCommand] Error auto-voting:", err);
-              }
+                  // Get voter user ID
+                  const voterResponse = await fetch(
+                    `${BACKEND_URL}/api/users/by-sender-number/${voterNumber}`,
+                  );
 
-              // Create mentions for all participants except the requester
-              const mentions = eligibleVoters.filter(
-                (voter) => voter !== whatsappId,
-              );
+                  if (!voterResponse.ok) {
+                    return;
+                  }
 
-              // Create voting poll
-              const requesterName = await resolveUserName(senderNumber, client);
+                  const voterData = await voterResponse.json();
+                  if (!voterData.success) {
+                    return;
+                  }
 
-              // Build message with mentions
-              let messageText =
-                `🎵 *${requesterName}* quer adicionar:\n\n` +
-                `🎵 *${selectedTrack.name}*\n` +
-                `🎤 ${selectedTrack.artists.map((a) => a.name).join(", ")}\n\n` +
-                `Vote para aprovar ou rejeitar: `;
+                  const voterUserId = voterData.user.id;
 
-              // Add mention tags for participants
-              for (const mentionId of mentions) {
-                messageText += `@${mentionId.replace("@c.us", "")} `;
-              }
+                  // Cast vote
+                  const voteResponse = await fetch(
+                    `${BACKEND_URL}/api/jam/queue/${queueEntry.id}/vote`,
+                    {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ userId: voterUserId, isFor }),
+                    },
+                  );
 
-              await chat.sendMessage(messageText, {
-                mentions: mentions,
-              });
+                  if (!voteResponse.ok) {
+                    return;
+                  }
 
-              const votePoll = await polls.createPoll(
-                client,
-                chatId,
-                "Aprovar esta música?",
-                ["✅ Sim", "❌ Não"],
-                {
-                  allowMultiple: false,
-                  onVote: async (voteData) => {
-                    try {
-                      // Only count votes from jam participants
-                      if (!eligibleVoters.includes(voteData.voter)) {
-                        return;
-                      }
+                  const voteResultData = await voteResponse.json();
+                  if (!voteResultData.success) {
+                    return;
+                  }
 
-                      const isFor = voteData.selectedIndexes[0] === 0;
-                      const voterNumber = voteData.voter.replace("@c.us", "");
+                  const result = voteResultData;
 
-                      // Get voter user ID
-                      const voterResponse = await fetch(
-                        `${BACKEND_URL}/api/users/by-sender-number/${voterNumber}`,
-                      );
+                  // Check if approved/rejected
+                  if (result.status === "approved") {
+                    await chat.sendMessage(
+                      `✅ *Música aprovada!*\n\n` +
+                        `🎵 ${selectedTrack.name}\n` +
+                        `🎤 ${selectedTrack.artists.map((a) => a.name).join(", ")}\n\n` +
+                        `Adicionada à fila por ${requesterName}`,
+                    );
+                  } else if (result.status === "rejected") {
+                    await chat.sendMessage(
+                      `❌ *Música rejeitada*\n\n` +
+                        `🎵 ${selectedTrack.name}\n` +
+                        `🎤 ${selectedTrack.artists.map((a) => a.name).join(", ")}\n\n` +
+                        `Não foi adicionada à fila.`,
+                    );
+                  } else {
+                    // Still pending
+                    const stats = result.stats;
+                    const statusText =
+                      `📊 Votação: ${stats.votesFor} ✅ / ${stats.votesAgainst} ❌ ` +
+                      `(necessário: ${stats.needed}/${stats.totalEligible})`;
 
-                      if (!voterResponse.ok) {
-                        return;
-                      }
-
-                      const voterData = await voterResponse.json();
-                      if (!voterData.success) {
-                        return;
-                      }
-
-                      const voterUserId = voterData.user.id;
-
-                      // Cast vote
-                      const voteResponse = await fetch(
-                        `${BACKEND_URL}/api/jam/queue/${queueEntry.id}/vote`,
-                        {
-                          method: "POST",
-                          headers: { "Content-Type": "application/json" },
-                          body: JSON.stringify({ userId: voterUserId, isFor }),
-                        },
-                      );
-
-                      if (!voteResponse.ok) {
-                        return;
-                      }
-
-                      const voteResultData = await voteResponse.json();
-                      if (!voteResultData.success) {
-                        return;
-                      }
-
-                      const result = voteResultData;
-
-                      // Check if approved/rejected
-                      if (result.status === "approved") {
-                        await chat.sendMessage(
-                          `✅ *Música aprovada!*\n\n` +
-                            `🎵 ${selectedTrack.name}\n` +
-                            `🎤 ${selectedTrack.artists.map((a) => a.name).join(", ")}\n\n` +
-                            `Adicionada à fila por ${requesterName}`,
-                        );
-                      } else if (result.status === "rejected") {
-                        await chat.sendMessage(
-                          `❌ *Música rejeitada*\n\n` +
-                            `🎵 ${selectedTrack.name}\n` +
-                            `🎤 ${selectedTrack.artists.map((a) => a.name).join(", ")}\n\n` +
-                            `Não foi adicionada à fila.`,
-                        );
-                      } else {
-                        // Still pending
-                        const stats = result.stats;
-                        const statusText =
-                          `📊 Votação: ${stats.votesFor} ✅ / ${stats.votesAgainst} ❌ ` +
-                          `(necessário: ${stats.needed}/${stats.totalEligible})`;
-
-                        // Send status update (throttled to avoid spam)
-                        if (stats.votesFor + stats.votesAgainst <= 2) {
-                          await chat.sendMessage(statusText);
-                        }
-                      }
-                    } catch (err) {
-                      logger.error(
-                        "[AdicionarCommand] Error processing vote:",
-                        err,
-                      );
+                    // Send status update (throttled to avoid spam)
+                    if (stats.votesFor + stats.votesAgainst <= 2) {
+                      await chat.sendMessage(statusText);
                     }
-                  },
-                },
-              );
-            } catch (err) {
-              logger.error("[AdicionarCommand] Error adding track:", err);
-              await chat.sendMessage(
-                "❌ Erro ao adicionar música. Tente novamente em alguns instantes.",
-              );
-            }
+                  }
+                } catch (err) {
+                  logger.error("[AdicionarCommand] Error processing vote:", err);
+                }
+              },
+            },
+          );
+        } catch (err) {
+          logger.error("[AdicionarCommand] Error adding track:", err);
+          await chat.sendMessage(
+            "❌ Erro ao adicionar música. Tente novamente em alguns instantes.",
+          );
+        }
+      };
+
+      // Helper function to create track selection poll with pagination
+      const createTrackSelectionPoll = async (
+        allTracks,
+        page = 0,
+        isPlaylistOrAlbum = false,
+      ) => {
+        const TRACKS_PER_PAGE = 5;
+        const startIndex = page * TRACKS_PER_PAGE;
+        const endIndex = startIndex + TRACKS_PER_PAGE;
+        const pageTracks = allTracks.slice(startIndex, endIndex);
+        const hasNextPage = endIndex < allTracks.length;
+
+        const pollOptions = [];
+
+        // Option 1: Add all tracks (only for playlist/album)
+        if (isPlaylistOrAlbum) {
+          const collectionType = playlistId ? "playlist" : "álbum";
+          pollOptions.push(`➕ Adicionar ${collectionType} completo (${allTracks.length} músicas)`);
+        }
+
+        // Options 2-6: Individual tracks
+        pageTracks.forEach((track, index) => {
+          const artists = track.artists.map((a) => a.name).join(", ");
+          const trackNumber = startIndex + index + 1;
+          pollOptions.push(`${trackNumber}. ${track.name} - ${artists}`);
+        });
+
+        // Next page option
+        if (hasNextPage) {
+          pollOptions.push("➡️ Próxima página");
+        }
+
+        // Cancel option
+        pollOptions.push("❌ Cancelar");
+
+        const pollTitle = isPlaylistOrAlbum
+          ? `Músicas ${searchContext} (${startIndex + 1}-${Math.min(endIndex, allTracks.length)}/${allTracks.length})`
+          : `Qual música adicionar?`;
+
+        const poll = await polls.createPoll(
+          client,
+          chatId,
+          pollTitle,
+          pollOptions,
+          {
+            allowMultiple: false,
+            onVote: async (vote) => {
+              try {
+                // Check if voter is the requester
+                if (vote.voter !== whatsappId) {
+                  return;
+                }
+
+                const selectedIndex = vote.selectedIndexes[0];
+                const optionOffset = isPlaylistOrAlbum ? 1 : 0;
+
+                // Check if canceled
+                if (selectedIndex === pollOptions.length - 1) {
+                  await chat.sendMessage("❌ Adição cancelada.");
+                  return;
+                }
+
+                // Check if "Next page" was selected
+                if (hasNextPage && selectedIndex === pollOptions.length - 2) {
+                  await chat.sendMessage(
+                    "📄 Carregando próxima página...",
+                  );
+                  await createTrackSelectionPoll(
+                    allTracks,
+                    page + 1,
+                    isPlaylistOrAlbum,
+                  );
+                  return;
+                }
+
+                // Check if "Add all" was selected
+                if (isPlaylistOrAlbum && selectedIndex === 0) {
+                  const collectionType = playlistId ? "playlist" : "álbum";
+                  const requesterName = await resolveUserName(senderNumber, client);
+
+                  // Get all jam participants for voting
+                  const eligibleVoters = [
+                    jam.host.sender_number,
+                    ...jam.listeners.map((l) => l.user.sender_number),
+                  ].map((num) => `${num}@c.us`);
+
+                  // Create mentions for all participants except the requester
+                  const mentions = eligibleVoters.filter(
+                    (voter) => voter !== whatsappId,
+                  );
+
+                  // Build message with mentions
+                  let messageText =
+                    `🎵 *${requesterName}* quer adicionar:\n\n` +
+                    `📀 ${searchContext} completo (${allTracks.length} músicas)\n\n` +
+                    `${requesterName} já votou ✅\n\n` +
+                    `Vote para aprovar ou rejeitar: `;
+
+                  // Add mention tags for participants
+                  for (const mentionId of mentions) {
+                    messageText += `@${mentionId.replace("@c.us", "")} `;
+                  }
+
+                  await chat.sendMessage(messageText, {
+                    mentions: mentions,
+                  });
+
+                  // Create approval poll for entire collection
+                  const collectionVotePoll = await polls.createPoll(
+                    client,
+                    chatId,
+                    `Aprovar ${collectionType} completo?`,
+                    ["✅ Sim", "❌ Não"],
+                    {
+                      allowMultiple: false,
+                      onVote: async (voteData) => {
+                        try {
+                          // Only count votes from jam participants
+                          if (!eligibleVoters.includes(voteData.voter)) {
+                            return;
+                          }
+
+                          const isFor = voteData.selectedIndexes[0] === 0;
+                          const voterNumber = voteData.voter.replace("@c.us", "");
+
+                          // Get voter user ID
+                          const voterResponse = await fetch(
+                            `${BACKEND_URL}/api/users/by-sender-number/${voterNumber}`,
+                          );
+
+                          if (!voterResponse.ok) {
+                            return;
+                          }
+
+                          const voterUserData = await voterResponse.json();
+                          if (!voterUserData.success) {
+                            return;
+                          }
+
+                          const voterUserId = voterUserData.user.id;
+
+                          // Initialize votes if not exists
+                          if (!collectionVotePoll.votes) {
+                            collectionVotePoll.votes = { for: [], against: [] };
+                            
+                            // Automatically vote YES for requester
+                            collectionVotePoll.votes.for.push(userId);
+                            
+                            logger.info(
+                              `[AdicionarCommand] Auto-voted YES for collection requester: ${userId}`,
+                            );
+                          }
+
+                          // Remove previous vote from this voter
+                          collectionVotePoll.votes.for = collectionVotePoll.votes.for.filter(
+                            (v) => v !== voterUserId,
+                          );
+                          collectionVotePoll.votes.against = collectionVotePoll.votes.against.filter(
+                            (v) => v !== voterUserId,
+                          );
+
+                          // Add new vote
+                          if (isFor) {
+                            collectionVotePoll.votes.for.push(voterUserId);
+                          } else {
+                            collectionVotePoll.votes.against.push(voterUserId);
+                          }
+
+                          const votesFor = collectionVotePoll.votes.for.length;
+                          const votesAgainst = collectionVotePoll.votes.against.length;
+                          const totalVotes = votesFor + votesAgainst;
+                          const totalEligible = eligibleVoters.length;
+                          const needed = Math.ceil(totalEligible / 2);
+
+                          logger.info(
+                            `[AdicionarCommand] Collection vote: ${votesFor}/${totalEligible} (needed: ${needed})`,
+                          );
+
+                          // Check if approved (majority)
+                          if (votesFor >= needed) {
+                            await chat.sendMessage(
+                              `✅ *${collectionType.charAt(0).toUpperCase() + collectionType.slice(1)} aprovado!*\n\n` +
+                              `📀 Adicionando ${allTracks.length} músicas à fila...\n` +
+                              `⏳ Isso pode levar alguns instantes.`,
+                            );
+
+                            let addedCount = 0;
+                            let failedCount = 0;
+
+                            // Add all tracks directly to queue (no individual voting)
+                            for (const track of allTracks) {
+                              try {
+                                const trackData = {
+                                  trackUri: track.uri,
+                                  trackId: track.id,
+                                  trackName: track.name,
+                                  trackArtists: track.artists.map((a) => a.name).join(", "),
+                                  trackAlbum: track.album.name,
+                                  trackImage: track.album.images[0]?.url || null,
+                                };
+
+                                const addResponse = await fetch(
+                                  `${BACKEND_URL}/api/jam/${jam.id}/queue`,
+                                  {
+                                    method: "POST",
+                                    headers: { "Content-Type": "application/json" },
+                                    body: JSON.stringify({ 
+                                      userId, 
+                                      trackData,
+                                      skipVoting: true // Skip individual voting since collection was approved
+                                    }),
+                                  },
+                                );
+
+                                if (addResponse.ok) {
+                                  const addData = await addResponse.json();
+                                  if (addData.success) {
+                                    addedCount++;
+                                  } else {
+                                    failedCount++;
+                                  }
+                                } else {
+                                  failedCount++;
+                                }
+
+                                // Progress update every 10 tracks
+                                if (addedCount % 10 === 0 && addedCount < allTracks.length) {
+                                  await chat.sendMessage(
+                                    `⏳ Progresso: ${addedCount}/${allTracks.length} músicas adicionadas...`,
+                                  );
+                                }
+
+                                // Small delay to avoid overwhelming the system
+                                await new Promise(resolve => setTimeout(resolve, 300));
+                              } catch (err) {
+                                logger.error(`[AdicionarCommand] Failed to add track: ${track.name}`, err);
+                                failedCount++;
+                              }
+                            }
+
+                            const summaryMsg = failedCount > 0
+                              ? `✅ ${addedCount} músicas adicionadas à fila!\n⚠️ ${failedCount} falharam.`
+                              : `✅ Todas as ${addedCount} músicas foram adicionadas à fila por ${requesterName}!`;
+
+                            await chat.sendMessage(summaryMsg);
+                          } else if (votesAgainst >= needed) {
+                            // Rejected
+                            await chat.sendMessage(
+                              `❌ *${collectionType.charAt(0).toUpperCase() + collectionType.slice(1)} rejeitado*\n\n` +
+                              `📀 ${searchContext}\n\n` +
+                              `Não foi adicionado à fila.`,
+                            );
+                          } else {
+                            // Still pending
+                            const statusText =
+                              `📊 Votação: ${votesFor} ✅ / ${votesAgainst} ❌ ` +
+                              `(necessário: ${needed}/${totalEligible})`;
+
+                            // Send status update (throttled to avoid spam)
+                            if (totalVotes <= 2) {
+                              await chat.sendMessage(statusText);
+                            }
+                          }
+                        } catch (err) {
+                          logger.error("[AdicionarCommand] Error processing collection vote:", err);
+                        }
+                      },
+                    },
+                  );
+
+                  return;
+                }
+
+                // Individual track selected
+                const trackIndex = isPlaylistOrAlbum
+                  ? startIndex + (selectedIndex - optionOffset)
+                  : selectedIndex;
+
+                const selectedTrack = allTracks[trackIndex];
+
+                if (!selectedTrack) {
+                  await chat.sendMessage("❌ Opção inválida.");
+                  return;
+                }
+
+                await addTrackWithVoting(selectedTrack);
+              } catch (err) {
+                logger.error("[AdicionarCommand] Error in poll vote:", err);
+                await chat.sendMessage("❌ Erro ao processar seleção.");
+              }
+            },
           },
-        },
-      );
+        );
+      };
+
+      // Determine if this is a playlist/album search
+      const isPlaylistOrAlbum = !!(playlistId || albumId);
+
+      // Create initial poll with pagination
+      await createTrackSelectionPoll(tracks, 0, isPlaylistOrAlbum);
     } catch (err) {
       logger.error("[AdicionarCommand] Error:", err);
       return reply(
