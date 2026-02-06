@@ -108,6 +108,13 @@ async function start() {
     // Configure WhatsApp client in poll component for contact resolution
     polls.setWhatsAppClient(client);
 
+    // Register Spotify poll handlers
+    const spotifyPollHandlers = require("../commands/spotify/pollHandlers");
+    spotifyPollHandlers.registerSpotifyPollHandlers(polls, client);
+
+    // Restore callbacks from database after handlers are registered
+    await polls.restoreCallbacksFromDatabase();
+
     client.on("vote_update", async (vote) => {
       try {
         await polls.handleVoteUpdate(vote);

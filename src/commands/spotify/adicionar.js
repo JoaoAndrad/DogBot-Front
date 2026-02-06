@@ -375,83 +375,18 @@ module.exports = {
             ["✅ Sim", "❌ Não"],
             {
               allowMultiple: false,
-              onVote: async (voteData) => {
-                try {
-                  // Only count votes from jam participants
-                  if (!eligibleVoters.includes(voteData.voter)) {
-                    return;
-                  }
-
-                  const isFor = voteData.selectedIndexes[0] === 0;
-                  const voterNumber = voteData.voter.replace("@c.us", "");
-
-                  // Get voter user ID
-                  const voterResponse = await fetch(
-                    `${BACKEND_URL}/api/users/by-sender-number/${voterNumber}`,
-                  );
-
-                  if (!voterResponse.ok) {
-                    return;
-                  }
-
-                  const voterData = await voterResponse.json();
-                  if (!voterData.success) {
-                    return;
-                  }
-
-                  const voterUserId = voterData.user.id;
-
-                  // Cast vote
-                  const voteResponse = await fetch(
-                    `${BACKEND_URL}/api/jam/queue/${queueEntry.id}/vote`,
-                    {
-                      method: "POST",
-                      headers: { "Content-Type": "application/json" },
-                      body: JSON.stringify({ userId: voterUserId, isFor }),
-                    },
-                  );
-
-                  if (!voteResponse.ok) {
-                    return;
-                  }
-
-                  const voteResultData = await voteResponse.json();
-                  if (!voteResultData.success) {
-                    return;
-                  }
-
-                  const result = voteResultData;
-
-                  // Check if approved/rejected
-                  if (result.status === "approved") {
-                    await chat.sendMessage(
-                      `✅ *Música aprovada!*\n\n` +
-                        `🎵 ${selectedTrack.name}\n` +
-                        `🎤 ${selectedTrack.artists.map((a) => a.name).join(", ")}\n\n` +
-                        `Adicionada à fila por ${requesterName}`,
-                    );
-                  } else if (result.status === "rejected") {
-                    await chat.sendMessage(
-                      `❌ *Música rejeitada*\n\n` +
-                        `🎵 ${selectedTrack.name}\n` +
-                        `🎤 ${selectedTrack.artists.map((a) => a.name).join(", ")}\n\n` +
-                        `Não foi adicionada à fila.`,
-                    );
-                  } else {
-                    // Still pending
-                    const stats = result.stats;
-                    const statusText =
-                      `📊 Votação: ${stats.votesFor} ✅ / ${stats.votesAgainst} ❌ ` +
-                      `(necessário: ${stats.needed}/${stats.totalEligible})`;
-
-                    // Send status update (throttled to avoid spam)
-                    if (stats.votesFor + stats.votesAgainst <= 2) {
-                      await chat.sendMessage(statusText);
-                    }
-                  }
-                } catch (err) {
-                  logger.error("[AdicionarCommand] Error processing vote:", err);
-                }
+              voteType: "spotify_track",
+              metadata: {
+                jamId: jam.id,
+                queueEntryId: queueEntry.id,
+                userId,
+                trackData: {
+                  trackName: selectedTrack.name,
+                  trackArtists: selectedTrack.artists.map((a) => a.name).join(", "),
+                },
+                eligibleVoters,
+                whatsappId,
+                requesterName,
               },
             },
           );
@@ -578,157 +513,20 @@ module.exports = {
                     ["✅ Sim", "❌ Não"],
                     {
                       allowMultiple: false,
-                      onVote: async (voteData) => {
-                        try {
-                          // Only count votes from jam participants
-                          if (!eligibleVoters.includes(voteData.voter)) {
-                            return;
-                          }
-
-                          const isFor = voteData.selectedIndexes[0] === 0;
-                          const voterNumber = voteData.voter.replace("@c.us", "");
-
-                          // Get voter user ID
-                          const voterResponse = await fetch(
-                            `${BACKEND_URL}/api/users/by-sender-number/${voterNumber}`,
-                          );
-
-                          if (!voterResponse.ok) {
-                            return;
-                          }
-
-                          const voterUserData = await voterResponse.json();
-                          if (!voterUserData.success) {
-                            return;
-                          }
-
-                          const voterUserId = voterUserData.user.id;
-
-                          // Initialize votes if not exists
-                          if (!collectionVotePoll.votes) {
-                            collectionVotePoll.votes = { for: [], against: [] };
-                            
-                            // Automatically vote YES for requester
-                            collectionVotePoll.votes.for.push(userId);
-                            
-                            logger.info(
-                              `[AdicionarCommand] Auto-voted YES for collection requester: ${userId}`,
-                            );
-                          }
-
-                          // Remove previous vote from this voter
-                          collectionVotePoll.votes.for = collectionVotePoll.votes.for.filter(
-                            (v) => v !== voterUserId,
-                          );
-                          collectionVotePoll.votes.against = collectionVotePoll.votes.against.filter(
-                            (v) => v !== voterUserId,
-                          );
-
-                          // Add new vote
-                          if (isFor) {
-                            collectionVotePoll.votes.for.push(voterUserId);
-                          } else {
-                            collectionVotePoll.votes.against.push(voterUserId);
-                          }
-
-                          const votesFor = collectionVotePoll.votes.for.length;
-                          const votesAgainst = collectionVotePoll.votes.against.length;
-                          const totalVotes = votesFor + votesAgainst;
-                          const totalEligible = eligibleVoters.length;
-                          const needed = Math.ceil(totalEligible / 2);
-
-                          logger.info(
-                            `[AdicionarCommand] Collection vote: ${votesFor}/${totalEligible} (needed: ${needed})`,
-                          );
-
-                          // Check if approved (majority)
-                          if (votesFor >= needed) {
-                            await chat.sendMessage(
-                              `✅ *${collectionType.charAt(0).toUpperCase() + collectionType.slice(1)} aprovado!*\n\n` +
-                              `📀 Adicionando ${allTracks.length} músicas à fila...\n` +
-                              `⏳ Isso pode levar alguns instantes.`,
-                            );
-
-                            let addedCount = 0;
-                            let failedCount = 0;
-
-                            // Add all tracks directly to queue (no individual voting)
-                            for (const track of allTracks) {
-                              try {
-                                const trackData = {
-                                  trackUri: track.uri,
-                                  trackId: track.id,
-                                  trackName: track.name,
-                                  trackArtists: track.artists.map((a) => a.name).join(", "),
-                                  trackAlbum: track.album.name,
-                                  trackImage: track.album.images[0]?.url || null,
-                                };
-
-                                const addResponse = await fetch(
-                                  `${BACKEND_URL}/api/jam/${jam.id}/queue`,
-                                  {
-                                    method: "POST",
-                                    headers: { "Content-Type": "application/json" },
-                                    body: JSON.stringify({ 
-                                      userId, 
-                                      trackData,
-                                      skipVoting: true // Skip individual voting since collection was approved
-                                    }),
-                                  },
-                                );
-
-                                if (addResponse.ok) {
-                                  const addData = await addResponse.json();
-                                  if (addData.success) {
-                                    addedCount++;
-                                  } else {
-                                    failedCount++;
-                                  }
-                                } else {
-                                  failedCount++;
-                                }
-
-                                // Progress update every 10 tracks
-                                if (addedCount % 10 === 0 && addedCount < allTracks.length) {
-                                  await chat.sendMessage(
-                                    `⏳ Progresso: ${addedCount}/${allTracks.length} músicas adicionadas...`,
-                                  );
-                                }
-
-                                // Small delay to avoid overwhelming the system
-                                await new Promise(resolve => setTimeout(resolve, 300));
-                              } catch (err) {
-                                logger.error(`[AdicionarCommand] Failed to add track: ${track.name}`, err);
-                                failedCount++;
-                              }
-                            }
-
-                            const summaryMsg = failedCount > 0
-                              ? `✅ ${addedCount} músicas adicionadas à fila!\n⚠️ ${failedCount} falharam.`
-                              : `✅ Todas as ${addedCount} músicas foram adicionadas à fila por ${requesterName}!`;
-
-                            await chat.sendMessage(summaryMsg);
-                          } else if (votesAgainst >= needed) {
-                            // Rejected
-                            await chat.sendMessage(
-                              `❌ *${collectionType.charAt(0).toUpperCase() + collectionType.slice(1)} rejeitado*\n\n` +
-                              `📀 ${searchContext}\n\n` +
-                              `Não foi adicionado à fila.`,
-                            );
-                          } else {
-                            // Still pending
-                            const statusText =
-                              `📊 Votação: ${votesFor} ✅ / ${votesAgainst} ❌ ` +
-                              `(necessário: ${needed}/${totalEligible})`;
-
-                            // Send status update (throttled to avoid spam)
-                            if (totalVotes <= 2) {
-                              await chat.sendMessage(statusText);
-                            }
-                          }
-                        } catch (err) {
-                          logger.error("[AdicionarCommand] Error processing collection vote:", err);
-                        }
+                      voteType: "spotify_collection",
+                      metadata: {
+                        jamId: jam.id,
+                        userId,
+                        allTracks,
+                        collectionType,
+                        searchContext,
+                        eligibleVoters,
+                        whatsappId,
+                        requesterName,
+                        votes: {
+                          for: [userId], // Requester auto-votes YES
+                          against: [],
+                        },
                       },
                     },
                   );

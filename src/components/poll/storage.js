@@ -34,6 +34,7 @@ async function savePoll(msgId, poll) {
     vote_type: poll.voteType || poll.vote_type || null,
     vote_id: poll.voteId || poll.vote_id || null,
     group_id: poll.groupId || poll.group_id || null,
+    metadata: poll.metadata || poll.meta || null,
   };
   try {
     const res = await _fetch(url.resolve(BACKEND_URL, "/api/polls/"), {

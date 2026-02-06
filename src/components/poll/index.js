@@ -13,10 +13,7 @@ const callbacks = new Map();
 let whatsappClient = null;
 
 // Store handlers for different vote types
-const voteHandlers = {
-  add: null,
-  skip: null,
-};
+const voteHandlers = {};
 
 function setWhatsAppClient(client) {
   whatsappClient = client;
@@ -24,9 +21,11 @@ function setWhatsAppClient(client) {
 }
 
 function registerVoteHandler(voteType, handler) {
-  if (voteType === "add" || voteType === "skip") {
+  if (voteType && typeof handler === "function") {
     voteHandlers[voteType] = handler;
     logger.info(`[PollComponent] Vote handler registrado para: ${voteType}`);
+  } else {
+    logger.warn(`[PollComponent] Tentativa de registrar handler inválido: ${voteType}`);
   }
 }
 
@@ -42,22 +41,44 @@ async function restoreCallbacksFromDatabase() {
 
     logger.info(`[PollComponent] Encontradas ${polls.length} polls ativas`);
 
+    let restoredCount = 0;
+
     for (const poll of polls) {
       const msgId = poll.id;
-      const voteType = poll.voteType || poll.vote_type;
-      const voteId = poll.voteId || poll.vote_id;
+      const voteType = poll.vote_type || poll.voteType;
+      const voteId = poll.vote_id || poll.voteId;
 
       // Se houver handler registrado para este tipo, restaura o callback
       if (voteType && voteHandlers[voteType]) {
         callbacks.set(msgId, voteHandlers[voteType]);
+        restoredCount++;
         logger.info(
-          `[PollComponent] Callback restaurado: msgId=${msgId}, voteType=${voteType}, voteId=${voteId}`,
+          `[PollComponent] Callback restaurado: msgId=${msgId}, voteType=${voteType}`,
         );
+      } else if (poll.metadata) {
+        // Try to infer voteType from metadata
+        const metadata = typeof poll.metadata === 'string' 
+          ? JSON.parse(poll.metadata) 
+          : poll.metadata;
+        
+        const inferredType = metadata.queueEntryId 
+          ? "spotify_track" 
+          : metadata.allTracks 
+          ? "spotify_collection" 
+          : null;
+        
+        if (inferredType && voteHandlers[inferredType]) {
+          callbacks.set(msgId, voteHandlers[inferredType]);
+          restoredCount++;
+          logger.info(
+            `[PollComponent] Callback restaurado (inferido): msgId=${msgId}, voteType=${inferredType}`,
+          );
+        }
       }
     }
 
     logger.info(
-      `[PollComponent] Callbacks restaurados: ${callbacks.size} polls ativas`,
+      `[PollComponent] Callbacks restaurados: ${restoredCount}/${polls.length} polls`,
     );
   } catch (err) {
     logger.error(`[PollComponent] Erro ao restaurar callbacks: ${err.message}`);
@@ -148,6 +169,7 @@ async function createPoll(clientOrSender, chatId, title, options, opts = {}) {
     voteType: opts.voteType || null,
     voteId: opts.voteId || null,
     groupId: opts.groupId || null,
+    metadata: opts.metadata || null,
     createdAt: Date.now(),
   };
 
