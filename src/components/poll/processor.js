@@ -164,8 +164,7 @@ async function executeAction(result, client) {
     switch (actionType) {
       case "menu_spotify":
       case "menu":
-        // Menu action: delegate to flow manager
-        // Use userId from metadata (who started the flow), not voterId (who voted)
+        // Menu action: execute directly based on backend decision
         const menuUserId = data.userId || result.voterId;
         
         logger.debug(`[processor] Menu action data:`, {
@@ -178,17 +177,28 @@ async function executeAction(result, client) {
         
         if (handler) {
           logger.info(`[processor] Executing menu handler: ${handler} for user ${menuUserId}`);
+          // Execute handler directly by getting flow from flowManager
           const flowManager = require("../menu/flowManager");
-          await flowManager.handleVote(
-            client,
-            poll.chatId,
-            menuUserId,
-            { flowId: data.flowId, path: data.path },
-            result.selectedIndex,
-          );
+          const flow = flowManager.flows.get(data.flowId);
+          
+          if (flow && flow.handlers && flow.handlers[handler]) {
+            // Execute handler directly with context
+            await flow.handlers[handler]({
+              client,
+              chatId: poll.chatId,
+              userId: menuUserId,
+              flowId: data.flowId,
+              path: data.path,
+              data: data,
+            });
+          } else {
+            logger.warn(`[processor] Handler ${handler} not found in flow ${data.flowId}`);
+          }
         } else if (target) {
-          logger.info(`[processor] Navigating to: ${target}`);
-          // Navigation handled by flow manager
+          logger.info(`[processor] Navigating to: ${target} for user ${menuUserId}`);
+          const flowManager = require("../menu/flowManager");
+          // Navigate to target path by re-rendering
+          await flowManager._renderNode(client, poll.chatId, menuUserId, data.flowId, target);
         }
         break;
 
