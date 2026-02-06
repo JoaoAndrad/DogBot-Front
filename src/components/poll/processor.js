@@ -29,7 +29,11 @@ function registerActionHandler(actionType, handler) {
  */
 async function getPollState(pollId) {
   try {
-    const data = await backendClient.sendToBackend(`/api/polls/${pollId}/state`, null, 'GET');
+    const data = await backendClient.sendToBackend(
+      `/api/polls/${pollId}/state`,
+      null,
+      "GET",
+    );
     return data;
   } catch (error) {
     logger.error(
@@ -150,9 +154,20 @@ async function restoreAllPolls(client) {
     logger.info("[processor] Validating poll recovery from backend...");
 
     // Get all polls from backend (could filter by recent/active later)
-    const polls = await backendClient.sendToBackend("/api/polls/", null, 'GET');
+    const polls = await backendClient.sendToBackend("/api/polls/", null, "GET");
+
+    logger.debug("[processor] Backend response type:", typeof polls);
+    logger.debug("[processor] Is array:", Array.isArray(polls));
+
     if (!Array.isArray(polls)) {
-      logger.error("[processor] Invalid response from backend:", polls);
+      logger.error(
+        "[processor] Invalid response from backend, expected array but got:",
+        typeof polls,
+      );
+      logger.error(
+        "[processor] Response content:",
+        JSON.stringify(polls).substring(0, 200),
+      );
       return;
     }
 
@@ -188,6 +203,8 @@ async function restoreAllPolls(client) {
     );
   } catch (error) {
     logger.error("[processor] Failed to validate polls:", error.message);
+    logger.error("[processor] Stack trace:", error.stack);
+    logger.error("[processor] Full error:", error);
   }
 }
 
