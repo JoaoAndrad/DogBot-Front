@@ -81,7 +81,139 @@ function getActionType(poll) {
 }
 
 /**
- * Process a poll vote - main entry point
+ * Process a poll vote via backend (NEW approach)
+ * Backend interprets metadata and returns action to execute
+ * @param {string} pollId - Poll message ID
+ * @param {Object} vote - Vote event from WhatsApp
+ * @param {Object} client - WhatsApp client instance
+ * @returns {Promise<void>}
+ */
+async function processVoteViaBackend(pollId, vote, client) {
+  try {
+    logger.info(`[processor] Processing vote via backend for poll ${pollId}`);
+
+    // Extract voter ID
+    let voterId =
+      vote.voter ||
+      vote.voterId ||
+      (vote.author && vote.author.id) ||
+      (vote.voter && vote.voter._serialized) ||
+      "unknown";
+
+    // Extract selected index
+    const selectedOptions = vote.selectedOptions || vote.selected || [];
+    let selectedIndex = null;
+
+    if (Array.isArray(selectedOptions) && selectedOptions.length > 0) {
+      const first = selectedOptions[0];
+      if (typeof first === "object") {
+        selectedIndex =
+          first.localId != null ? first.localId : first.local_id || null;
+      } else {
+        selectedIndex = Number(first);
+      }
+    }
+
+    if (selectedIndex === null || selectedIndex === undefined) {
+      logger.warn(`[processor] No selected index found in vote for ${pollId}`);
+      return;
+    }
+
+    // Call backend to process vote
+    const result = await backendClient.sendToBackend(
+      `/api/polls/${pollId}/process-vote`,
+      { voterId, selectedIndex },
+      "POST",
+    );
+
+    logger.info(
+      `[processor] Backend returned action: ${result.action}`,
+      result.handler || result.target || "",
+    );
+
+    // Execute action based on backend response
+    await executeAction(result, client);
+  } catch (error) {
+    logger.error(
+      `[processor] Error processing vote via backend for ${pollId}:`,
+      error.message,
+    );
+  }
+}
+
+/**
+ * Execute action returned by backend
+ * @param {Object} result - Result from backend processVote
+ * @param {Object} client - WhatsApp client instance
+ */
+async function executeAction(result, client) {
+  const { action, actionType, poll, handler, target, data } = result;
+
+  try {
+    // Get chat
+    const chat = await client.getChatById(poll.chatId);
+
+    switch (actionType) {
+      case "menu_spotify":
+      case "menu":
+        // Menu action: delegate to flow manager
+        if (handler) {
+          logger.info(`[processor] Executing menu handler: ${handler}`);
+          const flowManager = require("../menu/flowManager");
+          await flowManager.handleVote(
+            client,
+            poll.chatId,
+            result.voterId,
+            { flowId: data.flowId, path: data.path },
+            result.selectedIndex,
+          );
+        } else if (target) {
+          logger.info(`[processor] Navigating to: ${target}`);
+          // Navigation handled by flow manager
+        }
+        break;
+
+      case "spotify_track":
+        // Use existing Spotify track handler
+        const trackHandler = actionHandlers.get("spotify_track");
+        if (trackHandler) {
+          const { poll: pollData, votes, stats } = await getPollState(
+            result.pollId,
+          );
+          await trackHandler(pollData, votes, stats, client);
+        }
+        break;
+
+      case "spotify_collection":
+        // Use existing Spotify collection handler
+        const collectionHandler = actionHandlers.get("spotify_collection");
+        if (collectionHandler) {
+          const { poll: pollData, votes, stats } = await getPollState(
+            result.pollId,
+          );
+          await collectionHandler(pollData, votes, stats, client);
+        }
+        break;
+
+      case "confession":
+        // Confession approval/rejection
+        logger.info(
+          `[processor] Confession ${data.approved ? "approved" : "rejected"}`,
+        );
+        // TODO: Implement confession handler
+        break;
+
+      default:
+        logger.debug(`[processor] Generic action: ${action}`);
+        break;
+    }
+  } catch (error) {
+    logger.error(`[processor] Error executing action ${action}:`, error);
+  }
+}
+
+/**
+ * Process a poll vote - main entry point (OLD approach - for Spotify polls)
  * @param {string} pollId - Poll message ID
  * @param {Object} client - WhatsApp client instance
  * @returns {Promise<void>}
@@ -213,5 +345,6 @@ module.exports = {
   getPollState,
   getActionType,
   processPollVote,
+  processVoteViaBackend,
   restoreAllPolls,
 };

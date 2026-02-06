@@ -245,18 +245,34 @@ class FlowManager {
       return;
     }
 
-    // Create poll
+    // Create poll with metadata for backend processing
     const polls = require("../poll");
     const optionLabels = node.options.map((o) => o.label);
 
+    // Build metadata with action mapping for each option
+    const options = node.options.map((opt, index) => ({
+      index,
+      label: opt.label,
+      action: opt.action, // 'exec', 'goto', 'back'
+      handler: opt.handler, // handler name if action='exec'
+      target: opt.target, // target path if action='goto'
+      data: opt.data, // additional data for handler
+    }));
+
     await polls.createPoll(client, chatId, node.title, optionLabels, {
-      metadata: { flowId, path },
+      metadata: {
+        actionType: "menu",
+        flowId,
+        path,
+        userId, // Store who started the flow
+        options, // All option configurations
+      },
+      // Keep onVote as fallback for backward compatibility
       onVote: async (voteData) => {
         const voterId = voteData.voter;
         const selectedIndex = voteData.selectedIndexes[0];
 
         // Only handle vote if it's from the user who started the flow
-        // (in groups, ignore votes from other users)
         if (voterId === userId) {
           await this.handleVote(
             client,

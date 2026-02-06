@@ -143,9 +143,9 @@ async function start() {
           if (vote.participant) pollId = `${pollId}_${vote.participant}`;
         }
 
-        // Process the vote using the processor
+        // NEW: Process vote through backend instead of local processor
         if (pollId) {
-          await processor.processPollVote(pollId, client);
+          await processor.processVoteViaBackend(pollId, vote, client);
         }
       } catch (err) {
         logger.error("Erro ao processar vote_update:", err);
