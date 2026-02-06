@@ -113,16 +113,37 @@ async function start() {
     const spotifyPollHandlers = require("../commands/spotify/pollHandlers");
     spotifyPollHandlers.registerSpotifyPollHandlers();
 
-    // Restore all polls from backend using processor
-    await processor.restoreAllPolls(client, polls);
+    // Validate poll recovery capability
+    await processor.restoreAllPolls(client);
 
     client.on("vote_update", async (vote) => {
       try {
         // First, record the vote in backend (handled by poll component)
         await polls.handleVoteUpdate(vote);
 
-        // Then process the vote using the processor
-        const pollId = vote.vote?.parentMessage?.id?._serialized;
+        // Extract poll ID from vote event (same logic as handleVoteUpdate)
+        let pollId = null;
+        if (vote.parentMsgKey && vote.parentMsgKey._serialized) {
+          pollId = vote.parentMsgKey._serialized;
+        } else if (vote.parentMsgKey && vote.parentMsgKey.id) {
+          pollId = vote.parentMsgKey.id;
+        } else if (vote.messageId) {
+          pollId = vote.messageId;
+        } else if (vote.message && vote.message.id) {
+          pollId = vote.message.id;
+        } else if (vote.message && vote.message._serialized) {
+          pollId = vote.message._serialized;
+        } else if (vote && vote._serialized) {
+          pollId = vote._serialized;
+        } else if (vote && vote.key && vote.key._serialized) {
+          pollId = vote.key._serialized;
+        } else if (vote && vote.id && vote.remote) {
+          const fromMeFlag = vote.fromMe ? "true" : "false";
+          pollId = `${fromMeFlag}_${vote.remote}_${vote.id}`;
+          if (vote.participant) pollId = `${pollId}_${vote.participant}`;
+        }
+
+        // Process the vote using the processor
         if (pollId) {
           await processor.processPollVote(pollId, client);
         }

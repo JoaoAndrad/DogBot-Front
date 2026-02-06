@@ -29,8 +29,8 @@ function registerActionHandler(actionType, handler) {
  */
 async function getPollState(pollId) {
   try {
-    const response = await backendClient.get(`/api/polls/${pollId}/state`);
-    return response.data;
+    const data = await backendClient.sendToBackend(`/api/polls/${pollId}/state`, null, 'GET');
+    return data;
   } catch (error) {
     logger.error(
       `[processor] Failed to get poll state for ${pollId}:`,
@@ -139,57 +139,53 @@ async function processGenericVote(poll, votes, stats, client) {
 }
 
 /**
- * Restore all active polls from backend and set up their callbacks
- * Should be called on bot startup
+ * Restore all active polls from backend - validates they can be processed
+ * Should be called on bot startup to verify poll recovery capability
  * @param {Object} client - WhatsApp client instance
- * @param {Object} pollComponent - Poll component with createPoll function
  */
-async function restoreAllPolls(client, pollComponent) {
+async function restoreAllPolls(client) {
   try {
-    logger.info("[processor] Restoring all active polls from backend...");
+    logger.info("[processor] Validating poll recovery from backend...");
 
     // Get all polls from backend (could filter by recent/active later)
-    const response = await backendClient.get("/api/polls/");
-    const polls = response.data || [];
+    const polls = await backendClient.sendToBackend("/api/polls/", null, 'GET');
+    if (!Array.isArray(polls)) {
+      logger.error("[processor] Invalid response from backend:", polls);
+      return;
+    }
 
-    logger.info(`[processor] Found ${polls.length} polls to restore`);
+    logger.info(`[processor] Found ${polls.length} total polls in database`);
 
-    let restored = 0;
+    // Count polls by action type
+    const pollsByType = {};
+    let recoverable = 0;
+
     for (const poll of polls) {
       try {
         const actionType = getActionType(poll);
+        pollsByType[actionType] = (pollsByType[actionType] || 0) + 1;
+
         const handler = actionHandlers.get(actionType);
-
-        if (!handler) {
-          logger.warn(
-            `[processor] Skipping poll ${poll.id} - no handler for ${actionType}`,
-          );
-          continue;
+        if (handler) {
+          recoverable++;
         }
-
-        // Create callback that uses the processor
-        const callback = async (vote) => {
-          await processPollVote(poll.id, client);
-        };
-
-        // Register the callback with poll component
-        pollComponent.createPoll.addCallback(poll.id, callback);
-        restored++;
-
-        logger.info(`[processor] Restored poll ${poll.id} (${actionType})`);
       } catch (err) {
         logger.error(
-          `[processor] Failed to restore poll ${poll.id}:`,
+          `[processor] Failed to check poll ${poll.id}:`,
           err.message,
         );
       }
     }
 
+    logger.info(`[processor] Poll types:`, pollsByType);
     logger.info(
-      `[processor] Successfully restored ${restored}/${polls.length} polls`,
+      `[processor] ${recoverable}/${polls.length} polls have registered handlers`,
+    );
+    logger.info(
+      "[processor] Poll recovery ready - votes will be processed automatically",
     );
   } catch (error) {
-    logger.error("[processor] Failed to restore polls:", error.message);
+    logger.error("[processor] Failed to validate polls:", error.message);
   }
 }
 
