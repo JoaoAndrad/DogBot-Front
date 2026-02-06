@@ -166,7 +166,7 @@ async function executeAction(result, client) {
       case "menu":
         // Menu action: execute directly based on backend decision
         const menuUserId = data.userId || result.voterId;
-        
+
         logger.debug(`[processor] Menu action data:`, {
           flowId: data.flowId,
           path: data.path,
@@ -174,31 +174,56 @@ async function executeAction(result, client) {
           handler,
           target,
         });
-        
+
         if (handler) {
-          logger.info(`[processor] Executing menu handler: ${handler} for user ${menuUserId}`);
+          logger.info(
+            `[processor] Executing menu handler: ${handler} for user ${menuUserId}`,
+          );
           // Execute handler directly by getting flow from flowManager
           const flowManager = require("../menu/flowManager");
           const flow = flowManager.flows.get(data.flowId);
-          
+
           if (flow && flow.handlers && flow.handlers[handler]) {
-            // Execute handler directly with context
-            await flow.handlers[handler]({
-              client,
-              chatId: poll.chatId,
+            // Create context expected by handlers
+            const ctx = {
               userId: menuUserId,
+              chatId: poll.chatId,
+              client,
+              reply: (text) => client.sendMessage(poll.chatId, text),
               flowId: data.flowId,
-              path: data.path,
+              state: null, // State will be fetched by handler if needed
               data: data,
-            });
+            };
+
+            // Execute handler with context
+            const result = await flow.handlers[handler](ctx, data);
+
+            // Check if flow should end
+            if (result && result.end) {
+              const storage = require("../menu/storage");
+              await storage.deleteState(menuUserId, data.flowId);
+              logger.info(
+                `[processor] Flow ${data.flowId} ended for ${menuUserId}`,
+              );
+            }
           } else {
-            logger.warn(`[processor] Handler ${handler} not found in flow ${data.flowId}`);
+            logger.warn(
+              `[processor] Handler ${handler} not found in flow ${data.flowId}`,
+            );
           }
         } else if (target) {
-          logger.info(`[processor] Navigating to: ${target} for user ${menuUserId}`);
+          logger.info(
+            `[processor] Navigating to: ${target} for user ${menuUserId}`,
+          );
           const flowManager = require("../menu/flowManager");
           // Navigate to target path by re-rendering
-          await flowManager._renderNode(client, poll.chatId, menuUserId, data.flowId, target);
+          await flowManager._renderNode(
+            client,
+            poll.chatId,
+            menuUserId,
+            data.flowId,
+            target,
+          );
         }
         break;
 
@@ -206,9 +231,11 @@ async function executeAction(result, client) {
         // Use existing Spotify track handler
         const trackHandler = actionHandlers.get("spotify_track");
         if (trackHandler) {
-          const { poll: pollData, votes, stats } = await getPollState(
-            result.pollId,
-          );
+          const {
+            poll: pollData,
+            votes,
+            stats,
+          } = await getPollState(result.pollId);
           await trackHandler(pollData, votes, stats, client);
         }
         break;
@@ -217,9 +244,11 @@ async function executeAction(result, client) {
         // Use existing Spotify collection handler
         const collectionHandler = actionHandlers.get("spotify_collection");
         if (collectionHandler) {
-          const { poll: pollData, votes, stats } = await getPollState(
-            result.pollId,
-          );
+          const {
+            poll: pollData,
+            votes,
+            stats,
+          } = await getPollState(result.pollId);
           await collectionHandler(pollData, votes, stats, client);
         }
         break;
