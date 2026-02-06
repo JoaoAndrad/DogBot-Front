@@ -149,6 +149,14 @@ async function processVoteViaBackend(pollId, vote, client) {
 async function executeAction(result, client) {
   const { action, actionType, poll, handler, target, data } = result;
 
+  logger.debug(`[processor] executeAction received:`, {
+    action,
+    actionType,
+    handler,
+    target,
+    dataKeys: data ? Object.keys(data) : [],
+  });
+
   try {
     // Get chat
     const chat = await client.getChatById(poll.chatId);
@@ -157,13 +165,24 @@ async function executeAction(result, client) {
       case "menu_spotify":
       case "menu":
         // Menu action: delegate to flow manager
+        // Use userId from metadata (who started the flow), not voterId (who voted)
+        const menuUserId = data.userId || result.voterId;
+        
+        logger.debug(`[processor] Menu action data:`, {
+          flowId: data.flowId,
+          path: data.path,
+          userId: menuUserId,
+          handler,
+          target,
+        });
+        
         if (handler) {
-          logger.info(`[processor] Executing menu handler: ${handler}`);
+          logger.info(`[processor] Executing menu handler: ${handler} for user ${menuUserId}`);
           const flowManager = require("../menu/flowManager");
           await flowManager.handleVote(
             client,
             poll.chatId,
-            result.voterId,
+            menuUserId,
             { flowId: data.flowId, path: data.path },
             result.selectedIndex,
           );
