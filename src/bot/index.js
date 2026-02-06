@@ -104,20 +104,28 @@ async function start() {
   // listen for poll votes (vote_update) and dispatch to polls handler
   try {
     const polls = require("../components/poll");
+    const processor = require("../components/poll/processor");
 
     // Configure WhatsApp client in poll component for contact resolution
     polls.setWhatsAppClient(client);
 
-    // Register Spotify poll handlers
+    // Register Spotify poll handlers with processor
     const spotifyPollHandlers = require("../commands/spotify/pollHandlers");
-    spotifyPollHandlers.registerSpotifyPollHandlers(polls, client);
+    spotifyPollHandlers.registerSpotifyPollHandlers();
 
-    // Restore callbacks from database after handlers are registered
-    await polls.restoreCallbacksFromDatabase();
+    // Restore all polls from backend using processor
+    await processor.restoreAllPolls(client, polls);
 
     client.on("vote_update", async (vote) => {
       try {
+        // First, record the vote in backend (handled by poll component)
         await polls.handleVoteUpdate(vote);
+
+        // Then process the vote using the processor
+        const pollId = vote.vote?.parentMessage?.id?._serialized;
+        if (pollId) {
+          await processor.processPollVote(pollId, client);
+        }
       } catch (err) {
         logger.error("Erro ao processar vote_update:", err);
       }

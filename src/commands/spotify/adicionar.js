@@ -81,9 +81,7 @@ async function getPlaylistTracks(playlistId) {
  */
 async function getAlbumTracks(albumId) {
   try {
-    const response = await fetch(
-      `${BACKEND_URL}/api/spotify/album/${albumId}`,
-    );
+    const response = await fetch(`${BACKEND_URL}/api/spotify/album/${albumId}`);
 
     if (!response.ok) {
       return { success: false, error: "FETCH_FAILED" };
@@ -329,14 +327,11 @@ module.exports = {
 
           // Automatically cast YES vote from requester
           try {
-            await fetch(
-              `${BACKEND_URL}/api/jam/queue/${queueEntry.id}/vote`,
-              {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ userId, isFor: true }),
-              },
-            );
+            await fetch(`${BACKEND_URL}/api/jam/queue/${queueEntry.id}/vote`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ userId, isFor: true }),
+            });
             logger.info(
               `[AdicionarCommand] Auto-voted YES for requester: ${userId}`,
             );
@@ -377,12 +372,15 @@ module.exports = {
               allowMultiple: false,
               voteType: "spotify_track",
               metadata: {
+                actionType: "spotify_track",
                 jamId: jam.id,
                 queueEntryId: queueEntry.id,
                 userId,
                 trackData: {
                   trackName: selectedTrack.name,
-                  trackArtists: selectedTrack.artists.map((a) => a.name).join(", "),
+                  trackArtists: selectedTrack.artists
+                    .map((a) => a.name)
+                    .join(", "),
                 },
                 eligibleVoters,
                 whatsappId,
@@ -415,7 +413,9 @@ module.exports = {
         // Option 1: Add all tracks (only for playlist/album)
         if (isPlaylistOrAlbum) {
           const collectionType = playlistId ? "playlist" : "álbum";
-          pollOptions.push(`➕ Adicionar ${collectionType} completo (${allTracks.length} músicas)`);
+          pollOptions.push(
+            `➕ Adicionar ${collectionType} completo (${allTracks.length} músicas)`,
+          );
         }
 
         // Options 2-6: Individual tracks
@@ -462,9 +462,7 @@ module.exports = {
 
                 // Check if "Next page" was selected
                 if (hasNextPage && selectedIndex === pollOptions.length - 2) {
-                  await chat.sendMessage(
-                    "📄 Carregando próxima página...",
-                  );
+                  await chat.sendMessage("📄 Carregando próxima página...");
                   await createTrackSelectionPoll(
                     allTracks,
                     page + 1,
@@ -476,7 +474,10 @@ module.exports = {
                 // Check if "Add all" was selected
                 if (isPlaylistOrAlbum && selectedIndex === 0) {
                   const collectionType = playlistId ? "playlist" : "álbum";
-                  const requesterName = await resolveUserName(senderNumber, client);
+                  const requesterName = await resolveUserName(
+                    senderNumber,
+                    client,
+                  );
 
                   // Get all jam participants for voting
                   const eligibleVoters = [
@@ -515,6 +516,7 @@ module.exports = {
                       allowMultiple: false,
                       voteType: "spotify_collection",
                       metadata: {
+                        actionType: "spotify_collection",
                         jamId: jam.id,
                         userId,
                         allTracks,
