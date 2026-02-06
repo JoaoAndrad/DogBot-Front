@@ -102,10 +102,11 @@ async function processPollVote(pollId, client) {
     const handler = actionHandlers.get(actionType);
 
     if (!handler) {
-      logger.warn(
-        `[processor] No handler registered for actionType: ${actionType}`,
+      // Generic votes and menu polls don't need special processing
+      // They use the callback system instead
+      logger.debug(
+        `[processor] No handler for ${actionType} - using generic processor`,
       );
-      // Use generic fallback handler
       await processGenericVote(poll, votes, stats, client);
       return;
     }
@@ -126,16 +127,17 @@ async function processPollVote(pollId, client) {
 
 /**
  * Generic vote processor (fallback for unknown action types)
- * Logs vote results but doesn't perform any specific action
+ * Used for menu polls and other polls managed by callback system
  */
 async function processGenericVote(poll, votes, stats, client) {
-  logger.info(`[processor] Generic vote processing for poll ${poll.id}`);
-  logger.info(`[processor] Title: ${poll.title}`);
-  logger.info(`[processor] Total votes: ${stats.total}`);
-  logger.info(`[processor] Votes by option:`, stats.byOption);
+  logger.debug(`[processor] Generic vote for poll ${poll.id} - ${poll.title}`);
+  logger.debug(
+    `[processor] ${stats.total} votes, distribution:`,
+    stats.byOption,
+  );
 
-  // For generic polls, just log the results
-  // Custom handlers should be registered for polls that need specific actions
+  // Generic polls are handled by the callback system
+  // No additional processing needed here
 }
 
 /**
