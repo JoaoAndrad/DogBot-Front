@@ -182,15 +182,15 @@ module.exports = {
         const isG = !!c.isGroup || String(chatId).endsWith("@g.us");
         if (!isG) continue;
 
-        // try to get participants from chat object; if missing, fetch via getChatById
-        let participants = c.participants;
-        if (!Array.isArray(participants)) {
-          try {
-            const full = await client.getChatById(chatId);
-            participants = full && full.participants ? full.participants : [];
-          } catch (e) {
-            participants = [];
-          }
+        // Always fetch fresh participants via getChatById to ensure up-to-date member list
+        // (cache from getChats() may be stale if users left/joined recently)
+        let participants = [];
+        try {
+          const full = await client.getChatById(chatId);
+          participants = full && full.participants ? full.participants : [];
+        } catch (e) {
+          // If getChatById fails, fallback to cached participants
+          participants = Array.isArray(c.participants) ? c.participants : [];
         }
 
         if (!Array.isArray(participants) || participants.length === 0) continue;
