@@ -101,6 +101,40 @@ async function verifyAndCleanGroupChat(client, chat, chatId) {
         }
         return false;
       }
+
+      // Check if group has only bot alone or bot + 1 person (leave these groups)
+      const participantCount = participantIds.length;
+      if (participantCount <= 2) {
+        const groupName =
+          (freshChat && freshChat.name) || chat.name || chatId.split("@")[0];
+        logger.info(
+          `[ChatCleaner] 👋 Saindo do grupo (${participantCount} participante${participantCount > 1 ? "s" : ""}): ${groupName} (${chatId})`,
+        );
+
+        // Leave the group first
+        try {
+          if (freshChat && typeof freshChat.leave === "function") {
+            await freshChat.leave();
+            logger.info(`[ChatCleaner] ✅ Saiu do grupo: ${groupName}`);
+          }
+        } catch (leaveError) {
+          logger.warn(
+            `[ChatCleaner] ⚠️  Não foi possível sair do grupo ${groupName}:`,
+            leaveError.message,
+          );
+        }
+
+        // Then delete the chat
+        const deleted = await archiveInactiveChat(
+          chat,
+          chatId,
+          `group with only ${participantCount} participant(s)`,
+        );
+        if (deleted) {
+          logger.info(`[ChatCleaner] 🗑️  Chat excluído: ${groupName}`);
+        }
+        return false;
+      }
     }
 
     return true; // Bot is still in group

@@ -288,13 +288,49 @@ module.exports = {
           continue;
         }
 
+        // Check if group has only bot alone or bot + 1 person (leave these groups)
+        const participantCount = memberIds.length;
+        if (participantCount <= 2) {
+          botNotInGroupCount++;
+          const groupName =
+            (full && full.name) || c.name || chatId.split("@")[0];
+          console.log(
+            `[confissao] 👋 Saindo do grupo (${participantCount} participante${participantCount > 1 ? "s" : ""}): ${groupName} (${chatId})`,
+          );
+
+          // Leave the group first
+          try {
+            if (full && typeof full.leave === "function") {
+              await full.leave();
+              console.log(`[confissao] ✅ Saiu do grupo: ${groupName}`);
+            }
+          } catch (leaveError) {
+            console.log(
+              `[confissao] ⚠️  Não foi possível sair do grupo ${groupName}:`,
+              leaveError.message,
+            );
+          }
+
+          // Then delete the chat
+          const deleted = await chatCleaner.archiveInactiveChat(
+            c,
+            chatId,
+            `group with only ${participantCount} participant(s)`,
+          );
+          if (deleted) {
+            chatsDeleted++;
+            console.log(`[confissao] 🗑️  Chat excluído: ${groupName}`);
+          }
+          continue;
+        }
+
         if (memberIds.includes(senderNumber)) {
           // Get readable name from fresh data
           const name = (full && full.name) || chatId.split("@")[0];
           candidateGroups.push({ id: chatId, name });
         }
 
-        // Add to bot's active groups list
+        // Add to bot's active groups list (only if passed all checks above)
         botActiveGroupsList.push({
           name: (full && full.name) || chatId.split("@")[0],
           id: chatId,
@@ -303,16 +339,6 @@ module.exports = {
       } catch (e) {
         // ignore per-chat errors
       }
-
-      // List all active groups
-      if (botActiveGroupsList.length > 0) {
-        console.log(`[confissao] 📋 Lista de grupos ativos:`);
-        botActiveGroupsList.forEach((group, index) => {
-          console.log(
-            `[confissao]    ${index + 1}. ${group.name} (${group.participantCount} participantes)`,
-          );
-        });
-      }
     }
 
     const botActiveGroups = totalGroups - botNotInGroupCount;
@@ -320,6 +346,17 @@ module.exports = {
     console.log(
       `[confissao] 🤖 Grupos onde o bot está ativo: ${botActiveGroups}`,
     );
+
+    // List all active groups
+    if (botActiveGroupsList.length > 0) {
+      console.log(`[confissao] 📋 Lista de grupos ativos:`);
+      botActiveGroupsList.forEach((group, index) => {
+        console.log(
+          `[confissao]    ${index + 1}. ${group.name} (${group.participantCount} participantes)`,
+        );
+      });
+    }
+
     console.log(
       `[confissao] ✅ Grupos que o usuário está: ${candidateGroups.length}`,
     );
