@@ -175,6 +175,7 @@ module.exports = {
       return;
     }
 
+    const chatCleaner = require("../../utils/chatCleaner");
     const candidateGroups = [];
     for (const c of chats) {
       try {
@@ -193,16 +194,21 @@ module.exports = {
           participants = full && full.participants ? full.participants : [];
         } catch (e) {
           // getChatById failed: group doesn't exist or bot is not a member anymore
-          // Skip this group entirely (don't use cached data)
-          console.log(
-            `[confissao] Skipping group ${chatId}: bot not in group or group doesn't exist`,
+          // Delete this chat to prevent it from appearing in future scans
+          await chatCleaner.archiveInactiveChat(
+            c,
+            chatId,
+            "bot removed from group or group deleted",
           );
           continue;
         }
 
         if (!Array.isArray(participants) || participants.length === 0) {
-          console.log(
-            `[confissao] Skipping group ${chatId}: no participants found`,
+          // Delete chat since it has no participants
+          await chatCleaner.archiveInactiveChat(
+            c,
+            chatId,
+            "no participants found",
           );
           continue;
         }

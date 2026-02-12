@@ -1,6 +1,7 @@
 const logger = require("../utils/logger");
 const storage = require("./storage");
 const pipeline = require("./pipeline");
+const chatCleaner = require("../utils/chatCleaner");
 const fs = require("fs");
 const path = require("path");
 
@@ -74,6 +75,18 @@ async function runCatchup(client, options = {}) {
         chat.id && chat.id._serialized
           ? chat.id._serialized
           : chat.id || chat.name || "unknown";
+
+      // For group chats, verify bot is still a member before processing
+      const stillInGroup = await chatCleaner.verifyAndCleanGroupChat(
+        client,
+        chat,
+        chatId,
+      );
+
+      if (!stillInGroup) {
+        continue; // Skip this deleted chat
+      }
+
       const lastTs = storage.getLastTs(chatId) || 0;
       // Buscar últimas mensagens (limit)
       const messages = await chat.fetchMessages({
