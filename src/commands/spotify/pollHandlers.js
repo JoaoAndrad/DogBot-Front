@@ -52,19 +52,31 @@ async function handleTrackVote(poll, votes, stats, client) {
     const isFor = selectedIndexes && selectedIndexes.includes(0);
     const voterNumber = voter.replace("@c.us", "");
 
+    // Get chat to send messages (get early for error handling)
+    const chatId = poll.chat_id;
+    const chat = await client.getChatById(chatId);
+
     // Get voter user ID
     const voterResponse = await fetch(
       `${BACKEND_URL}/api/users/by-sender-number/${voterNumber}`,
     );
 
     if (!voterResponse.ok) {
-      logger.error("[PollHandlers] Failed to get voter user");
+      logger.error(
+        `[PollHandlers] Failed to get voter user: ${voterResponse.status}`,
+      );
+      await chat.sendMessage(
+        `⚠️ Erro ao identificar votante. Certifique-se de estar cadastrado.`,
+      );
       return;
     }
 
     const voterData = await voterResponse.json();
     if (!voterData.success) {
       logger.error("[PollHandlers] Voter data not found");
+      await chat.sendMessage(
+        `⚠️ Usuário não cadastrado. Use /cadastro primeiro.`,
+      );
       return;
     }
 
@@ -81,29 +93,33 @@ async function handleTrackVote(poll, votes, stats, client) {
     );
 
     if (!voteResponse.ok) {
-      logger.error("[PollHandlers] Failed to cast vote");
+      const errorText = await voteResponse.text().catch(() => "Unknown error");
+      logger.error(
+        `[PollHandlers] Failed to cast vote: ${voteResponse.status} - ${errorText}`,
+      );
+      await chat.sendMessage(`⚠️ Erro ao processar voto. Tente novamente.`);
       return;
     }
 
     const voteResultData = await voteResponse.json();
     if (!voteResultData.success) {
-      logger.error("[PollHandlers] Vote result not successful");
+      logger.error(
+        "[PollHandlers] Vote result not successful:",
+        voteResultData,
+      );
+      await chat.sendMessage(`⚠️ Erro ao processar voto. Tente novamente.`);
       return;
     }
 
     const result = voteResultData;
 
-    // Get chat to send messages
-    const chatId = poll.chat_id;
-    const chat = await client.getChatById(chatId);
-
     // Check if approved/rejected
     if (result.status === "approved") {
       await chat.sendMessage(
-        `✅ *Música aprovada!*\n\n` +
+        `✅ *Música aprovada e adicionada à fila!*\n\n` +
           `🎵 ${trackData.trackName}\n` +
           `🎤 ${trackData.trackArtists}\n\n` +
-          `Adicionada à fila por ${requesterName}`,
+          `Solicitada por ${requesterName}`,
       );
     } else if (result.status === "rejected") {
       await chat.sendMessage(
@@ -126,6 +142,20 @@ async function handleTrackVote(poll, votes, stats, client) {
     }
   } catch (err) {
     logger.error("[PollHandlers] Error processing track vote:", err);
+    try {
+      const chatId = poll?.chat_id;
+      if (chatId && client) {
+        const chat = await client.getChatById(chatId);
+        await chat.sendMessage(
+          `⚠️ Erro inesperado ao processar votação. Tente novamente.`,
+        );
+      }
+    } catch (notifyError) {
+      logger.error(
+        "[PollHandlers] Failed to send error notification:",
+        notifyError,
+      );
+    }
   }
 }
 
@@ -190,13 +220,21 @@ async function handleCollectionVote(poll, votes, stats, client) {
     );
 
     if (!voterResponse.ok) {
-      logger.error("[PollHandlers] Failed to get voter user");
+      logger.error(
+        `[PollHandlers] Failed to get voter user for collection: ${voterResponse.status}`,
+      );
+      await chat.sendMessage(
+        `⚠️ Erro ao identificar votante. Certifique-se de estar cadastrado.`,
+      );
       return;
     }
 
     const voterUserData = await voterResponse.json();
     if (!voterUserData.success) {
-      logger.error("[PollHandlers] Voter data not found");
+      logger.error("[PollHandlers] Voter user data not found for collection");
+      await chat.sendMessage(
+        `⚠️ Usuário não cadastrado. Use /cadastro primeiro.`,
+      );
       return;
     }
 
@@ -332,6 +370,20 @@ async function handleCollectionVote(poll, votes, stats, client) {
     }
   } catch (err) {
     logger.error("[PollHandlers] Error processing collection vote:", err);
+    try {
+      const chatId = poll?.chat_id;
+      if (chatId && client) {
+        const chat = await client.getChatById(chatId);
+        await chat.sendMessage(
+          `⚠️ Erro inesperado ao processar votação de coleção. Tente novamente.`,
+        );
+      }
+    } catch (notifyError) {
+      logger.error(
+        "[PollHandlers] Failed to send error notification:",
+        notifyError,
+      );
+    }
   }
 }
 

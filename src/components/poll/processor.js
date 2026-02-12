@@ -231,12 +231,20 @@ async function executeAction(result, client) {
         // Use existing Spotify track handler
         const trackHandler = actionHandlers.get("spotify_track");
         if (trackHandler) {
-          const {
-            poll: pollData,
-            votes,
-            stats,
-          } = await getPollState(result.pollId);
-          await trackHandler(pollData, votes, stats, client);
+          try {
+            const {
+              poll: pollData,
+              votes,
+              stats,
+            } = await getPollState(result.pollId);
+            await trackHandler(pollData, votes, stats, client);
+          } catch (error) {
+            logger.error(`[processor] Error in spotify_track handler:`, error);
+            const chat = await client.getChatById(poll.chatId);
+            await chat.sendMessage(
+              `⚠️ Erro ao processar votação de música. Tente novamente.`,
+            );
+          }
         }
         break;
 
@@ -244,12 +252,23 @@ async function executeAction(result, client) {
         // Use existing Spotify collection handler
         const collectionHandler = actionHandlers.get("spotify_collection");
         if (collectionHandler) {
-          const {
-            poll: pollData,
-            votes,
-            stats,
-          } = await getPollState(result.pollId);
-          await collectionHandler(pollData, votes, stats, client);
+          try {
+            const {
+              poll: pollData,
+              votes,
+              stats,
+            } = await getPollState(result.pollId);
+            await collectionHandler(pollData, votes, stats, client);
+          } catch (error) {
+            logger.error(
+              `[processor] Error in spotify_collection handler:`,
+              error,
+            );
+            const chat = await client.getChatById(poll.chatId);
+            await chat.sendMessage(
+              `⚠️ Erro ao processar votação de coleção. Tente novamente.`,
+            );
+          }
         }
         break;
 
