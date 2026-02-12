@@ -177,6 +177,7 @@ module.exports = {
 
     const chatCleaner = require("../../utils/chatCleaner");
     const candidateGroups = [];
+    const botActiveGroupsList = []; // Lista de grupos onde o bot está ativo
 
     // Get bot's own ID to verify membership
     let botId = null;
@@ -292,8 +293,25 @@ module.exports = {
           const name = (full && full.name) || chatId.split("@")[0];
           candidateGroups.push({ id: chatId, name });
         }
+
+        // Add to bot's active groups list
+        botActiveGroupsList.push({
+          name: (full && full.name) || chatId.split("@")[0],
+          id: chatId,
+          participantCount: memberIds.length,
+        });
       } catch (e) {
         // ignore per-chat errors
+      }
+
+      // List all active groups
+      if (botActiveGroupsList.length > 0) {
+        console.log(`[confissao] 📋 Lista de grupos ativos:`);
+        botActiveGroupsList.forEach((group, index) => {
+          console.log(
+            `[confissao]    ${index + 1}. ${group.name} (${group.participantCount} participantes)`,
+          );
+        });
       }
     }
 
