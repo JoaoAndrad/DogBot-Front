@@ -47,6 +47,14 @@ async function verifyAndCleanGroupChat(client, chat, chatId) {
   }
 
   try {
+    // Get bot's own ID
+    let botId = null;
+    if (client.info && client.info.wid && client.info.wid._serialized) {
+      botId = client.info.wid._serialized;
+    } else if (client.info && client.info.me && client.info.me._serialized) {
+      botId = client.info.me._serialized;
+    }
+
     // Try to get fresh chat data to verify bot is still in the group
     const freshChat = await client.getChatById(chatId);
 
@@ -69,6 +77,30 @@ async function verifyAndCleanGroupChat(client, chat, chatId) {
         logger.info(`[ChatCleaner] 🗑️  Chat excluído: ${groupName}`);
       }
       return false;
+    }
+
+    // CRITICAL: Check if bot is actually in the participant list
+    if (botId) {
+      const participantIds = freshChat.participants
+        .map((p) => (p && p.id && p.id._serialized) || null)
+        .filter(Boolean);
+
+      if (!participantIds.includes(botId)) {
+        const groupName =
+          (freshChat && freshChat.name) || chat.name || chatId.split("@")[0];
+        logger.info(
+          `[ChatCleaner] ❌ Bot não está mais no grupo (não é participante): ${groupName} (${chatId})`,
+        );
+        const deleted = await archiveInactiveChat(
+          chat,
+          chatId,
+          "bot not in participant list",
+        );
+        if (deleted) {
+          logger.info(`[ChatCleaner] 🗑️  Chat excluído: ${groupName}`);
+        }
+        return false;
+      }
     }
 
     return true; // Bot is still in group

@@ -178,6 +178,19 @@ module.exports = {
     const chatCleaner = require("../../utils/chatCleaner");
     const candidateGroups = [];
 
+    // Get bot's own ID to verify membership
+    let botId = null;
+    try {
+      if (client.info && client.info.wid && client.info.wid._serialized) {
+        botId = client.info.wid._serialized;
+      } else if (client.info && client.info.me && client.info.me._serialized) {
+        botId = client.info.me._serialized;
+      }
+      console.log(`[confissao] 🤖 Bot ID: ${botId}`);
+    } catch (err) {
+      console.log("[confissao] ⚠️  Não foi possível obter ID do bot");
+    }
+
     // Count groups for logging
     const totalGroups = chats.filter(
       (c) =>
@@ -252,6 +265,28 @@ module.exports = {
           .map((p) => (p && p.id && p.id._serialized ? p.id._serialized : null))
           .filter(Boolean);
 
+        // CRITICAL: Verify bot is actually in the group's participant list
+        if (botId && !memberIds.includes(botId)) {
+          botNotInGroupCount++;
+          const groupName =
+            (full && full.name) || c.name || chatId.split("@")[0];
+          console.log(
+            `[confissao] ❌ Bot não está mais no grupo (não é participante): ${groupName} (${chatId})`,
+          );
+
+          // Delete this chat since bot is not a member
+          const deleted = await chatCleaner.archiveInactiveChat(
+            c,
+            chatId,
+            "bot not in participant list",
+          );
+          if (deleted) {
+            chatsDeleted++;
+            console.log(`[confissao] 🗑️  Chat excluído: ${groupName}`);
+          }
+          continue;
+        }
+
         if (memberIds.includes(senderNumber)) {
           // Get readable name from fresh data
           const name = (full && full.name) || chatId.split("@")[0];
@@ -262,6 +297,11 @@ module.exports = {
       }
     }
 
+    const botActiveGroups = totalGroups - botNotInGroupCount;
+
+    console.log(
+      `[confissao] 🤖 Grupos onde o bot está ativo: ${botActiveGroups}`,
+    );
     console.log(
       `[confissao] ✅ Grupos que o usuário está: ${candidateGroups.length}`,
     );
