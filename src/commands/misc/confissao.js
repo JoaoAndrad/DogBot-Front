@@ -177,6 +177,21 @@ module.exports = {
 
     const chatCleaner = require("../../utils/chatCleaner");
     const candidateGroups = [];
+
+    // Count groups for logging
+    const totalGroups = chats.filter(
+      (c) =>
+        !!c.isGroup ||
+        (c.id &&
+          c.id._serialized &&
+          String(c.id._serialized).endsWith("@g.us")),
+    ).length;
+
+    let chatsDeleted = 0;
+    let botNotInGroupCount = 0;
+
+    console.log(`[confissao] 📊 Grupos encontrados: ${totalGroups}`);
+
     for (const c of chats) {
       try {
         const chatId =
@@ -194,22 +209,42 @@ module.exports = {
           participants = full && full.participants ? full.participants : [];
         } catch (e) {
           // getChatById failed: group doesn't exist or bot is not a member anymore
+          botNotInGroupCount++;
+          const groupName = c.name || chatId.split("@")[0];
+          console.log(
+            `[confissao] ❌ Bot não está mais no grupo: ${groupName} (${chatId})`,
+          );
+
           // Delete this chat to prevent it from appearing in future scans
-          await chatCleaner.archiveInactiveChat(
+          const deleted = await chatCleaner.archiveInactiveChat(
             c,
             chatId,
             "bot removed from group or group deleted",
           );
+          if (deleted) {
+            chatsDeleted++;
+            console.log(`[confissao] 🗑️  Chat excluído: ${groupName}`);
+          }
           continue;
         }
 
         if (!Array.isArray(participants) || participants.length === 0) {
+          botNotInGroupCount++;
+          const groupName = c.name || chatId.split("@")[0];
+          console.log(
+            `[confissao] ⚠️  Grupo sem participantes: ${groupName} (${chatId})`,
+          );
+
           // Delete chat since it has no participants
-          await chatCleaner.archiveInactiveChat(
+          const deleted = await chatCleaner.archiveInactiveChat(
             c,
             chatId,
             "no participants found",
           );
+          if (deleted) {
+            chatsDeleted++;
+            console.log(`[confissao] 🗑️  Chat excluído: ${groupName}`);
+          }
           continue;
         }
 
@@ -226,6 +261,14 @@ module.exports = {
         // ignore per-chat errors
       }
     }
+
+    console.log(
+      `[confissao] ✅ Grupos que o usuário está: ${candidateGroups.length}`,
+    );
+    console.log(
+      `[confissao] ❌ Grupos que o bot não está mais: ${botNotInGroupCount}`,
+    );
+    console.log(`[confissao] 🗑️  Chats excluídos: ${chatsDeleted}`);
 
     if (!candidateGroups.length) {
       await reply(
