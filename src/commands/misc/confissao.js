@@ -158,9 +158,11 @@ module.exports = {
     // media helpers (images/videos) — implemented below
 
     // Find groups in common with the user by scanning bot chats and checking membership
+    // Note: getChats() returns cached list of chat IDs, but we ALWAYS use getChatById()
+    // to fetch fresh participant data for each group to avoid stale cache issues
     let chats = [];
     try {
-      // client.getChats may return many chats; filter group chats
+      // Get list of all chats (cached IDs only - we'll refresh data for each group below)
       chats = await client.getChats();
     } catch (err) {
       console.error(
@@ -185,8 +187,9 @@ module.exports = {
         // Always fetch fresh participants via getChatById to ensure up-to-date member list
         // (cache from getChats() may be stale if users left/joined recently)
         let participants = [];
+        let full = null;
         try {
-          const full = await client.getChatById(chatId);
+          full = await client.getChatById(chatId);
           participants = full && full.participants ? full.participants : [];
         } catch (e) {
           // If getChatById fails, fallback to cached participants
@@ -200,9 +203,12 @@ module.exports = {
           .filter(Boolean);
 
         if (memberIds.includes(senderNumber)) {
-          // get readable name
+          // Get readable name from fresh data (full), fallback to cache only if needed
           const name =
-            c.name || (c.contact && c.contact.name) || chatId.split("@")[0];
+            (full && full.name) ||
+            c.name ||
+            (c.contact && c.contact.name) ||
+            chatId.split("@")[0];
           candidateGroups.push({ id: chatId, name });
         }
       } catch (e) {
@@ -431,12 +437,13 @@ module.exports = {
           if (!targetGroup) {
             await reply("Nenhum grupo selecionado. Enviando sem menções.");
           } else {
-            // get participants from group
+            // Get fresh participants from group (never use cached data)
             let fullChat = null;
             try {
               fullChat = await client.getChatById(targetGroup.id);
             } catch (e) {
               try {
+                // Retry once on failure
                 fullChat = await client.getChatById(targetGroup.id);
               } catch (ee) {
                 fullChat = null;
