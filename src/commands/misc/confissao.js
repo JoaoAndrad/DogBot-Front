@@ -184,31 +184,36 @@ module.exports = {
         const isG = !!c.isGroup || String(chatId).endsWith("@g.us");
         if (!isG) continue;
 
-        // Always fetch fresh participants via getChatById to ensure up-to-date member list
-        // (cache from getChats() may be stale if users left/joined recently)
+        // Always fetch fresh data via getChatById to verify bot is still in the group
+        // If this fails, the group no longer exists or bot was removed - skip it entirely
         let participants = [];
         let full = null;
         try {
           full = await client.getChatById(chatId);
           participants = full && full.participants ? full.participants : [];
         } catch (e) {
-          // If getChatById fails, fallback to cached participants
-          participants = Array.isArray(c.participants) ? c.participants : [];
+          // getChatById failed: group doesn't exist or bot is not a member anymore
+          // Skip this group entirely (don't use cached data)
+          console.log(
+            `[confissao] Skipping group ${chatId}: bot not in group or group doesn't exist`,
+          );
+          continue;
         }
 
-        if (!Array.isArray(participants) || participants.length === 0) continue;
+        if (!Array.isArray(participants) || participants.length === 0) {
+          console.log(
+            `[confissao] Skipping group ${chatId}: no participants found`,
+          );
+          continue;
+        }
 
         const memberIds = participants
           .map((p) => (p && p.id && p.id._serialized ? p.id._serialized : null))
           .filter(Boolean);
 
         if (memberIds.includes(senderNumber)) {
-          // Get readable name from fresh data (full), fallback to cache only if needed
-          const name =
-            (full && full.name) ||
-            c.name ||
-            (c.contact && c.contact.name) ||
-            chatId.split("@")[0];
+          // Get readable name from fresh data
+          const name = (full && full.name) || chatId.split("@")[0];
           candidateGroups.push({ id: chatId, name });
         }
       } catch (e) {
