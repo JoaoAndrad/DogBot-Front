@@ -4,6 +4,93 @@
  */
 
 const logger = require("./logger");
+const fs = require("fs");
+const path = require("path");
+
+// Cache file to store ignored chats (to avoid re-processing on every restart)
+const IGNORED_CHATS_FILE = path.join(
+  __dirname,
+  "../../data/ignored_chats.json",
+);
+
+// Ensure data directory exists
+const dataDir = path.dirname(IGNORED_CHATS_FILE);
+if (!fs.existsSync(dataDir)) {
+  fs.mkdirSync(dataDir, { recursive: true });
+}
+
+/**
+ * Load ignored chats from cache
+ * @returns {Set<string>} Set of chat IDs to ignore
+ */
+function loadIgnoredChats() {
+  try {
+    if (fs.existsSync(IGNORED_CHATS_FILE)) {
+      const data = fs.readFileSync(IGNORED_CHATS_FILE, "utf8");
+      const parsed = JSON.parse(data);
+      return new Set(parsed.chats || []);
+    }
+  } catch (error) {
+    logger.warn(
+      "[ChatCleaner] ⚠️  Erro ao carregar cache de chats ignorados:",
+      error.message,
+    );
+  }
+  return new Set();
+}
+
+/**
+ * Save ignored chats to cache
+ * @param {Set<string>} ignoredChats - Set of chat IDs to ignore
+ */
+function saveIgnoredChats(ignoredChats) {
+  try {
+    const data = {
+      lastUpdated: new Date().toISOString(),
+      chats: Array.from(ignoredChats),
+    };
+    fs.writeFileSync(IGNORED_CHATS_FILE, JSON.stringify(data, null, 2));
+  } catch (error) {
+    logger.warn(
+      "[ChatCleaner] ⚠️  Erro ao salvar cache de chats ignorados:",
+      error.message,
+    );
+  }
+}
+
+/**
+ * Add chat to ignored list
+ * @param {string} chatId - Chat ID to ignore
+ */
+function addToIgnoredChats(chatId) {
+  const ignoredChats = loadIgnoredChats();
+  ignoredChats.add(chatId);
+  saveIgnoredChats(ignoredChats);
+}
+
+/**
+ * Remove chat from ignored list (use when bot is re-added to a group)
+ * @param {string} chatId - Chat ID to remove from ignore list
+ */
+function removeFromIgnoredChats(chatId) {
+  const ignoredChats = loadIgnoredChats();
+  ignoredChats.delete(chatId);
+  saveIgnoredChats(ignoredChats);
+}
+
+/**
+ * Clear all ignored chats (useful for debugging)
+ */
+function clearIgnoredChats() {
+  try {
+    if (fs.existsSync(IGNORED_CHATS_FILE)) {
+      fs.unlinkSync(IGNORED_CHATS_FILE);
+      logger.info("[ChatCleaner] 🧹 Cache de chats ignorados limpo");
+    }
+  } catch (error) {
+    logger.warn("[ChatCleaner] ⚠️  Erro ao limpar cache:", error.message);
+  }
+}
 
 /**
  * Deletes a chat that the bot is no longer part of
@@ -46,6 +133,13 @@ async function verifyAndCleanGroupChat(client, chat, chatId) {
     return true; // Not a group, no need to verify
   }
 
+  // Check if chat is already in ignored list (to avoid re-processing)
+  const ignoredChats = loadIgnoredChats();
+  if (ignoredChats.has(chatId)) {
+    // Silently skip - already processed in previous run
+    return false;
+  }
+
   try {
     // Get bot's own ID
     let botId = null;
@@ -76,6 +170,7 @@ async function verifyAndCleanGroupChat(client, chat, chatId) {
       if (deleted) {
         logger.info(`[ChatCleaner] 🗑️  Chat excluído: ${groupName}`);
       }
+      addToIgnoredChats(chatId); // Add to ignored list
       return false;
     }
 
@@ -99,6 +194,7 @@ async function verifyAndCleanGroupChat(client, chat, chatId) {
         if (deleted) {
           logger.info(`[ChatCleaner] 🗑️  Chat excluído: ${groupName}`);
         }
+        addToIgnoredChats(chatId); // Add to ignored list
         return false;
       }
 
@@ -133,6 +229,7 @@ async function verifyAndCleanGroupChat(client, chat, chatId) {
         if (deleted) {
           logger.info(`[ChatCleaner] 🗑️  Chat excluído: ${groupName}`);
         }
+        addToIgnoredChats(chatId); // Add to ignored list
         return false;
       }
     }
@@ -152,6 +249,7 @@ async function verifyAndCleanGroupChat(client, chat, chatId) {
     if (deleted) {
       logger.info(`[ChatCleaner] 🗑️  Chat excluído: ${groupName}`);
     }
+    addToIgnoredChats(chatId); // Add to ignored list
     return false;
   }
 }
@@ -159,10 +257,10 @@ async function verifyAndCleanGroupChat(client, chat, chatId) {
 /**
  * Clean all inactive group chats from client's chat list
  * @param {Object} client - WhatsApp client instance
- * @returns {Promise<{total: number, deleted: number}>} Cleanup statistics
+ * @returns {Promise<{total: number, deleted: number, ignored: number}>} Cleanup statistics
  */
 async function cleanAllInactiveChats(client) {
-  const stats = { total: 0, deleted: 0 };
+  const stats = { total: 0, deleted: 0, ignored: 0 };
 
   try {
     const chats = await client.getChats();
@@ -176,6 +274,14 @@ async function cleanAllInactiveChats(client) {
 
     stats.total = groups.length;
 
+    const ignoredChats = loadIgnoredChats();
+
+    if (ignoredChats.size > 0) {
+      logger.info(
+        `[ChatCleaner] 💤 ${ignoredChats.size} chats já estão sendo ignorados (cache)`,
+      );
+    }
+
     logger.info(`[ChatCleaner] 📊 Iniciando limpeza de ${stats.total} grupos`);
 
     for (const chat of groups) {
@@ -186,6 +292,12 @@ async function cleanAllInactiveChats(client) {
             : chat.id || null;
 
         if (!chatId) continue;
+
+        // Check if already ignored
+        if (ignoredChats.has(chatId)) {
+          stats.ignored++;
+          continue;
+        }
 
         const stillInGroup = await verifyAndCleanGroupChat(
           client,
@@ -202,7 +314,7 @@ async function cleanAllInactiveChats(client) {
     }
 
     logger.info(
-      `[ChatCleaner] ✅ Limpeza concluída: ${stats.deleted} chats excluídos de ${stats.total} grupos`,
+      `[ChatCleaner] ✅ Limpeza concluída: ${stats.deleted} chats excluídos, ${stats.ignored} ignorados, de ${stats.total} grupos`,
     );
   } catch (error) {
     logger.error(`[ChatCleaner] ❌ Erro durante limpeza:`, error);
@@ -215,4 +327,8 @@ module.exports = {
   archiveInactiveChat,
   verifyAndCleanGroupChat,
   cleanAllInactiveChats,
+  loadIgnoredChats,
+  addToIgnoredChats,
+  removeFromIgnoredChats,
+  clearIgnoredChats,
 };

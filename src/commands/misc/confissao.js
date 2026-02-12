@@ -179,6 +179,14 @@ module.exports = {
     const candidateGroups = [];
     const botActiveGroupsList = []; // Lista de grupos onde o bot está ativo
 
+    // Load ignored chats cache
+    const ignoredChats = chatCleaner.loadIgnoredChats();
+    if (ignoredChats.size > 0) {
+      console.log(
+        `[confissao] 💤 ${ignoredChats.size} chats sendo ignorados (cache)`,
+      );
+    }
+
     // Get bot's own ID to verify membership
     let botId = null;
     try {
@@ -214,6 +222,12 @@ module.exports = {
         const isG = !!c.isGroup || String(chatId).endsWith("@g.us");
         if (!isG) continue;
 
+        // Skip if already in ignored list
+        if (ignoredChats.has(chatId)) {
+          botNotInGroupCount++;
+          continue;
+        }
+
         // Always fetch fresh data via getChatById to verify bot is still in the group
         // If this fails, the group no longer exists or bot was removed - skip it entirely
         let participants = [];
@@ -239,6 +253,7 @@ module.exports = {
             chatsDeleted++;
             console.log(`[confissao] 🗑️  Chat excluído: ${groupName}`);
           }
+          chatCleaner.addToIgnoredChats(chatId);
           continue;
         }
 
@@ -259,6 +274,7 @@ module.exports = {
             chatsDeleted++;
             console.log(`[confissao] 🗑️  Chat excluído: ${groupName}`);
           }
+          chatCleaner.addToIgnoredChats(chatId);
           continue;
         }
 
@@ -285,6 +301,7 @@ module.exports = {
             chatsDeleted++;
             console.log(`[confissao] 🗑️  Chat excluído: ${groupName}`);
           }
+          chatCleaner.addToIgnoredChats(chatId);
           continue;
         }
 
@@ -321,6 +338,7 @@ module.exports = {
             chatsDeleted++;
             console.log(`[confissao] 🗑️  Chat excluído: ${groupName}`);
           }
+          chatCleaner.addToIgnoredChats(chatId);
           continue;
         }
 
