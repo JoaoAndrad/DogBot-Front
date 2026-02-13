@@ -1,7 +1,7 @@
 const backendClient = require("../../services/backendClient");
 const { renderCard } = require("../../services/statsCardService");
 const logger = require("../../utils/logger");
-const polls = require("../../../components/poll");
+const polls = require("../../components/poll");
 const fetch = require("node-fetch");
 const path = require("path");
 
