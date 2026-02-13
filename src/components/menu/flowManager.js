@@ -267,22 +267,8 @@ class FlowManager {
         userId, // Store who started the flow
         options, // All option configurations
       },
-      // Keep onVote as fallback for backward compatibility
-      onVote: async (voteData) => {
-        const voterId = voteData.voter;
-        const selectedIndex = voteData.selectedIndexes[0];
-
-        // Only handle vote if it's from the user who started the flow
-        if (voterId === userId) {
-          await this.handleVote(
-            client,
-            chatId,
-            voterId,
-            { flowId, path },
-            selectedIndex
-          );
-        }
-      },
+      // Vote handling is done only via backend (processVoteViaBackend) to avoid
+      // processing the same vote twice (callback + backend both calling _renderNode).
     });
   }
 
