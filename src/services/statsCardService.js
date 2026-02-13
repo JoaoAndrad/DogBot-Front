@@ -19,6 +19,38 @@ Handlebars.registerHelper("indexPlusOne", function (index) {
   return (parseInt(index, 10) || 0) + 1;
 });
 
+// Register helper for greater than comparison
+Handlebars.registerHelper("gt", function (a, b) {
+  return a > b;
+});
+
+// Register helper to format period with proper preposition
+Handlebars.registerHelper("formatPeriod", function (period) {
+  if (!period) return "no período";
+  const p = String(period).toLowerCase();
+  
+  // Check for month names or "esse mês"
+  const months = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 
+                  'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
+  const hasMonth = months.some(m => p.includes(m));
+  if (hasMonth || p.includes('esse mês')) {
+    return `em ${period}`;
+  }
+  
+  // Check for "últimos X dias"
+  if (p.includes('últimos') || p.includes('ultimos')) {
+    return `nos ${period}`;
+  }
+  
+  // Check for "geral"
+  if (p === 'geral') {
+    return 'geral';
+  }
+  
+  // Default
+  return `no ${period}`;
+});
+
 let browserInstance = null;
 
 async function getBrowser() {

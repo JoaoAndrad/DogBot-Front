@@ -760,6 +760,7 @@ const spotifyFlow = createFlow("spotify", {
             total: sum.totalPlays || 0,
             unique: sum.uniqueTracks || 0,
             time: fmtDuration(sum.totalListenMs || 0),
+            albumImages: json.topAlbumImages || [],
             bars: (json.activity || []).map((d) => {
               const percent = Math.round(
                 ((d.count || 0) / maxActivityCount) * 100
@@ -773,6 +774,17 @@ const spotifyFlow = createFlow("spotify", {
             top3: (json.topArtists || [])
               .slice(0, 3)
               .map((a) => ({ name: a.name, plays: a.count || 0 })),
+            top5Artists: (json.topArtists || [])
+              .slice(0, 5)
+              .map((a) => ({ name: a.name, plays: a.count || 0 })),
+            top5Songs: (json.repeats || []).slice(0, 5).map((r) => ({
+              song: (r.track && r.track.name) || r.id || "Desconhecida",
+              artist:
+                r.track && Array.isArray(r.track.artists)
+                  ? r.track.artists.join(", ")
+                  : (r.track && r.track.artists) || "",
+              plays: r.count || r.plays || r.playCount || 0,
+            })),
             repeat: (json.repeats || []).slice(0, 3).map((r) => ({
               song: (r.track && r.track.name) || r.id || "Desconhecida",
               artist:

@@ -1,420 +1,353 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="pt-BR">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Resumo Musical High-End</title>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Resumo Musical - League Spartan</title>
     <style>
-      @import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap");
+        /* Importando a fonte League Spartan */
+        @import url('https://fonts.googleapis.com/css2?family=League+Spartan:wght@400;500;700;800;900&display=swap');
 
-      :root {
-        --bg-color: #f0f2f5;
-        --card-bg: #ffffff;
-        --text-primary: #1f2937;
-        --text-secondary: #404349;
-        --brand-gradient: linear-gradient(180deg, #2dd4bf 0%, #3b82f6 100%);
-        --shadow-soft: 0 4px 20px -2px rgba(0, 0, 0, 0.05);
-      }
+        body {
+            background-color: #000;
+            color: #fff;
+            font-family: 'League Spartan', sans-serif;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+            min-height: 100vh;
+            overflow-x: hidden; /* Evita barra de rolagem horizontal se o mosaico sair um pouco */
+        }
 
-      body {
-        margin: 0;
-        padding: 16px;
-        font-family: "Inter", sans-serif;
-        background-color: #f1f2f6;
-        width: 800px;
-        display: flex;
-        flex-direction: column;
-        gap: 0;
-      }
+        .container {
+            width: 100%;
+            max-width: 650px;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+        }
 
-      header {
-        display: flex;
-        align-items: baseline;
-        justify-content: center;
-        gap: 8px;
-        margin-bottom: 0;
-      }
-      h1 {
-        font-size: 28px;
-        font-weight: 700;
-        color: var(--text-primary);
-        margin: 0;
-      }
-      .header-suffix {
-        font-weight: 400;
-        color: var(--text-primary);
-        font-size: 20px;
-      }
+        /* --- MOSAICO DE ÁLBUNS (POSICIONAMENTO ABSOLUTO) --- */
+        .mosaic-container {
+            position: relative;
+            height: 450px;
+            width: 100%;
+            margin-bottom: 10px;
+            /* Centraliza visualmente o bloco de imagens */
+            left: -20px; 
+        }
 
-      .card {
-        background: var(--card-bg);
-        border-radius: 24px;
-        padding: 24px;
-        box-shadow: var(--shadow-soft);
-        border: 1px solid rgba(255, 255, 255, 0.5);
-        margin-bottom: 12px;
-      }
+        .album {
+            position: absolute;
+            box-sizing: border-box;
+            background-size: cover;
+            background-position: center;
+            background-repeat: no-repeat;
+        }
 
-      .card-title {
-        font-size: 18px;
-        font-weight: 700;
-        color: #374151;
-        margin-bottom: 20px;
-        display: flex;
-        align-items: center;
-        gap: 8px;
-      }
+        /* CONFIGURAÇÃO DAS CORES E POSIÇÕES BASEADA NA IMAGEM */
+        
+        /* FILEIRA DE TRÁS (Cores escuras/topo) - Z-INDEX BAIXO */
+        .alb-1 { /* Vinho */
+            background-color: #720018; 
+            width: 180px; height: 180px;
+            top: 0; left: 0;
+            z-index: 1;
+        }
+        .alb-2 { /* Verde Bandeira */
+            background-color: #1aab4e;
+            width: 180px; height: 180px;
+            top: 0; left: 182px;
+            z-index: 1;
+        }
+        .alb-3 { /* Azul Royal */
+            background-color: #3b4cca;
+            width: 180px; height: 180px;
+            top: 0; left: 364px;
+            z-index: 1;
+        }
+        .alb-4 { /* Azul Acinzentado */
+            background-color: #728ebb;
+            width: 160px; height: 160px;
+            top: 0; left: 546px; /* Cortado na direita */
+            z-index: 1;
+        }
 
-      .icon-svg {
-        width: 22px;
-        height: 22px;
-        fill: #3b82f6;
-      }
+        /* FILEIRA DA FRENTE (Sobreposições) - Z-INDEX ALTO */
+        /* Nota: Na imagem, eles parecem maiores e descem mais */
+        
+        .alb-5 { /* Roxo */
+            background-color: #a04ba0;
+            width: 200px; height: 260px; /* Mais retangular na imagem */
+            top: 150px; left: 0;
+            z-index: 2;
+        }
 
-      .stats-grid {
-        display: grid;
-        grid-template-columns: 1fr 1fr 1fr;
-        gap: 8px;
-        text-align: center;
-      }
-      .stat-item {
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-      }
-      .stat-value {
-        font-size: 42px;
-        font-weight: 800;
-        color: var(--text-primary);
-        line-height: 1.1;
-      }
-      .stat-icon {
-        margin: 10px 0;
-        color: #60a5fa;
-      }
-      .stat-label {
-        font-size: 14px;
-        color: var(--text-secondary);
-        font-weight: 500;
-      }
+        .alb-6 { /* Amarelo Ouro */
+            background-color: #ffcc00;
+            width: 210px; height: 210px;
+            top: 110px; left: 150px;
+            z-index: 3;
+            border: 2px solid #a04ba0; /* Borda roxa sutil da sobreposição */
+            box-shadow: -2px 2px 5px rgba(0,0,0,0.5);
+        }
 
-      .chart-container {
-        display: flex;
-        justify-content: space-between;
-        align-items: flex-end;
-        height: 140px;
-        padding-top: 12px;
-        background-image: linear-gradient(#f3f4f6 1px, transparent 1px);
-        background-size: 100% 33%;
-      }
-      .bar-wrapper {
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        gap: 8px;
-        flex: 1;
-        height: 100%;
-        justify-content: flex-end;
-      }
-      .bar-value-top {
-        font-size: 13px;
-        color: var(--text-secondary);
-        margin-bottom: 4px;
-      }
-      .bar {
-        width: 24px;
-        border-radius: 12px;
-        background: var(--brand-gradient);
-        min-height: 6px;
-      }
-      .day-label {
-        font-size: 14px;
-        color: #6b7280;
-        font-weight: 600;
-      }
+        .alb-7 { /* Verde Limão */
+            background-color: #b3d828;
+            width: 210px; height: 210px;
+            top: 145px; left: 315px;
+            z-index: 4;
+            border: 2px solid #a04ba0;
+            box-shadow: -2px 2px 5px rgba(0,0,0,0.5);
+        }
 
-      .split-section {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 12px;
-      }
+        .alb-8 { /* Ciano */
+            background-color: #2bc3f3;
+            width: 210px; height: 210px;
+            top: 120px; left: 500px;
+            z-index: 5;
+            border: 2px solid #a04ba0;
+            box-shadow: -2px 2px 5px rgba(0,0,0,0.5);
+        }
 
-      .list-item {
-        display: flex;
-        align-items: center;
-        margin-bottom: 18px;
-      }
-      .list-item:last-child {
-        margin-bottom: 0;
-      }
-      .rank-badge {
-        background-color: #3b82f6;
-        color: white;
-        width: 32px;
-        height: 32px;
-        border-radius: 50%;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 14px;
-        font-weight: 700;
-        margin-right: 14px;
-        flex-shrink: 0;
-      }
-      .item-info {
-        display: flex;
-        flex-direction: column;
-        overflow: hidden;
-        flex: 1;
-      }
-      .item-name {
-        font-size: 16px;
-        font-weight: 600;
-        color: var(--text-primary);
-        overflow: hidden;
-        text-overflow: ellipsis;
-        display: -webkit-box;
-        -webkit-line-clamp: 2;
-        line-clamp: 2;
-        -webkit-box-orient: vertical;
-        word-break: break-word;
-        line-height: 1.3;
-      }
-      .item-sub {
-        font-size: 13px;
-        color: var(--text-secondary);
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-      }
 
-      .time-blocks {
-        display: flex;
-        gap: 10px;
-        width: 100%;
-      }
-      .time-block {
-        flex: 1;
-        border-radius: 12px;
-        padding: 16px 8px;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        text-align: center;
-        color: #1f2937;
-      }
-      .tb-morning {
-        background-color: #bae6fd;
-      }
-      .tb-afternoon {
-        background-color: #fde68a;
-      }
-      .tb-night {
-        background-color: #e9d5ff;
-      }
-      .tb-dawn {
-        background-color: #1e3a8a;
-        color: white;
-      }
+        /* --- TIPOGRAFIA --- */
+        h1 {
+            text-align: center;
+            font-size: 2rem;
+            margin: 0 0 10px 0;
+            font-weight: 800; /* Extra Bold */
+            letter-spacing: -0.5px;
+        }
 
-      .tb-label {
-        font-size: 13px;
-        font-weight: 600;
-        margin-bottom: 4px;
-      }
-      .tb-value {
-        font-size: 16px;
-        font-weight: 800;
-      }
+        .subtitle {
+            text-align: left;
+            font-size: 1.8rem;
+            font-weight: 800;
+            margin-bottom: 30px;
+            padding-left: 0;
+        }
+        
+        .green-text { 
+            color: #00c853; 
+        }
 
-      .mini-list-item {
-        margin-bottom: 12px;
-        font-size: 14px;
-        border-bottom: 1px solid #f3f4f6;
-        padding-bottom: 8px;
-      }
-      .mini-list-item:last-child {
-        border: none;
-        margin: 0;
-        padding-bottom: 0;
-      }
-      .mini-title {
-        font-weight: 600;
-        color: var(--text-primary);
-        overflow: hidden;
-        text-overflow: ellipsis;
-        display: -webkit-box;
-        -webkit-line-clamp: 2;
-        line-clamp: 2;
-        -webkit-box-orient: vertical;
-        word-break: break-word;
-        line-height: 1.3;
-      }
-      .mini-artist {
-        color: var(--text-secondary);
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-      }
+        /* --- GRID DE INFORMAÇÕES (3 COLUNAS) --- */
+        .info-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 20px;
+            align-items: start;
+        }
+
+        .column h2 {
+            font-size: 1.5rem;
+            margin: 0 0 15px 0;
+            font-weight: 800;
+        }
+
+        ul {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+
+        li {
+            font-size: 1.1rem;
+            margin-bottom: 8px;
+            font-weight: 700; /* Bold */
+            white-space: nowrap;
+            line-height: 1.2;
+        }
+
+        .plays {
+            display: block;
+            font-size: 0.7rem;
+            color: #ddd; /* Um pouco mais claro que cinza escuro */
+            font-weight: 500;
+            margin-top: 2px;
+        }
+
+        /* --- PLAYER CONTROLS (COLUNA 1) --- */
+        .player-container {
+            margin-top: 25px;
+            width: 100%;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 4px;
+            background-color: #555;
+            border-radius: 2px;
+            position: relative;
+            margin-bottom: 15px;
+        }
+
+        .progress-active {
+            width: 30%;
+            height: 100%;
+            background-color: #fff;
+            border-radius: 2px;
+            position: relative;
+        }
+
+        .progress-dot {
+            position: absolute;
+            right: -6px;
+            top: -4px;
+            width: 12px;
+            height: 12px;
+            background-color: #fff;
+            border-radius: 50%;
+        }
+
+        .controls {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 1.2rem;
+        }
+        
+        .play-button {
+            background: #fff;
+            color: #000;
+            border-radius: 50%;
+            width: 35px;
+            height: 35px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1rem;
+        }
+        
+        .control-icon {
+            cursor: pointer;
+            opacity: 0.9;
+        }
+        .control-icon:hover { opacity: 1; }
+
+
+        /* --- WAVEFORM (COLUNA 3) --- */
+        .waveform-container {
+            display: flex;
+            align-items: center;
+            justify-content: flex-start; /* Alinhado à esquerda como na imagem */
+            gap: 3px;
+            height: 40px;
+            margin-top: 40px;
+        }
+
+        .wave-bar {
+            width: 3px;
+            background-color: #fff;
+            border-radius: 2px;
+            animation: wave 1s infinite ease-in-out alternate;
+        }
+
+        /* Alturas estáticas para simular a imagem */
+        .w1 { height: 15px; } .w2 { height: 25px; } .w3 { height: 40px; }
+        .w4 { height: 30px; } .w5 { height: 20px; } .w6 { height: 35px; }
+        .w7 { height: 25px; } .w8 { height: 10px; } .w9 { height: 30px; }
+        .w10 { height: 20px; } .w11 { height: 40px; } .w12 { height: 25px; }
+        .w13 { height: 15px; } .w14 { height: 10px; } .w15 { height: 20px; }
+
+        @media (max-width: 700px) {
+            .mosaic-container { transform: scale(0.6); transform-origin: top left; margin-bottom: -150px; width: 150%; }
+            .info-grid { grid-template-columns: 1fr; gap: 30px; }
+            h1 { font-size: 1.5rem; }
+            .subtitle { font-size: 1.2rem; }
+        }
+
     </style>
-  </head>
-  <body>
-    <header>
-      <svg class="icon-svg" viewBox="0 0 24 24">
-        <path d="M9 18V5l12-2v13"></path>
-        <circle cx="6" cy="18" r="3"></circle>
-        <circle cx="18" cy="16" r="3"></circle>
-      </svg>
-      <h1>Seu Resumo Musical</h1>
-      <span class="header-suffix">— {{period}}</span>
-    </header>
+</head>
+<body>
 
-    <div class="card">
-      <div class="card-title">Estatísticas Gerais</div>
-      <div class="stats-grid">
-        <div class="stat-item">
-          <div class="stat-value">{{total}}</div>
-          <div class="stat-icon">
-            <svg
-              width="16"
-              height="16"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-            >
-              <path d="M9 18V5l12-2v13"></path>
-              <circle cx="6" cy="18" r="3"></circle>
-              <circle cx="18" cy="16" r="3"></circle>
-            </svg>
-          </div>
-          <div class="stat-label">Músicas</div>
+    <div class="container">
+        
+        <div class="mosaic-container">
+            {{#each albumImages}}
+            {{#if @index}}
+            {{#unless (gt @index 7)}}
+            <div class="album alb-{{indexPlusOne @index}}" style="background-image: url('{{this}}');"></div>
+            {{/unless}}
+            {{else}}
+            <div class="album alb-1" style="background-image: url('{{this}}');"></div>
+            {{/if}}
+            {{/each}}
         </div>
-        <div class="stat-item">
-          <div class="stat-value">
-            {{time}}<span
-              style="font-size: 18px; font-weight: 600; margin-left: 6px"
-              >min</span
-            >
-          </div>
-          <div class="stat-icon">
-            <svg
-              width="16"
-              height="16"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-            >
-              <circle cx="12" cy="12" r="10"></circle>
-              <polyline points="12 6 12 12 16 14"></polyline>
-            </svg>
-          </div>
-          <div class="stat-label">Tempo ouvindo</div>
+
+        <h1>Meu resumo musical {{formatPeriod period}}</h1>
+        
+        <div class="subtitle">
+            Tempo ouvindo: <span class="green-text">{{time}} minutos</span>
         </div>
-        <div class="stat-item">
-          <div class="stat-value">{{unique}}</div>
-          <div class="stat-icon">
-            <svg
-              width="16"
-              height="16"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-            >
-              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
-              <circle cx="12" cy="7" r="4"></circle>
-            </svg>
-          </div>
-          <div class="stat-label">Artistas Únicos</div>
+
+        <div class="info-grid">
+            <div class="column">
+                <h2>Top artistas</h2>
+                <ul>
+                    {{#each top5Artists}}
+                    <li>{{indexPlusOne @index}} {{this.name}}</li>
+                    {{/each}}
+                </ul>
+                
+                <div class="player-container">
+                    <div class="progress-bar">
+                        <div class="progress-active">
+                            <div class="progress-dot"></div>
+                        </div>
+                    </div>
+                    <div class="controls">
+                        <span class="control-icon">🔀</span>
+                        <span class="control-icon">⏮</span>
+                        <div class="play-button">❚❚</div>
+                        <span class="control-icon">⏭</span>
+                        <span class="control-icon">↻</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="column">
+                <h2>Top músicas</h2>
+                <ul>
+                    {{#each top5Songs}}
+                    <li>
+                        {{indexPlusOne @index}} {{this.song}}
+                        <span class="plays">{{this.plays}} plays</span>
+                    </li>
+                    {{/each}}
+                </ul>
+            </div>
+
+            <div class="column">
+                <h2>Estatísticas</h2>
+                <ul>
+                    <li>{{total}} músicas totais</li>
+                    <li>{{unique}} artistas únicos</li>
+                </ul>
+
+                <div class="waveform-container">
+                    <div class="wave-bar w1"></div>
+                    <div class="wave-bar w2"></div>
+                    <div class="wave-bar w3"></div>
+                    <div class="wave-bar w4"></div>
+                    <div class="wave-bar w5"></div>
+                    <div class="wave-bar w6"></div>
+                    <div class="wave-bar w7"></div>
+                    <div class="wave-bar w8"></div>
+                    <div class="wave-bar w9"></div>
+                    <div class="wave-bar w10"></div>
+                    <div class="wave-bar w11"></div>
+                    <div class="wave-bar w12"></div>
+                    <div class="wave-bar w13"></div>
+                    <div class="wave-bar w14"></div>
+                    <div class="wave-bar w15"></div>
+                </div>
+            </div>
         </div>
-      </div>
+
     </div>
 
-    <div class="card">
-      <div class="card-title">Músicas ouvidas por dia — {{period}}</div>
-      <div class="chart-container">
-        {{#each bars}}
-        <div class="bar-wrapper">
-          <span class="bar-value-top">{{this.height}}</span>
-          <div class="bar" style="height: {{this.percent}}%;"></div>
-          <div class="day-label">{{this.label}}</div>
-        </div>
-        {{/each}}
-      </div>
-    </div>
-
-    <div class="split-section">
-      <div class="card">
-        <div class="card-title">Top artistas</div>
-        {{#each top3}}
-        <div class="list-item">
-          <div class="rank-badge">{{indexPlusOne @index}}</div>
-          <div class="item-info">
-            <span class="item-name">{{this.name}}</span>
-            <span class="item-sub">{{this.plays}} plays</span>
-          </div>
-        </div>
-        {{/each}}
-      </div>
-
-      <div class="card">
-        <div class="card-title">Mais escutadas</div>
-        {{#each repeat}}
-        <div class="list-item">
-          <div class="item-info">
-            <span class="item-name">"{{this.song}}"</span>
-            <span class="item-sub">{{this.artist}} — {{this.plays}} plays</span>
-          </div>
-        </div>
-        {{/each}}
-      </div>
-    </div>
-
-    <div class="card">
-      <div class="card-title">Seus horários de escuta</div>
-      <div class="time-blocks">
-        <div class="time-block tb-morning">
-          <span class="tb-label">Manhã</span>
-          <span class="tb-value">{{segments.morning}}%</span>
-        </div>
-        <div class="time-block tb-afternoon">
-          <span class="tb-label">Tarde</span>
-          <span class="tb-value">{{segments.afternoon}}%</span>
-        </div>
-        <div class="time-block tb-night">
-          <span class="tb-label">Noite</span>
-          <span class="tb-value">{{segments.night}}%</span>
-        </div>
-        <div class="time-block tb-dawn">
-          <span class="tb-label">Madrugada</span>
-          <span class="tb-value">{{segments.dawn}}%</span>
-        </div>
-      </div>
-    </div>
-
-    <div class="split-section">
-      <div class="card">
-        <div class="card-title">Descobertas recentes</div>
-        {{#each discoveries}}
-        <div class="mini-list-item">
-          <div class="mini-title">{{this.title}}</div>
-          <div class="mini-artist">{{this.artist}}</div>
-        </div>
-        {{/each}}
-      </div>
-      <div class="card">
-        <div class="card-title">Últimas 3 músicas ouvidas</div>
-        {{#each lastTracks}}
-        <div class="mini-list-item">
-          <div class="mini-title">{{this.title}}</div>
-          <div class="mini-artist">{{this.artist}}</div>
-        </div>
-        {{/each}}
-      </div>
-    </div>
-  </body>
+</body>
 </html>
