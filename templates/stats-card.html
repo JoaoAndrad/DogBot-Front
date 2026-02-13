@@ -169,7 +169,7 @@
         align-items: start;
         justify-content: center; /* Centraliza as colunas */
         width: 100%;
-        padding: 0 20px 20px 20px;
+        padding: 0 20px 80px 20px; /* Aumentado o padding-bottom para 80px para dar espaço ao logo */
         box-sizing: border-box;
         margin-top: 0; /* Remove margem negativa */
       }
@@ -470,10 +470,10 @@
           </div>
         </div>
       </div>
-    </div>
 
-    {{#if logoBase64}}
-    <img src="{{logoBase64}}" alt="Logo" class="logo" />
-    {{/if}}
+      {{#if logoBase64}}
+      <img src="{{logoBase64}}" alt="Logo" class="logo" />
+      {{/if}}
+    </div>
   </body>
 </html>
