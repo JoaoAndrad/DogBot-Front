@@ -66,22 +66,23 @@ async function renderCard(data, opts = {}) {
     console.log("[statsCard] Criando nova página...");
     page = await browser.newPage();
 
+    const size = opts.size || 1080;
     const viewport = {
-      width: opts.width || 1600,
-      height: opts.height || 100,
-      deviceScaleFactor: 2,
+      width: size,
+      height: size,
+      deviceScaleFactor: 1,
     };
-    console.log("[statsCard] Configurando viewport:", viewport);
+    console.log("[statsCard] Viewport fixo:", viewport.width, "x", viewport.height);
     await page.setViewport(viewport);
 
     console.log("[statsCard] Carregando HTML na página...");
     await page.setContent(html, { waitUntil: "networkidle0" });
     console.log("[statsCard] HTML carregado com sucesso");
 
-    console.log("[statsCard] Capturando screenshot...");
+    console.log("[statsCard] Capturando screenshot 1080x1080...");
     const buffer = await page.screenshot({
       type: "png",
-      fullPage: true,
+      fullPage: false,
     });
     console.log(
       "[statsCard] Screenshot capturado, tamanho:",
