@@ -36,10 +36,10 @@
       /* --- MOSAICO DE ÁLBUNS (POSICIONAMENTO ABSOLUTO) --- */
       .mosaic-container {
         position: relative;
-        height: 600px; /* Aumentado de 380px para 600px */
-        width: 1000px; /* Aumentado de 706px para 1000px */
-        margin: 0 auto 30px auto; /* Centralizado com margem inferior maior */
-        overflow: hidden; /* Esconde o que ultrapassar */
+        height: 750px; /* Aumentado de 600px para 750px */
+        width: 1000px;
+        margin: 0 auto 30px auto;
+        overflow: hidden;
       }
 
       .album {
@@ -56,8 +56,8 @@
       .alb-1 {
         /* Vinho */
         background-color: #720018;
-        width: 260px; /* Aumentado de 180px */
-        height: 260px;
+        width: 320px; /* Aumentado de 260px */
+        height: 320px;
         top: 0;
         left: 0;
         z-index: 1;
@@ -65,28 +65,28 @@
       .alb-2 {
         /* Verde Bandeira */
         background-color: #1aab4e;
-        width: 260px;
-        height: 260px;
+        width: 320px;
+        height: 320px;
         top: 0;
-        left: 265px; /* Ajustado proporcionalmente */
+        left: 325px; /* Ajustado proporcionalmente */
         z-index: 1;
       }
       .alb-3 {
         /* Azul Royal */
         background-color: #3b4cca;
-        width: 260px;
-        height: 260px;
+        width: 320px;
+        height: 320px;
         top: 0;
-        left: 530px;
+        left: 650px;
         z-index: 1;
       }
       .alb-4 {
         /* Azul Acinzentado */
         background-color: #728ebb;
-        width: 220px; /* Aumentado de 160px */
-        height: 220px;
+        width: 270px; /* Aumentado de 220px */
+        height: 270px;
         top: 0;
-        left: 795px;
+        left: 975px;
         z-index: 1;
       }
 
@@ -94,9 +94,9 @@
       .alb-5 {
         /* Roxo */
         background-color: #a04ba0;
-        width: 290px; /* Aumentado de 200px */
-        height: 300px; /* Aumentado de 210px */
-        top: 240px; /* Ajustado proporcionalmente */
+        width: 360px; /* Aumentado de 290px */
+        height: 370px; /* Aumentado de 300px */
+        top: 300px; /* Ajustado proporcionalmente */
         left: 0;
         z-index: 2;
       }
@@ -104,30 +104,30 @@
       .alb-6 {
         /* Amarelo Ouro */
         background-color: #ffcc00;
-        width: 300px; /* Aumentado de 210px */
-        height: 300px;
-        top: 220px; /* Ajustado */
-        left: 210px; /* Ajustado */
+        width: 370px; /* Aumentado de 300px */
+        height: 370px;
+        top: 280px; /* Ajustado */
+        left: 260px; /* Ajustado */
         z-index: 3;
       }
 
       .alb-7 {
         /* Verde Limão */
         background-color: #b3d828;
-        width: 300px;
-        height: 300px;
-        top: 235px;
-        left: 450px;
+        width: 370px;
+        height: 370px;
+        top: 290px;
+        left: 550px;
         z-index: 4;
       }
 
       .alb-8 {
         /* Ciano */
         background-color: #2bc3f3;
-        width: 300px;
-        height: 300px;
-        top: 210px;
-        left: 710px;
+        width: 370px;
+        height: 370px;
+        top: 260px;
+        left: 870px;
         z-index: 5;
       }
 
@@ -145,10 +145,10 @@
       }
 
       .subtitle {
-        text-align: center; /* Centralizado */
-        font-size: 2.5rem; /* Aumentado de 1.5rem para 2.5rem */
+        text-align: left; /* Volta para esquerda */
+        font-size: 2.5rem; /* Mantém aumentado */
         font-weight: 800;
-        margin-bottom: 40px; /* Aumentado o margin-bottom */
+        margin-bottom: 0; /* Remove margin-bottom */
         grid-column: 1 / -1; /* Ocupa todas as colunas do grid */
         overflow: hidden;
         text-overflow: ellipsis;
@@ -162,8 +162,9 @@
       /* --- GRID DE INFORMAÇÕES (3 COLUNAS) --- */
       .info-grid {
         display: grid;
-        grid-template-columns: 1fr; /* Uma coluna apenas para melhor layout vertical */
-        row-gap: 40px; /* Gap vertical entre seções */
+        grid-template-columns: auto auto auto; /* Volta para 3 colunas */
+        column-gap: 70px; /* Aumentado de 50px */
+        row-gap: 25px; /* Aumentado de 15px */
         align-items: start;
         justify-content: center;
         width: 100%;
@@ -174,11 +175,11 @@
 
       .column {
         min-width: 0;
-        max-width: 100%; /* Largura total */
+        max-width: 300px; /* Aumentado de 200px */
       }
 
       .column h2 {
-        font-size: 2.2rem; /* Aumentado de 1.3rem para 2.2rem */
+        font-size: 2.2rem; /* Mantém aumentado */
         margin: 0 0 20px 0;
         font-weight: 800;
         overflow: hidden;
@@ -193,9 +194,9 @@
       }
 
       li {
-        font-size: 1.6rem; /* Aumentado de 0.95rem para 1.6rem */
+        font-size: 1.6rem; /* Mantém aumentado */
         margin-bottom: 12px;
-        font-weight: 700; /* Bold */
+        font-weight: 700;
         line-height: 1.4;
         overflow: hidden;
         text-overflow: ellipsis;
@@ -204,7 +205,7 @@
 
       .plays {
         display: block;
-        font-size: 1.2rem; /* Aumentado de 0.65rem para 1.2rem */
+        font-size: 1.2rem; /* Mantém aumentado */
         color: #ddd;
         font-weight: 500;
         margin-top: 2px;
@@ -217,14 +218,11 @@
       .player-container {
         margin-top: 30px;
         width: 100%;
-        max-width: 400px; /* Limita largura para melhor proporção */
-        margin-left: auto;
-        margin-right: auto;
       }
 
       .progress-bar {
         width: 100%;
-        height: 5px; /* Aumentado de 3px */
+        height: 5px;
         background-color: #555;
         border-radius: 3px;
         position: relative;
@@ -243,7 +241,7 @@
         position: absolute;
         right: -7px;
         top: -4px;
-        width: 13px; /* Aumentado de 9px */
+        width: 13px;
         height: 13px;
         background-color: #fff;
         border-radius: 50%;
@@ -253,7 +251,7 @@
         display: flex;
         justify-content: space-between;
         align-items: center;
-        font-size: 1.5rem; /* Aumentado de 0.85rem */
+        font-size: 1.5rem;
         width: 100%;
       }
 
@@ -261,23 +259,23 @@
         background: #fff;
         color: #000;
         border-radius: 50%;
-        width: 45px; /* Aumentado de 26px */
+        width: 45px;
         height: 45px;
         display: flex;
         align-items: center;
         justify-content: center;
-        font-size: 1.2rem; /* Aumentado de 0.7rem */
+        font-size: 1.2rem;
         font-weight: 900;
       }
 
       .control-icon {
         cursor: pointer;
         opacity: 0.9;
-        font-size: 1.6rem; /* Aumentado de 0.9rem */
+        font-size: 1.6rem;
         display: flex;
         align-items: center;
         justify-content: center;
-        width: 28px; /* Aumentado de 16px */
+        width: 28px;
         height: 28px;
       }
       .control-icon:hover {
@@ -290,14 +288,13 @@
         align-items: center;
         justify-content: space-between;
         width: 100%;
-        max-width: 400px; /* Limita largura */
-        margin: 40px auto 0 auto; /* Centralizado */
         gap: 0;
-        height: 60px; /* Aumentado de 35px */
+        height: 60px;
+        margin-top: 40px;
       }
 
       .wave-bar {
-        width: 7px; /* Aumentado de 4px */
+        width: 7px;
         background-color: #fff;
         border-radius: 3px;
         flex-shrink: 0;
