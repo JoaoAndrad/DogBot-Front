@@ -9,7 +9,7 @@ const templatePath = path.join(
   "..",
   "..",
   "templates",
-  "stats-card.html"
+  "stats-card.html",
 );
 const tplSrc = fs.readFileSync(templatePath, "utf8");
 const tpl = Handlebars.compile(tplSrc);
@@ -28,25 +28,37 @@ Handlebars.registerHelper("gt", function (a, b) {
 Handlebars.registerHelper("formatPeriod", function (period) {
   if (!period) return "no período";
   const p = String(period).toLowerCase();
-  
+
   // Check for month names or "esse mês"
-  const months = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 
-                  'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
-  const hasMonth = months.some(m => p.includes(m));
-  if (hasMonth || p.includes('esse mês')) {
+  const months = [
+    "janeiro",
+    "fevereiro",
+    "março",
+    "abril",
+    "maio",
+    "junho",
+    "julho",
+    "agosto",
+    "setembro",
+    "outubro",
+    "novembro",
+    "dezembro",
+  ];
+  const hasMonth = months.some((m) => p.includes(m));
+  if (hasMonth || p.includes("esse mês")) {
     return `em ${period}`;
   }
-  
+
   // Check for "últimos X dias"
-  if (p.includes('últimos') || p.includes('ultimos')) {
+  if (p.includes("últimos") || p.includes("ultimos")) {
     return `nos ${period}`;
   }
-  
+
   // Check for "geral"
-  if (p === 'geral') {
-    return 'geral';
+  if (p === "geral") {
+    return "geral";
   }
-  
+
   // Default
   return `no ${period}`;
 });
@@ -81,11 +93,26 @@ async function renderCard(data, opts = {}) {
     time: data.time,
   });
 
+  // Convert logo to base64 if logoPath is provided
+  if (data.logoPath && fs.existsSync(data.logoPath)) {
+    try {
+      const logoBuffer = fs.readFileSync(data.logoPath);
+      const logoBase64 = logoBuffer.toString('base64');
+      data.logoBase64 = `data:image/png;base64,${logoBase64}`;
+      console.log("[statsCard] Logo convertido para base64");
+    } catch (err) {
+      console.error("[statsCard] Erro ao converter logo:", err);
+      data.logoBase64 = "";
+    }
+  } else {
+    data.logoBase64 = "";
+  }
+
   const html = tpl(data);
   console.log(
     "[statsCard] Template HTML compilado, tamanho:",
     html.length,
-    "caracteres"
+    "caracteres",
   );
 
   let browser = null;
@@ -118,7 +145,7 @@ async function renderCard(data, opts = {}) {
     console.log(
       "[statsCard] Screenshot capturado, tamanho:",
       buffer.length,
-      "bytes"
+      "bytes",
     );
 
     await page.close();

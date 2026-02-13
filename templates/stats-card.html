@@ -381,6 +381,9 @@
         height: 50px;
         opacity: 0.8;
         z-index: 1000;
+        filter: brightness(1.2) contrast(1.2);
+        /* Inverte as cores para que o logo branco fique visível no fundo preto */
+        filter: invert(1) brightness(0.8);
       }
     </style>
   </head>
@@ -470,7 +473,9 @@
         </div>
       </div>
     </div>
-    
-    <img src="file://{{logoPath}}" alt="Logo" class="logo" />
+
+    {{#if logoBase64}}
+    <img src="{{logoBase64}}" alt="Logo" class="logo" />
+    {{/if}}
   </body>
 </html>
