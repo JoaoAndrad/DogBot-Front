@@ -27,7 +27,7 @@
         position: relative;
         display: flex;
         flex-direction: column;
-        padding: 0 20px 20px 20px; /* Padding apenas nas laterais e embaixo, não no topo */
+        padding: 0; /* Remove todo padding */
         box-sizing: border-box;
       }
 
@@ -35,8 +35,8 @@
       .mosaic-container {
         position: relative;
         height: 380px; /* Reduzido de 450px para 380px */
-        width: 100%; /* Usa 100% da largura do container */
-        margin: 0 -20px 10px -20px; /* Margem negativa para compensar o padding do container */
+        width: 706px; /* Largura fixa de 706px */
+        margin: 0 0 10px 0; /* Sem margens laterais */
         overflow: hidden; /* Esconde o que ultrapassar */
       }
 
@@ -141,6 +141,7 @@
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
+        padding: 0 20px; /* Padding lateral para o título */
       }
 
       .subtitle {
@@ -148,7 +149,7 @@
         font-size: 1.5rem;
         font-weight: 800;
         margin-bottom: 20px;
-        padding-left: 0;
+        padding: 0 20px; /* Padding lateral para o subtítulo */
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
@@ -165,6 +166,8 @@
         gap: 25px;
         align-items: start;
         width: 100%;
+        padding: 0 20px 20px 20px; /* Padding lateral e inferior para o grid */
+        box-sizing: border-box;
       }
 
       .column {
