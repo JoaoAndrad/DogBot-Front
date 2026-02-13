@@ -148,7 +148,7 @@
         text-align: left;
         font-size: 1.5rem;
         font-weight: 800;
-        margin-bottom: 20px;
+        margin-bottom: 35px; /* Aumentado de 20px para 35px para alinhar com h2 */
         padding: 0 20px; /* Padding lateral para o subtítulo */
         overflow: hidden;
         text-overflow: ellipsis;
@@ -169,6 +169,7 @@
         width: 100%;
         padding: 0 20px 20px 20px;
         box-sizing: border-box;
+        margin-top: -15px; /* Margem negativa para subir o grid e alinhar melhor */
       }
 
       .column {
@@ -249,24 +250,32 @@
         display: flex;
         justify-content: space-between;
         align-items: center;
-        font-size: 1rem;
+        font-size: 1.1rem;
+        width: 100%;
       }
 
       .play-button {
         background: #fff;
         color: #000;
         border-radius: 50%;
-        width: 28px;
-        height: 28px;
+        width: 32px;
+        height: 32px;
         display: flex;
         align-items: center;
         justify-content: center;
-        font-size: 0.8rem;
+        font-size: 0.9rem;
+        font-weight: 900;
       }
 
       .control-icon {
         cursor: pointer;
         opacity: 0.9;
+        font-size: 1.2rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 20px;
+        height: 20px;
       }
       .control-icon:hover {
         opacity: 1;
@@ -276,16 +285,18 @@
       .waveform-container {
         display: flex;
         align-items: center;
-        justify-content: flex-start; /* Alinhado à esquerda como na imagem */
-        gap: 2px;
+        justify-content: space-between; /* Distribui as barras uniformemente */
+        width: 100%; /* Ocupa 100% da largura da coluna */
+        gap: 0; /* Remove gap fixo */
         height: 35px;
         margin-top: 30px;
       }
 
       .wave-bar {
-        width: 2.5px;
+        width: 4px; /* Aumentado de 2.5px para 4px */
         background-color: #fff;
         border-radius: 2px;
+        flex-shrink: 0; /* Impede que as barras encolham */
       }
 
       /* Alturas estáticas para simular a imagem */
@@ -399,11 +410,11 @@
               </div>
             </div>
             <div class="controls">
-              <span class="control-icon">🔀</span>
-              <span class="control-icon">⏮</span>
-              <div class="play-button">❚❚</div>
-              <span class="control-icon">⏭</span>
-              <span class="control-icon">↻</span>
+              <span class="control-icon">⤨</span>
+              <span class="control-icon">⏮︎</span>
+              <div class="play-button">⏸</div>
+              <span class="control-icon">⏭︎</span>
+              <span class="control-icon">⟲</span>
             </div>
           </div>
         </div>
