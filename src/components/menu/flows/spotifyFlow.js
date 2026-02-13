@@ -815,9 +815,9 @@ const spotifyFlow = createFlow("spotify", {
           };
 
           const img = await renderCard(templateData, {
-            width: 800,
-            height: 1200,
-            outputWidth: 400,
+            width: 746,
+            height: 900,
+            outputWidth: 746,
           });
           const { MessageMedia } = require("whatsapp-web.js");
           const media = new MessageMedia("image/png", img.toString("base64"));

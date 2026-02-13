@@ -17,12 +17,14 @@
             display: flex;
             justify-content: center;
             min-height: 100vh;
-            overflow-x: hidden; /* Evita barra de rolagem horizontal se o mosaico sair um pouco */
+            overflow-x: hidden;
+            width: 746px; /* Largura exata: 706px do mosaico + 40px de padding */
+            box-sizing: border-box;
         }
 
         .container {
             width: 100%;
-            max-width: 650px;
+            max-width: 686px; /* Largura exata do mosaico (546px dos albums + 140px de margem) */
             position: relative;
             display: flex;
             flex-direction: column;
@@ -32,10 +34,9 @@
         .mosaic-container {
             position: relative;
             height: 450px;
-            width: 100%;
+            width: 706px; /* Largura total do mosaico */
             margin-bottom: 10px;
-            /* Centraliza visualmente o bloco de imagens */
-            left: -20px; 
+            overflow: hidden; /* Esconde o que ultrapassar */
         }
 
         .album {
@@ -115,18 +116,24 @@
         /* --- TIPOGRAFIA --- */
         h1 {
             text-align: center;
-            font-size: 2rem;
+            font-size: 1.8rem;
             margin: 0 0 10px 0;
             font-weight: 800; /* Extra Bold */
             letter-spacing: -0.5px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
         }
 
         .subtitle {
             text-align: left;
-            font-size: 1.8rem;
+            font-size: 1.5rem;
             font-weight: 800;
-            margin-bottom: 30px;
+            margin-bottom: 20px;
             padding-left: 0;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
         }
         
         .green-text { 
@@ -137,14 +144,22 @@
         .info-grid {
             display: grid;
             grid-template-columns: 1fr 1fr 1fr;
-            gap: 20px;
+            gap: 15px;
             align-items: start;
+            width: 100%;
+        }
+
+        .column {
+            min-width: 0; /* Permite truncamento */
         }
 
         .column h2 {
-            font-size: 1.5rem;
-            margin: 0 0 15px 0;
+            font-size: 1.3rem;
+            margin: 0 0 12px 0;
             font-weight: 800;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
         }
 
         ul {
@@ -154,34 +169,39 @@
         }
 
         li {
-            font-size: 1.1rem;
-            margin-bottom: 8px;
+            font-size: 0.95rem;
+            margin-bottom: 6px;
             font-weight: 700; /* Bold */
+            line-height: 1.3;
+            overflow: hidden;
+            text-overflow: ellipsis;
             white-space: nowrap;
-            line-height: 1.2;
         }
 
         .plays {
             display: block;
-            font-size: 0.7rem;
+            font-size: 0.65rem;
             color: #ddd; /* Um pouco mais claro que cinza escuro */
             font-weight: 500;
-            margin-top: 2px;
+            margin-top: 1px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
         }
 
         /* --- PLAYER CONTROLS (COLUNA 1) --- */
         .player-container {
-            margin-top: 25px;
+            margin-top: 20px;
             width: 100%;
         }
 
         .progress-bar {
             width: 100%;
-            height: 4px;
+            height: 3px;
             background-color: #555;
             border-radius: 2px;
             position: relative;
-            margin-bottom: 15px;
+            margin-bottom: 12px;
         }
 
         .progress-active {
@@ -194,10 +214,10 @@
 
         .progress-dot {
             position: absolute;
-            right: -6px;
-            top: -4px;
-            width: 12px;
-            height: 12px;
+            right: -5px;
+            top: -3px;
+            width: 9px;
+            height: 9px;
             background-color: #fff;
             border-radius: 50%;
         }
@@ -206,19 +226,19 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
-            font-size: 1.2rem;
+            font-size: 1rem;
         }
         
         .play-button {
             background: #fff;
             color: #000;
             border-radius: 50%;
-            width: 35px;
-            height: 35px;
+            width: 28px;
+            height: 28px;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 1rem;
+            font-size: 0.8rem;
         }
         
         .control-icon {
@@ -233,30 +253,31 @@
             display: flex;
             align-items: center;
             justify-content: flex-start; /* Alinhado à esquerda como na imagem */
-            gap: 3px;
-            height: 40px;
-            margin-top: 40px;
+            gap: 2px;
+            height: 35px;
+            margin-top: 30px;
         }
 
         .wave-bar {
-            width: 3px;
+            width: 2.5px;
             background-color: #fff;
             border-radius: 2px;
-            animation: wave 1s infinite ease-in-out alternate;
         }
 
         /* Alturas estáticas para simular a imagem */
-        .w1 { height: 15px; } .w2 { height: 25px; } .w3 { height: 40px; }
-        .w4 { height: 30px; } .w5 { height: 20px; } .w6 { height: 35px; }
-        .w7 { height: 25px; } .w8 { height: 10px; } .w9 { height: 30px; }
-        .w10 { height: 20px; } .w11 { height: 40px; } .w12 { height: 25px; }
-        .w13 { height: 15px; } .w14 { height: 10px; } .w15 { height: 20px; }
+        .w1 { height: 12px; } .w2 { height: 20px; } .w3 { height: 33px; }
+        .w4 { height: 25px; } .w5 { height: 16px; } .w6 { height: 29px; }
+        .w7 { height: 20px; } .w8 { height: 8px; } .w9 { height: 25px; }
+        .w10 { height: 16px; } .w11 { height: 33px; } .w12 { height: 20px; }
+        .w13 { height: 12px; } .w14 { height: 8px; } .w15 { height: 16px; }
 
         @media (max-width: 700px) {
             .mosaic-container { transform: scale(0.6); transform-origin: top left; margin-bottom: -150px; width: 150%; }
-            .info-grid { grid-template-columns: 1fr; gap: 30px; }
-            h1 { font-size: 1.5rem; }
-            .subtitle { font-size: 1.2rem; }
+            .info-grid { grid-template-columns: 1fr; gap: 25px; }
+            h1 { font-size: 1.3rem; }
+            .subtitle { font-size: 1.1rem; }
+            .column h2 { font-size: 1.1rem; }
+            li { font-size: 0.85rem; }
         }
 
     </style>
