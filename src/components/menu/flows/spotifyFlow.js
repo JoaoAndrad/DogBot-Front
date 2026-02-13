@@ -131,6 +131,11 @@ const spotifyFlow = createFlow("spotify", {
         data: { days: 90 },
       },
       {
+        label: "Selecionar o mês",
+        action: "goto",
+        target: "/stats/select-month",
+      },
+      {
         label: "Geral",
         action: "exec",
         handler: "stats",
@@ -138,6 +143,102 @@ const spotifyFlow = createFlow("spotify", {
       },
       { label: "⬅️ Voltar", action: "back" },
     ],
+  },
+
+  "/stats/select-month": {
+    title: "📅 Selecione o período",
+    dynamic: true,
+    handler: async (ctx) => {
+      try {
+        const resolved = await resolveUserUuid(ctx.userId);
+        const userParam = resolved || ctx.userId;
+        
+        // Buscar períodos disponíveis
+        const url = `${BACKEND_URL}/api/spotify/available-periods?userId=${encodeURIComponent(userParam)}`;
+        const res = await fetch(url, { method: "GET" });
+        const json = await res.json();
+        
+        if (!json || !json.periods || json.periods.length === 0) {
+          await ctx.reply("❌ Nenhum período com dados encontrado.");
+          return { end: false };
+        }
+        
+        const opts = [];
+        
+        // Se tem múltiplos anos, agrupar por ano
+        if (json.hasMultipleYears) {
+          const yearGroups = {};
+          json.periods.forEach((p) => {
+            if (!yearGroups[p.year]) yearGroups[p.year] = [];
+            yearGroups[p.year].push(p);
+          });
+          
+          // Criar opção para cada ano
+          for (const year of json.years) {
+            const months = yearGroups[year] || [];
+            opts.push({
+              label: `📅 ${year}`,
+              action: "goto",
+              target: `/stats/year/${year}`,
+            });
+          }
+        } else {
+          // Apenas um ano - mostrar diretamente os meses
+          json.periods.forEach((p) => {
+            opts.push({
+              label: p.label,
+              action: "exec",
+              handler: "statsMonth",
+              data: { month: p.value },
+            });
+          });
+        }
+        
+        opts.push({ label: "⬅️ Voltar", action: "back" });
+        return { options: opts };
+      } catch (e) {
+        await ctx.reply("❌ Erro ao buscar períodos: " + (e.message || e));
+        return { end: false };
+      }
+    },
+  },
+
+  "/stats/year/:year": {
+    title: "📅 Selecione o mês",
+    dynamic: true,
+    handler: async (ctx) => {
+      try {
+        const year = ctx.path.split("/").pop();
+        const resolved = await resolveUserUuid(ctx.userId);
+        const userParam = resolved || ctx.userId;
+        
+        // Buscar períodos disponíveis
+        const url = `${BACKEND_URL}/api/spotify/available-periods?userId=${encodeURIComponent(userParam)}`;
+        const res = await fetch(url, { method: "GET" });
+        const json = await res.json();
+        
+        if (!json || !json.periods || json.periods.length === 0) {
+          await ctx.reply("❌ Nenhum período encontrado.");
+          return { end: false };
+        }
+        
+        // Filtrar meses do ano selecionado
+        const monthsInYear = json.periods.filter(p => p.year === parseInt(year));
+        
+        const opts = monthsInYear.map((p) => ({
+          label: p.label,
+          action: "exec",
+          handler: "statsMonth",
+          data: { month: p.value },
+        }));
+        
+        opts.push({ label: "⬅️ Voltar", action: "back" });
+        return { options: opts };
+      } catch (e) {
+        await ctx.reply("❌ Erro ao buscar meses: " + (e.message || e));
+        return { end: false };
+      }
+    },
   },
 
   "/history": {
@@ -833,6 +934,101 @@ const spotifyFlow = createFlow("spotify", {
       } catch (e) {
         await ctx.reply(
           "❌ Erro ao obter estatísticas: " + (e && e.message ? e.message : e)
+        );
+      }
+      return { end: false };
+    },
+
+    statsMonth: async (ctx, data) => {
+      try {
+        const month = data?.month; // formato YYYY-MM
+        if (!month) {
+          await ctx.reply("❌ Mês inválido.");
+          return { end: false };
+        }
+
+        const resolved = await resolveUserUuid(ctx.userId);
+        const userParam = resolved || ctx.userId;
+        const isGroup = !!(
+          ctx &&
+          ctx.chatId &&
+          String(ctx.chatId).endsWith("@g.us")
+        );
+
+        // Calcular início e fim do mês
+        const [year, monthNum] = month.split("-");
+        const monthStart = new Date(parseInt(year), parseInt(monthNum) - 1, 1);
+        const monthEnd = new Date(parseInt(year), parseInt(monthNum), 1);
+
+        let url = `${BACKEND_URL}/api/spotify/stats?userId=${encodeURIComponent(
+          userParam
+        )}`;
+        url += `&from=${encodeURIComponent(monthStart.toISOString())}`;
+        url += `&to=${encodeURIComponent(monthEnd.toISOString())}`;
+
+        if (isGroup) url += `&scope=group`;
+
+        // Formatar label do período
+        const date = new Date(monthStart);
+        const displayLabel = date.toLocaleString('pt-BR', { 
+          month: 'long', 
+          year: 'numeric' 
+        });
+        url += `&period=${encodeURIComponent(displayLabel)}`;
+
+        const res = await fetch(url, { method: "GET" });
+        const json = await res.json();
+
+        if (!json) {
+          await ctx.reply("❌ Erro ao obter estatísticas.");
+          return { end: false };
+        }
+
+        // Gerar card (mesma lógica do stats)
+        function fmtDuration(ms) {
+          const totalMin = Math.floor(ms / 60000);
+          return totalMin;
+        }
+
+        const sum = json.summary || {};
+        const path = require("path");
+        const logoPath = path.join(__dirname, "..", "..", "..", "templates", "logo.png");
+
+        const templateData = {
+          period: displayLabel,
+          total: sum.totalPlays || 0,
+          unique: sum.uniqueTracks || 0,
+          time: fmtDuration(sum.totalListenMs || 0),
+          albumImages: json.topAlbumImages || [],
+          logoPath: logoPath,
+          top5Artists: (json.topArtists || [])
+            .slice(0, 5)
+            .map((a) => ({ name: a.name, plays: a.count || 0 })),
+          top5Songs: (json.repeats || []).slice(0, 5).map((r) => ({
+            song: (r.track && r.track.name) || r.id || "Desconhecida",
+            artist:
+              r.track && Array.isArray(r.track.artists)
+                ? r.track.artists.join(", ")
+                : (r.track && r.track.artists) || "",
+            plays: r.count || r.plays || r.playCount || 0,
+          })),
+        };
+
+        try {
+          const img = await renderCard(templateData, {
+            width: 706,
+            height: 100,
+            outputWidth: 706,
+          });
+          const { MessageMedia } = require("whatsapp-web.js");
+          const media = new MessageMedia("image/png", img.toString("base64"));
+          await ctx.client.sendMessage(ctx.chatId, media, { caption: "" });
+        } catch (e) {
+          await ctx.reply("❌ Erro ao gerar card: " + (e.message || e));
+        }
+      } catch (e) {
+        await ctx.reply(
+          "❌ Erro ao obter estatísticas do mês: " + (e && e.message ? e.message : e)
         );
       }
       return { end: false };
