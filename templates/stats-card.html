@@ -438,7 +438,10 @@
           <h2>Top artistas</h2>
           <ul>
             {{#each top5Artists}}
-            <li>{{indexPlusOne @index}} {{this.name}}</li>
+            <li>
+              {{indexPlusOne @index}} {{this.name}}
+              <span class="plays">{{this.count}} plays</span>
+            </li>
             {{/each}}
           </ul>
         </div>
