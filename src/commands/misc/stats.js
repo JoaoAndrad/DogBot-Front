@@ -12,23 +12,20 @@ module.exports = {
     const userId = message.author || message.from;
 
     try {
-      // Abrir o menu de estatísticas do Spotify Flow
-      const spotifyFlow = flowManager.getFlow("spotify");
+      // Abrir o Spotify Flow diretamente no menu de estatísticas
+      // Primeiro, vamos salvar o estado inicial apontando para /stats
+      const storage = require("../../components/menu/storage");
       
-      if (!spotifyFlow) {
-        return reply("❌ Flow do Spotify não encontrado.");
-      }
+      const expiresAt = new Date(Date.now() + 30 * 60 * 1000); // 30 minutos
+      await storage.saveState(userId, "spotify", {
+        path: "/stats",
+        history: ["/"],
+        context: {},
+        expiresAt: expiresAt.toISOString(),
+      });
       
-      // Criar contexto para o flow
-      const flowCtx = {
-        userId,
-        chatId,
-        client,
-        reply: (text) => client.sendMessage(chatId, text),
-      };
-      
-      // Navegar diretamente para o menu de estatísticas
-      await flowManager.openFlow("spotify", flowCtx, "/stats");
+      // Renderizar o nó /stats diretamente
+      await flowManager._renderNode(client, chatId, userId, "spotify", "/stats");
       
     } catch (err) {
       logger.error("[stats] erro:", err);
