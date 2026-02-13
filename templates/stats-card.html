@@ -162,17 +162,18 @@
       /* --- GRID DE INFORMAÇÕES (3 COLUNAS) --- */
       .info-grid {
         display: grid;
-        grid-template-columns: 1fr 1fr 1fr;
-        gap: 40px; /* Aumentado de 25px para 40px */
+        grid-template-columns: auto auto auto; /* auto ao invés de 1fr para compactar */
+        gap: 50px; /* Gap uniforme entre as colunas */
         align-items: start;
+        justify-content: center; /* Centraliza as colunas */
         width: 100%;
-        padding: 0 20px 20px 20px; /* Padding lateral e inferior para o grid */
+        padding: 0 20px 20px 20px;
         box-sizing: border-box;
       }
 
       .column {
         min-width: 0; /* Permite truncamento */
-        padding: 0; /* Removido padding interno de 5px */
+        max-width: 200px; /* Largura máxima para cada coluna */
       }
 
       .column h2 {
