@@ -53,37 +53,6 @@ function renderProgressBar(percent, width = 16) {
   return "[" + "█".repeat(filled) + "-".repeat(empty) + "]";
 }
 
-function formatPeriodWithPreposition(period) {
-  if (!period) return "no período";
-  const lower = String(period).toLowerCase();
-
-  // Meses: "em fevereiro", "em março"
-  if (
-    /^(janeiro|fevereiro|março|abril|maio|junho|julho|agosto|setembro|outubro|novembro|dezembro)$/i.test(
-      lower
-    )
-  ) {
-    return `em ${lower}`;
-  }
-
-  // "Esse mês" -> "nesse mês"
-  if (lower === "esse mês") return "nesse mês";
-
-  // "Últimos X dias" -> "nos últimos X dias"
-  if (lower.includes("últimos") && lower.includes("dias")) {
-    return `nos ${lower}`;
-  }
-  if (/últimos \d+ dias/.test(lower)) {
-    return `nos ${lower}`;
-  }
-
-  // Geral -> "no geral"
-  if (lower === "geral") return "no geral";
-
-  // Fallback
-  return `no ${period}`;
-}
-
 const spotifyFlow = createFlow("spotify", {
   root: {
     title: "🎵 Spotify",
@@ -788,16 +757,9 @@ const spotifyFlow = createFlow("spotify", {
           // Use the display label derived from the selected option (no fallback to hardcoded "Esse mês")
           const templateData = {
             period: displayLabel,
-            periodWithPreposition: formatPeriodWithPreposition(displayLabel),
             total: sum.totalPlays || 0,
             unique: sum.uniqueTracks || 0,
             time: fmtDuration(sum.totalListenMs || 0),
-            topAlbums: Array.from({ length: 8 }, (_, i) =>
-              json.topAlbums?.[i]
-                ? { name: json.topAlbums[i].name, imageUrl: json.topAlbums[i].imageUrl || "" }
-                : { name: "", imageUrl: "" }
-            ),
-            audioBars: Array.from({ length: 35 }, () => 20 + Math.random() * 80),
             bars: (json.activity || []).map((d) => {
               const percent = Math.round(
                 ((d.count || 0) / maxActivityCount) * 100
@@ -808,11 +770,6 @@ const spotifyFlow = createFlow("spotify", {
                 percent,
               };
             }),
-            top5artists: (json.topArtists || []).slice(0, 5).map((a) => ({ name: a.name })),
-            top5tracks: (json.repeats || []).slice(0, 5).map((r) => ({
-              song: (r.track && r.track.name) || r.id || "Desconhecida",
-              plays: r.count || r.plays || r.playCount || 0,
-            })),
             top3: (json.topArtists || [])
               .slice(0, 3)
               .map((a) => ({ name: a.name, plays: a.count || 0 })),
@@ -846,7 +803,9 @@ const spotifyFlow = createFlow("spotify", {
           };
 
           const img = await renderCard(templateData, {
-            size: 1080,
+            width: 800,
+            height: 1200,
+            outputWidth: 400,
           });
           const { MessageMedia } = require("whatsapp-web.js");
           const media = new MessageMedia("image/png", img.toString("base64"));
