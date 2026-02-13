@@ -16,20 +16,20 @@
         padding: 0;
         display: flex;
         justify-content: center;
-        align-items: center;
+        align-items: flex-start; /* Alinha no topo */
         overflow-x: hidden;
-        width: 1080px; /* Largura do Instagram Story */
-        min-height: 1920px; /* Altura do Instagram Story */
+        width: 1080px;
+        min-height: 1920px;
         box-sizing: border-box;
       }
 
       .container {
         width: 100%;
-        max-width: 1080px; /* Largura do Instagram Story */
+        max-width: 1080px;
         position: relative;
         display: flex;
         flex-direction: column;
-        padding: 0; /* Remove padding para mosaico colar nas bordas */
+        padding: 0;
         box-sizing: border-box;
       }
 
@@ -134,25 +134,25 @@
       /* --- TIPOGRAFIA --- */
       h1 {
         text-align: center;
-        font-size: 3rem;
-        margin: 30px 0 20px 0; /* Adiciona margem superior */
+        font-size: 4rem; /* Aumentado de 3rem */
+        margin: 40px 0 30px 0;
         font-weight: 800;
         letter-spacing: -0.5px;
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
-        padding: 0 40px; /* Padding lateral para não colar nas bordas */
+        padding: 0 60px;
       }
 
       .subtitle {
-        text-align: center; /* Centralizado */
-        font-size: 2.8rem; /* Aumentado */
+        text-align: center;
+        font-size: 3.5rem; /* Aumentado de 2.8rem */
         font-weight: 800;
-        margin-bottom: 60px; /* Maior espaçamento */
+        margin-bottom: 80px; /* Aumentado */
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
-        padding: 0 60px; /* Padding lateral */
+        padding: 0 60px;
       }
 
       .green-text {
@@ -162,13 +162,13 @@
       /* --- GRID DE INFORMAÇÕES (2 COLUNAS) --- */
       .info-grid {
         display: grid;
-        grid-template-columns: 1fr 1fr; /* 2 colunas iguais */
-        column-gap: 60px; /* Gap entre as colunas */
-        row-gap: 0; /* Sem gap vertical */
+        grid-template-columns: 1fr 1fr;
+        column-gap: 80px; /* Aumentado */
+        row-gap: 0;
         align-items: start;
         justify-content: center;
         width: 100%;
-        padding: 0 60px 40px 60px; /* Aumentado padding lateral */
+        padding: 0 80px 60px 80px; /* Aumentado padding */
         box-sizing: border-box;
         margin-top: 0;
       }
@@ -179,8 +179,8 @@
       }
 
       .column h2 {
-        font-size: 2.8rem; /* Aumentado de 2.2rem */
-        margin: 0 0 30px 0; /* Aumentado margin-bottom */
+        font-size: 3.6rem; /* Aumentado de 2.8rem */
+        margin: 0 0 40px 0; /* Aumentado margin-bottom */
         font-weight: 800;
         overflow: hidden;
         text-overflow: ellipsis;
@@ -194,8 +194,8 @@
       }
 
       li {
-        font-size: 2rem; /* Aumentado de 1.6rem */
-        margin-bottom: 18px; /* Aumentado de 12px */
+        font-size: 2.6rem; /* Aumentado de 2rem */
+        margin-bottom: 24px; /* Aumentado */
         font-weight: 700;
         line-height: 1.4;
         overflow: hidden;
@@ -205,10 +205,10 @@
 
       .plays {
         display: block;
-        font-size: 1.5rem; /* Aumentado de 1.2rem */
+        font-size: 2rem; /* Aumentado de 1.5rem */
         color: #ddd;
         font-weight: 500;
-        margin-top: 4px;
+        margin-top: 6px;
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
@@ -216,9 +216,9 @@
 
       /* --- ESTATÍSTICAS (LINHA COMPLETA ABAIXO) --- */
       .stats-row {
-        grid-column: 1 / -1; /* Ocupa ambas as colunas */
-        margin-top: 60px; /* Espaço acima das estatísticas */
-        font-size: 2.2rem; /* Tamanho grande */
+        grid-column: 1 / -1;
+        margin-top: 80px; /* Aumentado */
+        font-size: 2.8rem; /* Aumentado de 2.2rem */
         font-weight: 700;
         text-align: center;
       }
@@ -393,10 +393,10 @@
       /* --- LOGO --- */
       .logo {
         position: absolute;
-        right: 40px;
-        bottom: 40px;
-        width: 80px; /* Aumentado de 50px */
-        height: 80px;
+        right: 60px;
+        bottom: 60px;
+        width: 100px; /* Aumentado de 80px */
+        height: 100px;
         opacity: 0.8;
         z-index: 1000;
       }
