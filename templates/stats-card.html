@@ -145,42 +145,42 @@
       }
 
       .subtitle {
-        text-align: left; /* Volta para esquerda */
-        font-size: 2.5rem; /* Mantém aumentado */
+        text-align: center; /* Centralizado */
+        font-size: 2.8rem; /* Aumentado */
         font-weight: 800;
-        margin-bottom: 0; /* Remove margin-bottom */
-        grid-column: 1 / -1; /* Ocupa todas as colunas do grid */
+        margin-bottom: 60px; /* Maior espaçamento */
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
+        padding: 0 60px; /* Padding lateral */
       }
 
       .green-text {
         color: #00c853;
       }
 
-      /* --- GRID DE INFORMAÇÕES (3 COLUNAS) --- */
+      /* --- GRID DE INFORMAÇÕES (2 COLUNAS) --- */
       .info-grid {
         display: grid;
-        grid-template-columns: auto auto auto; /* Volta para 3 colunas */
-        column-gap: 70px; /* Aumentado de 50px */
-        row-gap: 25px; /* Aumentado de 15px */
+        grid-template-columns: 1fr 1fr; /* 2 colunas iguais */
+        column-gap: 60px; /* Gap entre as colunas */
+        row-gap: 0; /* Sem gap vertical */
         align-items: start;
         justify-content: center;
         width: 100%;
-        padding: 0 40px 40px 40px;
+        padding: 0 60px 40px 60px; /* Aumentado padding lateral */
         box-sizing: border-box;
         margin-top: 0;
       }
 
       .column {
         min-width: 0;
-        max-width: 300px; /* Aumentado de 200px */
+        max-width: 100%;
       }
 
       .column h2 {
-        font-size: 2.2rem; /* Mantém aumentado */
-        margin: 0 0 20px 0;
+        font-size: 2.8rem; /* Aumentado de 2.2rem */
+        margin: 0 0 30px 0; /* Aumentado margin-bottom */
         font-weight: 800;
         overflow: hidden;
         text-overflow: ellipsis;
@@ -194,8 +194,8 @@
       }
 
       li {
-        font-size: 1.6rem; /* Mantém aumentado */
-        margin-bottom: 12px;
+        font-size: 2rem; /* Aumentado de 1.6rem */
+        margin-bottom: 18px; /* Aumentado de 12px */
         font-weight: 700;
         line-height: 1.4;
         overflow: hidden;
@@ -205,13 +205,31 @@
 
       .plays {
         display: block;
-        font-size: 1.2rem; /* Mantém aumentado */
+        font-size: 1.5rem; /* Aumentado de 1.2rem */
         color: #ddd;
         font-weight: 500;
-        margin-top: 2px;
+        margin-top: 4px;
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
+      }
+
+      /* --- ESTATÍSTICAS (LINHA COMPLETA ABAIXO) --- */
+      .stats-row {
+        grid-column: 1 / -1; /* Ocupa ambas as colunas */
+        margin-top: 60px; /* Espaço acima das estatísticas */
+        font-size: 2.2rem; /* Tamanho grande */
+        font-weight: 700;
+        text-align: center;
+      }
+
+      .stats-row .stats-title {
+        font-weight: 800;
+        margin-right: 15px;
+      }
+
+      .stats-row .stats-values {
+        font-weight: 600;
       }
 
       /* --- PLAYER CONTROLS (COLUNA 1) --- */
@@ -402,11 +420,11 @@
 
       <h1>Meu resumo musical {{formatPeriod period}}</h1>
 
-      <div class="info-grid">
-        <div class="subtitle">
-          Tempo ouvindo: <span class="green-text">{{time}} minutos</span>
-        </div>
+      <div class="subtitle">
+        Tempo ouvindo: <span class="green-text">{{time}} minutos</span>
+      </div>
 
+      <div class="info-grid">
         <div class="column">
           <h2>Top artistas</h2>
           <ul>
@@ -414,21 +432,6 @@
             <li>{{indexPlusOne @index}} {{this.name}}</li>
             {{/each}}
           </ul>
-
-          <div class="player-container">
-            <div class="progress-bar">
-              <div class="progress-active">
-                <div class="progress-dot"></div>
-              </div>
-            </div>
-            <div class="controls">
-              <span class="control-icon">⤮</span>
-              <span class="control-icon">|◀</span>
-              <div class="play-button">| |</div>
-              <span class="control-icon">▶|</span>
-              <span class="control-icon">⟳</span>
-            </div>
-          </div>
         </div>
 
         <div class="column">
@@ -443,30 +446,9 @@
           </ul>
         </div>
 
-        <div class="column">
-          <h2>Estatísticas</h2>
-          <ul>
-            <li>{{total}} músicas totais</li>
-            <li>{{unique}} artistas únicos</li>
-          </ul>
-
-          <div class="waveform-container">
-            <div class="wave-bar w1"></div>
-            <div class="wave-bar w2"></div>
-            <div class="wave-bar w3"></div>
-            <div class="wave-bar w4"></div>
-            <div class="wave-bar w5"></div>
-            <div class="wave-bar w6"></div>
-            <div class="wave-bar w7"></div>
-            <div class="wave-bar w8"></div>
-            <div class="wave-bar w9"></div>
-            <div class="wave-bar w10"></div>
-            <div class="wave-bar w11"></div>
-            <div class="wave-bar w12"></div>
-            <div class="wave-bar w13"></div>
-            <div class="wave-bar w14"></div>
-            <div class="wave-bar w15"></div>
-          </div>
+        <div class="stats-row">
+          <span class="stats-title">Estatísticas:</span>
+          <span class="stats-values">{{total}} músicas totais, {{unique}} artistas únicos</span>
         </div>
       </div>
 
