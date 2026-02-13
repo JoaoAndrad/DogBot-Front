@@ -163,7 +163,8 @@
       .info-grid {
         display: grid;
         grid-template-columns: auto auto auto; /* auto ao invés de 1fr para compactar */
-        gap: 50px; /* Gap uniforme entre as colunas */
+        column-gap: 50px; /* Apenas gap horizontal entre colunas */
+        row-gap: 15px; /* Gap vertical pequeno entre linhas */
         align-items: start;
         justify-content: center; /* Centraliza as colunas */
         width: 100%;
