@@ -756,12 +756,16 @@ const spotifyFlow = createFlow("spotify", {
           }
 
           // Use the display label derived from the selected option (no fallback to hardcoded "Esse mês")
+          const path = require("path");
+          const logoPath = path.join(__dirname, "..", "..", "..", "templates", "logo.png");
+          
           const templateData = {
             period: displayLabel,
             total: sum.totalPlays || 0,
             unique: sum.uniqueTracks || 0,
             time: fmtDuration(sum.totalListenMs || 0),
             albumImages: json.topAlbumImages || [],
+            logoPath: logoPath,
             bars: (json.activity || []).map((d) => {
               const percent = Math.round(
                 ((d.count || 0) / maxActivityCount) * 100

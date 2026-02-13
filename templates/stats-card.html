@@ -148,9 +148,8 @@
         text-align: left;
         font-size: 1.5rem;
         font-weight: 800;
-        margin-bottom: 35px; /* Aumentado de 20px para 35px para alinhar com h2 */
-        padding: 0 20px; /* Base padding */
-        padding-left: calc((100% - (200px * 3 + 50px * 2)) / 2 + 20px); /* Alinha com a primeira coluna */
+        margin-bottom: 20px;
+        grid-column: 1 / -1; /* Ocupa todas as colunas do grid */
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
@@ -170,7 +169,7 @@
         width: 100%;
         padding: 0 20px 20px 20px;
         box-sizing: border-box;
-        margin-top: -15px; /* Margem negativa para subir o grid e alinhar melhor */
+        margin-top: 0; /* Remove margem negativa */
       }
 
       .column {
@@ -371,6 +370,17 @@
           font-size: 0.85rem;
         }
       }
+
+      /* --- LOGO --- */
+      .logo {
+        position: fixed;
+        bottom: 20px;
+        right: 20px;
+        width: 50px;
+        height: 50px;
+        opacity: 0.8;
+        z-index: 1000;
+      }
     </style>
   </head>
   <body>
@@ -391,11 +401,11 @@
 
       <h1>Meu resumo musical {{formatPeriod period}}</h1>
 
-      <div class="subtitle">
-        Tempo ouvindo: <span class="green-text">{{time}} minutos</span>
-      </div>
-
       <div class="info-grid">
+        <div class="subtitle">
+          Tempo ouvindo: <span class="green-text">{{time}} minutos</span>
+        </div>
+
         <div class="column">
           <h2>Top artistas</h2>
           <ul>
@@ -459,5 +469,7 @@
         </div>
       </div>
     </div>
+    
+    <img src="file://{{logoPath}}" alt="Logo" class="logo" />
   </body>
 </html>
