@@ -217,19 +217,27 @@
       /* --- ESTATÍSTICAS (LINHA COMPLETA ABAIXO) --- */
       .stats-row {
         grid-column: 1 / -1;
-        margin-top: 80px; /* Aumentado */
-        font-size: 2.8rem; /* Aumentado de 2.2rem */
+        margin-top: 80px;
+        font-size: 2.8rem;
         font-weight: 700;
-        text-align: center;
+        text-align: left; /* Alinhado à esquerda */
+        line-height: 1.6;
       }
 
       .stats-row .stats-title {
         font-weight: 800;
-        margin-right: 15px;
+        display: block; /* Uma linha */
       }
 
-      .stats-row .stats-values {
+      .stats-row .stats-line {
+        display: block;
         font-weight: 600;
+      }
+
+      .stats-row .stats-indent {
+        display: block;
+        font-weight: 600;
+        margin-left: 220px; /* Indentação */
       }
 
       /* --- PLAYER CONTROLS (COLUNA 1) --- */
@@ -447,8 +455,8 @@
         </div>
 
         <div class="stats-row">
-          <span class="stats-title">Estatísticas:</span>
-          <span class="stats-values">{{total}} músicas totais, {{unique}} artistas únicos</span>
+          <span class="stats-title">Estatísticas: {{total}} músicas ouvidas</span>
+          <span class="stats-indent">{{unique}} artistas únicos</span>
         </div>
       </div>
 
