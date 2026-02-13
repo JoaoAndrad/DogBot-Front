@@ -816,7 +816,7 @@ const spotifyFlow = createFlow("spotify", {
 
           const img = await renderCard(templateData, {
             width: 746,
-            height: 900,
+            height: 100,
             outputWidth: 746,
           });
           const { MessageMedia } = require("whatsapp-web.js");
