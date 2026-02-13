@@ -29,16 +29,16 @@
         position: relative;
         display: flex;
         flex-direction: column;
-        padding: 40px 40px 60px 40px; /* Padding para conteúdo não ficar nas bordas */
+        padding: 0; /* Remove padding para mosaico colar nas bordas */
         box-sizing: border-box;
       }
 
       /* --- MOSAICO DE ÁLBUNS (POSICIONAMENTO ABSOLUTO) --- */
       .mosaic-container {
         position: relative;
-        height: 750px; /* Aumentado de 600px para 750px */
-        width: 1000px;
-        margin: 0 auto 30px auto;
+        height: 680px; /* Aumentado de 600px para 680px para acomodar os álbuns mais baixos */
+        width: 1080px; /* Largura total do Instagram Story */
+        margin: 0; /* Sem margem para colar nas bordas */
         overflow: hidden;
       }
 
@@ -56,8 +56,8 @@
       .alb-1 {
         /* Vinho */
         background-color: #720018;
-        width: 320px; /* Aumentado de 260px */
-        height: 320px;
+        width: 260px;
+        height: 260px;
         top: 0;
         left: 0;
         z-index: 1;
@@ -65,28 +65,28 @@
       .alb-2 {
         /* Verde Bandeira */
         background-color: #1aab4e;
-        width: 320px;
-        height: 320px;
+        width: 260px;
+        height: 260px;
         top: 0;
-        left: 325px; /* Ajustado proporcionalmente */
+        left: 270px; /* Ajustado para colar melhor */
         z-index: 1;
       }
       .alb-3 {
         /* Azul Royal */
         background-color: #3b4cca;
-        width: 320px;
-        height: 320px;
+        width: 260px;
+        height: 260px;
         top: 0;
-        left: 650px;
+        left: 540px;
         z-index: 1;
       }
       .alb-4 {
         /* Azul Acinzentado */
         background-color: #728ebb;
-        width: 270px; /* Aumentado de 220px */
-        height: 270px;
+        width: 280px; /* Aumentado para cobrir até a borda direita */
+        height: 260px;
         top: 0;
-        left: 975px;
+        left: 810px;
         z-index: 1;
       }
 
@@ -94,9 +94,9 @@
       .alb-5 {
         /* Roxo */
         background-color: #a04ba0;
-        width: 360px; /* Aumentado de 290px */
-        height: 370px; /* Aumentado de 300px */
-        top: 300px; /* Ajustado proporcionalmente */
+        width: 290px;
+        height: 320px; /* Aumentado de 300px */
+        top: 310px; /* Aumentado de 240px para descer mais */
         left: 0;
         z-index: 2;
       }
@@ -104,44 +104,44 @@
       .alb-6 {
         /* Amarelo Ouro */
         background-color: #ffcc00;
-        width: 370px; /* Aumentado de 300px */
-        height: 370px;
-        top: 280px; /* Ajustado */
-        left: 260px; /* Ajustado */
+        width: 300px;
+        height: 320px; /* Aumentado de 300px */
+        top: 290px; /* Aumentado de 220px */
+        left: 220px;
         z-index: 3;
       }
 
       .alb-7 {
         /* Verde Limão */
         background-color: #b3d828;
-        width: 370px;
-        height: 370px;
-        top: 290px;
-        left: 550px;
+        width: 300px;
+        height: 320px; /* Aumentado de 300px */
+        top: 305px; /* Aumentado de 235px */
+        left: 460px;
         z-index: 4;
       }
 
       .alb-8 {
         /* Ciano */
         background-color: #2bc3f3;
-        width: 370px;
-        height: 370px;
-        top: 260px;
-        left: 870px;
+        width: 320px; /* Aumentado para cobrir até a borda direita */
+        height: 320px; /* Aumentado de 300px */
+        top: 280px; /* Aumentado de 210px */
+        left: 760px;
         z-index: 5;
       }
 
       /* --- TIPOGRAFIA --- */
       h1 {
         text-align: center;
-        font-size: 3rem; /* Aumentado de 1.8rem para 3rem */
-        margin: 0 0 20px 0;
-        font-weight: 800; /* Extra Bold */
+        font-size: 3rem;
+        margin: 30px 0 20px 0; /* Adiciona margem superior */
+        font-weight: 800;
         letter-spacing: -0.5px;
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
-        padding: 0 20px; /* Padding lateral para o título */
+        padding: 0 40px; /* Padding lateral para não colar nas bordas */
       }
 
       .subtitle {
