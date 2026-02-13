@@ -29,6 +29,7 @@
         flex-direction: column;
         padding: 0; /* Remove todo padding */
         box-sizing: border-box;
+        min-height: 100vh; /* Garante altura mínima para posicionar o logo */
       }
 
       /* --- MOSAICO DE ÁLBUNS (POSICIONAMENTO ABSOLUTO) --- */
@@ -374,16 +375,13 @@
 
       /* --- LOGO --- */
       .logo {
-        position: fixed;
+        position: absolute;
         bottom: 20px;
         right: 20px;
         width: 50px;
         height: 50px;
         opacity: 0.8;
         z-index: 1000;
-        filter: brightness(1.2) contrast(1.2);
-        /* Inverte as cores para que o logo branco fique visível no fundo preto */
-        filter: invert(1) brightness(0.8);
       }
     </style>
   </head>

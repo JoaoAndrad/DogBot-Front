@@ -95,21 +95,32 @@ async function renderCard(data, opts = {}) {
 
   // Convert logo to base64 if logoPath is provided
   console.log("[statsCard/LOGO] logoPath recebido:", data.logoPath);
-  
+
   if (data.logoPath) {
-    console.log("[statsCard/LOGO] Verificando se arquivo existe:", data.logoPath);
+    console.log(
+      "[statsCard/LOGO] Verificando se arquivo existe:",
+      data.logoPath,
+    );
     const exists = fs.existsSync(data.logoPath);
     console.log("[statsCard/LOGO] Arquivo existe?", exists);
-    
+
     if (exists) {
       try {
         console.log("[statsCard/LOGO] Lendo arquivo do logo...");
         const logoBuffer = fs.readFileSync(data.logoPath);
-        console.log("[statsCard/LOGO] Logo lido, tamanho:", logoBuffer.length, "bytes");
-        
-        const logoBase64 = logoBuffer.toString('base64');
-        console.log("[statsCard/LOGO] Logo convertido para base64, tamanho:", logoBase64.length, "caracteres");
-        
+        console.log(
+          "[statsCard/LOGO] Logo lido, tamanho:",
+          logoBuffer.length,
+          "bytes",
+        );
+
+        const logoBase64 = logoBuffer.toString("base64");
+        console.log(
+          "[statsCard/LOGO] Logo convertido para base64, tamanho:",
+          logoBase64.length,
+          "caracteres",
+        );
+
         data.logoBase64 = `data:image/png;base64,${logoBase64}`;
         console.log("[statsCard/LOGO] ✅ Logo base64 configurado com sucesso");
       } catch (err) {
@@ -117,7 +128,10 @@ async function renderCard(data, opts = {}) {
         data.logoBase64 = "";
       }
     } else {
-      console.warn("[statsCard/LOGO] ⚠️ Arquivo de logo não encontrado:", data.logoPath);
+      console.warn(
+        "[statsCard/LOGO] ⚠️ Arquivo de logo não encontrado:",
+        data.logoPath,
+      );
       data.logoBase64 = "";
     }
   } else {
@@ -131,11 +145,14 @@ async function renderCard(data, opts = {}) {
     html.length,
     "caracteres",
   );
-  
+
   // Log para verificar se logoBase64 está no HTML
   if (data.logoBase64) {
     const hasLogoInHtml = html.includes('class="logo"');
-    console.log("[statsCard/LOGO] Tag de logo presente no HTML?", hasLogoInHtml);
+    console.log(
+      "[statsCard/LOGO] Tag de logo presente no HTML?",
+      hasLogoInHtml,
+    );
   }
 
   let browser = null;
