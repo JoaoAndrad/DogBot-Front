@@ -29,7 +29,7 @@
         flex-direction: column;
         padding: 0; /* Remove todo padding */
         box-sizing: border-box;
-        min-height: 100vh; /* Garante altura mínima para posicionar o logo */
+        padding-bottom: 20px; /* Apenas um pequeno padding inferior */
       }
 
       /* --- MOSAICO DE ÁLBUNS (POSICIONAMENTO ABSOLUTO) --- */
@@ -169,7 +169,7 @@
         align-items: start;
         justify-content: center; /* Centraliza as colunas */
         width: 100%;
-        padding: 0 20px 80px 20px; /* Aumentado o padding-bottom para 80px para dar espaço ao logo */
+        padding: 0 20px 20px 20px; /* Voltando ao padding original */
         box-sizing: border-box;
         margin-top: 0; /* Remove margem negativa */
       }
@@ -381,8 +381,8 @@
         height: 50px;
         opacity: 0.8;
         z-index: 1000;
-        /* Posiciona o logo alinhado com o waveform (terceira coluna) */
-        bottom: 75px; /* Ajusta para ficar alinhado horizontalmente com o player */
+        /* Posiciona o logo alinhado com o centro do player */
+        bottom: 40px; /* Ajustado para alinhar com o player (reduzido de 75px) */
       }
     </style>
   </head>
