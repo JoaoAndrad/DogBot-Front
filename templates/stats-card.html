@@ -221,22 +221,24 @@
         font-size: 2.8rem;
         font-weight: 700;
         display: flex;
-        flex-direction: column;
-        gap: 8px;
-      }
-
-      .stats-row .stats-line {
-        display: flex;
-        align-items: baseline;
+        align-items: flex-start;
+        gap: 40px; /* Espaço entre "Estatísticas:" e os valores */
       }
 
       .stats-row .stats-label {
         font-weight: 800;
-        min-width: 150px; /* Metade de 300px */
+        white-space: nowrap;
       }
 
-      .stats-row .stats-value {
+      .stats-row .stats-values {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
         font-weight: 600;
+      }
+
+      .stats-row .stats-values .stat-item {
+        display: block;
       }
 
       /* --- PLAYER CONTROLS (COLUNA 1) --- */
@@ -454,13 +456,10 @@
         </div>
 
         <div class="stats-row">
-          <div class="stats-line">
-            <span class="stats-label">Estatísticas:</span>
-            <span class="stats-value">{{total}} músicas ouvidas</span>
-          </div>
-          <div class="stats-line">
-            <span class="stats-label"></span>
-            <span class="stats-value">{{unique}} artistas únicos</span>
+          <span class="stats-label">Estatísticas:</span>
+          <div class="stats-values">
+            <span class="stat-item">{{total}} músicas ouvidas</span>
+            <span class="stat-item">{{unique}} artistas únicos</span>
           </div>
         </div>
       </div>
