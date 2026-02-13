@@ -572,7 +572,8 @@ const spotifyFlow = createFlow("spotify", {
           const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
           url += `&from=${encodeURIComponent(monthStart.toISOString())}`;
           url += `&to=${encodeURIComponent(new Date().toISOString())}`;
-          displayLabel = "Esse mês";
+          // Gera o nome do mês em português (minúsculo)
+          displayLabel = now.toLocaleString('pt-BR', { month: 'long' });
         } else {
           if (days && Number(days) > 0) url += `&days=${Number(days)}`;
           displayLabel =
@@ -815,9 +816,9 @@ const spotifyFlow = createFlow("spotify", {
           };
 
           const img = await renderCard(templateData, {
-            width: 746,
+            width: 706,
             height: 100,
-            outputWidth: 746,
+            outputWidth: 706,
           });
           const { MessageMedia } = require("whatsapp-web.js");
           const media = new MessageMedia("image/png", img.toString("base64"));

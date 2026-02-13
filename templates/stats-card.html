@@ -1,368 +1,447 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="pt-BR">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Resumo Musical - League Spartan</title>
     <style>
-        /* Importando a fonte League Spartan */
-        @import url('https://fonts.googleapis.com/css2?family=League+Spartan:wght@400;500;700;800;900&display=swap');
+      /* Importando a fonte League Spartan */
+      @import url("https://fonts.googleapis.com/css2?family=League+Spartan:wght@400;500;700;800;900&display=swap");
 
-        body {
-            background-color: #000;
-            color: #fff;
-            font-family: 'League Spartan', sans-serif;
-            margin: 0;
-            padding: 20px;
-            display: flex;
-            justify-content: center;
-            overflow-x: hidden;
-            width: 746px; /* Largura exata: 706px do mosaico + 40px de padding */
-            box-sizing: border-box;
-        }
+      body {
+        background-color: #000;
+        color: #fff;
+        font-family: "League Spartan", sans-serif;
+        margin: 0;
+        padding: 0;
+        display: flex;
+        justify-content: flex-start;
+        overflow-x: hidden;
+        width: 706px; /* Largura exata do mosaico */
+        box-sizing: border-box;
+      }
 
-        .container {
-            width: 100%;
-            max-width: 686px; /* Largura exata do mosaico (546px dos albums + 140px de margem) */
-            position: relative;
-            display: flex;
-            flex-direction: column;
-        }
+      .container {
+        width: 100%;
+        max-width: 706px; /* Largura exata do mosaico */
+        position: relative;
+        display: flex;
+        flex-direction: column;
+        padding: 0 20px 20px 20px; /* Padding apenas nas laterais e embaixo, não no topo */
+        box-sizing: border-box;
+      }
 
-        /* --- MOSAICO DE ÁLBUNS (POSICIONAMENTO ABSOLUTO) --- */
+      /* --- MOSAICO DE ÁLBUNS (POSICIONAMENTO ABSOLUTO) --- */
+      .mosaic-container {
+        position: relative;
+        height: 380px; /* Reduzido de 450px para 380px */
+        width: 100%; /* Usa 100% da largura do container */
+        margin: 0 -20px 10px -20px; /* Margem negativa para compensar o padding do container */
+        overflow: hidden; /* Esconde o que ultrapassar */
+      }
+
+      .album {
+        position: absolute;
+        box-sizing: border-box;
+        background-size: cover;
+        background-position: center;
+        background-repeat: no-repeat;
+      }
+
+      /* CONFIGURAÇÃO DAS CORES E POSIÇÕES BASEADA NA IMAGEM */
+
+      /* FILEIRA DE TRÁS (Cores escuras/topo) - Z-INDEX BAIXO */
+      .alb-1 {
+        /* Vinho */
+        background-color: #720018;
+        width: 180px;
+        height: 180px;
+        top: 0;
+        left: 0;
+        z-index: 1;
+      }
+      .alb-2 {
+        /* Verde Bandeira */
+        background-color: #1aab4e;
+        width: 180px;
+        height: 180px;
+        top: 0;
+        left: 182px;
+        z-index: 1;
+      }
+      .alb-3 {
+        /* Azul Royal */
+        background-color: #3b4cca;
+        width: 180px;
+        height: 180px;
+        top: 0;
+        left: 364px;
+        z-index: 1;
+      }
+      .alb-4 {
+        /* Azul Acinzentado */
+        background-color: #728ebb;
+        width: 160px;
+        height: 160px;
+        top: 0;
+        left: 546px; /* Cortado na direita */
+        z-index: 1;
+      }
+
+      /* FILEIRA DA FRENTE (Sobreposições) - Z-INDEX ALTO */
+      /* Nota: Na imagem, eles parecem maiores e descem mais */
+
+      .alb-5 {
+        /* Roxo */
+        background-color: #a04ba0;
+        width: 200px;
+        height: 210px; /* Reduzido de 260px para 210px */
+        top: 150px;
+        left: 0;
+        z-index: 2;
+      }
+
+      .alb-6 {
+        /* Amarelo Ouro */
+        background-color: #ffcc00;
+        width: 210px;
+        height: 210px;
+        top: 110px;
+        left: 150px;
+        z-index: 3;
+      }
+
+      .alb-7 {
+        /* Verde Limão */
+        background-color: #b3d828;
+        width: 210px;
+        height: 210px;
+        top: 145px;
+        left: 315px;
+        z-index: 4;
+      }
+
+      .alb-8 {
+        /* Ciano */
+        background-color: #2bc3f3;
+        width: 210px;
+        height: 210px;
+        top: 120px;
+        left: 500px;
+        z-index: 5;
+      }
+
+      /* --- TIPOGRAFIA --- */
+      h1 {
+        text-align: center;
+        font-size: 1.8rem;
+        margin: 0 0 10px 0;
+        font-weight: 800; /* Extra Bold */
+        letter-spacing: -0.5px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .subtitle {
+        text-align: left;
+        font-size: 1.5rem;
+        font-weight: 800;
+        margin-bottom: 20px;
+        padding-left: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .green-text {
+        color: #00c853;
+      }
+
+      /* --- GRID DE INFORMAÇÕES (3 COLUNAS) --- */
+      .info-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr 1fr;
+        gap: 25px;
+        align-items: start;
+        width: 100%;
+      }
+
+      .column {
+        min-width: 0; /* Permite truncamento */
+        padding: 0 5px; /* Pequeno padding interno */
+      }
+
+      .column h2 {
+        font-size: 1.3rem;
+        margin: 0 0 12px 0;
+        font-weight: 800;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      ul {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+      }
+
+      li {
+        font-size: 0.95rem;
+        margin-bottom: 6px;
+        font-weight: 700; /* Bold */
+        line-height: 1.3;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .plays {
+        display: block;
+        font-size: 0.65rem;
+        color: #ddd; /* Um pouco mais claro que cinza escuro */
+        font-weight: 500;
+        margin-top: 1px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      /* --- PLAYER CONTROLS (COLUNA 1) --- */
+      .player-container {
+        margin-top: 20px;
+        width: 100%;
+      }
+
+      .progress-bar {
+        width: 100%;
+        height: 3px;
+        background-color: #555;
+        border-radius: 2px;
+        position: relative;
+        margin-bottom: 12px;
+      }
+
+      .progress-active {
+        width: 30%;
+        height: 100%;
+        background-color: #fff;
+        border-radius: 2px;
+        position: relative;
+      }
+
+      .progress-dot {
+        position: absolute;
+        right: -5px;
+        top: -3px;
+        width: 9px;
+        height: 9px;
+        background-color: #fff;
+        border-radius: 50%;
+      }
+
+      .controls {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        font-size: 1rem;
+      }
+
+      .play-button {
+        background: #fff;
+        color: #000;
+        border-radius: 50%;
+        width: 28px;
+        height: 28px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 0.8rem;
+      }
+
+      .control-icon {
+        cursor: pointer;
+        opacity: 0.9;
+      }
+      .control-icon:hover {
+        opacity: 1;
+      }
+
+      /* --- WAVEFORM (COLUNA 3) --- */
+      .waveform-container {
+        display: flex;
+        align-items: center;
+        justify-content: flex-start; /* Alinhado à esquerda como na imagem */
+        gap: 2px;
+        height: 35px;
+        margin-top: 30px;
+      }
+
+      .wave-bar {
+        width: 2.5px;
+        background-color: #fff;
+        border-radius: 2px;
+      }
+
+      /* Alturas estáticas para simular a imagem */
+      .w1 {
+        height: 12px;
+      }
+      .w2 {
+        height: 20px;
+      }
+      .w3 {
+        height: 33px;
+      }
+      .w4 {
+        height: 25px;
+      }
+      .w5 {
+        height: 16px;
+      }
+      .w6 {
+        height: 29px;
+      }
+      .w7 {
+        height: 20px;
+      }
+      .w8 {
+        height: 8px;
+      }
+      .w9 {
+        height: 25px;
+      }
+      .w10 {
+        height: 16px;
+      }
+      .w11 {
+        height: 33px;
+      }
+      .w12 {
+        height: 20px;
+      }
+      .w13 {
+        height: 12px;
+      }
+      .w14 {
+        height: 8px;
+      }
+      .w15 {
+        height: 16px;
+      }
+
+      @media (max-width: 700px) {
         .mosaic-container {
-            position: relative;
-            height: 380px; /* Reduzido de 450px para 380px */
-            width: 706px; /* Largura total do mosaico */
-            margin-bottom: 10px;
-            overflow: hidden; /* Esconde o que ultrapassar */
+          transform: scale(0.6);
+          transform-origin: top left;
+          margin-bottom: -150px;
+          width: 150%;
         }
-
-        .album {
-            position: absolute;
-            box-sizing: border-box;
-            background-size: cover;
-            background-position: center;
-            background-repeat: no-repeat;
-        }
-
-        /* CONFIGURAÇÃO DAS CORES E POSIÇÕES BASEADA NA IMAGEM */
-        
-        /* FILEIRA DE TRÁS (Cores escuras/topo) - Z-INDEX BAIXO */
-        .alb-1 { /* Vinho */
-            background-color: #720018; 
-            width: 180px; height: 180px;
-            top: 0; left: 0;
-            z-index: 1;
-        }
-        .alb-2 { /* Verde Bandeira */
-            background-color: #1aab4e;
-            width: 180px; height: 180px;
-            top: 0; left: 182px;
-            z-index: 1;
-        }
-        .alb-3 { /* Azul Royal */
-            background-color: #3b4cca;
-            width: 180px; height: 180px;
-            top: 0; left: 364px;
-            z-index: 1;
-        }
-        .alb-4 { /* Azul Acinzentado */
-            background-color: #728ebb;
-            width: 160px; height: 160px;
-            top: 0; left: 546px; /* Cortado na direita */
-            z-index: 1;
-        }
-
-        /* FILEIRA DA FRENTE (Sobreposições) - Z-INDEX ALTO */
-        /* Nota: Na imagem, eles parecem maiores e descem mais */
-        
-        .alb-5 { /* Roxo */
-            background-color: #a04ba0;
-            width: 200px; height: 210px; /* Reduzido de 260px para 210px */
-            top: 150px; left: 0;
-            z-index: 2;
-        }
-
-        .alb-6 { /* Amarelo Ouro */
-            background-color: #ffcc00;
-            width: 210px; height: 210px;
-            top: 110px; left: 150px;
-            z-index: 3;
-        }
-
-        .alb-7 { /* Verde Limão */
-            background-color: #b3d828;
-            width: 210px; height: 210px;
-            top: 145px; left: 315px;
-            z-index: 4;
-        }
-
-        .alb-8 { /* Ciano */
-            background-color: #2bc3f3;
-            width: 210px; height: 210px;
-            top: 120px; left: 500px;
-            z-index: 5;
-        }
-
-
-        /* --- TIPOGRAFIA --- */
-        h1 {
-            text-align: center;
-            font-size: 1.8rem;
-            margin: 0 0 10px 0;
-            font-weight: 800; /* Extra Bold */
-            letter-spacing: -0.5px;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            white-space: nowrap;
-        }
-
-        .subtitle {
-            text-align: left;
-            font-size: 1.5rem;
-            font-weight: 800;
-            margin-bottom: 20px;
-            padding-left: 0;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            white-space: nowrap;
-        }
-        
-        .green-text { 
-            color: #00c853; 
-        }
-
-        /* --- GRID DE INFORMAÇÕES (3 COLUNAS) --- */
         .info-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr 1fr;
-            gap: 25px;
-            align-items: start;
-            width: 100%;
+          grid-template-columns: 1fr;
+          gap: 25px;
         }
-
-        .column {
-            min-width: 0; /* Permite truncamento */
-            padding: 0 5px; /* Pequeno padding interno */
+        h1 {
+          font-size: 1.3rem;
         }
-
+        .subtitle {
+          font-size: 1.1rem;
+        }
         .column h2 {
-            font-size: 1.3rem;
-            margin: 0 0 12px 0;
-            font-weight: 800;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            white-space: nowrap;
+          font-size: 1.1rem;
         }
-
-        ul {
-            list-style: none;
-            padding: 0;
-            margin: 0;
-        }
-
         li {
-            font-size: 0.95rem;
-            margin-bottom: 6px;
-            font-weight: 700; /* Bold */
-            line-height: 1.3;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            white-space: nowrap;
+          font-size: 0.85rem;
         }
-
-        .plays {
-            display: block;
-            font-size: 0.65rem;
-            color: #ddd; /* Um pouco mais claro que cinza escuro */
-            font-weight: 500;
-            margin-top: 1px;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            white-space: nowrap;
-        }
-
-        /* --- PLAYER CONTROLS (COLUNA 1) --- */
-        .player-container {
-            margin-top: 20px;
-            width: 100%;
-        }
-
-        .progress-bar {
-            width: 100%;
-            height: 3px;
-            background-color: #555;
-            border-radius: 2px;
-            position: relative;
-            margin-bottom: 12px;
-        }
-
-        .progress-active {
-            width: 30%;
-            height: 100%;
-            background-color: #fff;
-            border-radius: 2px;
-            position: relative;
-        }
-
-        .progress-dot {
-            position: absolute;
-            right: -5px;
-            top: -3px;
-            width: 9px;
-            height: 9px;
-            background-color: #fff;
-            border-radius: 50%;
-        }
-
-        .controls {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            font-size: 1rem;
-        }
-        
-        .play-button {
-            background: #fff;
-            color: #000;
-            border-radius: 50%;
-            width: 28px;
-            height: 28px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 0.8rem;
-        }
-        
-        .control-icon {
-            cursor: pointer;
-            opacity: 0.9;
-        }
-        .control-icon:hover { opacity: 1; }
-
-
-        /* --- WAVEFORM (COLUNA 3) --- */
-        .waveform-container {
-            display: flex;
-            align-items: center;
-            justify-content: flex-start; /* Alinhado à esquerda como na imagem */
-            gap: 2px;
-            height: 35px;
-            margin-top: 30px;
-        }
-
-        .wave-bar {
-            width: 2.5px;
-            background-color: #fff;
-            border-radius: 2px;
-        }
-
-        /* Alturas estáticas para simular a imagem */
-        .w1 { height: 12px; } .w2 { height: 20px; } .w3 { height: 33px; }
-        .w4 { height: 25px; } .w5 { height: 16px; } .w6 { height: 29px; }
-        .w7 { height: 20px; } .w8 { height: 8px; } .w9 { height: 25px; }
-        .w10 { height: 16px; } .w11 { height: 33px; } .w12 { height: 20px; }
-        .w13 { height: 12px; } .w14 { height: 8px; } .w15 { height: 16px; }
-
-        @media (max-width: 700px) {
-            .mosaic-container { transform: scale(0.6); transform-origin: top left; margin-bottom: -150px; width: 150%; }
-            .info-grid { grid-template-columns: 1fr; gap: 25px; }
-            h1 { font-size: 1.3rem; }
-            .subtitle { font-size: 1.1rem; }
-            .column h2 { font-size: 1.1rem; }
-            li { font-size: 0.85rem; }
-        }
-
+      }
     </style>
-</head>
-<body>
-
+  </head>
+  <body>
     <div class="container">
-        
-        <div class="mosaic-container">
-            {{#each albumImages}}
-            {{#if @index}}
-            {{#unless (gt @index 7)}}
-            <div class="album alb-{{indexPlusOne @index}}" style="background-image: url('{{this}}');"></div>
-            {{/unless}}
-            {{else}}
-            <div class="album alb-1" style="background-image: url('{{this}}');"></div>
-            {{/if}}
+      <div class="mosaic-container">
+        {{#each albumImages}} {{#if @index}} {{#unless (gt @index 7)}}
+        <div
+          class="album alb-{{indexPlusOne @index}}"
+          style="background-image: url('{{this}}');"
+        ></div>
+        {{/unless}} {{else}}
+        <div
+          class="album alb-1"
+          style="background-image: url('{{this}}');"
+        ></div>
+        {{/if}} {{/each}}
+      </div>
+
+      <h1>Meu resumo musical {{formatPeriod period}}</h1>
+
+      <div class="subtitle">
+        Tempo ouvindo: <span class="green-text">{{time}} minutos</span>
+      </div>
+
+      <div class="info-grid">
+        <div class="column">
+          <h2>Top artistas</h2>
+          <ul>
+            {{#each top5Artists}}
+            <li>{{indexPlusOne @index}} {{this.name}}</li>
             {{/each}}
+          </ul>
+
+          <div class="player-container">
+            <div class="progress-bar">
+              <div class="progress-active">
+                <div class="progress-dot"></div>
+              </div>
+            </div>
+            <div class="controls">
+              <span class="control-icon">🔀</span>
+              <span class="control-icon">⏮</span>
+              <div class="play-button">❚❚</div>
+              <span class="control-icon">⏭</span>
+              <span class="control-icon">↻</span>
+            </div>
+          </div>
         </div>
 
-        <h1>Meu resumo musical {{formatPeriod period}}</h1>
-        
-        <div class="subtitle">
-            Tempo ouvindo: <span class="green-text">{{time}} minutos</span>
+        <div class="column">
+          <h2>Top músicas</h2>
+          <ul>
+            {{#each top5Songs}}
+            <li>
+              {{indexPlusOne @index}} {{this.song}}
+              <span class="plays">{{this.plays}} plays</span>
+            </li>
+            {{/each}}
+          </ul>
         </div>
 
-        <div class="info-grid">
-            <div class="column">
-                <h2>Top artistas</h2>
-                <ul>
-                    {{#each top5Artists}}
-                    <li>{{indexPlusOne @index}} {{this.name}}</li>
-                    {{/each}}
-                </ul>
-                
-                <div class="player-container">
-                    <div class="progress-bar">
-                        <div class="progress-active">
-                            <div class="progress-dot"></div>
-                        </div>
-                    </div>
-                    <div class="controls">
-                        <span class="control-icon">🔀</span>
-                        <span class="control-icon">⏮</span>
-                        <div class="play-button">❚❚</div>
-                        <span class="control-icon">⏭</span>
-                        <span class="control-icon">↻</span>
-                    </div>
-                </div>
-            </div>
+        <div class="column">
+          <h2>Estatísticas</h2>
+          <ul>
+            <li>{{total}} músicas totais</li>
+            <li>{{unique}} artistas únicos</li>
+          </ul>
 
-            <div class="column">
-                <h2>Top músicas</h2>
-                <ul>
-                    {{#each top5Songs}}
-                    <li>
-                        {{indexPlusOne @index}} {{this.song}}
-                        <span class="plays">{{this.plays}} plays</span>
-                    </li>
-                    {{/each}}
-                </ul>
-            </div>
-
-            <div class="column">
-                <h2>Estatísticas</h2>
-                <ul>
-                    <li>{{total}} músicas totais</li>
-                    <li>{{unique}} artistas únicos</li>
-                </ul>
-
-                <div class="waveform-container">
-                    <div class="wave-bar w1"></div>
-                    <div class="wave-bar w2"></div>
-                    <div class="wave-bar w3"></div>
-                    <div class="wave-bar w4"></div>
-                    <div class="wave-bar w5"></div>
-                    <div class="wave-bar w6"></div>
-                    <div class="wave-bar w7"></div>
-                    <div class="wave-bar w8"></div>
-                    <div class="wave-bar w9"></div>
-                    <div class="wave-bar w10"></div>
-                    <div class="wave-bar w11"></div>
-                    <div class="wave-bar w12"></div>
-                    <div class="wave-bar w13"></div>
-                    <div class="wave-bar w14"></div>
-                    <div class="wave-bar w15"></div>
-                </div>
-            </div>
+          <div class="waveform-container">
+            <div class="wave-bar w1"></div>
+            <div class="wave-bar w2"></div>
+            <div class="wave-bar w3"></div>
+            <div class="wave-bar w4"></div>
+            <div class="wave-bar w5"></div>
+            <div class="wave-bar w6"></div>
+            <div class="wave-bar w7"></div>
+            <div class="wave-bar w8"></div>
+            <div class="wave-bar w9"></div>
+            <div class="wave-bar w10"></div>
+            <div class="wave-bar w11"></div>
+            <div class="wave-bar w12"></div>
+            <div class="wave-bar w13"></div>
+            <div class="wave-bar w14"></div>
+            <div class="wave-bar w15"></div>
+          </div>
         </div>
-
+      </div>
     </div>
-
-</body>
+  </body>
 </html>
