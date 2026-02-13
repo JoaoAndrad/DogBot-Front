@@ -9,7 +9,17 @@ module.exports = {
   async execute(ctx) {
     const { message, client, reply } = ctx;
     const chatId = message.from;
-    const userId = message.author || message.from;
+    
+    // Usar getContact() para obter o número real (@c.us) ao invés de @lid
+    let userId = message.author || message.from;
+    try {
+      const contact = await message.getContact();
+      if (contact && contact.id && contact.id._serialized) {
+        userId = contact.id._serialized;
+      }
+    } catch (err) {
+      logger.error("[stats] Error getting contact:", err.message);
+    }
 
     try {
       // Abrir o Spotify Flow diretamente no menu de estatísticas
