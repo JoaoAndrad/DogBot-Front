@@ -858,9 +858,10 @@ const spotifyFlow = createFlow("spotify", {
 
           // Use the display label derived from the selected option (no fallback to hardcoded "Esse mês")
           const path = require("path");
-          const logoPath = path.join(__dirname, "..", "..", "..", "templates", "logo.png");
+          // Caminho correto: em produção fica em /application/templates/logo.png
+          const logoPath = path.join(process.cwd(), "templates", "logo.png");
           console.log("[spotifyFlow/LOGO] Caminho do logo calculado:", logoPath);
-          console.log("[spotifyFlow/LOGO] __dirname atual:", __dirname);
+          console.log("[spotifyFlow/LOGO] process.cwd():", process.cwd());
           
           const templateData = {
             period: displayLabel,
@@ -994,7 +995,8 @@ const spotifyFlow = createFlow("spotify", {
 
         const sum = json.summary || {};
         const path = require("path");
-        const logoPath = path.join(__dirname, "..", "..", "..", "templates", "logo.png");
+        // Caminho correto: em produção fica em /application/templates/logo.png
+        const logoPath = path.join(process.cwd(), "templates", "logo.png");
         console.log("[spotifyFlow/LOGO/statsMonth] Caminho do logo:", logoPath);
 
         const templateData = {
