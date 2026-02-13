@@ -15,28 +15,30 @@
         margin: 0;
         padding: 0;
         display: flex;
-        justify-content: flex-start;
+        justify-content: center;
+        align-items: center;
         overflow-x: hidden;
-        width: 706px; /* Largura exata do mosaico */
+        width: 1080px; /* Largura do Instagram Story */
+        min-height: 1920px; /* Altura do Instagram Story */
         box-sizing: border-box;
       }
 
       .container {
         width: 100%;
-        max-width: 706px; /* Largura exata do mosaico */
+        max-width: 1080px; /* Largura do Instagram Story */
         position: relative;
         display: flex;
         flex-direction: column;
-        padding: 0; /* Remove todo padding */
+        padding: 40px 40px 60px 40px; /* Padding para conteúdo não ficar nas bordas */
         box-sizing: border-box;
       }
 
       /* --- MOSAICO DE ÁLBUNS (POSICIONAMENTO ABSOLUTO) --- */
       .mosaic-container {
         position: relative;
-        height: 380px; /* Reduzido de 450px para 380px */
-        width: 706px; /* Largura fixa de 706px */
-        margin: 0 0 10px 0; /* Sem margens laterais */
+        height: 600px; /* Aumentado de 380px para 600px */
+        width: 1000px; /* Aumentado de 706px para 1000px */
+        margin: 0 auto 30px auto; /* Centralizado com margem inferior maior */
         overflow: hidden; /* Esconde o que ultrapassar */
       }
 
@@ -54,8 +56,8 @@
       .alb-1 {
         /* Vinho */
         background-color: #720018;
-        width: 180px;
-        height: 180px;
+        width: 260px; /* Aumentado de 180px */
+        height: 260px;
         top: 0;
         left: 0;
         z-index: 1;
@@ -63,40 +65,38 @@
       .alb-2 {
         /* Verde Bandeira */
         background-color: #1aab4e;
-        width: 180px;
-        height: 180px;
+        width: 260px;
+        height: 260px;
         top: 0;
-        left: 182px;
+        left: 265px; /* Ajustado proporcionalmente */
         z-index: 1;
       }
       .alb-3 {
         /* Azul Royal */
         background-color: #3b4cca;
-        width: 180px;
-        height: 180px;
+        width: 260px;
+        height: 260px;
         top: 0;
-        left: 364px;
+        left: 530px;
         z-index: 1;
       }
       .alb-4 {
         /* Azul Acinzentado */
         background-color: #728ebb;
-        width: 160px;
-        height: 160px;
+        width: 220px; /* Aumentado de 160px */
+        height: 220px;
         top: 0;
-        left: 546px; /* Cortado na direita */
+        left: 795px;
         z-index: 1;
       }
 
       /* FILEIRA DA FRENTE (Sobreposições) - Z-INDEX ALTO */
-      /* Nota: Na imagem, eles parecem maiores e descem mais */
-
       .alb-5 {
         /* Roxo */
         background-color: #a04ba0;
-        width: 200px;
-        height: 210px; /* Reduzido de 260px para 210px */
-        top: 150px;
+        width: 290px; /* Aumentado de 200px */
+        height: 300px; /* Aumentado de 210px */
+        top: 240px; /* Ajustado proporcionalmente */
         left: 0;
         z-index: 2;
       }
@@ -104,38 +104,38 @@
       .alb-6 {
         /* Amarelo Ouro */
         background-color: #ffcc00;
-        width: 210px;
-        height: 210px;
-        top: 130px;
-        left: 150px;
+        width: 300px; /* Aumentado de 210px */
+        height: 300px;
+        top: 220px; /* Ajustado */
+        left: 210px; /* Ajustado */
         z-index: 3;
       }
 
       .alb-7 {
         /* Verde Limão */
         background-color: #b3d828;
-        width: 210px;
-        height: 210px;
-        top: 145px;
-        left: 315px;
+        width: 300px;
+        height: 300px;
+        top: 235px;
+        left: 450px;
         z-index: 4;
       }
 
       .alb-8 {
         /* Ciano */
         background-color: #2bc3f3;
-        width: 210px;
-        height: 210px;
-        top: 120px;
-        left: 500px;
+        width: 300px;
+        height: 300px;
+        top: 210px;
+        left: 710px;
         z-index: 5;
       }
 
       /* --- TIPOGRAFIA --- */
       h1 {
         text-align: center;
-        font-size: 1.8rem;
-        margin: 0 0 10px 0;
+        font-size: 3rem; /* Aumentado de 1.8rem para 3rem */
+        margin: 0 0 20px 0;
         font-weight: 800; /* Extra Bold */
         letter-spacing: -0.5px;
         overflow: hidden;
@@ -145,10 +145,10 @@
       }
 
       .subtitle {
-        text-align: left;
-        font-size: 1.5rem;
+        text-align: center; /* Centralizado */
+        font-size: 2.5rem; /* Aumentado de 1.5rem para 2.5rem */
         font-weight: 800;
-        margin-bottom: 0; /* Removido completamente o margin-bottom */
+        margin-bottom: 40px; /* Aumentado o margin-bottom */
         grid-column: 1 / -1; /* Ocupa todas as colunas do grid */
         overflow: hidden;
         text-overflow: ellipsis;
@@ -162,25 +162,24 @@
       /* --- GRID DE INFORMAÇÕES (3 COLUNAS) --- */
       .info-grid {
         display: grid;
-        grid-template-columns: auto auto auto; /* auto ao invés de 1fr para compactar */
-        column-gap: 50px; /* Apenas gap horizontal entre colunas */
-        row-gap: 15px; /* Gap vertical pequeno entre linhas */
+        grid-template-columns: 1fr; /* Uma coluna apenas para melhor layout vertical */
+        row-gap: 40px; /* Gap vertical entre seções */
         align-items: start;
-        justify-content: center; /* Centraliza as colunas */
+        justify-content: center;
         width: 100%;
-        padding: 0 20px 20px 20px; /* Voltando ao padding original */
+        padding: 0 40px 40px 40px;
         box-sizing: border-box;
-        margin-top: 0; /* Remove margem negativa */
+        margin-top: 0;
       }
 
       .column {
-        min-width: 0; /* Permite truncamento */
-        max-width: 200px; /* Largura máxima para cada coluna */
+        min-width: 0;
+        max-width: 100%; /* Largura total */
       }
 
       .column h2 {
-        font-size: 1.3rem;
-        margin: 0 0 12px 0;
+        font-size: 2.2rem; /* Aumentado de 1.3rem para 2.2rem */
+        margin: 0 0 20px 0;
         font-weight: 800;
         overflow: hidden;
         text-overflow: ellipsis;
@@ -194,10 +193,10 @@
       }
 
       li {
-        font-size: 0.95rem;
-        margin-bottom: 6px;
+        font-size: 1.6rem; /* Aumentado de 0.95rem para 1.6rem */
+        margin-bottom: 12px;
         font-weight: 700; /* Bold */
-        line-height: 1.3;
+        line-height: 1.4;
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
@@ -205,10 +204,10 @@
 
       .plays {
         display: block;
-        font-size: 0.65rem;
-        color: #ddd; /* Um pouco mais claro que cinza escuro */
+        font-size: 1.2rem; /* Aumentado de 0.65rem para 1.2rem */
+        color: #ddd;
         font-weight: 500;
-        margin-top: 1px;
+        margin-top: 2px;
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
@@ -216,33 +215,36 @@
 
       /* --- PLAYER CONTROLS (COLUNA 1) --- */
       .player-container {
-        margin-top: 20px;
+        margin-top: 30px;
         width: 100%;
+        max-width: 400px; /* Limita largura para melhor proporção */
+        margin-left: auto;
+        margin-right: auto;
       }
 
       .progress-bar {
         width: 100%;
-        height: 3px;
+        height: 5px; /* Aumentado de 3px */
         background-color: #555;
-        border-radius: 2px;
+        border-radius: 3px;
         position: relative;
-        margin-bottom: 12px;
+        margin-bottom: 18px;
       }
 
       .progress-active {
         width: 30%;
         height: 100%;
         background-color: #fff;
-        border-radius: 2px;
+        border-radius: 3px;
         position: relative;
       }
 
       .progress-dot {
         position: absolute;
-        right: -5px;
-        top: -3px;
-        width: 9px;
-        height: 9px;
+        right: -7px;
+        top: -4px;
+        width: 13px; /* Aumentado de 9px */
+        height: 13px;
         background-color: #fff;
         border-radius: 50%;
       }
@@ -251,7 +253,7 @@
         display: flex;
         justify-content: space-between;
         align-items: center;
-        font-size: 0.85rem; /* Reduzido de 1.1rem */
+        font-size: 1.5rem; /* Aumentado de 0.85rem */
         width: 100%;
       }
 
@@ -259,24 +261,24 @@
         background: #fff;
         color: #000;
         border-radius: 50%;
-        width: 26px; /* Reduzido de 32px */
-        height: 26px; /* Reduzido de 32px */
+        width: 45px; /* Aumentado de 26px */
+        height: 45px;
         display: flex;
         align-items: center;
         justify-content: center;
-        font-size: 0.7rem; /* Reduzido de 0.9rem */
+        font-size: 1.2rem; /* Aumentado de 0.7rem */
         font-weight: 900;
       }
 
       .control-icon {
         cursor: pointer;
         opacity: 0.9;
-        font-size: 0.9rem; /* Reduzido de 1.2rem */
+        font-size: 1.6rem; /* Aumentado de 0.9rem */
         display: flex;
         align-items: center;
         justify-content: center;
-        width: 16px; /* Reduzido de 20px */
-        height: 16px; /* Reduzido de 20px */
+        width: 28px; /* Aumentado de 16px */
+        height: 28px;
       }
       .control-icon:hover {
         opacity: 1;
@@ -286,65 +288,66 @@
       .waveform-container {
         display: flex;
         align-items: center;
-        justify-content: space-between; /* Distribui as barras uniformemente */
-        width: 100%; /* Ocupa 100% da largura da coluna */
-        gap: 0; /* Remove gap fixo */
-        height: 35px;
-        margin-top: 30px;
+        justify-content: space-between;
+        width: 100%;
+        max-width: 400px; /* Limita largura */
+        margin: 40px auto 0 auto; /* Centralizado */
+        gap: 0;
+        height: 60px; /* Aumentado de 35px */
       }
 
       .wave-bar {
-        width: 4px; /* Aumentado de 2.5px para 4px */
+        width: 7px; /* Aumentado de 4px */
         background-color: #fff;
-        border-radius: 2px;
-        flex-shrink: 0; /* Impede que as barras encolham */
+        border-radius: 3px;
+        flex-shrink: 0;
       }
 
-      /* Alturas estáticas para simular a imagem */
+      /* Alturas estáticas para simular a imagem - proporcionalmente aumentadas */
       .w1 {
-        height: 12px;
+        height: 20px;
       }
       .w2 {
-        height: 20px;
+        height: 35px;
       }
       .w3 {
-        height: 33px;
+        height: 55px;
       }
       .w4 {
-        height: 25px;
+        height: 42px;
       }
       .w5 {
-        height: 16px;
+        height: 28px;
       }
       .w6 {
-        height: 29px;
+        height: 48px;
       }
       .w7 {
-        height: 20px;
+        height: 35px;
       }
       .w8 {
-        height: 8px;
+        height: 14px;
       }
       .w9 {
-        height: 25px;
+        height: 42px;
       }
       .w10 {
-        height: 16px;
+        height: 28px;
       }
       .w11 {
-        height: 33px;
+        height: 55px;
       }
       .w12 {
-        height: 20px;
+        height: 35px;
       }
       .w13 {
-        height: 12px;
+        height: 20px;
       }
       .w14 {
-        height: 8px;
+        height: 14px;
       }
       .w15 {
-        height: 16px;
+        height: 28px;
       }
 
       @media (max-width: 700px) {
@@ -375,13 +378,12 @@
       /* --- LOGO --- */
       .logo {
         position: absolute;
-        right: 20px;
-        width: 50px;
-        height: 50px;
+        right: 40px;
+        bottom: 40px;
+        width: 80px; /* Aumentado de 50px */
+        height: 80px;
         opacity: 0.8;
         z-index: 1000;
-        /* Posiciona o logo alinhado com o centro do player */
-        bottom: 40px; /* Ajustado para alinhar com o player (reduzido de 75px) */
       }
     </style>
   </head>
