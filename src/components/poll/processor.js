@@ -165,7 +165,23 @@ async function executeAction(result, client) {
       case "menu_spotify":
       case "menu":
         // Menu action: execute directly based on backend decision
-        const menuUserId = data.userId || result.voterId;
+        // Para estatísticas, usar quem votou ao invés de quem criou o menu
+        let menuUserId = result.voterId || data.userId;
+        
+        // Resolver o userId para obter @c.us ao invés de @lid
+        try {
+          const msg = await chat.fetchMessages({ limit: 50 });
+          const voteMsg = msg.find(m => m.author === result.voterId || m.from === result.voterId);
+          if (voteMsg) {
+            const contact = await voteMsg.getContact();
+            if (contact && contact.id && contact.id._serialized) {
+              menuUserId = contact.id._serialized;
+              logger.debug(`[processor] Resolved voter ${result.voterId} to ${menuUserId}`);
+            }
+          }
+        } catch (err) {
+          logger.warn(`[processor] Could not resolve voter contact:`, err.message);
+        }
 
         logger.debug(`[processor] Menu action data:`, {
           flowId: data.flowId,
