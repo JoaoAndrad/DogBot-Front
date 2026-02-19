@@ -243,7 +243,18 @@ function formatWorkoutDescription(ranking, winnersHistory) {
         annualGoal,
       } = entry;
 
-      // Emoji for first place
+      // Medal emoji for top 3, gorilla for first place
+      let prefix;
+      if (rank === 1) {
+        prefix = "🥇";
+      } else if (rank === 2) {
+        prefix = "🥈";
+      } else if (rank === 3) {
+        prefix = "🥉";
+      } else {
+        prefix = `${rank}.`;
+      }
+
       const emoji = rank === 1 ? " 🦍" : "";
 
       const trophy = trophiesInGroup > 0 ? ` (${trophiesInGroup}x 🏆)` : "";
@@ -254,7 +265,7 @@ function formatWorkoutDescription(ranking, winnersHistory) {
           ? ` (${yearWorkouts}/${annualGoal})`
           : "";
 
-      desc += `${rank}. ${name}${emoji}${trophy}: ${monthWorkouts}${goalProgress}\n`;
+      desc += `${prefix} ${name}${emoji}${trophy}: ${monthWorkouts}${goalProgress}\n`;
     }
   }
 
@@ -324,13 +335,26 @@ function truncateDescription(
       annualGoal,
     } = entry;
     const firstName = name.split(" ")[0];
+
+    // Medal emoji for top 3
+    let prefix;
+    if (rank === 1) {
+      prefix = "🥇";
+    } else if (rank === 2) {
+      prefix = "🥈";
+    } else if (rank === 3) {
+      prefix = "🥉";
+    } else {
+      prefix = `${rank}.`;
+    }
+
     const emoji = rank === 1 ? " 🦍" : "";
     const trophy = trophiesInGroup > 0 ? ` (${trophiesInGroup}x🏆)` : "";
     const goalProgress =
       yearWorkouts !== null && annualGoal !== null
         ? ` (${yearWorkouts}/${annualGoal})`
         : "";
-    truncated += `${rank}. ${firstName}${emoji}${trophy}: ${monthWorkouts}${goalProgress}\n`;
+    truncated += `${prefix} ${firstName}${emoji}${trophy}: ${monthWorkouts}${goalProgress}\n`;
   }
 
   truncated += "\n@Bot treinei";
@@ -348,12 +372,25 @@ function truncateDescription(
         annualGoal,
       } = entry;
       const firstName = name.split(" ")[0];
+
+      // Medal emoji for top 3
+      let prefix;
+      if (rank === 1) {
+        prefix = "🥇";
+      } else if (rank === 2) {
+        prefix = "🥈";
+      } else if (rank === 3) {
+        prefix = "🥉";
+      } else {
+        prefix = `${rank}.`;
+      }
+
       const trophy = trophiesInGroup > 0 ? `(${trophiesInGroup}x🏆)` : "";
       const goalProgress =
         yearWorkouts !== null && annualGoal !== null
           ? ` (${yearWorkouts}/${annualGoal})`
           : "";
-      truncated += `${rank}. ${firstName} ${trophy}: ${monthWorkouts}${goalProgress}\n`;
+      truncated += `${prefix} ${firstName} ${trophy}: ${monthWorkouts}${goalProgress}\n`;
     }
     truncated += "\n@Bot treinei";
   }
