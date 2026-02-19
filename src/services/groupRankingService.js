@@ -62,12 +62,26 @@ async function updateGroupRanking(chatId) {
       `[groupRanking] Updating ranking for ${chatId} with ${memberIds.length} members`,
     );
 
+    // Log chat info for debugging
+    logger.debug(`[groupRanking] Chat info:`, {
+      name: chat.name,
+      isGroup: chat.isGroup,
+      isReadOnly: chat.isReadOnly,
+      canSend: chat.canSend,
+      participants_count: participants.length,
+    });
+
     // Fetch ranking
     const ranking = await backendClient.sendToBackend(
       `/api/workouts/ranking/${chatId}`,
       { memberIds },
       "POST",
     );
+
+    logger.debug(`[groupRanking] Ranking data:`, {
+      count: ranking?.length || 0,
+      sample: ranking?.[0],
+    });
 
     // Fetch season history
     const history = await backendClient.sendToBackend(
@@ -76,8 +90,27 @@ async function updateGroupRanking(chatId) {
       "GET",
     );
 
+    logger.debug(`[groupRanking] History data:`, {
+      keys: Object.keys(history || {}),
+      sample: Object.values(history || {})[0],
+    });
+
     // Format description
-    const description = formatWorkoutDescription(ranking, history);
+    let description;
+    try {
+      description = formatWorkoutDescription(ranking, history);
+      logger.debug(
+        `[groupRanking] Description formatted successfully: ${description.length} chars`,
+      );
+    } catch (formatErr) {
+      logger.error(`[groupRanking] Error formatting description:`, {
+        message: formatErr.message,
+        stack: formatErr.stack,
+        ranking_length: ranking?.length,
+        history_keys: Object.keys(history || {}),
+      });
+      throw formatErr;
+    }
 
     // Validate description
     if (!description || typeof description !== "string") {
@@ -92,15 +125,34 @@ async function updateGroupRanking(chatId) {
       `[groupRanking] Description length: ${description.length} chars`,
     );
 
+    // Log description preview
+    logger.debug(
+      `[groupRanking] Description preview: ${description.substring(0, 100)}...`,
+    );
+
+    // Log full description for debugging (only on first few chars to avoid log spam)
+    if (description.length < 512) {
+      logger.debug(`[groupRanking] Full description:`, description);
+    }
+
     // Update group description
+    logger.debug(
+      `[groupRanking] Attempting to set description for ${chatId}...`,
+    );
     try {
+      logger.debug(`[groupRanking] Calling chat.setDescription() now...`);
       await chat.setDescription(description);
       logger.info(`[groupRanking] Updated description for ${chatId}`);
     } catch (descErr) {
-      logger.error(
-        `[groupRanking] Failed to set description for ${chatId}:`,
-        descErr.message,
-      );
+      logger.error(`[groupRanking] Failed to set description for ${chatId}:`, {
+        message: descErr.message,
+        name: descErr.name,
+        stack: descErr.stack,
+        errorString: String(descErr),
+        errorJson: JSON.stringify(descErr, Object.getOwnPropertyNames(descErr)),
+        description_length: description.length,
+        description_preview: description.substring(0, 200),
+      });
       // Continue anyway - description update is not critical
     }
 
@@ -111,7 +163,12 @@ async function updateGroupRanking(chatId) {
       "POST",
     );
   } catch (err) {
-    logger.error(`[groupRanking] Error updating ${chatId}:`, err);
+    logger.error(`[groupRanking] Error updating ${chatId}:`, {
+      message: err.message,
+      name: err.name,
+      stack: err.stack,
+      chatId: chatId,
+    });
   }
 }
 
