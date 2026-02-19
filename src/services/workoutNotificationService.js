@@ -7,12 +7,14 @@ const logger = require("../utils/logger");
  * @param {string} senderNumber - User's WhatsApp number
  * @param {Object} stats - Workout stats (streak, total_workouts, etc.)
  * @param {string} excludeChatId - Chat ID to exclude from notifications (where workout was logged)
+ * @param {string} userDisplayName - User's display name (optional)
  */
 async function notifyWorkoutToGroups(
   client,
   senderNumber,
   stats,
   excludeChatId,
+  userDisplayName = null,
 ) {
   try {
     // Get all chats
@@ -66,15 +68,19 @@ async function notifyWorkoutToGroups(
           continue;
         }
 
-        // Get user name from participants
-        const participant = participants.find((p) => {
-          const participantNumber =
-            p.id.user || p.id._serialized.replace(/@c\.us$/i, "");
-          return participantNumber === cleanSenderNumber;
-        });
+        // Use provided displayName or try to get from participants
+        let displayName = userDisplayName;
 
-        const displayName =
-          participant?.pushname || participant?.notify || "Usuário";
+        if (!displayName) {
+          // Fallback: try to get from participants
+          const participant = participants.find((p) => {
+            const participantNumber =
+              p.id.user || p.id._serialized.replace(/@c\.us$/i, "");
+            return participantNumber === cleanSenderNumber;
+          });
+          displayName =
+            participant?.pushname || participant?.notify || "Usuário";
+        }
 
         // Send notification
         const message = `🏋️ ${displayName} registrou um treino!\n🔥 Sequência: ${stats.streak} dia${stats.streak > 1 ? "s" : ""}`;

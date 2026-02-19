@@ -2,6 +2,9 @@ const polls = require("../../components/poll");
 const backendClient = require("../../services/backendClient");
 const logger = require("../../utils/logger");
 
+// In-memory contest votes tracking
+const activeContests = new Map();
+
 /**
  * Comando /contestar para iniciar votação de contestação de treino
  * Uso: /contestar @usuario
@@ -32,13 +35,24 @@ module.exports = {
       const chatId = chat.id._serialized;
       const contesterId = ctx.message.from || ctx.message.author;
 
-      // Não pode contestar a si mesmo
-      if (targetUserId === contesterId) {
-        await ctx.reply("❌ Você não pode contestar seu próprio treino!");
-        return;
+      // Resolver @lid para @c.us se necessário para o contestador
+      let contesterNumber = contesterId;
+      if (contesterId.includes("@lid")) {
+        try {
+          const contact = await ctx.client.getContactById(contesterId);
+          if (contact && contact.id && contact.id._serialized) {
+            contesterNumber = contact.id._serialized;
+          }
+        } catch (err) {
+          logger.error(
+            `[contestar] Erro ao resolver contestador @lid: ${err.message}`,
+          );
+        }
       }
 
-      // Resolver @lid para @c.us se necessário
+      const contesterNumberClean = contesterNumber.replace(/@c\.us$/i, "");
+
+      // Resolver @lid para @c.us se necessário para o alvo
       let targetNumber = targetUserId;
       if (targetUserId.includes("@lid")) {
         try {
@@ -47,12 +61,20 @@ module.exports = {
             targetNumber = contact.id._serialized;
           }
         } catch (err) {
-          logger.error(`[contestar] Erro ao resolver @lid: ${err.message}`);
+          logger.error(
+            `[contestar] Erro ao resolver alvo @lid: ${err.message}`,
+          );
         }
       }
 
       // Extrair apenas o número (sem @c.us)
       const targetUserNumber = targetNumber.replace(/@c\.us$/i, "");
+
+      // Não pode contestar a si mesmo
+      if (contesterNumberClean === targetUserNumber) {
+        await ctx.reply("❌ Você não pode contestar seu próprio treino!");
+        return;
+      }
 
       logger.info(
         `[contestar] Buscando último treino de ${targetUserNumber} no grupo ${chatId}`,
@@ -80,7 +102,7 @@ module.exports = {
         targetContact.pushname || targetContact.name || "Usuário";
 
       // Buscar informações do contestador
-      const contesterContact = await ctx.client.getContactById(contesterId);
+      const contesterContact = await ctx.client.getContactById(contesterNumber);
       const contesterName =
         contesterContact.pushname || contesterContact.name || "Alguém";
 
@@ -91,20 +113,53 @@ module.exports = {
         `[contestar] Último treino encontrado: ${lastWorkout.id} em ${workoutDate}`,
       );
 
+      // Get group participants
+      const participants = chat.participants || [];
+      const memberIds = participants.map((p) => p.id._serialized);
+
+      logger.info(`[contestar] 👥 Membros do grupo: ${memberIds.length}`);
+
+      // Filter eligible voters (exclude contestador and contestado)
+      const eligibleVoters = memberIds.filter((id) => {
+        const cleanId = id.replace(/@c\.us$/i, "");
+        return cleanId !== contesterNumberClean && cleanId !== targetUserNumber;
+      });
+
       // Criar poll de contestação
       const pollTitle = `⚖️ Contestação de Treino`;
       const pollOptions = ["✅ Manter treino", "❌ Remover treino"];
 
-      // Mensagem de contexto
-      await ctx.reply(
-        `⚖️ *CONTESTAÇÃO INICIADA*\n\n` +
-          `${contesterName} está contestando o treino de *${targetName}*\n\n` +
-          `📅 Data: ${workoutDate}\n` +
-          `🗳️ Vote na enquete abaixo!\n\n` +
-          `Se a maioria votar para remover, o treino será excluído.`,
-      );
+      // Mensagem de contexto com menções
+      const totalEligible = eligibleVoters.length + 1; // +1 para o contestador que já votou
+      const needed = Math.ceil(totalEligible / 2);
 
-      // Criar poll
+      let contextMessage =
+        `⚖️ *CONTESTAÇÃO INICIADA*\n\n` +
+        `${contesterName} está contestando o treino de *${targetName}*\n\n` +
+        `📅 Data: ${workoutDate}\n`;
+
+      const mentionsList = [];
+      if (eligibleVoters.length > 0) {
+        const mentions = eligibleVoters
+          .map((id) => {
+            const phoneNumber = id.split("@")[0];
+            mentionsList.push(id);
+            return `@${phoneNumber}`;
+          })
+          .join(" ");
+        contextMessage += `\n${mentions}\n`;
+      }
+
+      contextMessage +=
+        `\n🗳️ Vote na enquete abaixo!\n` +
+        `Votos: 1/${totalEligible} (${needed} necessários para decidir)\n\n` +
+        `Se a maioria votar para remover, o treino será excluído.`;
+
+      await ctx.client.sendMessage(chatId, contextMessage, {
+        mentions: mentionsList,
+      });
+
+      // Criar poll com callback para processar votos em tempo real
       const pollResult = await polls.createPoll(
         ctx.client,
         chatId,
@@ -115,13 +170,26 @@ module.exports = {
             type: "workout_contest",
             workoutId: lastWorkout.id,
             targetUserId: targetUserNumber,
-            contesterId: contesterId.replace(/@c\.us$/i, ""),
+            contesterId: contesterNumberClean,
             targetName: targetName,
+            contesterName: contesterName,
             workoutDate: workoutDate,
             chatId: chatId,
+            memberIds: memberIds,
           },
           onVote: async (voteData) => {
-            logger.info(`[contestar] Voto recebido:`, voteData);
+            await handleContestVote(
+              voteData,
+              ctx.client,
+              chatId,
+              lastWorkout.id,
+              targetUserNumber,
+              contesterNumberClean,
+              targetName,
+              contesterName,
+              workoutDate,
+              memberIds,
+            );
           },
         },
       );
@@ -136,13 +204,24 @@ module.exports = {
         `[contestar] Poll de contestação criada: ${pollResult.msgId}`,
       );
 
-      // Agendar fechamento da votação após 10 minutos
-      setTimeout(
-        async () => {
-          await processContestResult(pollResult.msgId, ctx.client);
-        },
-        10 * 60 * 1000,
-      ); // 10 minutos
+      // Inicializar tracking de votos
+      activeContests.set(pollResult.msgId, {
+        workoutId: lastWorkout.id,
+        targetUserId: targetUserNumber,
+        contesterId: contesterNumberClean,
+        targetName: targetName,
+        contesterName: contesterName,
+        workoutDate: workoutDate,
+        chatId: chatId,
+        memberIds: memberIds,
+        votes: { keep: 0, remove: 1 }, // Contestador já vota para remover
+        voters: new Set([contesterNumberClean]), // Marcar contestador como já votou
+        resolved: false,
+      });
+
+      logger.info(
+        `[contestar] Voto automático do contestador ${contesterName} registrado (remover)`,
+      );
     } catch (err) {
       logger.error(
         `[contestar] Erro ao processar comando: ${err.message}`,
@@ -154,122 +233,187 @@ module.exports = {
 };
 
 /**
- * Processa o resultado da votação de contestação
+ * Handle vote on workout contest poll
  */
-async function processContestResult(pollId, client) {
+async function handleContestVote(
+  voteData,
+  client,
+  chatId,
+  workoutId,
+  targetUserId,
+  contesterId,
+  targetName,
+  contesterName,
+  workoutDate,
+  memberIds,
+) {
   try {
-    logger.info(`[contestar] Processando resultado da votação: ${pollId}`);
+    const voter = voteData.voter; // Já vem resolvido para @c.us pelo pollComponent
+    const pollId = voteData.messageId || voteData.poll?.id;
 
-    // Buscar poll do backend
-    const pollState = await backendClient.sendToBackend(
-      `/api/polls/${pollId}`,
-      null,
-      "GET",
-    );
+    // Extrair número sem @c.us
+    const voterNumber = voter.replace(/@c\.us$/i, "");
 
-    if (!pollState || !pollState.poll) {
-      logger.error(`[contestar] Poll não encontrada: ${pollId}`);
-      return;
-    }
-
-    const poll = pollState.poll;
-    const votes = pollState.votes || [];
-    const metadata =
-      typeof poll.metadata === "string"
-        ? JSON.parse(poll.metadata)
-        : poll.metadata;
-
-    if (!metadata || metadata.type !== "workout_contest") {
-      logger.warn(`[contestar] Poll ${pollId} não é de contestação`);
-      return;
-    }
-
-    // Contar votos
-    let keepVotes = 0;
-    let removeVotes = 0;
-
-    votes.forEach((vote) => {
-      const selectedIndexes = vote.selected_indexes || [];
-      if (selectedIndexes.includes(0)) {
-        keepVotes++; // ✅ Manter treino
-      } else if (selectedIndexes.includes(1)) {
-        removeVotes++; // ❌ Remover treino
-      }
-    });
-
-    const totalVotes = keepVotes + removeVotes;
-
-    logger.info(
-      `[contestar] Resultado: ${removeVotes} para remover, ${keepVotes} para manter (${totalVotes} total)`,
-    );
-
-    // Determinar resultado
-    const shouldRemove = removeVotes > keepVotes;
-
-    // Buscar chat para enviar resultado
-    const chat = await client.getChatById(metadata.chatId);
-
-    if (totalVotes === 0) {
-      await chat.sendMessage(
-        `⚖️ *CONTESTAÇÃO ENCERRADA*\n\n` +
-          `Nenhum voto foi registrado.\n` +
-          `O treino de *${metadata.targetName}* (${metadata.workoutDate}) foi *mantido* por falta de votos.`,
+    // Ignorar voto do contestador (já contado automaticamente)
+    if (voterNumber === contesterId) {
+      logger.debug(
+        `[contestar] Voto do contestador ${contesterId} ignorado (já contado automaticamente)`,
       );
       return;
     }
 
-    if (shouldRemove) {
+    // Ignorar voto do contestado
+    if (voterNumber === targetUserId) {
+      logger.debug(
+        `[contestar] Voto do contestado ${targetUserId} ignorado (não pode votar em própria contestação)`,
+      );
+      return;
+    }
+
+    // Get contest data
+    const contest = activeContests.get(pollId);
+
+    if (!contest) {
+      logger.warn(`[contestar] Contest não encontrado para poll ${pollId}`);
+      return;
+    }
+
+    // Check if already resolved
+    if (contest.resolved) {
+      logger.debug(`[contestar] Contest ${pollId} já foi resolvido`);
+      return;
+    }
+
+    // Check if voter already voted
+    if (contest.voters.has(voterNumber)) {
+      logger.debug(`[contestar] ${voterNumber} já votou nesta contestação`);
+      return;
+    }
+
+    let selectedIndexes = voteData.selectedIndexes || [];
+
+    // selectedIndexes pode vir como objeto {"0": 0} em vez de array [0]
+    if (!Array.isArray(selectedIndexes)) {
+      selectedIndexes = Object.values(selectedIndexes);
+    }
+
+    // 0 = Manter, 1 = Remover
+    const voteToRemove = selectedIndexes.includes(1);
+
+    logger.info(
+      `[contestar] Voto recebido: voter=${voterNumber} voteToRemove=${voteToRemove}`,
+    );
+
+    // Register vote
+    contest.voters.add(voterNumber);
+    if (voteToRemove) {
+      contest.votes.remove++;
+    } else {
+      contest.votes.keep++;
+    }
+
+    // Get voter info for mention
+    const voterContact = await client.getContactById(voter);
+    const voterName =
+      voterContact?.pushname || voterContact?.name || voter.split("@")[0];
+
+    // Calculate eligible voters (all members except contestador and targetUserId)
+    const eligibleVoters = memberIds.filter((id) => {
+      const cleanId = id.replace(/@c\.us$/i, "");
+      return cleanId !== contesterId && cleanId !== targetUserId;
+    });
+
+    const totalEligible = eligibleVoters.length + 1; // +1 para incluir o contestador (que já votou)
+    const totalVotes = contest.votes.keep + contest.votes.remove;
+    const needed = Math.ceil(totalEligible / 2); // Maioria simples
+
+    logger.info(
+      `[contestar] Votos: ${contest.votes.remove} remover, ${contest.votes.keep} manter (${totalVotes}/${totalEligible}, ${needed} necessários)`,
+    );
+
+    // Check if resolved
+    const removeWon = contest.votes.remove >= needed;
+    const keepWon = contest.votes.keep >= needed;
+    const allVoted = totalVotes >= totalEligible;
+
+    if (!removeWon && !keepWon && !allVoted) {
+      // Ainda pendente - enviar atualização
+      const votesNeeded =
+        needed - Math.max(contest.votes.remove, contest.votes.keep);
+
+      await client.sendMessage(
+        chatId,
+        `@${voter.split("@")[0]} ${
+          voteToRemove ? "votou para remover" : "votou para manter"
+        } o treino de ${targetName}. ${
+          votesNeeded === 1
+            ? "Ainda precisa de 1 voto"
+            : `Ainda precisam de ${votesNeeded} votos`
+        } para decidir.`,
+        { mentions: [voter] },
+      );
+      return;
+    }
+
+    // Mark as resolved
+    contest.resolved = true;
+
+    if (removeWon) {
       // Remover treino
-      logger.info(`[contestar] Removendo treino ${metadata.workoutId}`);
+      logger.info(`[contestar] Removendo treino ${workoutId}`);
 
       try {
         await backendClient.sendToBackend(
-          `/api/workouts/logs/${metadata.workoutId}`,
+          `/api/workouts/logs/${workoutId}`,
           null,
           "DELETE",
         );
 
-        await chat.sendMessage(
+        await client.sendMessage(
+          chatId,
           `⚖️ *CONTESTAÇÃO ENCERRADA*\n\n` +
-            `📊 Resultado: ${removeVotes} votos para remover vs ${keepVotes} para manter\n\n` +
-            `❌ O treino de *${metadata.targetName}* (${metadata.workoutDate}) foi *REMOVIDO* por decisão da maioria.`,
+            `📊 Resultado: ${contest.votes.remove} votos para remover vs ${contest.votes.keep} para manter\n\n` +
+            `❌ O treino de *${targetName}* (${workoutDate}) foi *REMOVIDO* por decisão da maioria.`,
         );
 
-        logger.info(
-          `[contestar] Treino ${metadata.workoutId} removido com sucesso`,
-        );
+        logger.info(`[contestar] Treino ${workoutId} removido com sucesso`);
 
         // Atualizar ranking do grupo imediatamente
         const groupRankingService = require("../../services/groupRankingService");
-        logger.info(
-          `[contestar] Atualizando ranking do grupo ${metadata.chatId}...`,
-        );
-        await groupRankingService.updateGroupRanking(metadata.chatId);
+        logger.info(`[contestar] Atualizando ranking do grupo ${chatId}...`);
+        await groupRankingService.updateGroupRanking(chatId);
         logger.info(`[contestar] Ranking atualizado com sucesso`);
       } catch (deleteErr) {
         logger.error(
           `[contestar] Erro ao remover treino: ${deleteErr.message}`,
         );
-        await chat.sendMessage(
+        await client.sendMessage(
+          chatId,
           `⚖️ *CONTESTAÇÃO ENCERRADA*\n\n` +
-            `A maioria votou para remover (${removeVotes} vs ${keepVotes}), mas houve um erro ao processar a remoção.\n` +
+            `A maioria votou para remover (${contest.votes.remove} vs ${contest.votes.keep}), mas houve um erro ao processar a remoção.\n` +
             `Entre em contato com um administrador.`,
         );
       }
     } else {
-      await chat.sendMessage(
+      // Manter treino
+      await client.sendMessage(
+        chatId,
         `⚖️ *CONTESTAÇÃO ENCERRADA*\n\n` +
-          `📊 Resultado: ${removeVotes} votos para remover vs ${keepVotes} para manter\n\n` +
-          `✅ O treino de *${metadata.targetName}* (${metadata.workoutDate}) foi *MANTIDO*.`,
+          `📊 Resultado: ${contest.votes.remove} votos para remover vs ${contest.votes.keep} para manter\n\n` +
+          `✅ O treino de *${targetName}* (${workoutDate}) foi *MANTIDO*.`,
       );
     }
 
-    // Remover poll do banco
-    await backendClient.sendToBackend(`/api/polls/${pollId}`, null, "DELETE");
+    // Cleanup
+    activeContests.delete(pollId);
+
+    // Remove poll from backend
+    try {
+      await backendClient.sendToBackend(`/api/polls/${pollId}`, null, "DELETE");
+    } catch (err) {
+      logger.warn(`[contestar] Erro ao deletar poll: ${err.message}`);
+    }
   } catch (err) {
-    logger.error(
-      `[contestar] Erro ao processar resultado: ${err.message}`,
-      err,
-    );
+    logger.error(`[contestar] handleContestVote erro:`, err);
   }
 }
