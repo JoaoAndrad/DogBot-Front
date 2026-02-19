@@ -105,10 +105,7 @@ module.exports = {
             approx = `\n   ⏱️ ~${avg}%`;
           }
 
-          const names = group
-            .map((g) => g.who)
-            .slice(0, 3)
-            .join(" e ");
+          const names = group.map((g) => g.who).join(", ");
           const t = group[0].track;
           lines.push(`🎵 JAM Coletiva (${names}):`);
           lines.push(

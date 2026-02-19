@@ -15,13 +15,13 @@ async function resolveUserUuid(externalId) {
   if (!externalId) return null;
   const isUUID =
     /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
-      externalId
+      externalId,
     );
   if (isUUID) return externalId;
 
   try {
     const url = `${BACKEND_URL}/api/users/by-identifier/${encodeURIComponent(
-      externalId
+      externalId,
     )}`;
     const res = await fetch(url, { method: "GET" });
     if (!res.ok) return null;
@@ -85,7 +85,7 @@ const spotifyFlow = createFlow("spotify", {
           label: "📊 Estatísticas",
           action: "goto",
           target: "/stats",
-        }
+        },
       );
 
       if (isGroup) {
@@ -152,19 +152,19 @@ const spotifyFlow = createFlow("spotify", {
       try {
         const resolved = await resolveUserUuid(ctx.userId);
         const userParam = resolved || ctx.userId;
-        
+
         // Buscar períodos disponíveis
         const url = `${BACKEND_URL}/api/spotify/available-periods?userId=${encodeURIComponent(userParam)}`;
         const res = await fetch(url, { method: "GET" });
         const json = await res.json();
-        
+
         if (!json || !json.periods || json.periods.length === 0) {
           await ctx.reply("❌ Nenhum período com dados encontrado.");
           return { end: false };
         }
-        
+
         const opts = [];
-        
+
         // Se tem múltiplos anos, agrupar por ano
         if (json.hasMultipleYears) {
           const yearGroups = {};
@@ -172,7 +172,7 @@ const spotifyFlow = createFlow("spotify", {
             if (!yearGroups[p.year]) yearGroups[p.year] = [];
             yearGroups[p.year].push(p);
           });
-          
+
           // Criar opção para cada ano
           for (const year of json.years) {
             const months = yearGroups[year] || [];
@@ -193,7 +193,7 @@ const spotifyFlow = createFlow("spotify", {
             });
           });
         }
-        
+
         opts.push({ label: "⬅️ Voltar", action: "back" });
         return { options: opts };
       } catch (e) {
@@ -211,27 +211,29 @@ const spotifyFlow = createFlow("spotify", {
         const year = ctx.path.split("/").pop();
         const resolved = await resolveUserUuid(ctx.userId);
         const userParam = resolved || ctx.userId;
-        
+
         // Buscar períodos disponíveis
         const url = `${BACKEND_URL}/api/spotify/available-periods?userId=${encodeURIComponent(userParam)}`;
         const res = await fetch(url, { method: "GET" });
         const json = await res.json();
-        
+
         if (!json || !json.periods || json.periods.length === 0) {
           await ctx.reply("❌ Nenhum período encontrado.");
           return { end: false };
         }
-        
+
         // Filtrar meses do ano selecionado
-        const monthsInYear = json.periods.filter(p => p.year === parseInt(year));
-        
+        const monthsInYear = json.periods.filter(
+          (p) => p.year === parseInt(year),
+        );
+
         const opts = monthsInYear.map((p) => ({
           label: p.label,
           action: "exec",
           handler: "statsMonth",
           data: { month: p.value },
         }));
-        
+
         opts.push({ label: "⬅️ Voltar", action: "back" });
         return { options: opts };
       } catch (e) {
@@ -276,7 +278,7 @@ const spotifyFlow = createFlow("spotify", {
         });
         const ym = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(
           2,
-          "0"
+          "0",
         )}`;
         opts.push({
           label: label,
@@ -297,11 +299,11 @@ const spotifyFlow = createFlow("spotify", {
         const res = await spotifyClient.startAuth(payload);
         if (res && res.auth_url) {
           await ctx.reply(
-            `🔗 Abra o link para conectar o Spotify:\n${res.auth_url}`
+            `🔗 Abra o link para conectar o Spotify:\n${res.auth_url}`,
           );
         } else {
           await ctx.reply(
-            "❌ Não foi possível iniciar autenticação do Spotify."
+            "❌ Não foi possível iniciar autenticação do Spotify.",
           );
         }
       } catch (e) {
@@ -315,7 +317,7 @@ const spotifyFlow = createFlow("spotify", {
         const resolved = await resolveUserUuid(ctx.userId);
         const userParam = resolved || ctx.userId;
         const url = `${BACKEND_URL}/api/spotify/current?userId=${encodeURIComponent(
-          userParam
+          userParam,
         )}`;
         const res = await fetch(url, { method: "GET" });
         const json = await res.json();
@@ -331,7 +333,7 @@ const spotifyFlow = createFlow("spotify", {
             Math.round(((json.percentPlayed || 0) / 100) * durationMs);
           const percent = Math.round(
             json.percentPlayed ||
-              (durationMs ? (positionMs / durationMs) * 100 : 0)
+              (durationMs ? (positionMs / durationMs) * 100 : 0),
           );
           const bar = renderProgressBar(percent, 18);
 
@@ -341,7 +343,7 @@ const spotifyFlow = createFlow("spotify", {
           }\n`;
           if (t.album) reply += `Álbum: ${t.album}\n`;
           reply += `\n${bar} ${percent}%\n${msToTime(positionMs)} / ${msToTime(
-            durationMs
+            durationMs,
           )}\n`;
           reply += `Iniciado: ${new Date(json.startedAt).toLocaleString()}`;
 
@@ -360,10 +362,10 @@ const spotifyFlow = createFlow("spotify", {
             const trackId = t.id;
             if (trackId) {
               const proxyUrl = `${BACKEND_URL}/api/spotify/preview?trackId=${encodeURIComponent(
-                trackId
+                trackId,
               )}`;
               console.log(
-                `[spotifyFlow] fetching preview from proxy: ${proxyUrl}`
+                `[spotifyFlow] fetching preview from proxy: ${proxyUrl}`,
               );
               const ares = await fetch(proxyUrl, { method: "GET" });
               if (ares && ares.ok) {
@@ -377,33 +379,33 @@ const spotifyFlow = createFlow("spotify", {
                   const { MessageMedia } = require("whatsapp-web.js");
                   const media = new MessageMedia(
                     "audio/mpeg",
-                    buf.toString("base64")
+                    buf.toString("base64"),
                   );
                   await ctx.client.sendMessage(ctx.chatId, media, {});
                   console.log("[spotifyFlow] preview audio sent");
                 } else {
                   console.log(
                     "[spotifyFlow] preview proxy returned non-audio content-type:",
-                    contentType
+                    contentType,
                   );
                 }
               } else {
                 console.log(
                   "[spotifyFlow] preview unavailable from proxy; status:",
-                  ares && ares.status
+                  ares && ares.status,
                 );
               }
             }
           } catch (audioErr) {
             console.warn(
               "[spotifyFlow] error fetching/sending preview audio:",
-              audioErr && audioErr.message ? audioErr.message : audioErr
+              audioErr && audioErr.message ? audioErr.message : audioErr,
             );
           }
         }
       } catch (e) {
         await ctx.reply(
-          "❌ Erro ao consultar tocando agora: " + (e.message || e)
+          "❌ Erro ao consultar tocando agora: " + (e.message || e),
         );
       }
       return { end: false };
@@ -426,7 +428,7 @@ const spotifyFlow = createFlow("spotify", {
         const listenersRes = await backendClient.sendToBackend(
           `/api/groups/${encodeURIComponent(ctx.chatId)}/active-listeners`,
           { memberIds },
-          "POST"
+          "POST",
         );
 
         if (!listenersRes || !Array.isArray(listenersRes.listeners)) {
@@ -436,11 +438,11 @@ const spotifyFlow = createFlow("spotify", {
 
         const listeners = listenersRes.listeners;
         const anyPlaying = (listeners || []).some(
-          (l) => l && l.currentTrack && l.currentTrack.isPlaying
+          (l) => l && l.currentTrack && l.currentTrack.isPlaying,
         );
         if (!anyPlaying) {
           await ctx.reply(
-            "Nenhum usuário do grupo está ouvindo músicas no momento"
+            "Nenhum usuário do grupo está ouvindo músicas no momento",
           );
           return { end: false };
         }
@@ -484,7 +486,7 @@ const spotifyFlow = createFlow("spotify", {
                 Array.isArray(t.artists)
                   ? t.artists.join(", ")
                   : t.artists || ""
-              }`
+              }`,
             );
             lines.push(`   ${percent !== null ? `⏱️ ${percent}%` : ""}`);
             lines.push("");
@@ -499,15 +501,12 @@ const spotifyFlow = createFlow("spotify", {
             let approx = "";
             if (validPercs.length > 0) {
               const avg = Math.round(
-                validPercs.reduce((a, b) => a + b, 0) / validPercs.length
+                validPercs.reduce((a, b) => a + b, 0) / validPercs.length,
               );
               approx = `\n   ⏱️ ~${avg}%`;
             }
 
-            const names = group
-              .map((g) => g.who)
-              .slice(0, 3)
-              .join(" e ");
+            const names = group.map((g) => g.who).join(", ");
             const t = group[0].track;
             lines.push(`🎵 JAM Coletiva (${names}):`);
             lines.push(
@@ -515,7 +514,7 @@ const spotifyFlow = createFlow("spotify", {
                 Array.isArray(t.artists)
                   ? t.artists.join(", ")
                   : t.artists || ""
-              }${approx}`
+              }${approx}`,
             );
             lines.push("");
           }
@@ -538,22 +537,22 @@ const spotifyFlow = createFlow("spotify", {
             const ok = await sendCompositeSticker(
               ctx.client,
               ctx.chatId,
-              tracksArr
+              tracksArr,
             );
             if (!ok)
               console.info(
-                "[spotifyFlow] sendCompositeSticker failed after text"
+                "[spotifyFlow] sendCompositeSticker failed after text",
               );
           }
         } catch (e) {
           console.error(
             "[spotifyFlow] error sending composite sticker after text:",
-            e && e.message ? e.message : e
+            e && e.message ? e.message : e,
           );
         }
       } catch (e) {
         await ctx.reply(
-          "❌ Erro ao executar Todos: " + (e && e.message ? e.message : e)
+          "❌ Erro ao executar Todos: " + (e && e.message ? e.message : e),
         );
       }
       return { end: false };
@@ -576,7 +575,7 @@ const spotifyFlow = createFlow("spotify", {
         // pagination helper: fetch and display a page, then create poll to navigate
         async function renderPage(page = 1) {
           const url = `${BACKEND_URL}/api/spotify/history?userId=${encodeURIComponent(
-            userParam
+            userParam,
           )}&from=${from.toISOString()}&to=${to.toISOString()}&limit=10&page=${page}${
             isGroup ? "&scope=group" : ""
           }`;
@@ -629,12 +628,12 @@ const spotifyFlow = createFlow("spotify", {
                       // Close - do nothing
                     }
                   },
-                }
+                },
               );
             } catch (e) {
               console.error(
                 "[spotifyFlow] failed to create history navigation poll:",
-                e && e.message ? e.message : e
+                e && e.message ? e.message : e,
               );
             }
           }
@@ -664,7 +663,7 @@ const spotifyFlow = createFlow("spotify", {
             ? data.days
             : 7;
         let url = `${BACKEND_URL}/api/spotify/stats?userId=${encodeURIComponent(
-          userParam
+          userParam,
         )}`;
 
         let displayLabel = null;
@@ -674,7 +673,7 @@ const spotifyFlow = createFlow("spotify", {
           url += `&from=${encodeURIComponent(monthStart.toISOString())}`;
           url += `&to=${encodeURIComponent(new Date().toISOString())}`;
           // Gera o nome do mês em português (minúsculo)
-          displayLabel = now.toLocaleString('pt-BR', { month: 'long' });
+          displayLabel = now.toLocaleString("pt-BR", { month: "long" });
         } else {
           if (days && Number(days) > 0) url += `&days=${Number(days)}`;
           displayLabel =
@@ -693,7 +692,7 @@ const spotifyFlow = createFlow("spotify", {
         console.log(
           `[spotifyFlow] Período recebido (raw from backend): ${
             json && json.period
-          }`
+          }`,
         );
         if (!json) {
           await ctx.reply("❌ Erro ao obter estatísticas.");
@@ -709,7 +708,7 @@ const spotifyFlow = createFlow("spotify", {
         // Activity bars
         const maxCount = Math.max(
           ...(json.activity || []).map((d) => d.count),
-          1
+          1,
         );
         function bar(count, width = 10) {
           const filled = Math.round((count / maxCount) * width);
@@ -766,7 +765,7 @@ const spotifyFlow = createFlow("spotify", {
                 Array.isArray(track.artists)
                   ? track.artists.join(", ")
                   : track.artists || ""
-              } (${whenMin}min atrás)`
+              } (${whenMin}min atrás)`,
             );
           });
           lines.push("");
@@ -788,7 +787,7 @@ const spotifyFlow = createFlow("spotify", {
           lines.push(`* Manhã (6-12h): ${json.timeOfDay.morning}%`);
           lines.push(
             `* Tarde (12-18h): ${json.timeOfDay.afternoon}%` +
-              (json.timeOfDay.afternoon >= 35 ? " ⭐" : "")
+              (json.timeOfDay.afternoon >= 35 ? " ⭐" : ""),
           );
           lines.push(`* Noite (18-24h): ${json.timeOfDay.evening}%`);
           lines.push(`* Madrugada (0-6h): ${json.timeOfDay.night}%`);
@@ -806,7 +805,7 @@ const spotifyFlow = createFlow("spotify", {
                 Array.isArray(t.artists)
                   ? t.artists.join(", ")
                   : t.artists || ""
-              } (${whenMin}min atrás)`
+              } (${whenMin}min atrás)`,
             );
           });
         }
@@ -817,7 +816,7 @@ const spotifyFlow = createFlow("spotify", {
         try {
           const maxActivityCount = Math.max(
             ...(json.activity || []).map((x) => x.count),
-            1
+            1,
           );
 
           function formatPeriodLabel(p) {
@@ -860,9 +859,12 @@ const spotifyFlow = createFlow("spotify", {
           const path = require("path");
           // Caminho correto: em produção fica em /application/templates/logo.png
           const logoPath = path.join(process.cwd(), "templates", "logo.png");
-          console.log("[spotifyFlow/LOGO] Caminho do logo calculado:", logoPath);
+          console.log(
+            "[spotifyFlow/LOGO] Caminho do logo calculado:",
+            logoPath,
+          );
           console.log("[spotifyFlow/LOGO] process.cwd():", process.cwd());
-          
+
           const templateData = {
             period: displayLabel,
             total: sum.totalPlays || 0,
@@ -872,7 +874,7 @@ const spotifyFlow = createFlow("spotify", {
             logoPath: logoPath,
             bars: (json.activity || []).map((d) => {
               const percent = Math.round(
-                ((d.count || 0) / maxActivityCount) * 100
+                ((d.count || 0) / maxActivityCount) * 100,
               );
               return {
                 label: d.day || d.label || "",
@@ -936,7 +938,7 @@ const spotifyFlow = createFlow("spotify", {
         }
       } catch (e) {
         await ctx.reply(
-          "❌ Erro ao obter estatísticas: " + (e && e.message ? e.message : e)
+          "❌ Erro ao obter estatísticas: " + (e && e.message ? e.message : e),
         );
       }
       return { end: false };
@@ -964,7 +966,7 @@ const spotifyFlow = createFlow("spotify", {
         const monthEnd = new Date(parseInt(year), parseInt(monthNum), 1);
 
         let url = `${BACKEND_URL}/api/spotify/stats?userId=${encodeURIComponent(
-          userParam
+          userParam,
         )}`;
         url += `&from=${encodeURIComponent(monthStart.toISOString())}`;
         url += `&to=${encodeURIComponent(monthEnd.toISOString())}`;
@@ -973,9 +975,9 @@ const spotifyFlow = createFlow("spotify", {
 
         // Formatar label do período
         const date = new Date(monthStart);
-        const displayLabel = date.toLocaleString('pt-BR', { 
-          month: 'long', 
-          year: 'numeric' 
+        const displayLabel = date.toLocaleString("pt-BR", {
+          month: "long",
+          year: "numeric",
         });
         url += `&period=${encodeURIComponent(displayLabel)}`;
 
@@ -1033,7 +1035,8 @@ const spotifyFlow = createFlow("spotify", {
         }
       } catch (e) {
         await ctx.reply(
-          "❌ Erro ao obter estatísticas do mês: " + (e && e.message ? e.message : e)
+          "❌ Erro ao obter estatísticas do mês: " +
+            (e && e.message ? e.message : e),
         );
       }
       return { end: false };
@@ -1054,7 +1057,7 @@ const spotifyFlow = createFlow("spotify", {
           String(ctx.chatId).endsWith("@g.us")
         );
         const url = `${BACKEND_URL}/api/spotify/summary?userId=${encodeURIComponent(
-          userParam
+          userParam,
         )}&month=${encodeURIComponent(month)}${isGroup ? "&scope=group" : ""}`;
         const res = await fetch(url, { method: "GET" });
         const json = await res.json();
@@ -1065,7 +1068,7 @@ const spotifyFlow = createFlow("spotify", {
 
         let reply = `📅 Resumo — ${month}:\n`;
         reply += `• Total tocado: ${Math.floor(
-          (json.totalMs || 0) / 60000
+          (json.totalMs || 0) / 60000,
         )} min\n`;
         reply += `• Plays: ${json.playCount || 0}\n`;
         if (json.topTracks && json.topTracks.length) {
