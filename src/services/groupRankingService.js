@@ -79,10 +79,30 @@ async function updateGroupRanking(chatId) {
     // Format description
     const description = formatWorkoutDescription(ranking, history);
 
-    // Update group description
-    await chat.setDescription(description);
+    // Validate description
+    if (!description || typeof description !== "string") {
+      logger.error(
+        `[groupRanking] Invalid description for ${chatId}:`,
+        typeof description,
+      );
+      return;
+    }
 
-    logger.info(`[groupRanking] Updated description for ${chatId}`);
+    logger.debug(
+      `[groupRanking] Description length: ${description.length} chars`,
+    );
+
+    // Update group description
+    try {
+      await chat.setDescription(description);
+      logger.info(`[groupRanking] Updated description for ${chatId}`);
+    } catch (descErr) {
+      logger.error(
+        `[groupRanking] Failed to set description for ${chatId}:`,
+        descErr.message,
+      );
+      // Continue anyway - description update is not critical
+    }
 
     // Update last update timestamp
     await backendClient.sendToBackend(
