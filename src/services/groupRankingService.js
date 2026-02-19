@@ -28,7 +28,7 @@ async function updateGroupRanking(chatId) {
 
     // Check if tracking enabled
     const settings = await backendClient.sendToBackend(
-      `/api/groups/${chatId}/settings`,
+      `/api/workouts/groups/${chatId}/settings`,
       null,
       "GET",
     );
@@ -86,7 +86,7 @@ async function updateGroupRanking(chatId) {
 
     // Update last update timestamp
     await backendClient.sendToBackend(
-      `/api/groups/${chatId}/ranking-updated`,
+      `/api/workouts/groups/${chatId}/ranking-updated`,
       { timestamp: new Date().toISOString() },
       "POST",
     );

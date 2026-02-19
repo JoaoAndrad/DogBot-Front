@@ -38,7 +38,7 @@ async function notifyWorkoutToGroups(
 
         // Fetch group settings
         const settings = await backendClient.sendToBackend(
-          `/api/groups/${groupChatId}/settings`,
+          `/api/workouts/groups/${groupChatId}/settings`,
           null,
           "GET",
         );
