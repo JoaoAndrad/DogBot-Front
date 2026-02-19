@@ -123,21 +123,36 @@ module.exports = {
       const botId = ctx.client.info?.wid?._serialized;
       const botNumber = botId ? botId.replace(/@c\.us$/i, "") : null;
 
-      // Extract group admin numbers (exclude bot, contestador, contestado)
-      const adminNumbers = participants
-        .filter(
-          (p) => (p.isAdmin || p.isSuperAdmin) && p.id && p.id._serialized,
-        )
-        .map((p) => p.id._serialized.replace(/@c\.us$/i, ""))
-        .filter(
-          (n) =>
-            n !== botNumber &&
-            n !== contesterNumberClean &&
-            n !== targetUserNumber,
+      // Fetch group members who are admins in our DB (isAdmin=true)
+      // and are present in this group (intersect with memberIds)
+      const memberNumberSet = new Set(
+        memberIds.map((id) => id.replace(/@c\.us$/i, "")),
+      );
+      let adminNumbers = [];
+      try {
+        const adminsResp = await backendClient.sendToBackend(
+          "/api/users/admins",
+          null,
+          "GET",
         );
+        if (adminsResp && adminsResp.admins) {
+          adminNumbers = adminsResp.admins
+            .map((a) => a.sender_number)
+            .filter(
+              (n) =>
+                n &&
+                memberNumberSet.has(n) &&
+                n !== botNumber &&
+                n !== contesterNumberClean &&
+                n !== targetUserNumber,
+            );
+        }
+      } catch (err) {
+        logger.warn(`[contestar] Erro ao buscar admins do DB: ${err.message}`);
+      }
 
       logger.info(
-        `[contestar] 👑 Admins elegíveis (decisão final): ${adminNumbers.length}`,
+        `[contestar] 👑 Admins elegíveis (DB, no grupo, decisão final): ${adminNumbers.length}`,
       );
 
       // Filter eligible voters (exclude contestador, contestado, and bot)
