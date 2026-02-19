@@ -53,6 +53,26 @@ module.exports = {
 
       const contesterNumberClean = contesterNumber.replace(/@c\.us$/i, "");
 
+      // Verificar se o contestador tem cadastro no sistema
+      try {
+        const lookupRes = await backendClient.sendToBackend(
+          `/api/users/lookup?identifier=${encodeURIComponent(contesterNumber)}`,
+          null,
+          "GET",
+        );
+        if (!lookupRes || !lookupRes.found) {
+          await ctx.reply(
+            "❌ Você precisa se cadastrar antes de usar este comando!\n\nEnvie /cadastro no meu privado para se registrar.",
+          );
+          return;
+        }
+      } catch (err) {
+        logger.warn(
+          `[contestar] Erro ao verificar cadastro do contestador: ${err.message}`,
+        );
+        // Continue on lookup error to avoid blocking legitimate users
+      }
+
       // Resolver @lid para @c.us se necessário para o alvo
       let targetNumber = targetUserId;
       if (targetUserId.includes("@lid")) {
