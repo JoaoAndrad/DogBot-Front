@@ -337,20 +337,18 @@ async function handleContestVote(
     const allVoted = totalVotes >= totalEligible;
 
     if (!removeWon && !keepWon && !allVoted) {
-      // Ainda pendente - enviar atualização
+      // Ainda pendente - apenas log
       const votesNeeded =
         needed - Math.max(contest.votes.remove, contest.votes.keep);
 
-      await client.sendMessage(
-        chatId,
-        `@${voter.split("@")[0]} ${
+      logger.debug(
+        `[contestar] ${voterName} ${
           voteToRemove ? "votou para remover" : "votou para manter"
         } o treino de ${targetName}. ${
           votesNeeded === 1
             ? "Ainda precisa de 1 voto"
             : `Ainda precisam de ${votesNeeded} votos`
         } para decidir.`,
-        { mentions: [voter] },
       );
       return;
     }
