@@ -57,9 +57,13 @@ module.exports = {
         "GET",
       );
 
-      if (userResp && userResp.isAdmin) {
+      if (userResp && userResp.user && userResp.user.isAdmin) {
         isAdmin = true;
       }
+
+      console.log(
+        `[ativartreinos] Usuário ${cleanNumber} tentou executar comando. isAdmin: ${userResp?.user?.isAdmin || false}`,
+      );
     } catch (err) {
       console.error(
         "[ativartreinos] Erro ao verificar admin status:",
