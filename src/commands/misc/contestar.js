@@ -33,7 +33,8 @@ module.exports = {
 
       const targetUserId = mentionedIds[0];
       const chatId = chat.id._serialized;
-      const contesterId = ctx.message.from || ctx.message.author;
+      // In groups, .from is the chat ID; .author is the actual sender
+      const contesterId = ctx.message.author || ctx.message.from;
 
       // Resolver @lid para @c.us se necessário para o contestador
       let contesterNumber = contesterId;
