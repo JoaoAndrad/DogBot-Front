@@ -38,20 +38,6 @@ async function updateGroupRanking(chatId) {
       return;
     }
 
-    // Check throttle: skip if updated less than 1 minute ago (reduced for testing)
-    if (settings.lastRankingUpdate) {
-      const lastUpdate = new Date(settings.lastRankingUpdate);
-      const now = new Date();
-      const diffMinutes = (now - lastUpdate) / 1000 / 60;
-
-      if (diffMinutes < 1) {
-        logger.debug(
-          `[groupRanking] Skipping ${chatId} - updated ${diffMinutes.toFixed(0)} minutes ago`,
-        );
-        return;
-      }
-    }
-
     // Get current members (WhatsApp numbers only)
     const participants = chat.participants || [];
     const memberIds = participants.map(
