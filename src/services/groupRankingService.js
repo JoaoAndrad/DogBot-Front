@@ -131,6 +131,12 @@ function formatWorkoutDescription(ranking, winnersHistory) {
 
     for (const monthKey of sortedMonths) {
       const winners = winnersHistory[monthKey];
+
+      // Skip if winners is not an array or is empty
+      if (!Array.isArray(winners) || winners.length === 0) {
+        continue;
+      }
+
       const [month, _] = monthKey.split("/");
       const monthName = monthNames[parseInt(month) - 1];
 

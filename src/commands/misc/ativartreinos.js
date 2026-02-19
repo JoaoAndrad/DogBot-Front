@@ -81,6 +81,27 @@ module.exports = {
       return;
     }
 
+    // Check if already activated
+    try {
+      const settings = await backendClient.sendToBackend(
+        `/api/workouts/groups/${encodeURIComponent(chatId)}/settings`,
+        null,
+        "GET",
+      );
+
+      if (settings && settings.workoutTrackingEnabled) {
+        await reply(
+          "✅ Sistema de treinos já está ativado neste grupo!\n\n" +
+            "📝 Para registrar: mencione o bot + treinei\n" +
+            "🎯 Use /meta no privado para definir sua meta anual",
+        );
+        return;
+      }
+    } catch (err) {
+      console.error("[ativartreinos] Error checking group status:", err);
+      // Continue with activation if check fails
+    }
+
     // Activate group
     try {
       const result = await backendClient.sendToBackend(
