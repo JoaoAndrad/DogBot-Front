@@ -49,6 +49,17 @@ async function start() {
 
   client.on("ready", async () => {
     logger.info("WhatsApp client pronto");
+
+    // Initialize workout ranking service
+    try {
+      const groupRankingService = require("../services/groupRankingService");
+      groupRankingService.initialize(client);
+      groupRankingService.scheduleRankingUpdates();
+      logger.info("Workout ranking service initialized");
+    } catch (err) {
+      logger.error("Error initializing workout ranking service:", err);
+    }
+
     const config = require("../core/config");
     if (config.enableCatchup) {
       try {
