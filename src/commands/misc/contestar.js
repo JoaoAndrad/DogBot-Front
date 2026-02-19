@@ -119,11 +119,23 @@ module.exports = {
 
       logger.info(`[contestar] 👥 Membros do grupo: ${memberIds.length}`);
 
-      // Filter eligible voters (exclude contestador and contestado)
+      // Get bot ID
+      const botId = ctx.client.info?.wid?._serialized;
+      const botNumber = botId ? botId.replace(/@c\.us$/i, "") : null;
+
+      // Filter eligible voters (exclude contestador, contestado, and bot)
       const eligibleVoters = memberIds.filter((id) => {
         const cleanId = id.replace(/@c\.us$/i, "");
-        return cleanId !== contesterNumberClean && cleanId !== targetUserNumber;
+        return (
+          cleanId !== contesterNumberClean &&
+          cleanId !== targetUserNumber &&
+          cleanId !== botNumber
+        );
       });
+
+      logger.info(
+        `[contestar] 👥 Elegíveis para votar: ${eligibleVoters.length} (excluindo contestador, contestado e bot)`,
+      );
 
       // Criar poll de contestação
       const pollTitle = `⚖️ Contestação de Treino`;
@@ -176,6 +188,7 @@ module.exports = {
             workoutDate: workoutDate,
             chatId: chatId,
             memberIds: memberIds,
+            botNumber: botNumber,
           },
           onVote: async (voteData) => {
             await handleContestVote(
@@ -189,6 +202,7 @@ module.exports = {
               contesterName,
               workoutDate,
               memberIds,
+              botNumber,
             );
           },
         },
@@ -214,6 +228,7 @@ module.exports = {
         workoutDate: workoutDate,
         chatId: chatId,
         memberIds: memberIds,
+        botNumber: botNumber,
         votes: { keep: 0, remove: 1 }, // Contestador já vota para remover
         voters: new Set([contesterNumberClean]), // Marcar contestador como já votou
         resolved: false,
@@ -246,6 +261,7 @@ async function handleContestVote(
   contesterName,
   workoutDate,
   memberIds,
+  botNumber,
 ) {
   try {
     const voter = voteData.voter; // Já vem resolvido para @c.us pelo pollComponent
@@ -253,6 +269,12 @@ async function handleContestVote(
 
     // Extrair número sem @c.us
     const voterNumber = voter.replace(/@c\.us$/i, "");
+
+    // Ignorar voto do bot
+    if (botNumber && voterNumber === botNumber) {
+      logger.debug(`[contestar] Voto do bot ignorado`);
+      return;
+    }
 
     // Ignorar voto do contestador (já contado automaticamente)
     if (voterNumber === contesterId) {
@@ -317,10 +339,14 @@ async function handleContestVote(
     const voterName =
       voterContact?.pushname || voterContact?.name || voter.split("@")[0];
 
-    // Calculate eligible voters (all members except contestador and targetUserId)
+    // Calculate eligible voters (all members except contestador, targetUserId, and bot)
     const eligibleVoters = memberIds.filter((id) => {
       const cleanId = id.replace(/@c\.us$/i, "");
-      return cleanId !== contesterId && cleanId !== targetUserId;
+      return (
+        cleanId !== contesterId &&
+        cleanId !== targetUserId &&
+        cleanId !== botNumber
+      );
     });
 
     const totalEligible = eligibleVoters.length + 1; // +1 para incluir o contestador (que já votou)
