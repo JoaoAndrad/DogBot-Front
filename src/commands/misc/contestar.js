@@ -123,6 +123,23 @@ module.exports = {
       const botId = ctx.client.info?.wid?._serialized;
       const botNumber = botId ? botId.replace(/@c\.us$/i, "") : null;
 
+      // Extract group admin numbers (exclude bot, contestador, contestado)
+      const adminNumbers = participants
+        .filter(
+          (p) => (p.isAdmin || p.isSuperAdmin) && p.id && p.id._serialized,
+        )
+        .map((p) => p.id._serialized.replace(/@c\.us$/i, ""))
+        .filter(
+          (n) =>
+            n !== botNumber &&
+            n !== contesterNumberClean &&
+            n !== targetUserNumber,
+        );
+
+      logger.info(
+        `[contestar] 👑 Admins elegíveis (decisão final): ${adminNumbers.length}`,
+      );
+
       // Filter eligible voters (exclude contestador, contestado, and bot)
       const eligibleVoters = memberIds.filter((id) => {
         const cleanId = id.replace(/@c\.us$/i, "");
@@ -165,7 +182,10 @@ module.exports = {
       contextMessage +=
         `\n🗳️ Vote na enquete abaixo!\n` +
         `Votos: 1/${totalEligible} (${needed} necessários para decidir)\n\n` +
-        `Se a maioria votar para remover, o treino será excluído.`;
+        `Se a maioria votar para remover, o treino será excluído.` +
+        (adminNumbers.length > 0
+          ? `\n\nℹ️ Se a maioria votar para remover e o admin ainda não tiver votado, o admin terá a palavra final.`
+          : "");
 
       await ctx.client.sendMessage(chatId, contextMessage, {
         mentions: mentionsList,
@@ -189,6 +209,7 @@ module.exports = {
             chatId: chatId,
             memberIds: memberIds,
             botNumber: botNumber,
+            adminNumbers: adminNumbers,
           },
           onVote: async (voteData) => {
             await handleContestVote(
@@ -229,6 +250,8 @@ module.exports = {
         chatId: chatId,
         memberIds: memberIds,
         botNumber: botNumber,
+        adminNumbers: adminNumbers,
+        awaitingAdminDecision: false,
         votes: { keep: 0, remove: 1 }, // Contestador já vota para remover
         voters: new Set([contesterNumberClean]), // Marcar contestador como já votou
         resolved: false,
@@ -306,6 +329,20 @@ async function handleContestVote(
       return;
     }
 
+    // Admin final-say gate: when awaiting admin decision, only admins may vote
+    if (contest.awaitingAdminDecision) {
+      const isAdminVoter =
+        contest.adminNumbers && contest.adminNumbers.includes(voterNumber);
+      if (!isAdminVoter) {
+        logger.debug(
+          `[contestar] Aguardando decisão do admin — voto de ${voterNumber} ignorado`,
+        );
+        return;
+      }
+      // Admin is voting — fall through to register vote, then resolved via admin path below
+      logger.info(`[contestar] 👑 Admin ${voterNumber} dando a palavra final`);
+    }
+
     // Check if voter already voted
     if (contest.voters.has(voterNumber)) {
       logger.debug(`[contestar] ${voterNumber} já votou nesta contestação`);
@@ -332,6 +369,63 @@ async function handleContestVote(
       contest.votes.remove++;
     } else {
       contest.votes.keep++;
+    }
+
+    // Admin final-say resolution: if this was the admin's deciding vote, resolve immediately
+    if (contest.awaitingAdminDecision) {
+      const adminContact = await client.getContactById(voter);
+      const adminName =
+        adminContact?.pushname || adminContact?.name || voterNumber;
+
+      contest.resolved = true;
+
+      if (voteToRemove) {
+        try {
+          await backendClient.sendToBackend(
+            `/api/workouts/logs/${workoutId}`,
+            null,
+            "DELETE",
+          );
+          await client.sendMessage(
+            chatId,
+            `⚖️ *CONTESTAÇÃO ENCERRADA*\n\n` +
+              `👑 *${adminName}* (admin) deu a palavra final: *REMOVER*\n\n` +
+              `❌ O treino de *${targetName}* (${workoutDate}) foi *REMOVIDO*.`,
+          );
+          logger.info(
+            `[contestar] Treino ${workoutId} removido por decisão do admin ${adminName}`,
+          );
+          const groupRankingService = require("../../services/groupRankingService");
+          await groupRankingService.updateGroupRanking(chatId);
+        } catch (deleteErr) {
+          logger.error(
+            `[contestar] Erro ao remover treino (decisão do admin): ${deleteErr.message}`,
+          );
+          await client.sendMessage(
+            chatId,
+            `⚖️ Admin decidiu remover, mas houve um erro ao processar. Contate um administrador.`,
+          );
+        }
+      } else {
+        await client.sendMessage(
+          chatId,
+          `⚖️ *CONTESTAÇÃO ENCERRADA*\n\n` +
+            `👑 *${adminName}* (admin) deu a palavra final: *MANTER*\n\n` +
+            `✅ O treino de *${targetName}* (${workoutDate}) foi *MANTIDO*.`,
+        );
+      }
+
+      activeContests.delete(pollId);
+      try {
+        await backendClient.sendToBackend(
+          `/api/polls/${pollId}`,
+          null,
+          "DELETE",
+        );
+      } catch (err) {
+        logger.warn(`[contestar] Erro ao deletar poll: ${err.message}`);
+      }
+      return;
     }
 
     // Get voter info for mention
@@ -377,6 +471,36 @@ async function handleContestVote(
         } para decidir.`,
       );
       return;
+    }
+
+    // If remove won, check if an admin still needs to give the final say
+    if (removeWon && !contest.awaitingAdminDecision) {
+      const anyAdminVoted =
+        contest.adminNumbers.length === 0 ||
+        contest.adminNumbers.some((n) => contest.voters.has(n));
+
+      if (!anyAdminVoted) {
+        // Pause voting — await admin's final decision
+        contest.awaitingAdminDecision = true;
+        const adminMentionsList = contest.adminNumbers.map((n) => `${n}@c.us`);
+        const adminMentionsText = adminMentionsList
+          .map((id) => `@${id.split("@")[0]}`)
+          .join(" ");
+
+        await client.sendMessage(
+          chatId,
+          `⚖️ *MAIORIA VOTOU PARA REMOVER*\n\n` +
+            `📊 Placar: ${contest.votes.remove} remover vs ${contest.votes.keep} manter\n\n` +
+            `👑 ${adminMentionsText}\n` +
+            `A palavra final é do admin! Vote na enquete acima.\n\n` +
+            `_(Outros votos não serão mais aceitos)_`,
+          { mentions: adminMentionsList },
+        );
+        logger.info(
+          `[contestar] Aguardando decisão do admin para remoção do treino ${workoutId}`,
+        );
+        return;
+      }
     }
 
     // Mark as resolved
