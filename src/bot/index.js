@@ -54,7 +54,6 @@ async function start() {
     try {
       const groupRankingService = require("../services/groupRankingService");
       groupRankingService.initialize(client);
-      groupRankingService.scheduleRankingUpdates();
       logger.info("Workout ranking service initialized");
     } catch (err) {
       logger.error("Error initializing workout ranking service:", err);

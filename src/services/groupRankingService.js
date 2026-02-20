@@ -1,4 +1,3 @@
-const cron = require("node-cron");
 const backendClient = require("./backendClient");
 const logger = require("../utils/logger");
 
@@ -81,12 +80,30 @@ async function updateGroupRanking(chatId) {
       sample: Object.values(history || {})[0],
     });
 
+    // Extract user-written prefix from current description (anything before the ranking block)
+    const currentDescription = chat.description || "";
+    const rankingMarker = /🏆[^\n]*TEMPORADA|🏆 \d{4} 🏆/;
+    const markerIndex = currentDescription.search(rankingMarker);
+    const userPrefix =
+      markerIndex > 0
+        ? currentDescription.substring(0, markerIndex).trimEnd()
+        : "";
+
+    // Reserve space for the prefix + separator so ranking fits in 512 chars
+    const WHATSAPP_LIMIT = 512;
+    const prefixOverhead = userPrefix ? userPrefix.length + 2 : 0; // 2 = "\n\n"
+    const maxRankingLength = WHATSAPP_LIMIT - prefixOverhead;
+
     // Format description
-    let description;
+    let rankingBlock;
     try {
-      description = formatWorkoutDescription(ranking, history);
+      rankingBlock = formatWorkoutDescription(
+        ranking,
+        history,
+        maxRankingLength,
+      );
       logger.debug(
-        `[groupRanking] Description formatted successfully: ${description.length} chars`,
+        `[groupRanking] Description formatted successfully: ${rankingBlock.length} chars`,
       );
     } catch (formatErr) {
       logger.error(`[groupRanking] Error formatting description:`, {
@@ -99,29 +116,31 @@ async function updateGroupRanking(chatId) {
     }
 
     // Validate description
-    if (!description || typeof description !== "string") {
+    if (!rankingBlock || typeof rankingBlock !== "string") {
       logger.error(
         `[groupRanking] Invalid description for ${chatId}:`,
-        typeof description,
+        typeof rankingBlock,
       );
       return;
     }
 
+    // Compose final description: preserve user prefix + ranking block
+    const description = userPrefix
+      ? `${userPrefix}\n\n${rankingBlock}`
+      : rankingBlock;
+
     logger.debug(
-      `[groupRanking] Description length: ${description.length} chars`,
+      `[groupRanking] Description length: ${description.length} chars (prefix: ${userPrefix.length})`,
     );
 
-    // Log description preview
-    logger.debug(
-      `[groupRanking] Description preview: ${description.substring(0, 100)}...`,
-    );
-
-    // Log full description for debugging (only on first few chars to avoid log spam)
-    if (description.length < 512) {
-      logger.debug(`[groupRanking] Full description:`, description);
+    // Only update if description actually changed
+    if (currentDescription.trim() === description.trim()) {
+      logger.debug(
+        `[groupRanking] Description unchanged for ${chatId}, skipping update`,
+      );
+      return;
     }
 
-    // Update group description
     logger.debug(
       `[groupRanking] Attempting to set description for ${chatId}...`,
     );
@@ -162,9 +181,10 @@ async function updateGroupRanking(chatId) {
  * Format workout description with ranking and winners
  * @param {Array} ranking - Ranking array
  * @param {Object} winnersHistory - Winners history object
+ * @param {number} [maxLength=512] - Maximum allowed length for the ranking block
  * @returns {string} Formatted description
  */
-function formatWorkoutDescription(ranking, winnersHistory) {
+function formatWorkoutDescription(ranking, winnersHistory, maxLength = 512) {
   const now = new Date();
   const year = now.getFullYear();
   const monthNames = [
@@ -255,10 +275,10 @@ function formatWorkoutDescription(ranking, winnersHistory) {
     }
   }
 
-  desc += "\n📝 Registre me marcando + treinei";
+  desc += "\n📝 Registre me marcando + treinei ou usando /treinei";
 
-  // WhatsApp description limit: 512 chars
-  if (desc.length > 512) {
+  // Respect caller-supplied length limit
+  if (desc.length > maxLength) {
     desc = truncateDescription(
       desc,
       ranking,
@@ -266,6 +286,7 @@ function formatWorkoutDescription(ranking, winnersHistory) {
       year,
       currentMonthName,
       monthNames,
+      maxLength,
     );
   }
 
@@ -289,6 +310,7 @@ function truncateDescription(
   year,
   currentMonthName,
   monthNames,
+  maxLength = 512,
 ) {
   let truncated = `🏆 TEMPORADA ${year} 🏆\n\n`;
 
@@ -346,7 +368,7 @@ function truncateDescription(
   truncated += "\n@Bot treinei";
 
   // Still too long? Remove old winner history
-  if (truncated.length > 512) {
+  if (truncated.length > maxLength) {
     truncated = `🏆 ${year} 🏆\n\n📊 ${currentMonthName}:\n\n`;
     for (const entry of top10) {
       const {
@@ -381,7 +403,7 @@ function truncateDescription(
     truncated += "\n@Bot treinei";
   }
 
-  return truncated.substring(0, 512);
+  return truncated.substring(0, maxLength);
 }
 
 /**
@@ -423,22 +445,12 @@ async function updateAllGroupRankings() {
 }
 
 /**
- * Schedule ranking updates
+ * No-op: ranking updates are now triggered only on explicit events
+ * (workout logged/removed, system activated).
  */
 function scheduleRankingUpdates() {
-  // Run every 2 hours
-  cron.schedule(
-    "0 */2 * * *",
-    async () => {
-      await updateAllGroupRankings();
-    },
-    {
-      timezone: "America/Sao_Paulo",
-    },
-  );
-
   logger.info(
-    "[groupRanking] Periodic updates scheduled (every 2 hours, America/Sao_Paulo)",
+    "[groupRanking] Periodic cron disabled — updates run on demand only",
   );
 }
 
