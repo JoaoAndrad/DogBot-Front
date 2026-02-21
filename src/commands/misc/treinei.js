@@ -22,6 +22,27 @@ module.exports = {
         return;
       }
 
+      // Verificar se o grupo tem treinos ativados
+      try {
+        const settings = await backendClient.sendToBackend(
+          `/api/workouts/groups/${encodeURIComponent(from)}/settings`,
+          null,
+          "GET",
+        );
+        if (!settings || !settings.workoutTrackingEnabled) {
+          logger.info(
+            `[treinei] Group ${from} does not have workout tracking enabled, ignoring.`,
+          );
+          return;
+        }
+      } catch (err) {
+        logger.warn(
+          `[treinei] Could not verify group settings for ${from}, aborting:`,
+          err?.message,
+        );
+        return;
+      }
+
       const author = msg.author || msg.from || ctx.info?.from;
 
       // Resolve author @lid to real @c.us
