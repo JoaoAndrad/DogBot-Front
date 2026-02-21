@@ -64,7 +64,8 @@ module.exports = {
       }
 
       // Extract note: remove "/treinei" command
-      const body = msg.body || ctx.info?.body || "";
+      const body =
+        msg.body || (msg._data && msg._data.caption) || ctx.info?.body || "";
       const note =
         body
           .replace(/^(\/|!)treinei\s*/i, "") // Remove command
