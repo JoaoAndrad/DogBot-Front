@@ -102,22 +102,42 @@ module.exports = {
     }
 
     // determine sender identifier (serialized id like 5581...@c.us)
+    // For private chats, msg.from IS the chat ID and is always in @c.us format.
+    // message.getContact() may return a @lid id on newer WhatsApp versions —
+    // we use it only for backend identifier lookups, NOT as the poll chat target.
+    const privateChatId =
+      (message && message.from) || (info && info.from) || null;
+
     let senderNumber = null;
     try {
       if (message && typeof message.getContact === "function") {
         const contact = await message.getContact();
-        if (contact && contact.id && contact.id._serialized)
-          senderNumber = contact.id._serialized;
+        if (contact && contact.id && contact.id._serialized) {
+          const raw = contact.id._serialized;
+          // If contact resolves to @lid, attempt to resolve to real @c.us
+          if (raw.endsWith("@lid") && client) {
+            try {
+              const resolved = await client.getContactById(raw);
+              senderNumber =
+                (resolved && resolved.id && resolved.id._serialized) || raw;
+            } catch (e) {
+              senderNumber = raw;
+            }
+          } else {
+            senderNumber = raw;
+          }
+        }
       }
     } catch (err) {
       // ignore
     }
     if (!senderNumber) {
-      senderNumber =
-        (info && info.from) ||
-        (message && (message.from || message.author)) ||
-        null;
+      senderNumber = privateChatId || null;
     }
+
+    // Always use privateChatId (msg.from) as the WhatsApp chat destination for polls/replies.
+    // senderNumber may be @lid which cannot receive messages directly.
+    const pollChatId = privateChatId || senderNumber;
 
     // parse command body to extract confession text (remove leading /confissao)
     // Preserve original formatting (line breaks, quotes, spacing). Do not trim.
@@ -445,7 +465,7 @@ module.exports = {
       try {
         const _res = await createPollPromise(
           client,
-          senderNumber,
+          pollChatId,
           "Escolha o grupo para enviar sua confissão",
           labels,
           {},
@@ -541,7 +561,7 @@ module.exports = {
         try {
           const _res = await createPollPromise(
             client,
-            senderNumber,
+            pollChatId,
             prompt,
             options,
             {},
@@ -599,7 +619,7 @@ module.exports = {
       try {
         const _res = await createPollPromise(
           client,
-          senderNumber,
+          pollChatId,
           `Detectei ${mentionTokens.length} menção(ões) na sua mensagem. Deseja mencionar usuário(s)?`,
           ["Sim", "Não"],
           {},
@@ -698,7 +718,7 @@ module.exports = {
                       try {
                         const _res = await createPollPromise(
                           client,
-                          senderNumber,
+                          pollChatId,
                           "Detectei um vídeo. Vídeos não são suportados neste ambiente. Deseja que eu encaminhe sua mensagem original para o grupo selecionado?",
                           ["Sim", "Não"],
                           {},
@@ -908,7 +928,7 @@ module.exports = {
               try {
                 const _res = await createPollPromise(
                   client,
-                  senderNumber,
+                  pollChatId,
                   "Detectei um vídeo. Vídeos não são suportados neste ambiente. Deseja que eu encaminhe sua mensagem original para o grupo?",
                   ["Sim", "Não"],
                   {},
@@ -1045,11 +1065,12 @@ module.exports = {
     console.log(
       `[confissao] 🗳️  Aguardando seleção de grupo pelo usuário (${candidateGroups.length} opções)...`,
     );
+    console.log(`[confissao] 📬 pollChatId="${pollChatId}" senderNumber="${senderNumber}"`);
     try {
       // create a poll in the user's private chat to choose target group
       const pollResult = await createPollPromise(
         client,
-        senderNumber,
+        pollChatId,
         "Escolha o grupo para enviar sua confissão",
         optionLabels,
         {},
@@ -1103,7 +1124,7 @@ module.exports = {
                 try {
                   const _res = await createPollPromise(
                     client,
-                    senderNumber,
+                    pollChatId,
                     "Detectei um vídeo. Vídeos não são suportados neste ambiente. Deseja que eu encaminhe sua mensagem original para o grupo selecionado?",
                     ["Sim", "Não"],
                     {},
