@@ -422,11 +422,15 @@ module.exports = {
             }),
           );
 
-          // Collect poll message for cleanup IMMEDIATELY after creation
-          if (pollMsg) {
-            // store poll message and chatId for later cleanup
-            pollMessages.push({ pollMsg, chatId });
+          // If createPoll returned null, the poll failed to send — reject immediately
+          if (!pollMsg) {
+            reject(new Error(`[confissao] createPoll retornou null para "${title}" em ${chatId}`));
+            return;
           }
+
+          // Collect poll message for cleanup IMMEDIATELY after creation
+          // store poll message and chatId for later cleanup
+          pollMessages.push({ pollMsg, chatId });
           // Don't resolve here - wait for vote in onVote callback above
         } catch (err) {
           reject(err);

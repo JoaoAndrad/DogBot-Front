@@ -63,9 +63,10 @@ function createSender(client) {
         sent && sent.id && sent.id._serialized ? sent.id._serialized : sent.id;
       return { sent, msgId, type: "native", pollOptions };
     } catch (err) {
-      console.log("sendPoll: failed to send native poll", {
+      console.error("[sendPoll] ERRO ao enviar poll nativa:", {
         chatId,
         title,
+        optionsCount: normalizedOptionNames.length,
         err: err && (err.stack || err.message || err),
       });
       return null;

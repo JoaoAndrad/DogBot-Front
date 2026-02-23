@@ -151,7 +151,8 @@ async function createPoll(clientOrSender, chatId, title, options, opts = {}) {
   // Send
   const sendResult = await sender.sendPoll(payload, opts);
   if (!sendResult) {
-    logger.warn("createPoll: sendResult null");
+    // Always log this, even for confissão polls — it means the poll was not sent
+    console.error(`[createPoll] sendResult null — poll não foi enviado. title="${payload.title}" chatId="${payload.chatId}"`);
     return null;
   }
 
