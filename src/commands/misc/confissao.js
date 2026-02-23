@@ -463,10 +463,29 @@ module.exports = {
       });
     };
 
+    const buildUniqueGroupLabels = (groups) => {
+      const counts = new Map();
+      for (const group of groups) {
+        const base = (group && (group.name || group.id)) || "Grupo";
+        counts.set(base, (counts.get(base) || 0) + 1);
+      }
+
+      const seen = new Map();
+      return groups.map((group) => {
+        const base = (group && (group.name || group.id)) || "Grupo";
+        const total = counts.get(base) || 0;
+        if (total <= 1) return base;
+
+        const next = (seen.get(base) || 0) + 1;
+        seen.set(base, next);
+        return `${base} (${next})`;
+      });
+    };
+
     // Helper: pick a group (returns chosen group object or null)
     const pickGroup = async () => {
       if (candidateGroups.length === 1) return candidateGroups[0];
-      const labels = candidateGroups.map((g) => g.name || g.id);
+      const labels = buildUniqueGroupLabels(candidateGroups);
       try {
         const _res = await createPollPromise(
           client,
@@ -1064,7 +1083,7 @@ module.exports = {
     }
 
     // Build poll options (labels) and keep mapping to chat ids
-    const optionLabels = candidateGroups.map((g) => g.name || g.id);
+    const optionLabels = buildUniqueGroupLabels(candidateGroups);
     const optionChatIds = candidateGroups.map((g) => g.id);
 
     console.log(
