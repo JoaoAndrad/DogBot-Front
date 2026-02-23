@@ -135,9 +135,28 @@ module.exports = {
       senderNumber = privateChatId || null;
     }
 
-    // Always use privateChatId (msg.from) as the WhatsApp chat destination for polls/replies.
-    // senderNumber may be @lid which cannot receive messages directly.
-    const pollChatId = privateChatId || senderNumber;
+    // Determine the actual chat ID to send polls/replies to.
+    // Both privateChatId and senderNumber may be @lid on newer WhatsApp versions.
+    // Prefer whichever resolves to @c.us; fall back to the other.
+    const isLid = (id) => id && String(id).endsWith("@lid");
+    let pollChatId;
+    if (!isLid(privateChatId)) {
+      pollChatId = privateChatId;
+    } else if (!isLid(senderNumber)) {
+      pollChatId = senderNumber;
+    } else {
+      // Both are @lid — try to resolve privateChatId to @c.us via getContactById
+      pollChatId = privateChatId; // fallback, will try to resolve below
+      if (client && privateChatId) {
+        try {
+          const resolved = await client.getContactById(privateChatId);
+          const resolvedId = resolved && resolved.id && resolved.id._serialized;
+          if (resolvedId && !isLid(resolvedId)) pollChatId = resolvedId;
+        } catch (e) {
+          // keep @lid fallback
+        }
+      }
+    }
 
     // parse command body to extract confession text (remove leading /confissao)
     // Preserve original formatting (line breaks, quotes, spacing). Do not trim.
