@@ -58,9 +58,11 @@ function createSender(client) {
       const poll = new Poll(title, normalizedOptionNames, optionsObj || {});
 
       // sendSeen is disabled globally in the client wrapper (see bot/index.js)
+      console.log(`[sendPoll] Enviando via sendMessage | chatId="${chatId}" | title="${title}"`);
       const sent = await client.sendMessage(chatId, poll);
       const msgId =
         sent && sent.id && sent.id._serialized ? sent.id._serialized : sent.id;
+      console.log(`[sendPoll] Enviado com sucesso | msgId="${msgId}" | chatId="${chatId}"`);
       return { sent, msgId, type: "native", pollOptions };
     } catch (err) {
       console.error("[sendPoll] ERRO ao enviar poll nativa:", {

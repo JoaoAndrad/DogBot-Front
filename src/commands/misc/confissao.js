@@ -448,6 +448,7 @@ module.exports = {
     ) => {
       return new Promise(async (resolve, reject) => {
         try {
+          console.log(`[confissao:poll] Criando poll | chatId="${chatId}" | title="${title}" | options=${options.length}`);
           const pollMsg = await polls.createPoll(
             clientOrSender,
             chatId,
@@ -455,6 +456,7 @@ module.exports = {
             options,
             Object.assign({}, opts, {
               onVote: async (payload) => {
+                console.log(`[confissao:poll] Voto recebido | title="${title}"`);
                 // Resolve with both payload and pollMsg reference
                 resolve({ payload, pollMsg });
               },
@@ -463,15 +465,18 @@ module.exports = {
 
           // If createPoll returned null, the poll failed to send — reject immediately
           if (!pollMsg) {
+            console.error(`[confissao:poll] createPoll retornou null | chatId="${chatId}" | title="${title}"`);
             reject(new Error(`[confissao] createPoll retornou null para "${title}" em ${chatId}`));
             return;
           }
 
+          console.log(`[confissao:poll] Poll criada e enviada | msgId="${pollMsg.msgId || JSON.stringify(pollMsg)}" | chatId="${chatId}"`);
           // Collect poll message for cleanup IMMEDIATELY after creation
           // store poll message and chatId for later cleanup
           pollMessages.push({ pollMsg, chatId });
           // Don't resolve here - wait for vote in onVote callback above
         } catch (err) {
+          console.error(`[confissao:poll] ERRO ao criar poll | chatId="${chatId}" | title="${title}" |`, err && (err.message || err));
           reject(err);
         }
       });
