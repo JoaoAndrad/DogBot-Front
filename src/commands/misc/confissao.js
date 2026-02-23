@@ -390,6 +390,10 @@ module.exports = {
       return;
     }
 
+    console.log(
+      `[confissao] 📨 Grupos em comum com o usuário: ${candidateGroups.length}`,
+    );
+
     // Helper: create a poll and await a single vote payload
     const polls = require("../../components/poll");
     const mediaHelper = require("../../utils/mediaHelper");
@@ -570,6 +574,7 @@ module.exports = {
     };
 
     // Detect mention tokens in the text: occurrences of @ followed by non-space chars
+    console.log(`[confissao] 🔍 Analisando texto da confissão...`);
     const mentionTokens = [];
     try {
       const regex = /@\S*/g;
@@ -584,6 +589,9 @@ module.exports = {
     // If there are mention tokens, ask the user whether to treat as mentions
     let mentionMap = []; // array of chosen jids in order
     if (mentionTokens.length > 0) {
+      console.log(
+        `[confissao] 🏷️  ${mentionTokens.length} menção(ões) detectadas: ${mentionTokens.join(", ")}`,
+      );
       try {
         const _res = await createPollPromise(
           client,
@@ -870,6 +878,9 @@ module.exports = {
     // If there's exactly one group in common, skip the poll and send directly
     if (candidateGroups.length === 1) {
       const target = candidateGroups[0];
+      console.log(
+        `[confissao] 📤 Enviando diretamente para o único grupo: ${target.name}`,
+      );
       try {
         const groupMsg = `*📩 Confissão:* ${text}`;
         if (message && message.hasMedia) {
@@ -1027,6 +1038,9 @@ module.exports = {
     const optionLabels = candidateGroups.map((g) => g.name || g.id);
     const optionChatIds = candidateGroups.map((g) => g.id);
 
+    console.log(
+      `[confissao] 🗳️  Aguardando seleção de grupo pelo usuário (${candidateGroups.length} opções)...`,
+    );
     try {
       // create a poll in the user's private chat to choose target group
       const pollResult = await createPollPromise(
@@ -1048,6 +1062,12 @@ module.exports = {
         const pick = Number(idxs[0]);
         const targetChat = optionChatIds[pick];
         if (!targetChat) return;
+
+        const pickedGroupName =
+          candidateGroups[pick] && candidateGroups[pick].name
+            ? candidateGroups[pick].name
+            : targetChat;
+        console.log(`[confissao] 📤 Grupo selecionado: ${pickedGroupName}`);
 
         // send confession to selected group (formatted)
         try {
