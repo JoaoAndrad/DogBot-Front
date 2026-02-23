@@ -201,11 +201,6 @@ module.exports = {
 
     // Load ignored chats cache
     const ignoredChats = chatCleaner.loadIgnoredChats();
-    if (ignoredChats.size > 0) {
-      console.log(
-        `[confissao] 💤 ${ignoredChats.size} chats sendo ignorados (cache)`,
-      );
-    }
 
     // Get bot's own ID to verify membership
     let botId = null;
@@ -215,9 +210,8 @@ module.exports = {
       } else if (client.info && client.info.me && client.info.me._serialized) {
         botId = client.info.me._serialized;
       }
-      console.log(`[confissao] 🤖 Bot ID: ${botId}`);
     } catch (err) {
-      console.log("[confissao] ⚠️  Não foi possível obter ID do bot");
+      // ignore
     }
 
     // Count groups for logging
@@ -231,8 +225,6 @@ module.exports = {
 
     let chatsDeleted = 0;
     let botNotInGroupCount = 0;
-
-    console.log(`[confissao] 📊 Grupos encontrados: ${totalGroups}`);
 
     for (const c of chats) {
       try {
@@ -259,9 +251,6 @@ module.exports = {
           // getChatById failed: group doesn't exist or bot is not a member anymore
           botNotInGroupCount++;
           const groupName = c.name || chatId.split("@")[0];
-          console.log(
-            `[confissao] ❌ Bot não está mais no grupo: ${groupName} (${chatId})`,
-          );
 
           // Delete this chat to prevent it from appearing in future scans
           const deleted = await chatCleaner.archiveInactiveChat(
@@ -271,7 +260,6 @@ module.exports = {
           );
           if (deleted) {
             chatsDeleted++;
-            console.log(`[confissao] 🗑️  Chat excluído: ${groupName}`);
           }
           chatCleaner.addToIgnoredChats(chatId);
           continue;
@@ -280,9 +268,6 @@ module.exports = {
         if (!Array.isArray(participants) || participants.length === 0) {
           botNotInGroupCount++;
           const groupName = c.name || chatId.split("@")[0];
-          console.log(
-            `[confissao] ⚠️  Grupo sem participantes: ${groupName} (${chatId})`,
-          );
 
           // Delete chat since it has no participants
           const deleted = await chatCleaner.archiveInactiveChat(
@@ -292,7 +277,6 @@ module.exports = {
           );
           if (deleted) {
             chatsDeleted++;
-            console.log(`[confissao] 🗑️  Chat excluído: ${groupName}`);
           }
           chatCleaner.addToIgnoredChats(chatId);
           continue;
@@ -307,9 +291,6 @@ module.exports = {
           botNotInGroupCount++;
           const groupName =
             (full && full.name) || c.name || chatId.split("@")[0];
-          console.log(
-            `[confissao] ❌ Bot não está mais no grupo (não é participante): ${groupName} (${chatId})`,
-          );
 
           // Delete this chat since bot is not a member
           const deleted = await chatCleaner.archiveInactiveChat(
@@ -319,7 +300,6 @@ module.exports = {
           );
           if (deleted) {
             chatsDeleted++;
-            console.log(`[confissao] 🗑️  Chat excluído: ${groupName}`);
           }
           chatCleaner.addToIgnoredChats(chatId);
           continue;
@@ -331,21 +311,14 @@ module.exports = {
           botNotInGroupCount++;
           const groupName =
             (full && full.name) || c.name || chatId.split("@")[0];
-          console.log(
-            `[confissao] 👋 Saindo do grupo (${participantCount} participante${participantCount > 1 ? "s" : ""}): ${groupName} (${chatId})`,
-          );
 
           // Leave the group first
           try {
             if (full && typeof full.leave === "function") {
               await full.leave();
-              console.log(`[confissao] ✅ Saiu do grupo: ${groupName}`);
             }
           } catch (leaveError) {
-            console.log(
-              `[confissao] ⚠️  Não foi possível sair do grupo ${groupName}:`,
-              leaveError.message,
-            );
+            // ignore leave errors
           }
 
           // Then delete the chat
@@ -356,7 +329,6 @@ module.exports = {
           );
           if (deleted) {
             chatsDeleted++;
-            console.log(`[confissao] 🗑️  Chat excluído: ${groupName}`);
           }
           chatCleaner.addToIgnoredChats(chatId);
           continue;
@@ -381,38 +353,12 @@ module.exports = {
 
     const botActiveGroups = totalGroups - botNotInGroupCount;
 
-    console.log(
-      `[confissao] 🤖 Grupos onde o bot está ativo: ${botActiveGroups}`,
-    );
-
-    // List all active groups
-    if (botActiveGroupsList.length > 0) {
-      console.log(`[confissao] 📋 Lista de grupos ativos:`);
-      botActiveGroupsList.forEach((group, index) => {
-        console.log(
-          `[confissao]    ${index + 1}. ${group.name} (${group.participantCount} participantes)`,
-        );
-      });
-    }
-
-    console.log(
-      `[confissao] ✅ Grupos que o usuário está: ${candidateGroups.length}`,
-    );
-    console.log(
-      `[confissao] ❌ Grupos que o bot não está mais: ${botNotInGroupCount}`,
-    );
-    console.log(`[confissao] 🗑️  Chats excluídos: ${chatsDeleted}`);
-
     if (!candidateGroups.length) {
       await reply(
         "Não encontrei nenhum grupo em comum com você onde eu esteja presente. Peça ao administrador para adicionar o bot no grupo desejado.",
       );
       return;
     }
-
-    console.log(
-      `[confissao] 📨 Grupos em comum com o usuário: ${candidateGroups.length}`,
-    );
 
     // Helper: create a poll and await a single vote payload
     const polls = require("../../components/poll");
@@ -429,7 +375,6 @@ module.exports = {
     ) => {
       return new Promise(async (resolve, reject) => {
         try {
-          console.log(`[confissao:poll] Criando poll | chatId="${chatId}" | title="${title}" | options=${options.length}`);
           const pollMsg = await polls.createPoll(
             clientOrSender,
             chatId,
@@ -437,7 +382,6 @@ module.exports = {
             options,
             Object.assign({}, opts, {
               onVote: async (payload) => {
-                console.log(`[confissao:poll] Voto recebido | title="${title}"`);
                 // Resolve with both payload and pollMsg reference
                 resolve({ payload, pollMsg });
               },
@@ -446,18 +390,15 @@ module.exports = {
 
           // If createPoll returned null, the poll failed to send — reject immediately
           if (!pollMsg) {
-            console.error(`[confissao:poll] createPoll retornou null | chatId="${chatId}" | title="${title}"`);
             reject(new Error(`[confissao] createPoll retornou null para "${title}" em ${chatId}`));
             return;
           }
 
-          console.log(`[confissao:poll] Poll criada e enviada | msgId="${pollMsg.msgId || JSON.stringify(pollMsg)}" | chatId="${chatId}"`);
           // Collect poll message for cleanup IMMEDIATELY after creation
           // store poll message and chatId for later cleanup
           pollMessages.push({ pollMsg, chatId });
           // Don't resolve here - wait for vote in onVote callback above
         } catch (err) {
-          console.error(`[confissao:poll] ERRO ao criar poll | chatId="${chatId}" | title="${title}" |`, err && (err.message || err));
           reject(err);
         }
       });
@@ -622,7 +563,6 @@ module.exports = {
     };
 
     // Detect mention tokens in the text: occurrences of @ followed by non-space chars
-    console.log(`[confissao] 🔍 Analisando texto da confissão...`);
     const mentionTokens = [];
     try {
       const regex = /@\S*/g;
@@ -637,9 +577,6 @@ module.exports = {
     // If there are mention tokens, ask the user whether to treat as mentions
     let mentionMap = []; // array of chosen jids in order
     if (mentionTokens.length > 0) {
-      console.log(
-        `[confissao] 🏷️  ${mentionTokens.length} menção(ões) detectadas: ${mentionTokens.join(", ")}`,
-      );
       try {
         const _res = await createPollPromise(
           client,
@@ -926,9 +863,6 @@ module.exports = {
     // If there's exactly one group in common, skip the poll and send directly
     if (candidateGroups.length === 1) {
       const target = candidateGroups[0];
-      console.log(
-        `[confissao] 📤 Enviando diretamente para o único grupo: ${target.name}`,
-      );
       try {
         const groupMsg = `*📩 Confissão:* ${text}`;
         if (message && message.hasMedia) {
@@ -1086,10 +1020,6 @@ module.exports = {
     const optionLabels = buildUniqueGroupLabels(candidateGroups);
     const optionChatIds = candidateGroups.map((g) => g.id);
 
-    console.log(
-      `[confissao] 🗳️  Aguardando seleção de grupo pelo usuário (${candidateGroups.length} opções)...`,
-    );
-    console.log(`[confissao] 📬 pollChatId="${pollChatId}" senderNumber="${senderNumber}"`);
     try {
       // create a poll in the user's private chat to choose target group
       const pollResult = await createPollPromise(
@@ -1116,7 +1046,6 @@ module.exports = {
           candidateGroups[pick] && candidateGroups[pick].name
             ? candidateGroups[pick].name
             : targetChat;
-        console.log(`[confissao] 📤 Grupo selecionado: ${pickedGroupName}`);
 
         // send confession to selected group (formatted)
         try {
