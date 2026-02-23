@@ -101,30 +101,34 @@ module.exports = {
       return;
     }
 
-    // determine sender identifier (serialized id like 5581...@c.us)
-    // For private chats, msg.from IS the chat ID and is always in @c.us format.
-    // message.getContact() may return a @lid id on newer WhatsApp versions —
-    // we use it only for backend identifier lookups, NOT as the poll chat target.
+    // determine sender identifier
+    // privateChatId = message.from = the actual WhatsApp chat this message came from.
+    // This is ALWAYS the correct destination for polls/replies (@c.us or @lid — both work).
+    // senderNumber is resolved to @c.us for backend identifier lookups only.
     const privateChatId =
       (message && message.from) || (info && info.from) || null;
+
+    // pollChatId: always use message.from — it's the verified chat we can write back into.
+    const pollChatId = privateChatId;
 
     let senderNumber = null;
     try {
       if (message && typeof message.getContact === "function") {
         const contact = await message.getContact();
         if (contact && contact.id && contact.id._serialized) {
-          const raw = contact.id._serialized;
-          // If contact resolves to @lid, attempt to resolve to real @c.us
-          if (raw.endsWith("@lid") && client) {
+          const contactId = contact.id._serialized;
+          // If contact resolves to @lid, try to resolve to real @c.us for backend lookups
+          if (contactId.endsWith("@lid") && client) {
             try {
-              const resolved = await client.getContactById(raw);
+              const resolved = await client.getContactById(contactId);
               senderNumber =
-                (resolved && resolved.id && resolved.id._serialized) || raw;
+                (resolved && resolved.id && resolved.id._serialized) ||
+                contactId;
             } catch (e) {
-              senderNumber = raw;
+              senderNumber = contactId;
             }
           } else {
-            senderNumber = raw;
+            senderNumber = contactId;
           }
         }
       }
@@ -133,29 +137,6 @@ module.exports = {
     }
     if (!senderNumber) {
       senderNumber = privateChatId || null;
-    }
-
-    // Determine the actual chat ID to send polls/replies to.
-    // Both privateChatId and senderNumber may be @lid on newer WhatsApp versions.
-    // Prefer whichever resolves to @c.us; fall back to the other.
-    const isLid = (id) => id && String(id).endsWith("@lid");
-    let pollChatId;
-    if (!isLid(privateChatId)) {
-      pollChatId = privateChatId;
-    } else if (!isLid(senderNumber)) {
-      pollChatId = senderNumber;
-    } else {
-      // Both are @lid — try to resolve privateChatId to @c.us via getContactById
-      pollChatId = privateChatId; // fallback, will try to resolve below
-      if (client && privateChatId) {
-        try {
-          const resolved = await client.getContactById(privateChatId);
-          const resolvedId = resolved && resolved.id && resolved.id._serialized;
-          if (resolvedId && !isLid(resolvedId)) pollChatId = resolvedId;
-        } catch (e) {
-          // keep @lid fallback
-        }
-      }
     }
 
     // parse command body to extract confession text (remove leading /confissao)
