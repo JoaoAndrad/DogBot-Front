@@ -560,8 +560,9 @@ async function sendBufferAsSticker(client, chatId, buffer, opts = {}) {
     const aspect = width && height ? width / height : 1;
 
     // Decide whether to send dual stickers: crop + full-fit
-    const needsDual =
-      width > 512 || height > 512 || Math.abs(aspect - 1) > 0.05;
+    // Decide whether to send dual stickers: only when aspect differs significantly from 1:1
+    // Images that are square (or near-square) will send a single sticker even if larger than 512px.
+    const needsDual = Math.abs(aspect - 1) > 0.05;
 
     // Helper to build MessageMedia from a buffer
     const buildMedia = (buf, filename) =>
