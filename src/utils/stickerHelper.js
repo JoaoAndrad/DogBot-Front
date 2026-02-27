@@ -544,9 +544,77 @@ async function sendCompositeSticker(client, chatId, tracks) {
   }
 }
 
+/**
+ * Convert a Buffer (image) to WebP sticker and send as sticker (or fallback to image).
+ * Options: { filename?, quoted?: messageObject }
+ */
+async function sendBufferAsSticker(client, chatId, buffer, opts = {}) {
+  try {
+    if (!buffer) return false;
+
+    // Convert to WebP 512x512
+    const webpBuffer = await sharp(buffer)
+      .resize(512, 512, { fit: "cover", position: "center" })
+      .webp({ quality: 80 })
+      .toBuffer();
+
+    const media = new MessageMedia(
+      "image/webp",
+      webpBuffer.toString("base64"),
+      opts.filename || "sticker.webp",
+    );
+
+    try {
+      await ensureUploadQpl(client);
+    } catch (e) {
+      logger.debug(
+        "[StickerHelper] ensureUploadQpl threw: " +
+          (e && e.message ? e.message : String(e)),
+      );
+    }
+
+    // Try to send as sticker; if opts.quoted is provided, pass it
+    try {
+      const sendOpts = Object.assign(
+        { sendMediaAsSticker: true },
+        opts.quoted ? { quoted: opts.quoted } : {},
+      );
+      await client.sendMessage(chatId, media, sendOpts);
+      logger.info("[StickerHelper] ✅ Buffer sticker sent successfully");
+      return true;
+    } catch (sendErr) {
+      logger.error(
+        `[StickerHelper] Error sending buffer sticker: ${
+          sendErr && sendErr.stack ? sendErr.stack : String(sendErr)
+        }`,
+      );
+      // Fallback to send as regular image
+      try {
+        const sendOpts = opts.quoted ? { quoted: opts.quoted } : {};
+        await client.sendMessage(chatId, media, sendOpts);
+        logger.info("[StickerHelper] ✅ Fallback image sent for buffer");
+        return true;
+      } catch (fallbackErr) {
+        logger.error(
+          `[StickerHelper] Fallback send failed: ${
+            fallbackErr && fallbackErr.stack
+              ? fallbackErr.stack
+              : String(fallbackErr)
+          }`,
+        );
+        return false;
+      }
+    }
+  } catch (e) {
+    logger.error("[StickerHelper] sendBufferAsSticker error: " + e.message);
+    return false;
+  }
+}
+
 module.exports = {
   sendTrackSticker,
   downloadAndConvertToWebp,
   sendCompositeSticker,
   downloadAndResize,
+  sendBufferAsSticker,
 };
