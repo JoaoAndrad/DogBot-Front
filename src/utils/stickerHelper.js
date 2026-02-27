@@ -552,17 +552,24 @@ async function sendBufferAsSticker(client, chatId, buffer, opts = {}) {
   try {
     if (!buffer) return false;
 
-    // Convert to WebP 512x512
-    const webpBuffer = await sharp(buffer)
-      .resize(512, 512, { fit: "cover", position: "center" })
-      .webp({ quality: 80 })
-      .toBuffer();
+    // Respect EXIF rotation and read metadata
+    const image = sharp(buffer).rotate();
+    const meta = await image.metadata().catch(() => ({}));
+    const width = meta.width || 0;
+    const height = meta.height || 0;
+    const aspect = width && height ? width / height : 1;
 
-    const media = new MessageMedia(
-      "image/webp",
-      webpBuffer.toString("base64"),
-      opts.filename || "sticker.webp",
-    );
+    // Decide whether to send dual stickers: crop + full-fit
+    const needsDual =
+      width > 512 || height > 512 || Math.abs(aspect - 1) > 0.05;
+
+    // Helper to build MessageMedia from a buffer
+    const buildMedia = (buf, filename) =>
+      new MessageMedia(
+        "image/webp",
+        buf.toString("base64"),
+        filename || "sticker.webp",
+      );
 
     try {
       await ensureUploadQpl(client);
@@ -573,7 +580,96 @@ async function sendBufferAsSticker(client, chatId, buffer, opts = {}) {
       );
     }
 
-    // Try to send as sticker; if opts.quoted is provided, pass it
+    // If dual stickers requested by heuristics or by option, send both
+    if (needsDual || opts.forceDual) {
+      try {
+        // cropped (fills square) - prefer entropy for subject
+        const cropBuf = await image
+          .clone()
+          .resize(512, 512, { fit: "cover", position: "entropy" })
+          .webp({ quality: 80 })
+          .toBuffer();
+
+        // full-fit (contains entire image with transparent padding)
+        const containBuf = await image
+          .clone()
+          .resize(512, 512, {
+            fit: "contain",
+            background: { r: 0, g: 0, b: 0, alpha: 0 },
+          })
+          .webp({ quality: 80 })
+          .toBuffer();
+
+        const cropMedia = buildMedia(
+          cropBuf,
+          opts.filename || "sticker-crop.webp",
+        );
+        const containMedia = buildMedia(
+          containBuf,
+          opts.filename || "sticker-full.webp",
+        );
+
+        // send cropped first (quoted if provided)
+        await client.sendMessage(
+          chatId,
+          cropMedia,
+          Object.assign(
+            { sendMediaAsSticker: true },
+            opts.quoted ? { quoted: opts.quoted } : {},
+          ),
+        );
+
+        // then send full-fit
+        await client.sendMessage(
+          chatId,
+          containMedia,
+          Object.assign(
+            { sendMediaAsSticker: true },
+            opts.quoted ? { quoted: opts.quoted } : {},
+          ),
+        );
+
+        logger.info("[StickerHelper] ✅ Dual stickers sent (crop + full-fit)");
+        return true;
+      } catch (sendErr) {
+        logger.error(
+          `[StickerHelper] Error sending dual stickers: ${sendErr && sendErr.stack ? sendErr.stack : String(sendErr)}`,
+        );
+        // Fallback: try single sticker crop
+        try {
+          const fallbackBuf = await image
+            .clone()
+            .resize(512, 512, { fit: "cover", position: "entropy" })
+            .webp({ quality: 80 })
+            .toBuffer();
+          const media2 = buildMedia(
+            fallbackBuf,
+            opts.filename || "sticker.webp",
+          );
+          await client.sendMessage(
+            chatId,
+            media2,
+            opts.quoted ? { quoted: opts.quoted } : {},
+          );
+          logger.info("[StickerHelper] ✅ Fallback single sticker sent");
+          return true;
+        } catch (fallbackErr) {
+          logger.error(
+            `[StickerHelper] Dual-fallback failed: ${fallbackErr && fallbackErr.stack ? fallbackErr.stack : String(fallbackErr)}`,
+          );
+          return false;
+        }
+      }
+    }
+
+    // Default single sticker: cover center
+    const webpBuffer = await image
+      .resize(512, 512, { fit: "cover", position: "center" })
+      .webp({ quality: 80 })
+      .toBuffer();
+
+    const media = buildMedia(webpBuffer, opts.filename || "sticker.webp");
+
     try {
       const sendOpts = Object.assign(
         { sendMediaAsSticker: true },
@@ -584,9 +680,7 @@ async function sendBufferAsSticker(client, chatId, buffer, opts = {}) {
       return true;
     } catch (sendErr) {
       logger.error(
-        `[StickerHelper] Error sending buffer sticker: ${
-          sendErr && sendErr.stack ? sendErr.stack : String(sendErr)
-        }`,
+        `[StickerHelper] Error sending buffer sticker: ${sendErr && sendErr.stack ? sendErr.stack : String(sendErr)}`,
       );
       // Fallback to send as regular image
       try {
@@ -596,11 +690,7 @@ async function sendBufferAsSticker(client, chatId, buffer, opts = {}) {
         return true;
       } catch (fallbackErr) {
         logger.error(
-          `[StickerHelper] Fallback send failed: ${
-            fallbackErr && fallbackErr.stack
-              ? fallbackErr.stack
-              : String(fallbackErr)
-          }`,
+          `[StickerHelper] Fallback send failed: ${fallbackErr && fallbackErr.stack ? fallbackErr.stack : String(fallbackErr)}`,
         );
         return false;
       }
