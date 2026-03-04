@@ -38,6 +38,20 @@ module.exports = {
     }
 
     try {
+      // Check before starting whether the user already has a Spotify account
+      // (so we can show the right success message after auth)
+      let isReconnect = false;
+      try {
+        const preLookup = await backend.sendToBackend(
+          `/api/users/lookup`,
+          { identifier: userId },
+          "POST",
+        );
+        isReconnect = !!(preLookup && preLookup.found && preLookup.hasSpotify);
+      } catch (_) {
+        // Ignore; treat as new user
+      }
+
       const payload = {
         userId,
         scopes:
@@ -78,10 +92,16 @@ module.exports = {
               const appIndex =
                 acct && typeof acct.appIndex === "number" ? acct.appIndex : 0;
               const serverNumber = appIndex + 1;
-              await reply(
-                `✅ Você foi conectado com sucesso no servidor ${serverNumber}.\\n\\n` +
-                  `Por favor, me informe o seu e-mail utilizado no Spotify para que eu possa adicioná-lo à nossa lista branca (requisito do Spotify).`,
-              );
+
+              if (isReconnect) {
+                await reply(
+                  `✅ Suas credenciais do Spotify foram atualizadas com sucesso no servidor ${serverNumber}.`,
+                );
+              } else {
+                await reply(
+                  `✅ Você foi conectado com sucesso no servidor ${serverNumber}.\n\nPor favor, me informe o seu e-mail utilizado no Spotify para que eu possa adicioná-lo à nossa lista branca (requisito do Spotify).`,
+                );
+              }
             }
           } catch (err) {
             console.log("[conectar] Polling error:", err.message);

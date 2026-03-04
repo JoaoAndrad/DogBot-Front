@@ -4,6 +4,32 @@ const pollComponent = require("../components/poll");
 const logger = require("../utils/logger");
 
 /**
+ * Format a WhatsApp JID (e.g. "5581982132346@c.us") into a readable phone number.
+ * For Brazilian numbers (+55): "+55 (DDD) NNNNN-NNNN"
+ * For others: just the bare number without the @suffix.
+ */
+function formatWhatsAppId(jid) {
+  if (!jid) return jid;
+  // Strip suffix (@c.us, @s.whatsapp.net, etc.)
+  const number = String(jid).replace(/@.*$/, "");
+  // Brazilian mobile: 55 + 2-digit DDD + 9-digit number = 13 digits
+  if (/^55\d{11}$/.test(number)) {
+    const ddd = number.slice(2, 4);
+    const part1 = number.slice(4, 9);
+    const part2 = number.slice(9);
+    return `+55 (${ddd}) ${part1}-${part2}`;
+  }
+  // Brazilian landline: 55 + 2-digit DDD + 8-digit number = 12 digits
+  if (/^55\d{10}$/.test(number)) {
+    const ddd = number.slice(2, 4);
+    const part1 = number.slice(4, 8);
+    const part2 = number.slice(8);
+    return `+55 (${ddd}) ${part1}-${part2}`;
+  }
+  return number;
+}
+
+/**
  * Handle cadastro conversation flow
  * Steps:
  * 0 - Ask for name
@@ -13,7 +39,7 @@ async function handleCadastroFlow(userId, body, state, reply, context) {
   const { step, data } = state;
 
   logger.info(
-    `[CadastroFlow] Handler chamado para userId=${userId}, step=${step}, body="${body}"`
+    `[CadastroFlow] Handler chamado para userId=${userId}, step=${step}, body="${body}"`,
   );
 
   // Step 0: Collect name
@@ -44,11 +70,12 @@ async function handleCadastroFlow(userId, body, state, reply, context) {
     });
 
     // Show confirmation message
+    const formattedContact = formatWhatsAppId(data.identifier);
     await reply(
       `📋 *Confirmação de Cadastro*\n\n` +
         `Nome: *${userName}*\n` +
-        `Identificador: ${data.identifier}\n\n` +
-        `Os dados acima estão corretos?`
+        `Contato: *${formattedContact}*\n\n` +
+        `Os dados acima estão corretos?`,
     );
 
     // Create poll for confirmation
@@ -61,7 +88,7 @@ async function handleCadastroFlow(userId, body, state, reply, context) {
         logger.error("[Cadastro] Cliente WhatsApp não disponível");
         conversationState.clearState(userId);
         return reply(
-          "❌ Erro ao criar enquete. Digite /cadastro para tentar novamente."
+          "❌ Erro ao criar enquete. Digite /cadastro para tentar novamente.",
         );
       }
 
@@ -74,7 +101,7 @@ async function handleCadastroFlow(userId, body, state, reply, context) {
           onVote: async (voteData) => {
             await handleCadastroVote(userId, voteData, reply);
           },
-        }
+        },
       );
 
       if (result) {
@@ -84,14 +111,14 @@ async function handleCadastroFlow(userId, body, state, reply, context) {
         logger.error("[Cadastro] Falha ao criar poll");
         conversationState.clearState(userId);
         return reply(
-          "❌ Erro ao criar enquete. Digite /cadastro para tentar novamente."
+          "❌ Erro ao criar enquete. Digite /cadastro para tentar novamente.",
         );
       }
     } catch (err) {
       logger.error("[Cadastro] Erro ao criar poll:", err);
       conversationState.clearState(userId);
       return reply(
-        "❌ Erro ao criar enquete. Digite /cadastro para tentar novamente."
+        "❌ Erro ao criar enquete. Digite /cadastro para tentar novamente.",
       );
     }
 
@@ -110,7 +137,7 @@ async function handleCadastroFlow(userId, body, state, reply, context) {
   // Fallback: unknown step
   conversationState.clearState(userId);
   return reply(
-    "❌ Erro no processo de cadastro. Por favor, digite /cadastro para recomeçar."
+    "❌ Erro no processo de cadastro. Por favor, digite /cadastro para recomeçar.",
   );
 }
 
@@ -159,22 +186,19 @@ async function handleCadastroVote(userId, voteData, reply) {
           `🎉 *Cadastro realizado com sucesso!*\n\n` +
             `Bem-vindo, *${finalData.userName}*!\n\n` +
             `Agora você pode usar todos os comandos:\n` +
-            `• /spotify - Conectar sua conta do Spotify\n` +
-            `• /nota - Avaliar músicas\n` +
-            `• /poll - Criar enquetes\n` +
-            `• /ajuda - Ver todos os comandos\n\n` +
-            `Divirta-se! 🚀`
+            `• /spotify - Conectar sua conta do Spotify\n\n` +
+            `Divirta-se! 🚀`,
         );
       }
 
       return reply(
-        "❌ Erro ao realizar cadastro. Tente novamente em alguns instantes."
+        "❌ Erro ao realizar cadastro. Tente novamente em alguns instantes.",
       );
     } catch (err) {
       logger.error("[Cadastro] Erro ao salvar cadastro:", err && err.message);
       conversationState.clearState(userId);
       return reply(
-        "❌ Erro ao realizar cadastro. Tente novamente em alguns instantes."
+        "❌ Erro ao realizar cadastro. Tente novamente em alguns instantes.",
       );
     }
   }
@@ -183,7 +207,7 @@ async function handleCadastroVote(userId, voteData, reply) {
   if (selectedIndex === 1) {
     conversationState.clearState(userId);
     return reply(
-      "❌ Cadastro cancelado.\n\nDigite /cadastro para tentar novamente."
+      "❌ Cadastro cancelado.\n\nDigite /cadastro para tentar novamente.",
     );
   }
 
