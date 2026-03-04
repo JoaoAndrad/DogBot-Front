@@ -392,6 +392,7 @@ module.exports = {
                 client,
                 chatId,
                 whatsappId,
+                initiatorLookup.spotifyAccount?.id,
               );
             },
           },
@@ -500,6 +501,7 @@ async function handleAddVote(
   client,
   chatId,
   creatorId,
+  initiatorAccountId,
 ) {
   try {
     const voter = voteData.voter; // Já vem resolvido para @c.us pelo pollComponent
@@ -639,13 +641,13 @@ async function handleAddVote(
         return;
       }
 
-      // Get account to use for adding (use first available account with playlist)
-      const accountId = group.playlist?.accountId;
+      // Use initiator's Spotify account to add the track (they proposed the song)
+      const accountId = initiatorAccountId || group.playlist?.accountId;
 
       if (!accountId) {
         await client.sendMessage(
           chatId,
-          "⚠️ Votação aprovada, mas não há conta Spotify configurada para gerenciar a playlist.",
+          "⚠️ Votação aprovada, mas a conta Spotify de quem propôs a música não está configurada.",
         );
         return;
       }
