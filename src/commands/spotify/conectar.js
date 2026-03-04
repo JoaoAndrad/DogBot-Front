@@ -74,9 +74,13 @@ module.exports = {
 
             if (lookupResult && lookupResult.found && lookupResult.hasSpotify) {
               clearInterval(interval);
+              const acct = lookupResult.spotifyAccount || null;
+              const appIndex =
+                acct && typeof acct.appIndex === "number" ? acct.appIndex : 0;
+              const serverNumber = appIndex + 1;
               await reply(
-                "✅ *Conta Spotify conectada com sucesso!*\\n\\n" +
-                  "Agora você pode usar todos os recursos do Spotify. Envie */spotify* para começar!",
+                `✅ Você foi conectado com sucesso no servidor ${serverNumber}.\\n\\n` +
+                  `Por favor, me informe o seu e-mail utilizado no Spotify para que eu possa adicioná-lo à nossa lista branca (requisito do Spotify).`,
               );
             }
           } catch (err) {
