@@ -55,7 +55,7 @@ module.exports = {
       const payload = {
         userId,
         scopes:
-          "user-read-private user-read-email user-read-playback-state user-read-currently-playing user-modify-playback-state",
+          "user-read-private user-read-email user-read-playback-state user-read-currently-playing user-modify-playback-state playlist-modify-public playlist-modify-private",
         show_dialog: true,
       };
 
