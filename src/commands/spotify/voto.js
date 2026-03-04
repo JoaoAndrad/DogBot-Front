@@ -347,6 +347,15 @@ module.exports = {
           return;
         }
 
+        // Guard: a vote for this track is already active (e.g. two users voting concurrently)
+        if (voteRes.alreadyExists) {
+          await client.sendMessage(
+            chatId,
+            `⚠️ Já existe uma votação ativa para *${currentTrack.trackName}*. Vote na enquete em aberto!`,
+          );
+          return;
+        }
+
         const vote = voteRes.vote;
         const stats = voteRes.stats;
 
@@ -647,7 +656,7 @@ async function handleAddVote(
       if (!accountId) {
         await client.sendMessage(
           chatId,
-          "⚠️ Votação aprovada, mas a conta Spotify de quem propôs a música não está configurada.",
+          "⚠️ Votação aprovada, mas não há conta Spotify configurada para gerenciar a playlist.",
         );
         return;
       }
