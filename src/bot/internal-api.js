@@ -54,7 +54,10 @@ async function startInternalApi(client, opts = {}) {
         if (!chatId || !title || !options.length) {
           res.writeHead(400, { "Content-Type": "application/json" });
           res.end(
-            JSON.stringify({ ok: false, error: "Missing chatId/title/options" })
+            JSON.stringify({
+              ok: false,
+              error: "Missing chatId/title/options",
+            }),
           );
           return;
         }
@@ -96,7 +99,7 @@ async function startInternalApi(client, opts = {}) {
                   selectedNames,
                 });
               },
-            }
+            },
           );
 
           res.writeHead(200, { "Content-Type": "application/json" });
@@ -104,6 +107,52 @@ async function startInternalApi(client, opts = {}) {
         } catch (err) {
           const errMsg = err && (err.stack || err.message || String(err));
           console.log("Internal API createPoll failed", errMsg);
+          res.writeHead(500, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ ok: false, error: errMsg }));
+        }
+        return;
+      }
+
+      if (method === "POST" && url === "/internal/send-message") {
+        let body = "";
+        let size = 0;
+        for await (const chunk of req) {
+          size += chunk.length;
+          if (size > 1e5) {
+            res.writeHead(413, { "Content-Type": "application/json" });
+            res.end(JSON.stringify({ ok: false, error: "payload too large" }));
+            return;
+          }
+          body += chunk;
+        }
+
+        let data = {};
+        try {
+          data = JSON.parse(body || "{}");
+        } catch (e) {
+          res.writeHead(400, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ ok: false, error: "invalid json" }));
+          return;
+        }
+
+        const chatId = data.chatId;
+        const message = data.message;
+
+        if (!chatId || !message) {
+          res.writeHead(400, { "Content-Type": "application/json" });
+          res.end(
+            JSON.stringify({ ok: false, error: "Missing chatId or message" }),
+          );
+          return;
+        }
+
+        try {
+          await client.sendMessage(chatId, message);
+          res.writeHead(200, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ ok: true }));
+        } catch (err) {
+          const errMsg = err && (err.stack || err.message || String(err));
+          console.log("Internal API send-message failed", errMsg);
           res.writeHead(500, { "Content-Type": "application/json" });
           res.end(JSON.stringify({ ok: false, error: errMsg }));
         }
