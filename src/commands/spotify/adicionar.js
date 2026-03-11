@@ -517,34 +517,45 @@ module.exports = {
                     mentions: mentions,
                   });
 
-                  // Create approval poll for entire collection
-                  const collectionVotePoll = await polls.createPoll(
-                    client,
-                    chatId,
-                    `Aprovar ${collectionType} completo?`,
-                    ["✅ Sim", "❌ Não"],
-                    {
-                      allowMultiple: false,
-                      voteType: "spotify_collection",
-                      metadata: {
-                        actionType: "spotify_collection",
-                        jamId: jam.id,
-                        userId,
-                        allTracks,
-                        collectionType,
-                        searchContext,
-                        eligibleVoters,
-                        whatsappId,
-                        requesterName,
-                        votes: {
-                          for: [userId], // Requester auto-votes YES
-                          against: [],
-                        },
-                      },
-                    },
-                  );
+                  // If jam is collaborative, skip collection voting and add all tracks directly
+                  if (jam.jamType === "collaborative") {
+                    await chat.sendMessage(
+                      `✅ ${requesterName} adicionou ${allTracks.length} músicas ${searchContext} à fila (modo colaborativo).`,
+                    );
 
-                  return;
+                    // Add each track sequentially to avoid rate limits
+                    for (const t of allTracks) {
+                      try {
+                        const trackData = {
+                          trackUri: t.uri,
+                          trackId: t.id,
+                          trackName: t.name,
+                          trackArtists: t.artists.map((a) => a.name).join(", "),
+                          trackAlbum: t.album.name,
+                          trackImage: t.album.images[0]?.url || null,
+                        };
+
+                        await fetch(`${BACKEND_URL}/api/jam/${jam.id}/queue`, {
+                          method: "POST",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({
+                            userId,
+                            trackData,
+                            skipVoting: true,
+                          }),
+                        });
+                        // small delay
+                        await new Promise((r) => setTimeout(r, 150));
+                      } catch (err) {
+                        logger.error(
+                          "[AdicionarCommand] Error adding collection track:",
+                          err,
+                        );
+                      }
+                    }
+
+                    return;
+                  }
                 }
 
                 // Individual track selected
