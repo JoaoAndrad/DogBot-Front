@@ -139,7 +139,7 @@ async function searchSpotifyTrack(query) {
 module.exports = {
   name: "adicionar",
   aliases: ["add", "adiciona"],
-  description: "Adiciona música à fila colaborativa com votação",
+  description: "Adiciona música à fila colaborativa (com ou sem votação)",
   category: "spotify",
   requiredArgs: 1,
   usage: "/adicionar <nome da música, link da playlist ou álbum>",
@@ -210,7 +210,7 @@ module.exports = {
       // If user is NOT the host, check if jam is collaborative
       if (!isHost && jam.jamType !== "collaborative") {
         return reply(
-          "❌ Esta jam não está no modo colaborativo. Peça ao host para usar */democratizar* primeiro.",
+          "❌ Esta jam não está no modo colaborativo. Peça ao host para usar */democratizar* primeiro.\n\n💡 Ao usar /democratizar, as músicas adicionadas vão direto para a fila sem votação!",
         );
       }
 
@@ -297,12 +297,15 @@ module.exports = {
             trackImage: selectedTrack.album.images[0]?.url || null,
           };
 
+          // In collaborative mode, skip voting
+          const skipVoting = jam.jamType === "collaborative";
+
           const addResponse = await fetch(
             `${BACKEND_URL}/api/jam/${jam.id}/queue`,
             {
               method: "POST",
               headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ userId, trackData }),
+              body: JSON.stringify({ userId, trackData, skipVoting }),
             },
           );
 
@@ -318,6 +321,15 @@ module.exports = {
           }
 
           const queueEntry = addData.queueEntry;
+          const requesterName = await resolveUserName(senderNumber, client);
+
+          // If voting is not needed (collaborative mode), just send confirmation
+          if (!addData.needsVoting) {
+            await chat.sendMessage(
+              `✅ *${requesterName}* adicionou à fila:\n\n🎵 *${selectedTrack.name}*\n🎤 ${selectedTrack.artists.map((a) => a.name).join(", ")}`,
+            );
+            return;
+          }
 
           // Get all jam participants for voting
           const eligibleVoters = [
@@ -345,7 +357,6 @@ module.exports = {
           );
 
           // Create voting poll
-          const requesterName = await resolveUserName(senderNumber, client);
 
           // Build message with mentions
           let messageText =
