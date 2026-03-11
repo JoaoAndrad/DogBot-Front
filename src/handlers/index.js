@@ -165,6 +165,7 @@ async function handle(context) {
                   .reportEvent("sticker_created", {
                     chatId: from,
                     fromId: (msg && (msg.author || msg.from)) || from,
+                    chatName: context.chatName || undefined,
                   })
                   .catch(() => {});
               }
@@ -627,6 +628,7 @@ async function handle(context) {
         commandName: "/" + cmdName,
         chatId: from,
         fromId: actualNumber || author || from,
+        chatName: context.chatName || undefined,
       })
       .catch(() => {});
 
