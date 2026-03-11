@@ -22,11 +22,14 @@ async function processEvent(context) {
     if (!ok) return false;
 
     const handlers = require("../handlers");
-    await handlers.handle(context);
-
-    botMetricsReporter
-      .reportEvent("message_processed", { chatId, fromId })
-      .catch(() => {});
+    try {
+      await handlers.handle(context);
+    } finally {
+      // Sempre conta como processada (mesmo se handle() lançar) — fonte: frontend
+      botMetricsReporter
+        .reportEvent("message_processed", { chatId, fromId })
+        .catch(() => {});
+    }
 
     await dedupe.markProcessed(context);
     return true;
