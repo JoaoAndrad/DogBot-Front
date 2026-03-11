@@ -13,6 +13,11 @@ async function processEvent(context) {
     const msg = context.msg || {};
     const chatId = msg.from || (msg._data && msg._data.from);
     const fromId = msg.author || msg.from || (msg._data && msg._data.from);
+    const isGroup = !!(
+      (msg && (msg.isGroup || msg.author)) ||
+      (chatId && String(chatId).endsWith("@g.us"))
+    );
+    context.isGroup = isGroup;
     let chatName = null;
     try {
       if (msg.getChat) {
@@ -23,7 +28,7 @@ async function processEvent(context) {
     context.chatName = chatName;
 
     botMetricsReporter
-      .reportEvent("message_received", { chatId, fromId, chatName })
+      .reportEvent("message_received", { chatId, fromId, chatName, isGroup })
       .catch(() => {});
 
     const ok = await middleware.run(context);
@@ -35,7 +40,12 @@ async function processEvent(context) {
     } finally {
       // Sempre conta como processada (mesmo se handle() lançar) — fonte: frontend
       botMetricsReporter
-        .reportEvent("message_processed", { chatId, fromId, chatName })
+        .reportEvent("message_processed", {
+          chatId,
+          fromId,
+          chatName,
+          isGroup: context.isGroup,
+        })
         .catch(() => {});
     }
 

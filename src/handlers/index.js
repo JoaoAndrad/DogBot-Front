@@ -166,6 +166,7 @@ async function handle(context) {
                     chatId: from,
                     fromId: (msg && (msg.author || msg.from)) || from,
                     chatName: context.chatName || undefined,
+                    isGroup: context.isGroup,
                   })
                   .catch(() => {});
               }
@@ -629,6 +630,7 @@ async function handle(context) {
         chatId: from,
         fromId: actualNumber || author || from,
         chatName: context.chatName || undefined,
+        isGroup: context.isGroup,
       })
       .catch(() => {});
 
