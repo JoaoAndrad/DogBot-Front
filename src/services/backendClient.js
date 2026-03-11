@@ -1,22 +1,23 @@
 const fetch = require("node-fetch");
 const config = require("../core/config");
 
-async function sendToBackend(path, body, method = "POST") {
-  // include internal secret header if provided by env/config
-  const url = process.env.BACKEND_URL || "http://localhost:8000";
+function getBackendHeaders() {
   const headers = { "Content-Type": "application/json" };
   if (config && config.botSecret) headers["X-Bot-Secret"] = config.botSecret;
   if (process.env.POLL_SHARED_SECRET)
     headers["X-Internal-Secret"] = process.env.POLL_SHARED_SECRET;
   if (process.env.INTERNAL_API_SECRET)
     headers["X-Internal-Secret"] = process.env.INTERNAL_API_SECRET;
+  return headers;
+}
 
+async function sendToBackend(path, body, method = "POST") {
+  const url = process.env.BACKEND_URL || "http://localhost:8000";
   const options = {
     method,
-    headers,
+    headers: getBackendHeaders(),
   };
 
-  // Only add body for POST/PUT/PATCH requests
   if (body && method !== "GET") {
     options.body = JSON.stringify(body);
   }
@@ -25,4 +26,18 @@ async function sendToBackend(path, body, method = "POST") {
   return res.json();
 }
 
-module.exports = { sendToBackend };
+/**
+ * GET request that returns response body as text (e.g. /api/status?format=message).
+ * @param {string} path - Path including query string, e.g. "/api/status?format=message&hoursBack=24"
+ * @returns {Promise<string>}
+ */
+async function getBackendText(path) {
+  const url = process.env.BACKEND_URL || "http://localhost:8000";
+  const res = await fetch(url + path, {
+    method: "GET",
+    headers: getBackendHeaders(),
+  });
+  return res.text();
+}
+
+module.exports = { sendToBackend, getBackendText };

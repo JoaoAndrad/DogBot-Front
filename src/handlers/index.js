@@ -3,6 +3,7 @@ const commands = require("../commands");
 const backendClient = require("../services/backendClient");
 const spotifyService = require("../services/spotifyService");
 const conversationState = require("../services/conversationState");
+const botMetricsReporter = require("../services/botMetricsReporter");
 const { handleCadastroFlow } = require("./cadastroFlowHandler");
 const { handleMetaFlow } = require("./metaFlowHandler");
 const mediaHelper = require("../utils/mediaHelper");
@@ -159,7 +160,14 @@ async function handle(context) {
                   quoted: targetMessage,
                 },
               );
-              // Silent on success as requested; only notify on failure
+              if (ok) {
+                botMetricsReporter
+                  .reportEvent("sticker_created", {
+                    chatId: from,
+                    fromId: (msg && (msg.author || msg.from)) || from,
+                  })
+                  .catch(() => {});
+              }
               if (!ok) {
                 try {
                   await reply(
@@ -613,6 +621,14 @@ async function handle(context) {
       args,
       services: { backend: backendClient, spotify: spotifyService },
     };
+
+    botMetricsReporter
+      .reportEvent("command", {
+        commandName: "/" + cmdName,
+        chatId: from,
+        fromId: actualNumber || author || from,
+      })
+      .catch(() => {});
 
     try {
       await cmd.execute(ctx);
