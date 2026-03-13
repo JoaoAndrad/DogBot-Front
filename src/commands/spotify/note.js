@@ -73,9 +73,21 @@ module.exports = {
           lineMedia = "📈 Nenhuma avaliação ainda.";
         }
 
+        const ratingsByUser = res.ratingsByUser || [];
+        const lineWho =
+          ratingsByUser.length > 0
+            ? "👥 Quem avaliou: " +
+              ratingsByUser
+                .map(
+                  (r) =>
+                    `${r.displayName || "?"}: ${Number(r.rating).toFixed(1)}`
+                )
+                .join(", ")
+            : "";
+
         const block = `🎶 ${trackName}\n👤 Artista: ${artist}\n💿 Álbum: ${
           album || "Desconhecido"
-        }\n\n${lineNota}\n${lineMedia}`;
+        }\n\n${lineNota}\n${lineMedia}${lineWho ? "\n" + lineWho : ""}`;
 
         let confirmationText = block;
         if (noteCreated) {
