@@ -4,7 +4,7 @@ const { sendTrackSticker } = require("../../utils/stickerHelper");
 module.exports = {
   name: "nota",
   description:
-    "Registrar nota para a música que você está ouvindo. Ex: /nota 8.5",
+    "Ver ou registrar nota da música que você está ouvindo. Ex: /nota ou /nota 8.5",
   async execute(ctx) {
     const body = String(
       (ctx.info && ctx.info.body) || (ctx.message && ctx.message.body) || ""
@@ -26,71 +26,58 @@ module.exports = {
       }
     }
 
-    // Extract rating value from command
+    // /nota sem valor = só consultar; /nota 8.5 = registrar
     const parts = body.split(/\s+/);
-    if (parts.length < 2) {
-      return reply("Uso: /nota <valor> (ex: /nota 8.5)");
-    }
+    const ratingRaw = parts.length >= 2 ? parts[1] : null;
 
-    const ratingRaw = parts[1];
+    const payload = {
+      userId: author,
+      source: "whatsapp",
+    };
+    if (ratingRaw != null && ratingRaw !== "") payload.rating = ratingRaw;
 
-    // Send to backend - let backend handle validation, track resolution, and saving
     try {
-      const res = await backendClient.sendToBackend("/api/spotify/notes", {
-        userId: author,
-        rating: ratingRaw,
-        source: "whatsapp",
-      });
+      const res = await backendClient.sendToBackend("/api/spotify/notes", payload);
 
       if (res && res.success) {
         const trackName = res.trackName || "Música";
         const artist = res.artist || "Desconhecido";
         const album = res.album || null;
         const imageUrl = res.imageUrl || null;
-        const rating = res.rating ? Number(res.rating).toFixed(1) : "N/A";
-        const avg = res.avgRating ? Number(res.avgRating).toFixed(1) : "N/A";
+        const hasUserRating = res.hasUserRating === true;
+        const rating = res.rating != null ? Number(res.rating).toFixed(1) : null;
+        const avg = res.avgRating != null ? Number(res.avgRating).toFixed(1) : null;
         const count = res.ratingCount || 0;
         const countLabel = Number(count) === 1 ? "avaliação" : "avaliações";
-        const prev =
-          res.previousRating != null ? String(res.previousRating) : null;
-        const prevDate = res.previousRatingDate || null;
 
-        // Prepare track sticker payload
         const trackWithImage = {
           trackId: res.trackId,
           trackName: trackName,
           image: imageUrl,
         };
 
-        // Build confirmation text first
-        let confirmationText;
-        if (prev) {
-          // updated
-          const prevDateStr = prevDate
-            ? new Intl.DateTimeFormat("pt-BR", {
-                day: "2-digit",
-                month: "2-digit",
-                year: "numeric",
-              }).format(new Date(prevDate))
-            : null;
-
-          confirmationText = `✅ Nota atualizada!\n🎶 ${trackName}\n👤 Artista: ${artist}\n💿 Álbum: ${
-            album || "Desconhecido"
-          }\n\n🔁 Sua nota anterior: ${prev}${
-            prevDateStr ? " — em " + prevDateStr : ""
-          }\n⭐ Nova nota: ${rating} / 10\n📈 Média: ${avg} — ${count} ${countLabel}`;
+        // Sempre o mesmo formato: faixa + sua nota + média (sem "Nota registrada/atualizada")
+        let lineNota;
+        if (hasUserRating && rating != null) {
+          lineNota = `⭐ Sua nota: ${rating} / 10`;
         } else {
-          // first time
-          confirmationText = `✅ Nota registrada!\n🎶 ${trackName}\n👤 Artista: ${artist}\n💿 Álbum: ${
-            album || "Desconhecido"
-          }\n\n⭐ Sua nota: ${rating} / 10\n📈 Média: ${avg} — ${count} ${countLabel}`;
+          lineNota = "⭐ Você ainda não avaliou esta música.";
         }
 
-        // Reply first, then send sticker (sticker errors shouldn't block the reply)
+        let lineMedia;
+        if (count > 0 && avg != null) {
+          lineMedia = `📈 Média: ${avg} — ${count} ${countLabel}`;
+        } else {
+          lineMedia = "📈 Nenhuma avaliação ainda.";
+        }
+
+        const confirmationText = `🎶 ${trackName}\n👤 Artista: ${artist}\n💿 Álbum: ${
+          album || "Desconhecido"
+        }\n\n${lineNota}\n${lineMedia}`;
+
         try {
           await reply(confirmationText);
         } catch (e) {
-          // if reply itself fails, still attempt sticker but log
           console.error(
             "Erro ao enviar confirmação de nota:",
             e && e.message ? e.message : e
@@ -106,7 +93,6 @@ module.exports = {
           );
         }
 
-        // We've already replied above
         return;
       }
 
@@ -114,9 +100,9 @@ module.exports = {
         // If backend provided a human message, show it verbatim
         if (res.message) return reply(res.message);
 
-        if (res.error === "no_track_playing") {
+        if (res.error === "not_playing" || res.error === "no_track_playing") {
           return reply(
-            "Não consegui detectar qual música você está ouvindo no momento."
+            res.message || "Nenhuma música tocando no momento."
           );
         }
         if (res.error === "invalid_rating") {
