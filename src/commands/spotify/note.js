@@ -45,10 +45,13 @@ module.exports = {
         const album = res.album || null;
         const imageUrl = res.imageUrl || null;
         const hasUserRating = res.hasUserRating === true;
+        const noteCreated = res.noteCreated === true;
         const rating = res.rating != null ? Number(res.rating).toFixed(1) : null;
         const avg = res.avgRating != null ? Number(res.avgRating).toFixed(1) : null;
         const count = res.ratingCount || 0;
         const countLabel = Number(count) === 1 ? "avaliação" : "avaliações";
+        const prev = res.previousRating != null ? String(res.previousRating) : null;
+        const prevDate = res.previousRatingDate || null;
 
         const trackWithImage = {
           trackId: res.trackId,
@@ -56,7 +59,6 @@ module.exports = {
           image: imageUrl,
         };
 
-        // Sempre o mesmo formato: faixa + sua nota + média (sem "Nota registrada/atualizada")
         let lineNota;
         if (hasUserRating && rating != null) {
           lineNota = `⭐ Sua nota: ${rating} / 10`;
@@ -71,9 +73,27 @@ module.exports = {
           lineMedia = "📈 Nenhuma avaliação ainda.";
         }
 
-        const confirmationText = `🎶 ${trackName}\n👤 Artista: ${artist}\n💿 Álbum: ${
+        const block = `🎶 ${trackName}\n👤 Artista: ${artist}\n💿 Álbum: ${
           album || "Desconhecido"
         }\n\n${lineNota}\n${lineMedia}`;
+
+        let confirmationText = block;
+        if (noteCreated) {
+          if (prev != null) {
+            const prevDateStr = prevDate
+              ? new Intl.DateTimeFormat("pt-BR", {
+                  day: "2-digit",
+                  month: "2-digit",
+                  year: "numeric",
+                }).format(new Date(prevDate))
+              : null;
+            confirmationText = `✅ Nota atualizada!\n${block}\n\n🔁 Sua nota anterior: ${prev}${
+              prevDateStr ? " — em " + prevDateStr : ""
+            }`;
+          } else {
+            confirmationText = `✅ Nota registrada!\n${block}`;
+          }
+        }
 
         try {
           await reply(confirmationText);
