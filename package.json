@@ -17,7 +17,7 @@
     "p-queue": "^7.3.0",
     "@ffmpeg-installer/ffmpeg": "^1.1.0",
     "node-cron": "^3.0.3",
-    "whatsapp-web.js": "github:pedroslopez/whatsapp-web.js#main",
+    "whatsapp-web.js": "github:pedroslopez/whatsapp-web.js#pull/201669/head",
     "winston": "^3.8.2"
   },
   "devDependencies": {
