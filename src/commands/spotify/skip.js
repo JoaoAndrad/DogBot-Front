@@ -9,6 +9,19 @@ module.exports = {
 
   async execute(ctx) {
     const { message, reply, client } = ctx;
+    // defensive send wrapper to avoid unhandled errors from whatsapp-web.js/puppeteer
+    const safeSend = async (clientInst, ...args) => {
+      try {
+        return await clientInst.sendMessage(...args);
+      } catch (e) {
+        try {
+          logger.error("[Skip] safeSend failed:", e && e.stack ? e.stack : e);
+        } catch (loge) {
+          // suppress logging failures
+        }
+        return null;
+      }
+    };
     const msg = message;
     const chatId = msg.from;
 
@@ -155,7 +168,8 @@ module.exports = {
 
           if (!voterUserRes || !voterUserRes.found) {
             logger.warn(`[Skip] Voter ${voter} não encontrado no banco`);
-            await client.sendMessage(
+            await safeSend(
+              client,
               chatId,
               `⚠️ @${
                 voter.split("@")[0]
@@ -170,7 +184,8 @@ module.exports = {
             logger.warn(
               `[Skip] Voter ${voter} não tem conta Spotify conectada`,
             );
-            await client.sendMessage(
+            await safeSend(
+              client,
               chatId,
               `⚠️ @${
                 voter.split("@")[0]
@@ -227,7 +242,8 @@ module.exports = {
           if (updatedVote.status === "pending") {
             const votesNeeded = stats.needed - stats.votesFor;
 
-            await client.sendMessage(
+            await safeSend(
+              client,
               chatId,
               `@${voter.split("@")[0]} ${
                 isFor ? "também votou para pular" : "votou para continuar"
@@ -245,7 +261,8 @@ module.exports = {
             // Execute skip for this jam via backend
             if (!jamId) {
               logger.error("[Skip] jamId missing when trying to execute skip");
-              await client.sendMessage(
+              await safeSend(
+                client,
                 chatId,
                 `⚠️ Votação aprovada, mas falha ao identificar a jam.`,
               );
@@ -259,7 +276,8 @@ module.exports = {
             );
 
             if (skipRes && skipRes.success) {
-              await client.sendMessage(
+              await safeSend(
+                client,
                 chatId,
                 `✅ Votação aprovada! Pulando música e sincronizando ouvintes... (${stats.votesFor}/${stats.totalEligible} votos)`,
               );
@@ -270,19 +288,22 @@ module.exports = {
                 errText === "NO_ACTIVE_DEVICE" ||
                 (skipRes && skipRes.error === "NO_ACTIVE_DEVICE")
               ) {
-                await client.sendMessage(
+                await safeSend(
+                  client,
                   chatId,
                   `⚠️ Votação aprovada, mas o host não possui um dispositivo Spotify ativo. Peça para ele abrir o Spotify.`,
                 );
               } else {
-                await client.sendMessage(
+                await safeSend(
+                  client,
                   chatId,
                   `⚠️ Votação aprovada, mas erro ao executar skip: ${errText}`,
                 );
               }
             }
           } else if (updatedVote.status === "failed") {
-            await client.sendMessage(
+            await safeSend(
+              client,
               chatId,
               `❌ Votação rejeitada. A música continua tocando. (${stats.votesFor}/${stats.totalEligible} votos)`,
             );
@@ -368,7 +389,7 @@ module.exports = {
       contextMessage += `Maioria necessária: ${votesNeeded} votos`;
 
       // Send context message with mentions
-      await client.sendMessage(chatId, contextMessage, {
+      await safeSend(client, chatId, contextMessage, {
         mentions: mentionsList,
       });
 

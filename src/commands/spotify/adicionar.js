@@ -284,6 +284,21 @@ module.exports = {
       // Get chat for sending polls
       const chat = await msg.getChat();
 
+      // defensive send wrapper for chat to avoid crashes from whatsapp-web.js/puppeteer
+      const safeChatSend = async (...args) => {
+        try {
+          return await chat.sendMessage(...args);
+        } catch (e) {
+          try {
+            logger.error(
+              "[AdicionarCommand] safeChatSend failed:",
+              e && e.stack ? e.stack : e,
+            );
+          } catch (loge) {}
+          return null;
+        }
+      };
+
       // Helper function to add track with voting
       const addTrackWithVoting = async (selectedTrack) => {
         try {
@@ -309,14 +324,28 @@ module.exports = {
             },
           );
 
-          if (!addResponse.ok) {
-            await chat.sendMessage("❌ Erro ao adicionar música.");
+          let addData = null;
+          try {
+            addData = await addResponse.json();
+          } catch (e) {
+            const txt = await addResponse.text().catch(() => null);
+            logger.error(
+              "[AdicionarCommand] addResponse not JSON:",
+              e && e.stack ? e.stack : e,
+              txt,
+            );
+            await safeChatSend(
+              `❌ Erro ao adicionar música. status=${addResponse.status}`,
+            );
             return;
           }
 
-          const addData = await addResponse.json();
-          if (!addData.success) {
-            await chat.sendMessage(`❌ ${addData.message || addData.error}`);
+          if (!addResponse.ok || !addData || !addData.success) {
+            const msg =
+              addData && (addData.message || addData.error)
+                ? addData.message || addData.error
+                : `Erro ao adicionar música (status=${addResponse.status})`;
+            await safeChatSend(`❌ ${msg}`);
             return;
           }
 
@@ -325,7 +354,7 @@ module.exports = {
 
           // If voting is not needed (collaborative mode), just send confirmation
           if (!addData.needsVoting) {
-            await chat.sendMessage(
+            await safeChatSend(
               `✅ *${requesterName}* adicionou à fila:\n\n🎵 *${selectedTrack.name}*\n🎤 ${selectedTrack.artists.map((a) => a.name).join(", ")}`,
             );
             return;
@@ -370,7 +399,7 @@ module.exports = {
             messageText += `@${mentionId.replace("@c.us", "")} `;
           }
 
-          await chat.sendMessage(messageText, {
+          await safeChatSend(messageText, {
             mentions: mentions,
           });
 
@@ -467,13 +496,13 @@ module.exports = {
 
                 // Check if canceled
                 if (selectedIndex === pollOptions.length - 1) {
-                  await chat.sendMessage("❌ Adição cancelada.");
+                  await safeChatSend("❌ Adição cancelada.");
                   return;
                 }
 
                 // Check if "Next page" was selected
                 if (hasNextPage && selectedIndex === pollOptions.length - 2) {
-                  await chat.sendMessage("📄 Carregando próxima página...");
+                  await safeChatSend("📄 Carregando próxima página...");
                   await createTrackSelectionPoll(
                     allTracks,
                     page + 1,
@@ -513,13 +542,13 @@ module.exports = {
                     messageText += `@${mentionId.replace("@c.us", "")} `;
                   }
 
-                  await chat.sendMessage(messageText, {
+                  await safeChatSend(messageText, {
                     mentions: mentions,
                   });
 
                   // If jam is collaborative, skip collection voting and add all tracks directly
                   if (jam.jamType === "collaborative") {
-                    await chat.sendMessage(
+                    await safeChatSend(
                       `✅ ${requesterName} adicionou ${allTracks.length} músicas ${searchContext} à fila (modo colaborativo).`,
                     );
 
@@ -566,14 +595,14 @@ module.exports = {
                 const selectedTrack = allTracks[trackIndex];
 
                 if (!selectedTrack) {
-                  await chat.sendMessage("❌ Opção inválida.");
+                  await safeChatSend("❌ Opção inválida.");
                   return;
                 }
 
                 await addTrackWithVoting(selectedTrack);
               } catch (err) {
                 logger.error("[AdicionarCommand] Error in poll vote:", err);
-                await chat.sendMessage("❌ Erro ao processar seleção.");
+                await safeChatSend("❌ Erro ao processar seleção.");
               }
             },
           },
