@@ -1,10 +1,12 @@
 const flowManager = require("../../components/menu/flowManager");
 const testFlow = require("../../components/menu/flows/testFlow");
 const spotifyFlow = require("../../components/menu/flows/spotifyFlow");
+const listsFlow = require("../../components/menu/flows/listsFlow");
 
 // Register flows on load
 flowManager.registerFlow(testFlow);
 flowManager.registerFlow(spotifyFlow);
+flowManager.registerFlow(listsFlow);
 
 module.exports = {
   name: "menu",
@@ -39,7 +41,7 @@ module.exports = {
       console.log("[Command:menu] Error stack:", err.stack);
       await client.sendMessage(
         chatId,
-        "❌ Erro ao iniciar menu: " + err.message
+        "❌ Erro ao iniciar menu: " + err.message,
       );
     }
   },
