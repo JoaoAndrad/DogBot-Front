@@ -240,6 +240,32 @@ async function executeAction(result, client) {
           target,
         });
 
+        // "back" action: pop history and re-render previous node (state lives in frontend)
+        if (action === "back") {
+          const flowManager = require("../menu/flowManager");
+          const storage = require("../menu/storage");
+          const savedState = (await storage.getState(
+            stateUserId,
+            data.flowId,
+          )) || { path: "/", history: [], context: {} };
+          const prevPath = savedState.history?.length
+            ? savedState.history.pop()
+            : "/";
+          savedState.path = prevPath;
+          await storage.saveState(stateUserId, data.flowId, savedState);
+          logger.info(
+            `[processor] Back to ${prevPath} for ${data.flowId} (user ${stateUserId})`,
+          );
+          await flowManager._renderNode(
+            client,
+            poll.chatId,
+            stateUserId,
+            data.flowId,
+            prevPath,
+          );
+          break;
+        }
+
         if (handler) {
           logger.info(
             `[processor] Executing menu handler: ${handler} for user ${menuUserId}`,
