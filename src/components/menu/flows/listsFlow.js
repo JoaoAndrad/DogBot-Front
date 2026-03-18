@@ -162,7 +162,9 @@ const listsFlow = createFlow("lists", {
           };
         }
 
-        const list = await listClient.getList(listId, ctx.userId);
+        const userId =
+          ctx.state?.context?._backendUserId || ctx.userId;
+        const list = await listClient.getList(listId, userId);
         const stats = await listClient.getListStats(listId);
 
         const itemsText = list.items
@@ -237,7 +239,9 @@ const listsFlow = createFlow("lists", {
           };
         }
 
-        const list = await listClient.getList(listId, ctx.userId, 1);
+        const userId =
+          ctx.state?.context?._backendUserId || ctx.userId;
+        const list = await listClient.getList(listId, userId, 1);
 
         if (list.items.length === 0) {
           return {
@@ -348,7 +352,9 @@ const listsFlow = createFlow("lists", {
           };
         }
 
-        const list = await listClient.getList(listId, ctx.userId);
+        const userId =
+          ctx.state?.context?._backendUserId || ctx.userId;
+        const list = await listClient.getList(listId, userId);
         const itemCount = list.items?.length || 0;
 
         const title =
@@ -451,6 +457,10 @@ const listsFlow = createFlow("lists", {
         // Persist selectedList into context, which is what storage persists
         ctx.state.context.selectedList = ctx.selectedList;
         ctx.state.context.selectedItem = null;
+        // Backend list APIs (getList, etc.) require UUID; processor passes resolved ctx.userId
+        if (ctx.userId && !String(ctx.userId).includes("@")) {
+          ctx.state.context._backendUserId = ctx.userId;
+        }
         ctx.state.path = "/list-detail";
         console.debug(`[ListsFlow📝] Navegando para: /list-detail`);
         if (!ctx.state.history.includes("/")) {

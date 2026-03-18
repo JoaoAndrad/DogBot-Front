@@ -241,25 +241,38 @@ async function executeAction(result, client) {
         });
 
         // "back" action: pop history and re-render previous node (state lives in frontend)
+        // Use poll.metadata.userId so we load/save the same key used when this poll was created
         if (action === "back") {
           const flowManager = require("../menu/flowManager");
           const storage = require("../menu/storage");
-          const savedState = (await storage.getState(
-            stateUserId,
-            data.flowId,
-          )) || { path: "/", history: [], context: {} };
+          const stateKey =
+            (poll && poll.metadata && poll.metadata.userId) || stateUserId;
+          const savedState = await storage.getState(stateKey, data.flowId);
+          if (!savedState) {
+            logger.warn(
+              `[processor] No state for back (key ${stateKey}); rendering root`,
+            );
+            await flowManager._renderNode(
+              client,
+              poll.chatId,
+              stateKey,
+              data.flowId,
+              "/",
+            );
+            break;
+          }
           const prevPath = savedState.history?.length
             ? savedState.history.pop()
             : "/";
           savedState.path = prevPath;
-          await storage.saveState(stateUserId, data.flowId, savedState);
+          await storage.saveState(stateKey, data.flowId, savedState);
           logger.info(
-            `[processor] Back to ${prevPath} for ${data.flowId} (user ${stateUserId})`,
+            `[processor] Back to ${prevPath} for ${data.flowId} (user ${stateKey})`,
           );
           await flowManager._renderNode(
             client,
             poll.chatId,
-            stateUserId,
+            stateKey,
             data.flowId,
             prevPath,
           );

@@ -279,7 +279,15 @@ class FlowManager {
       return;
     }
 
-    // Create poll with metadata for backend processing
+    // Create poll with metadata for backend processing (WhatsApp requires at least 2 options)
+    if (!renderOptions || renderOptions.length < 2) {
+      await client.sendMessage(
+        chatId,
+        "❌ Sessão expirada ou contexto perdido. Use o comando novamente para começar.",
+      );
+      return;
+    }
+
     const polls = require("../poll");
     const optionLabels = renderOptions.map((o) => o.label);
 
