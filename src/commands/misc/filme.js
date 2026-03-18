@@ -35,13 +35,16 @@ module.exports = {
         logger.warn(`[Filme] getContact failed, using raw id: ${err.message}`);
       }
 
-      // Extract query from message text
-      const text = msg.body || "";
-      const query = text.replace(/^\/filme\s+/i, "").trim();
+      // Extract query from message text (/filme, /movie, /filmes + optional spaces + rest)
+      const text = (msg.body || "").trim();
+      const query = text.replace(/^\/(filme|movie|filmes)\s*/i, "").trim();
 
       if (!query) {
         return reply(
-          "❌ Usage: /filme nome_do_filme ou /filme código_tmdb\n\nExample: /filme Inception ou /filme 27205",
+          "📽️ *Como usar o /filme*\n\n" +
+            "• _Buscar por nome:_\n`/filme Nome do Filme`\n" +
+            "• _Buscar por código TMDb (número na URL do themoviedb.org):_\n`/filme 27205`\n\n" +
+            "Exemplos:\n`/filme Inception`\n`/filme 27205`",
         );
       }
 

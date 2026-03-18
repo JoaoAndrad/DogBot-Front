@@ -194,6 +194,7 @@ async function executeAction(result, client) {
         }
 
         // For flows that call backend APIs with userId (MovieRating, lists), resolve to backend User UUID
+        let userResolvedToUuid = false;
         if (
           data.flowId === "add-film" ||
           data.flowId === "lists" ||
@@ -220,6 +221,7 @@ async function executeAction(result, client) {
                   `[processor] Resolved identifier ${menuUserId} to UUID ${resolvedUUID} for ${data.flowId}`,
                 );
                 menuUserId = resolvedUUID;
+                userResolvedToUuid = true;
               }
             } else {
               logger.warn(
@@ -299,6 +301,54 @@ async function executeAction(result, client) {
               history: [],
               context: {},
             };
+
+            // Evitar "dados do filme ou nota não encontrados" / "Sessão expirada": se o fluxo
+            // é de filme e o contexto necessário está vazio, avisar e não executar o handler.
+            if (data.flowId === "film-card") {
+              const ctxEmpty = !savedState.context || typeof savedState.context !== "object";
+              const needFilmData = ["markWatchedFilm", "rateFilm"].includes(handler);
+              const needFilmTitle = handler === "addFilmToList";
+              const hasFilmData =
+                !ctxEmpty &&
+                savedState.context.tmdbId &&
+                savedState.context.movieInfo;
+              const hasFilmTitle =
+                !ctxEmpty && savedState.context.filmTitle;
+              if (
+                (needFilmData && !hasFilmData) ||
+                (needFilmTitle && !hasFilmTitle)
+              ) {
+                await client.sendMessage(
+                  poll.chatId,
+                  "❌ O contexto desta enquete expirou ou não está disponível. Quem abriu o filme pode usar /filme (nome do filme) novamente para começar.",
+                );
+                break;
+              }
+              // Evitar FK violation: quem vota precisa estar registrado no backend (UUID).
+              if (
+                (handler === "markWatchedFilm" || handler === "rateFilm" || handler === "addFilmToList") &&
+                !userResolvedToUuid
+              ) {
+                await client.sendMessage(
+                  poll.chatId,
+                  "❌ Para salvar avaliação ou marcar como assistido você precisa estar registrado no bot. Envie /cadastro no meu PRIVADO primeiro",
+                );
+                break;
+              }
+            }
+
+            // Mesmo para listas: handlers que gravam precisam de usuário registrado (UUID).
+            if (
+              data.flowId === "lists" &&
+              !userResolvedToUuid &&
+              ["toggleWatched", "rateItem", "removeItem", "confirmDeleteList", "deleteList"].includes(handler)
+            ) {
+              await client.sendMessage(
+                poll.chatId,
+                "❌ Para avaliar ou alterar itens da lista você precisa estar registrado no bot. Fale no chat ou use /menu primeiro.",
+              );
+              break;
+            }
 
             // Create context expected by handlers
             const ctx = {

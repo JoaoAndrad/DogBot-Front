@@ -23,8 +23,9 @@ const filmCardFlow = createFlow("film-card", {
       const movieInfo = ctx.state?.context?.movieInfo;
       if (!movieInfo) {
         return {
-          title: "❌ Erro: contexto do filme não encontrado",
-          options: [],
+          title:
+            "❌ Contexto do filme não encontrado. Use /filme novamente para começar.",
+          skipPoll: true,
         };
       }
       const watched = movieInfo.userRating && movieInfo.userRating.watched;
