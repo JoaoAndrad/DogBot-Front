@@ -5,6 +5,13 @@
 
 const UTC3 = "America/Sao_Paulo";
 
+/** Formata nota 0–5: sem decimal quando inteiro (5.0 → "5", 4.5 → "4.5"). */
+function formatRatingValue(n) {
+  if (n == null || Number.isNaN(n)) return "";
+  const num = Number(n);
+  return num % 1 === 0 ? String(Math.round(num)) : num.toFixed(1);
+}
+
 function formatDateUTC3(d) {
   if (!d) return "";
   const date = d instanceof Date ? d : new Date(d);
@@ -26,8 +33,12 @@ function formatFilmCardMessage(movieInfo) {
   const title = `*${movieInfo.title}*`;
   const year = movieInfo.year ? ` (${movieInfo.year})` : "";
   const rating = movieInfo.voteAverage
-    ? `⭐ *TMDb:* ${(movieInfo.voteAverage / 2).toFixed(1)}/5`
+    ? `⭐ *TMDb:* ${formatRatingValue(movieInfo.voteAverage / 2)}/5`
     : "⭐ *TMDb:* N/A";
+  const usersAvgLine =
+    movieInfo.usersAverage != null
+      ? `⭐ *Média dos usuários:* ${formatRatingValue(movieInfo.usersAverage)}/5`
+      : "";
   const overview = movieInfo.overview ? movieInfo.overview : "";
 
   let statusLines;
@@ -40,7 +51,7 @@ function formatFilmCardMessage(movieInfo) {
         const dateStr = formatDateUTC3(r.ratedAt || r.watchedAt);
         const noteStr =
           r.rating != null
-            ? `👤 *Nota:* ${"⭐".repeat(Math.round(r.rating))} (${r.rating}/5) (${dateStr})`
+            ? `👤 *Nota:* ${"⭐".repeat(Math.round(r.rating))} (${formatRatingValue(r.rating)}/5) (${dateStr})`
             : `👤 *Nota:* Sem avaliação (${dateStr})`;
         return `✅ Assistido por "${displayName}" | ${noteStr}`;
       })
@@ -62,7 +73,7 @@ function formatFilmCardMessage(movieInfo) {
       const dateStr = formatDateUTC3(ratedAt || watchedAt);
       const noteStr =
         ratingVal != null
-          ? `👤 *Nota:* ${"⭐".repeat(Math.round(ratingVal))} (${ratingVal}/5) (${dateStr})`
+          ? `👤 *Nota:* ${"⭐".repeat(Math.round(ratingVal))} (${formatRatingValue(ratingVal)}/5) (${dateStr})`
           : `👤 *Nota:* Sem avaliação (${dateStr})`;
       statusLines = `✅ Assistido por "${displayName}" | ${noteStr}`;
     }
@@ -70,7 +81,7 @@ function formatFilmCardMessage(movieInfo) {
 
   let message = `📽️ ${title}${year}
 
-${rating}
+${rating}${usersAvgLine ? "\n" + usersAvgLine : ""}
 ${statusLines}
 `;
   const viewings = movieInfo.viewings || [];

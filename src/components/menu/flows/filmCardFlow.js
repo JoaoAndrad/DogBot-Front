@@ -131,8 +131,9 @@ const filmCardFlow = createFlow("film-card", {
         });
         const stars = "⭐".repeat(Math.round(numRating));
         const displayName = ctx.voterDisplayName || "Você";
+        const ratingStr = numRating % 1 === 0 ? String(Math.round(numRating)) : String(numRating);
         await ctx.reply(
-          `⭐ *${movieInfo.title}${movieInfo.year ? ` (${movieInfo.year})` : ""}*\n\n${stars} ${numRating}/5\n\n✅ Avaliação salva para *${displayName}* com sucesso!`
+          `⭐ *${movieInfo.title}${movieInfo.year ? ` (${movieInfo.year})` : ""}*\n\n${stars} ${ratingStr}/5\n\n✅ Avaliação salva para *${displayName}* com sucesso!`
         );
         if (movieInfo.posterUrl) {
           try {
