@@ -31,7 +31,13 @@ const listsFlow = createFlow("lists", {
     dynamic: true,
     handler: async (ctx) => {
       try {
-        const lists = await listClient.getUserLists(ctx.userId);
+        // Get lists for user or group (if in group, use groupChat ID)
+        const chatId = ctx.chatId || ctx.from;
+        const lists = await listClient.getUserLists(
+          ctx.userId,
+          1,
+          chatId && String(chatId).endsWith("@g.us") ? chatId : null,
+        );
 
         if (lists.length === 0) {
           return {

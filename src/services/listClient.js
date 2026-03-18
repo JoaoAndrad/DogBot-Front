@@ -28,18 +28,35 @@ async function searchMovies(query, page = 1) {
 }
 
 /**
- * Get todas as listas do usuário
- * @param {string} userId - User ID
+ * Get todas as listas do usuário ou listas de um grupo
+ * @param {string} userIdOrGroupId - User ID or Group Chat ID (@g.us)
  * @param {number} page - Página
+ * @param {string?} groupChatId - Opcional: se fornecido, busca listas do grupo em vez de listas do usuário
  * @returns {Promise<array>} Array de listas
  */
-async function getUserLists(userId, page = 1) {
+async function getUserLists(userIdOrGroupId, page = 1, groupChatId = null) {
   try {
-    const response = await sendToBackend(
-      "/api/lists?userId=" + encodeURIComponent(userId) + "&page=" + page,
-      null,
-      "GET",
-    );
+    // Se groupChatId for explicitamente fornecido, use-o. Caso contrário, detecte pelo userIdOrGroupId
+    const targetGroupId =
+      groupChatId ||
+      (String(userIdOrGroupId).endsWith("@g.us") ? userIdOrGroupId : null);
+
+    let query;
+    if (targetGroupId) {
+      query =
+        "/api/lists?groupChatId=" +
+        encodeURIComponent(targetGroupId) +
+        "&page=" +
+        page;
+    } else {
+      query =
+        "/api/lists?userId=" +
+        encodeURIComponent(userIdOrGroupId) +
+        "&page=" +
+        page;
+    }
+
+    const response = await sendToBackend(query, null, "GET");
     return response.lists || [];
   } catch (err) {
     console.error("[ListClient] Get user lists error:", err.message);
