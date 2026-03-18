@@ -37,8 +37,15 @@ const listsFlow = createFlow("lists", {
           return {
             title:
               "📽️ Você ainda não tem listas!\n\n" +
-              "Use `.criar-lista nome` para criar sua primeira lista.",
-            options: [{ label: "🔙 Voltar", action: "back" }],
+              "Use `/criar-lista nome` para criar sua primeira lista.",
+            options: [
+              {
+                label: "➕ Criar nova lista",
+                action: "back",
+                handler: "createList",
+              },
+              { label: "🔙 Voltar", action: "back" },
+            ],
             skipPoll: false,
           };
         }
@@ -62,7 +69,10 @@ const listsFlow = createFlow("lists", {
         return {
           title:
             "❌ Erro ao carregar listas.\n\n" + "Tente novamente ou volte.",
-          options: [{ label: "🔄 Voltar", action: "back" }],
+          options: [
+            { label: "🔄 Tentar novamente", action: "exec", handler: "root" },
+            { label: "🔙 Voltar", action: "back" },
+          ],
           skipPoll: false,
         };
       }
@@ -78,7 +88,10 @@ const listsFlow = createFlow("lists", {
         if (!listId) {
           return {
             title: "❌ Erro: Lista não selecionada",
-            options: [{ label: "🔙 Voltar", action: "back" }],
+            options: [
+              { label: "🔄 Tentar novamente", action: "exec", handler: "root" },
+              { label: "🔙 Voltar", action: "back" },
+            ],
           };
         }
 
@@ -118,7 +131,10 @@ const listsFlow = createFlow("lists", {
         console.error("[ListsFlow] List detail error:", err.message);
         return {
           title: "❌ Erro ao carregar lista",
-          options: [{ label: "🔙 Voltar", action: "back" }],
+          options: [
+            { label: "🔄 Tentar novamente", action: "exec", handler: "root" },
+            { label: "🔙 Voltar", action: "back" },
+          ],
         };
       }
     },
@@ -133,7 +149,10 @@ const listsFlow = createFlow("lists", {
         if (!listId) {
           return {
             title: "❌ Erro: Lista não selecionada",
-            options: [{ label: "🔙 Voltar", action: "back" }],
+            options: [
+              { label: "🔄 Tentar novamente", action: "exec", handler: "root" },
+              { label: "🔙 Voltar", action: "back" },
+            ],
           };
         }
 
@@ -141,8 +160,11 @@ const listsFlow = createFlow("lists", {
 
         if (list.items.length === 0) {
           return {
-            title: `📋 ${list.title}\n\nNenhum item na lista ainda.`,
-            options: [{ label: "🔙 Voltar", action: "back" }],
+            title: `📽️ ${list.title}\n\nNenhum item na lista ainda.`,
+            options: [
+              { label: "✄️ Adicionar filme", action: "back" },
+              { label: "🔙 Voltar", action: "back" },
+            ],
           };
         }
 
@@ -166,7 +188,10 @@ const listsFlow = createFlow("lists", {
         console.error("[ListsFlow] List items error:", err.message);
         return {
           title: "❌ Erro ao carregar items",
-          options: [{ label: "🔙 Voltar", action: "back" }],
+          options: [
+            { label: "🔄 Tentar novamente", action: "exec", handler: "root" },
+            { label: "🔙 Voltar", action: "back" },
+          ],
         };
       }
     },
@@ -180,7 +205,10 @@ const listsFlow = createFlow("lists", {
       if (!item) {
         return {
           title: "❌ Erro: Item não selecionado",
-          options: [{ label: "🔙 Voltar", action: "back" }],
+          options: [
+            { label: "🔄 Tentar novamente", action: "exec", handler: "root" },
+            { label: "🔙 Voltar", action: "back" },
+          ],
         };
       }
 
