@@ -5,6 +5,11 @@
  */
 
 const movieClient = require("../../services/movieClient");
+const {
+  downloadAndConvertToWebp,
+  sendBufferAsSticker,
+} = require("../../utils/stickerHelper");
+const logger = require("../../utils/logger");
 
 module.exports = {
   name: "avaliacao",
@@ -15,6 +20,7 @@ module.exports = {
       const msg = ctx.message;
       const reply = ctx.reply;
       const info = ctx.info || {};
+      const client = ctx.client;
 
       const userId = info.from || msg.from;
 
@@ -29,7 +35,7 @@ module.exports = {
 
       if (!input) {
         return reply(
-          "❌ Use: /avaliacao (nome do filme) + nota (de 1 a 5))\n\n" +
+          "❌ Use: /avaliacao (nome do filme) + nota (de 1 a 5)\n\n" +
             "Exemplo:\n" +
             "/avaliacao Inception 4",
         );
@@ -67,7 +73,7 @@ module.exports = {
       if (!ratingArg) {
         return reply(
           `📽️ *${movieInfo.title}${movieInfo.year ? ` (${movieInfo.year})` : ""}*\n\n` +
-            `Responda com a nota de 1 a 5:\n` +
+            `Qualidade de 1 a 5 ⭐:\n\n` +
             `/avaliacao ${tmdbId} 1\n` +
             `/avaliacao ${tmdbId} 2\n` +
             `/avaliacao ${tmdbId} 3\n` +
@@ -89,12 +95,34 @@ module.exports = {
         posterUrl: movieInfo.posterUrl,
       });
 
-      const message =
-        `⭐ *${movieInfo.title}${movieInfo.year ? ` (${movieInfo.year})` : ""}*\n` +
-        `Sua avaliação: ${"⭐".repeat(rating)} ${rating}/5\n\n` +
-        `✅ Filme salvo com sucesso!`;
+      const stars = "⭐".repeat(rating);
+      const message = `⭐ *${movieInfo.title}${movieInfo.year ? ` (${movieInfo.year})` : ""}*
 
-      return reply(message);
+${stars} ${rating}/5
+
+✅ Avaliação salva com sucesso!`;
+
+      // Send the message
+      await reply(message);
+
+      // Send poster as sticker if available
+      if (movieInfo.posterUrl) {
+        try {
+          const posterBuffer = await downloadAndConvertToWebp(
+            movieInfo.posterUrl,
+            tmdbId,
+          );
+          if (posterBuffer) {
+            await sendBufferAsSticker(client, msg.from, posterBuffer);
+          }
+        } catch (err) {
+          logger.warn(
+            `[Avaliacao] Failed to send poster sticker: ${err.message}`,
+          );
+        }
+      }
+
+      return;
     } catch (err) {
       console.error("[Avaliacao Command] Error:", err.message);
       return ctx.reply(`❌ Erro ao salvar avaliação: ${err.message}`);

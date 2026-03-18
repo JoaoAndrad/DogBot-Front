@@ -4,6 +4,11 @@
  */
 
 const movieClient = require("../../services/movieClient");
+const {
+  downloadAndConvertToWebp,
+  sendBufferAsSticker,
+} = require("../../utils/stickerHelper");
+const logger = require("../../utils/logger");
 
 module.exports = {
   name: "filme",
@@ -14,6 +19,7 @@ module.exports = {
       const msg = ctx.message;
       const reply = ctx.reply;
       const info = ctx.info || {};
+      const client = ctx.client;
 
       const userId = info.from || msg.from;
 
@@ -49,28 +55,57 @@ module.exports = {
         movieInfo = movie;
       }
 
-      // Format response
+      // Format response with improved formatting
       const title = `*${movieInfo.title}*`;
       const year = movieInfo.year ? ` (${movieInfo.year})` : "";
       const rating = movieInfo.voteAverage
-        ? `\n⭐ *TMDb Nota:* ${(movieInfo.voteAverage / 2).toFixed(1)}/5`
-        : "";
-      const overview = movieInfo.overview ? `\n\n${movieInfo.overview}` : "";
-      const userRating =
-        movieInfo.userRating && movieInfo.userRating.rating
-          ? `\n👤 *Sua nota:* ${movieInfo.userRating.rating}/5`
-          : "";
+        ? `⭐ *TMDb:* ${(movieInfo.voteAverage / 2).toFixed(1)}/5`
+        : "⭐ *TMDb:* N/A";
       const watched =
         movieInfo.userRating && movieInfo.userRating.watched
-          ? `\n✅ *Assistido:* Sim`
-          : "\n❌ *Assistido:* Não";
+          ? "✅ *Assistido*"
+          : "❌ *Assistido*";
+      const userRating =
+        movieInfo.userRating && movieInfo.userRating.rating
+          ? `👤 *Sua nota:* ${"⭐".repeat(movieInfo.userRating.rating)} (${movieInfo.userRating.rating}/5)`
+          : "👤 *Sua nota:* Sem avaliação";
 
-      const message =
-        `📽️ ${title}${year}${rating}${overview}${watched}${userRating}` +
-        `\n\n💡 Use /assisti ${movie.tmdbId} para marcar como assistido` +
-        `\n💡 Use /avaliacao ${movie.tmdbId} para avaliar`;
+      const overview = movieInfo.overview ? movieInfo.overview : "";
 
-      return reply(message);
+      // Build the formatted message
+      const message = `📽️ ${title}${year}
+
+${rating}
+${watched} | ${userRating}
+
+━━━━━━━━━━━━━━━━━━━━━━
+${overview}
+━━━━━━━━━━━━━━━━━━━━━━
+
+💡 /assisti ${movie.tmdbId} - Marcar como assistido
+💡 /avaliacao ${movie.tmdbId} - Adicionar avaliação`;
+
+      // Send the message
+      await reply(message);
+
+      // Send poster as sticker if available
+      if (movieInfo.posterUrl) {
+        try {
+          logger.info(`[Filme] Sending poster sticker for ${movieInfo.title}`);
+          const posterBuffer = await downloadAndConvertToWebp(
+            movieInfo.posterUrl,
+            movie.tmdbId,
+          );
+          if (posterBuffer) {
+            await sendBufferAsSticker(client, msg.from, posterBuffer);
+          }
+        } catch (err) {
+          logger.warn(`[Filme] Failed to send poster sticker: ${err.message}`);
+          // Don't fail the whole command if sticker fails
+        }
+      }
+
+      return;
     } catch (err) {
       console.error("[Filme Command] Error:", err.message);
       return ctx.reply(`❌ Erro ao buscar filme: ${err.message}`);

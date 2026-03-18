@@ -4,6 +4,11 @@
  */
 
 const movieClient = require("../../services/movieClient");
+const {
+  downloadAndConvertToWebp,
+  sendBufferAsSticker,
+} = require("../../utils/stickerHelper");
+const logger = require("../../utils/logger");
 
 module.exports = {
   name: "assisti",
@@ -14,6 +19,7 @@ module.exports = {
       const msg = ctx.message;
       const reply = ctx.reply;
       const info = ctx.info || {};
+      const client = ctx.client;
 
       const userId = info.from || msg.from;
 
@@ -60,11 +66,33 @@ module.exports = {
         posterUrl: movieInfo.posterUrl,
       });
 
-      const message =
-        `✅ *${movieInfo.title}${movieInfo.year ? ` (${movieInfo.year})` : ""}* marcado como assistido!\n\n` +
-        `💡 Use /avaliacao ${tmdbId} para avaliar este filme`;
+      const message = `✅ *${movieInfo.title}${movieInfo.year ? ` (${movieInfo.year})` : ""}*
 
-      return reply(message);
+Marcado como assistido! 🎬
+
+💡 /avaliacao ${tmdbId} - Avaliar este filme`;
+
+      // Send the message
+      await reply(message);
+
+      // Send poster as sticker if available
+      if (movieInfo.posterUrl) {
+        try {
+          const posterBuffer = await downloadAndConvertToWebp(
+            movieInfo.posterUrl,
+            tmdbId,
+          );
+          if (posterBuffer) {
+            await sendBufferAsSticker(client, msg.from, posterBuffer);
+          }
+        } catch (err) {
+          logger.warn(
+            `[Assisti] Failed to send poster sticker: ${err.message}`,
+          );
+        }
+      }
+
+      return;
     } catch (err) {
       console.error("[Assisti Command] Error:", err.message);
       return ctx.reply(`❌ Erro ao marcar como assistido: ${err.message}`);
