@@ -4,7 +4,6 @@
  */
 
 const movieClient = require("../../services/movieClient");
-const { tmdbClient } = require("../../lib/tmdbClient");
 
 module.exports = {
   name: "filme",
@@ -25,11 +24,12 @@ module.exports = {
       }
 
       // Search for the movie
-      const searchResults = await tmdbClient.search(query, {
+      const searchData = await movieClient.searchMovies(query, {
         type: "multi",
         page: 1,
       });
 
+      const searchResults = searchData.results || [];
       if (!searchResults || searchResults.length === 0) {
         return client.sendMessage(
           chatId,

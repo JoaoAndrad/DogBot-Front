@@ -4,7 +4,6 @@
  */
 
 const movieClient = require("../../services/movieClient");
-const { tmdbClient } = require("../../lib/tmdbClient");
 
 module.exports = {
   name: "assisti",
@@ -30,11 +29,12 @@ module.exports = {
 
       if (isNaN(input)) {
         // Search for the movie
-        const searchResults = await tmdbClient.search(input, {
+        const searchData = await movieClient.searchMovies(input, {
           type: "multi",
           page: 1,
         });
 
+        const searchResults = searchData.results || [];
         if (!searchResults || searchResults.length === 0) {
           return client.sendMessage(
             chatId,
@@ -48,7 +48,7 @@ module.exports = {
       } else {
         // Fetch details by ID
         try {
-          movieInfo = await tmdbClient.fetchDetails(tmdbId);
+          movieInfo = await movieClient.getMovieInfo(tmdbId);
         } catch {
           return client.sendMessage(
             chatId,
