@@ -139,7 +139,20 @@ const addFilmFlow = createFlow("add-film", {
      */
     selectList: async (ctx) => {
       try {
-        const { listId, tmdbId, filmTitle, filmData } = ctx.option?.data || {};
+        // Data can come from ctx.option?.data (poll selection) or ctx.data (backend response)
+        const optionData = ctx.option?.data || ctx.data || {};
+        const { listId, tmdbId, filmTitle, filmData } = optionData;
+
+        logger.debug(
+          `[AddFilmFlow] selectList - ctx.option?.data:`,
+          ctx.option?.data,
+        );
+        logger.debug(`[AddFilmFlow] selectList - ctx.data:`, ctx.data);
+        logger.debug(`[AddFilmFlow] selectList - extracted:`, {
+          listId,
+          tmdbId,
+          filmTitle,
+        });
 
         if (!listId || !tmdbId) {
           logger.error(
