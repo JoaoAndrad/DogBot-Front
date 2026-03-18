@@ -7,6 +7,7 @@
 
 const { createFlow } = require("../flowBuilder");
 const listClient = require("../../../services/listClient");
+const conversationState = require("../../../services/conversationState");
 const {
   downloadAndConvertToWebp,
   sendBufferAsSticker,
@@ -701,11 +702,15 @@ const listsFlow = createFlow("lists", {
      */
     createList: async (ctx) => {
       try {
-        await ctx.reply(
-          "📝 Para criar uma lista, use:\n\n" +
-            "`/criar-lista nome-da-lista`\n\n" +
-            "Exemplo: `/criar-lista Filmes Favoritos`",
-        );
+        // Start interactive list-creation flow and wait for user text input.
+        conversationState.startFlow(ctx.userId, "list-creation", {
+          chatId: ctx.chatId,
+          isGroup: String(ctx.chatId || "").endsWith("@g.us"),
+          source: "lists-menu",
+        });
+        conversationState.nextStep(ctx.userId); // move to step that consumes list name
+
+        await ctx.reply("Qual o nome que deseja dar para a sua nova lista?");
         return { end: true };
       } catch (err) {
         console.error("[ListsFlow] createList error:", err.message);

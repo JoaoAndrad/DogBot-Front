@@ -44,8 +44,12 @@ async function handleListFlow(userId, body, state, reply, context) {
         `[ListFlow] Criando lista "${listName}" para userId=${userId}`,
       );
 
-      // Create list via API
-      const newList = await listClient.createList(listName, userId);
+      // Create list via API (private or group, based on current context)
+      const groupChatId = context?.isGroup ? context?.from : null;
+      const newList = await listClient.createList(userId, {
+        title: listName,
+        groupChatId,
+      });
 
       if (!newList) {
         conversationState.clearState(userId);
