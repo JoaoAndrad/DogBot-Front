@@ -19,7 +19,7 @@ class FlowManager {
     const validation = validateFlow(flow);
     if (!validation.valid) {
       throw new Error(
-        `Invalid flow ${flow.flowId}: ${validation.errors.join(", ")}`
+        `Invalid flow ${flow.flowId}: ${validation.errors.join(", ")}`,
       );
     }
 
@@ -68,17 +68,17 @@ class FlowManager {
     const { flowId, path } = pollMeta;
 
     console.log(
-      `[FlowManager] Vote received: ${flowId}${path} option ${selectedIndex} by ${userId}`
+      `[FlowManager] Vote received: ${flowId}${path} option ${selectedIndex} by ${userId}`,
     );
 
     const state = await storage.getState(userId, flowId);
     if (!state) {
       console.log(
-        `[FlowManager] No state found for ${userId}:${flowId} - may have expired`
+        `[FlowManager] No state found for ${userId}:${flowId} - may have expired`,
       );
       await client.sendMessage(
         chatId,
-        "❌ Sessão expirada. Digite o comando novamente para começar."
+        "❌ Sessão expirada. Digite o comando novamente para começar.",
       );
       return;
     }
@@ -98,7 +98,7 @@ class FlowManager {
     const option = node.options[selectedIndex];
     if (!option) {
       console.log(
-        `[FlowManager] Invalid option index ${selectedIndex} for ${path}`
+        `[FlowManager] Invalid option index ${selectedIndex} for ${path}`,
       );
       return;
     }
@@ -110,7 +110,7 @@ class FlowManager {
       flowId,
       state,
       option,
-      path
+      path,
     );
   }
 
@@ -125,7 +125,7 @@ class FlowManager {
     flowId,
     state,
     option,
-    currentPath
+    currentPath,
   ) {
     const flow = this.flows.get(flowId);
 
@@ -148,7 +148,7 @@ class FlowManager {
         console.log(`[FlowManager] Handler ${option.handler} not found`);
         await client.sendMessage(
           chatId,
-          "❌ Erro interno: handler não encontrado"
+          "❌ Erro interno: handler não encontrado",
         );
         return;
       }
@@ -170,6 +170,14 @@ class FlowManager {
           // End flow
           await storage.deleteState(userId, flowId);
           console.log(`[FlowManager] Flow ${flowId} ended for ${userId}`);
+        } else {
+          // Save updated state after handler execution
+          await storage.saveState(userId, flowId, state);
+
+          // If handler altered path, render new node
+          if (state.path && state.path !== currentPath) {
+            await this._renderNode(client, chatId, userId, flowId, state.path);
+          }
         }
       } catch (err) {
         console.log(`[FlowManager] Handler error:`, err);
@@ -192,6 +200,13 @@ class FlowManager {
       return;
     }
 
+    // Load saved state for this flow
+    const state = (await storage.getState(userId, flowId)) || {
+      path: "/",
+      history: [],
+      context: {},
+    };
+
     // If node is dynamic, resolve options first
     if (node.dynamic && node.handler) {
       const ctx = {
@@ -200,6 +215,7 @@ class FlowManager {
         client,
         reply: (text) => client.sendMessage(chatId, text),
         flowId,
+        state,
       };
 
       try {
@@ -230,6 +246,7 @@ class FlowManager {
           client,
           reply: (text) => client.sendMessage(chatId, text),
           flowId,
+          state,
         };
 
         try {

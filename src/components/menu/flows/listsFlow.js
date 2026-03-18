@@ -33,17 +33,50 @@ const listsFlow = createFlow("lists", {
       try {
         // Get lists for user or group (if in group, use groupChat ID)
         const chatId = ctx.chatId || ctx.from;
-        const lists = await listClient.getUserLists(
-          ctx.userId,
-          1,
-          chatId && String(chatId).endsWith("@g.us") ? chatId : null,
+        const isGroup = chatId && String(chatId).endsWith("@g.us");
+        const groupChatId = isGroup ? chatId : null;
+
+        console.log(
+          `[ListsFlow] Loading lists - userId=${ctx.userId}, chatId=${chatId}, isGroup=${isGroup}, groupChatId=${groupChatId}`,
+        );
+
+        const lists = await listClient.getUserLists(ctx.userId, 1, groupChatId);
+
+        // Format logging for group lists
+        if (isGroup && lists.length > 0) {
+          // Group lists by owner
+          const listsByOwner = {};
+          lists.forEach((list) => {
+            const ownerName =
+              list.owner?.pushName || list.ownerUserId || "Desconhecido";
+            if (!listsByOwner[ownerName]) {
+              listsByOwner[ownerName] = [];
+            }
+            listsByOwner[ownerName].push(list);
+          });
+
+          // Format nice log
+          const groupSummary = Object.entries(listsByOwner)
+            .map(([owner, ownerLists]) => {
+              const listTitles = ownerLists
+                .map((l) => `"${l.title}"`)
+                .join(", ");
+              return `  👤 ${owner}: ${listTitles}`;
+            })
+            .join("\n");
+
+          console.log(`📋 Listas de usuários do grupo:\n${groupSummary}`);
+        }
+
+        console.log(
+          `[ListsFlow] Loaded ${lists.length} lists for ${isGroup ? "group" : "user"}: ${lists.map((l) => l.title).join(", ")}`,
         );
 
         if (lists.length === 0) {
           return {
-            title:
-              "📽️ Você ainda não tem listas!\n\n" +
-              "Use `/criar-lista nome` para criar sua primeira lista.",
+            title: isGroup
+              ? "📽️ Nenhuma lista no grupo ainda!\n\n Use `/criar-lista nome` para criar sua primeira lista."
+              : "📽️ Você ainda não tem listas!\n\n Use `/criar-lista nome` para criar sua primeira lista.",
             options: [
               {
                 label: "➕ Criar nova lista",
@@ -57,7 +90,9 @@ const listsFlow = createFlow("lists", {
         }
 
         const options = lists.map((list) => ({
-          label: `📋 ${list.title} (${list._count.items} items)`,
+          label:
+            `📋 ${list.title} (${list._count.items} items)` +
+            (isGroup && list.owner ? ` - ${list.owner.pushName}` : ""),
           action: "exec",
           handler: "selectList",
           data: { listId: list.id, listTitle: list.title },
@@ -66,7 +101,7 @@ const listsFlow = createFlow("lists", {
         options.push({ label: "🔙 Voltar", action: "back" });
 
         return {
-          title: "📽️ Minhas Listas",
+          title: isGroup ? "📽️ Listas do Grupo" : "📽️ Minhas Listas",
           options,
           skipPoll: false,
         };
