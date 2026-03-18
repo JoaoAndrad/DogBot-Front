@@ -105,12 +105,21 @@ const addFilmFlow = createFlow("add-film", {
         });
 
         if (lists.length === 0) {
+          const msgPrivate =
+            `📽️ *${filmTitle}*\n\n` +
+            `Você ainda não tem listas!\n\n` +
+            `Crie sua primeira lista com:\n` +
+            `/criar-lista nome da lista\n\n` +
+            `💡 Listas que você criar aqui no privado são só suas. Se criar uma lista em um grupo, ela fica visível para todos do grupo — para uma lista só sua, crie aqui no meu privado.`;
+          const msgGroup =
+            `📽️ *${filmTitle}*\n\n` +
+            `Ainda não há listas neste grupo!\n\n` +
+            `Alguém pode criar a primeira com:\n` +
+            `/criar-lista nome da lista\n\n` +
+            `💡 Listas criadas no grupo são visíveis para todos. Para uma lista só sua, crie no meu privado.`;
           return {
-            title:
-              `📽️ *${filmTitle}*\n\n` +
-              `❌ Você não tem listas criadas!\n\n` +
-              `Use /criar-lista para criar sua primeira lista`,
-            options: [{ label: "🔙 Voltar", action: "back" }],
+            title: isGroup ? msgGroup : msgPrivate,
+            skipPoll: true,
           };
         }
 

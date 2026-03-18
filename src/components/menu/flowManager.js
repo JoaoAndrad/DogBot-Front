@@ -235,6 +235,13 @@ class FlowManager {
         if (result && result.options) {
           renderOptions = result.options;
         }
+
+        // Só mensagem, sem enquete: envia o título e encerra o flow
+        if (result && result.skipPoll === true && renderTitle) {
+          await client.sendMessage(chatId, renderTitle);
+          await storage.deleteState(userId, flowId);
+          return;
+        }
       } catch (err) {
         console.log(`[FlowManager] Dynamic node handler error:`, err);
         await client.sendMessage(chatId, "❌ Erro ao carregar opções");
