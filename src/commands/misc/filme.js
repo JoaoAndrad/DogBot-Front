@@ -14,6 +14,7 @@ const logger = require("../../utils/logger");
 
 module.exports = {
   name: "filme",
+  aliases: ["movie", "filmes"],
   description: "📽️ Search and show movie/series info",
 
   async execute(ctx) {
@@ -57,12 +58,18 @@ module.exports = {
         await reply(message);
         if (movieInfo.posterUrl) {
           try {
-            const posterBuffer = await downloadImageToBuffer(movieInfo.posterUrl);
+            const posterBuffer = await downloadImageToBuffer(
+              movieInfo.posterUrl,
+            );
             if (posterBuffer) {
-              await sendBufferAsSticker(client, msg.from, posterBuffer, { fullOnly: true });
+              await sendBufferAsSticker(client, msg.from, posterBuffer, {
+                fullOnly: true,
+              });
             }
           } catch (err) {
-            logger.warn(`[Filme] Failed to send poster sticker: ${err.message}`);
+            logger.warn(
+              `[Filme] Failed to send poster sticker: ${err.message}`,
+            );
           }
         }
         const filmTitle = `${movieInfo.title}${movieInfo.year ? ` (${movieInfo.year})` : ""}`;
@@ -104,7 +111,9 @@ module.exports = {
             initialContext: { candidates, userId },
           });
         } catch (err) {
-          logger.warn(`[Filme] Failed to start film-search flow: ${err.message}`);
+          logger.warn(
+            `[Filme] Failed to start film-search flow: ${err.message}`,
+          );
         }
         return;
       }
@@ -129,7 +138,9 @@ module.exports = {
           logger.info(`[Filme] Sending poster sticker for ${movieInfo.title}`);
           const posterBuffer = await downloadImageToBuffer(movieInfo.posterUrl);
           if (posterBuffer) {
-            await sendBufferAsSticker(client, msg.from, posterBuffer, { fullOnly: true });
+            await sendBufferAsSticker(client, msg.from, posterBuffer, {
+              fullOnly: true,
+            });
           }
         } catch (err) {
           logger.warn(`[Filme] Failed to send poster sticker: ${err.message}`);
