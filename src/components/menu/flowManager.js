@@ -193,6 +193,8 @@ class FlowManager {
   async _renderNode(client, chatId, userId, flowId, path) {
     const flow = this.flows.get(flowId);
     const node = flow.nodes[path];
+    let renderTitle = node?.title;
+    let renderOptions = node?.options;
 
     if (!node) {
       console.log(`[FlowManager] Node ${path} not found in flow ${flowId}`);
@@ -226,8 +228,12 @@ class FlowManager {
           return;
         }
 
+        if (result && result.title) {
+          renderTitle = result.title;
+        }
+
         if (result && result.options) {
-          node.options = result.options;
+          renderOptions = result.options;
         }
       } catch (err) {
         console.log(`[FlowManager] Dynamic node handler error:`, err);
@@ -237,7 +243,11 @@ class FlowManager {
     }
 
     // If node has no options but has a handler, execute it directly
-    if ((!node.options || node.options.length === 0) && node.handler) {
+    if (
+      (!renderOptions || renderOptions.length === 0) &&
+      node.handler &&
+      !node.dynamic
+    ) {
       const handler = flow.handlers[node.handler];
       if (handler) {
         const ctx = {
@@ -264,10 +274,10 @@ class FlowManager {
 
     // Create poll with metadata for backend processing
     const polls = require("../poll");
-    const optionLabels = node.options.map((o) => o.label);
+    const optionLabels = renderOptions.map((o) => o.label);
 
     // Build metadata with action mapping for each option
-    const options = node.options.map((opt, index) => ({
+    const options = renderOptions.map((opt, index) => ({
       index,
       label: opt.label,
       action: opt.action, // 'exec', 'goto', 'back'
@@ -276,7 +286,7 @@ class FlowManager {
       data: opt.data, // additional data for handler
     }));
 
-    await polls.createPoll(client, chatId, node.title, optionLabels, {
+    await polls.createPoll(client, chatId, renderTitle, optionLabels, {
       metadata: {
         actionType: "menu",
         flowId,
