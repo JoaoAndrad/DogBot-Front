@@ -141,7 +141,8 @@ const listsFlow = createFlow("lists", {
     dynamic: true,
     handler: async (ctx) => {
       try {
-        const { listId } = ctx.selectedList || ctx.state?.selectedList || {};
+        const { listId } =
+          ctx.selectedList || ctx.state?.context?.selectedList || {};
         if (!listId) {
           return {
             title: "❌ Erro: Lista não selecionada",
@@ -215,7 +216,8 @@ const listsFlow = createFlow("lists", {
     dynamic: true,
     handler: async (ctx) => {
       try {
-        const { listId } = ctx.selectedList || ctx.state?.selectedList || {};
+        const { listId } =
+          ctx.selectedList || ctx.state?.context?.selectedList || {};
         if (!listId) {
           return {
             title: "❌ Erro: Lista não selecionada",
@@ -279,7 +281,8 @@ const listsFlow = createFlow("lists", {
     title: "🎬 Detalhes do Item",
     dynamic: true,
     handler: async (ctx) => {
-      const { item } = ctx.selectedItem || ctx.state?.selectedItem || {};
+      const { item } =
+        ctx.selectedItem || ctx.state?.context?.selectedItem || {};
       if (!item) {
         return {
           title: "❌ Erro: Item não selecionado",
@@ -332,7 +335,7 @@ const listsFlow = createFlow("lists", {
     handler: async (ctx) => {
       try {
         const { listId, listTitle } =
-          ctx.selectedList || ctx.state?.selectedList || {};
+          ctx.selectedList || ctx.state?.context?.selectedList || {};
         if (!listId) {
           return {
             title: "❌ Erro: Lista não selecionada",
@@ -435,12 +438,14 @@ const listsFlow = createFlow("lists", {
           ctx.state = { path: "/", history: [], context: {} };
           console.debug(`[ListsFlow📝] State inicializado`);
         }
+        if (!ctx.state.context) {
+          ctx.state.context = {};
+        }
 
         ctx.selectedList = { listId, listTitle };
-        // Persist selectedList into state so subsequent renders can access it
-        if (!ctx.state) ctx.state = { path: "/", history: [], context: {} };
-        ctx.state.selectedList = ctx.selectedList;
-        ctx.state.selectedItem = null;
+        // Persist selectedList into context, which is what storage persists
+        ctx.state.context.selectedList = ctx.selectedList;
+        ctx.state.context.selectedItem = null;
         ctx.state.path = "/list-detail";
         console.debug(`[ListsFlow📝] Navegando para: /list-detail`);
         if (!ctx.state.history.includes("/")) {
@@ -491,8 +496,12 @@ const listsFlow = createFlow("lists", {
           ctx.state = { path: "/", history: [], context: {} };
         }
 
+        if (!ctx.state.context) {
+          ctx.state.context = {};
+        }
+
         ctx.selectedItem = { itemId, item };
-        ctx.state.selectedItem = ctx.selectedItem;
+        ctx.state.context.selectedItem = ctx.selectedItem;
         if (!ctx.state.history.includes("/list-items")) {
           ctx.state.history.push("/list-items");
         }
@@ -510,7 +519,8 @@ const listsFlow = createFlow("lists", {
      */
     toggleWatched: async (ctx) => {
       try {
-        const selectedItem = ctx.selectedItem || ctx.state?.selectedItem;
+        const selectedItem =
+          ctx.selectedItem || ctx.state?.context?.selectedItem;
         if (!selectedItem?.itemId) {
           await ctx.reply("❌ Erro: Item não selecionado");
           return { end: false };
@@ -535,8 +545,8 @@ const listsFlow = createFlow("lists", {
         await ctx.reply(msg);
 
         // Volta pro detalhe do item
-        if (ctx.state?.selectedItem?.item) {
-          ctx.state.selectedItem.item.watched = newWatchedStatus;
+        if (ctx.state?.context?.selectedItem?.item) {
+          ctx.state.context.selectedItem.item.watched = newWatchedStatus;
         }
         if (ctx.state) {
           ctx.state.path = "/item-detail";
@@ -554,7 +564,8 @@ const listsFlow = createFlow("lists", {
      */
     removeItem: async (ctx) => {
       try {
-        const selectedItem = ctx.selectedItem || ctx.state?.selectedItem;
+        const selectedItem =
+          ctx.selectedItem || ctx.state?.context?.selectedItem;
         if (!selectedItem?.itemId) {
           await ctx.reply("❌ Erro: Item não selecionado");
           return { end: false };
@@ -566,7 +577,10 @@ const listsFlow = createFlow("lists", {
 
         // Volta pra lista de items
         if (ctx.state) {
-          ctx.state.selectedItem = null;
+          if (!ctx.state.context) {
+            ctx.state.context = {};
+          }
+          ctx.state.context.selectedItem = null;
           ctx.state.path = "/list-items";
         }
         return { end: false };
@@ -582,7 +596,8 @@ const listsFlow = createFlow("lists", {
      */
     rateItem: async (ctx) => {
       try {
-        const selectedItem = ctx.selectedItem || ctx.state?.selectedItem;
+        const selectedItem =
+          ctx.selectedItem || ctx.state?.context?.selectedItem;
         if (!selectedItem?.itemId) {
           await ctx.reply("❌ Erro: Item não selecionado");
           return { end: false };
@@ -635,8 +650,8 @@ const listsFlow = createFlow("lists", {
         await ctx.reply(msg);
 
         // Stay on item-detail
-        if (ctx.state?.selectedItem?.item) {
-          ctx.state.selectedItem.item.rating = rating;
+        if (ctx.state?.context?.selectedItem?.item) {
+          ctx.state.context.selectedItem.item.rating = rating;
         }
         if (ctx.state) {
           ctx.state.path = "/item-detail";
@@ -672,7 +687,8 @@ const listsFlow = createFlow("lists", {
      */
     deleteList: async (ctx) => {
       try {
-        const selectedList = ctx.selectedList || ctx.state?.selectedList;
+        const selectedList =
+          ctx.selectedList || ctx.state?.context?.selectedList;
         if (!selectedList?.listId) {
           await ctx.reply("❌ Erro: Lista não selecionada");
           return { end: false };
@@ -699,7 +715,8 @@ const listsFlow = createFlow("lists", {
      */
     confirmDeleteList: async (ctx) => {
       try {
-        const selectedList = ctx.selectedList || ctx.state?.selectedList;
+        const selectedList =
+          ctx.selectedList || ctx.state?.context?.selectedList;
         if (!selectedList?.listId) {
           await ctx.reply("❌ Erro: Lista não selecionada");
           return { end: false };
@@ -715,8 +732,11 @@ const listsFlow = createFlow("lists", {
         if (ctx.state) {
           ctx.state.path = "/";
           ctx.state.history = [];
-          ctx.state.selectedList = null;
-          ctx.state.selectedItem = null;
+          if (!ctx.state.context) {
+            ctx.state.context = {};
+          }
+          ctx.state.context.selectedList = null;
+          ctx.state.context.selectedItem = null;
         }
         ctx.selectedList = null;
         return { end: false };
