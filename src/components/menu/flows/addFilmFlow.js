@@ -35,7 +35,7 @@ const addFilmFlow = createFlow("add-film", {
           } catch (err) {
             logger.warn(`[AddFilmFlow❌] Filme não encontrado por ID: ${tmdbId}`);
             return {
-              title: `❌ Filme com ID ${tmdbId} não encontrado`,
+              title: `❌ *Filme não encontrado* (ID ${tmdbId})`,
               options: [{ label: "🔙 Voltar", action: "back" }],
             };
           }
@@ -45,7 +45,7 @@ const addFilmFlow = createFlow("add-film", {
         } else {
           if (!filmName) {
             return {
-              title: "❌ Erro: Nome do filme não fornecido",
+              title: "❌ *Erro:* Nome do filme não fornecido.",
               options: [{ label: "🔙 Voltar", action: "back" }],
             };
           }
@@ -63,7 +63,7 @@ const addFilmFlow = createFlow("add-film", {
           if (!results || results.length === 0) {
             logger.warn(`[AddFilmFlow❌] Filme não encontrado: "${filmName}"`);
             return {
-              title: `❌ Nenhum filme encontrado para: "${filmName}"`,
+              title: `❌ *Nenhum filme encontrado* para "${filmName}"`,
               options: [{ label: "🔙 Voltar", action: "back" }],
             };
           }
@@ -107,18 +107,18 @@ const addFilmFlow = createFlow("add-film", {
         if (lists.length === 0) {
           const msgPrivate =
             `📽️ *${filmTitle}*\n\n` +
-            `Você ainda não tem listas!\n\n` +
-            `Crie sua primeira lista com:\n` +
-            `/criar-lista nome da lista\n\n` +
-            `💡 Listas que você criar aqui no privado são só suas. Se criar uma lista em um grupo, ela fica visível para todos do grupo — para uma lista só sua, crie aqui no meu privado.\n\n` +
-            `Ou use o comando /listas`;
+            `*Você ainda não tem listas!*\n\n` +
+            `Crie sua primeira lista:\n` +
+            `\`\`\`\n/criar-lista nome da lista\n\`\`\`\n` +
+            `Ou use: \`/listas\`\n\n` +
+            `_💡 Listas criadas no privado são só suas. Em grupo, ficam visíveis para todos — para lista só sua, crie aqui no privado._`;
           const msgGroup =
             `📽️ *${filmTitle}*\n\n` +
-            `Ainda não há listas neste grupo!\n\n` +
-            `Alguém pode criar a primeira com:\n` +
-            `/criar-lista nome da lista\n\n` +
-            `💡 Listas criadas no grupo são visíveis para todos. Para uma lista só sua, crie no meu privado.\n\n` +
-            `Ou use o comando /listas`;
+            `*Ainda não há listas neste grupo!*\n\n` +
+            `Alguém pode criar a primeira:\n` +
+            `\`\`\`\n/criar-lista nome da lista\n\`\`\`\n` +
+            `Ou use: \`/listas\`\n\n` +
+            `_💡 Listas no grupo são visíveis para todos. Para lista só sua, crie no meu privado._`;
           return {
             title: isGroup ? msgGroup : msgPrivate,
             skipPoll: true,
@@ -171,14 +171,14 @@ const addFilmFlow = createFlow("add-film", {
         options.push({ label: "🔙 Voltar", action: "back" });
 
         return {
-          title: `📽️ *${filmTitle}*\n\nSelecione uma lista:`,
+          title: `📽️ *${filmTitle}*\n\n_Selecione uma lista:_`,
           options,
           skipPoll: false,
         };
       } catch (err) {
         logger.error("[AddFilmFlow] Root handler error:", err.message);
         return {
-          title: "❌ Erro ao buscar filme.\n\nOu use o comando /listas",
+          title: "❌ *Erro ao buscar filme.*\n\nUse \`/listas\` para ver suas listas.",
           skipPoll: true,
         };
       }
@@ -199,7 +199,7 @@ const addFilmFlow = createFlow("add-film", {
             `[AddFilmFlow❌] Dados faltando! ctx.data:`,
             JSON.stringify(ctx.data),
           );
-          await ctx.reply("❌ Erro ao processar seleção (dados incompletos)");
+          await ctx.reply("❌ *Erro* ao processar seleção (dados incompletos).");
           return { end: false };
         }
 
@@ -231,8 +231,8 @@ const addFilmFlow = createFlow("add-film", {
         // SUCCESS: send success message
         await ctx.reply(
           `✅ *${filmTitle}* adicionado com sucesso!\n\n` +
-            `🎬 Agora está na lista\n\n` +
-            `💡 Use /listas para gerenciar suas listas`,
+            `🎬 Agora está na lista.\n\n` +
+            `_Use \`/listas\` para gerenciar._`,
         );
 
         return { end: true };
@@ -248,11 +248,13 @@ const addFilmFlow = createFlow("add-film", {
           err.message.includes("already in list") ||
           err.message.includes("already")
         ) {
-          errorMsg = `⚠️ Este filme já está nesta lista!`;
+          errorMsg = `⚠️ *Este filme já está nesta lista!*`;
         } else if (err.message.includes("not found")) {
-          errorMsg = `❌ Lista não encontrada ou foi deletada`;
+          errorMsg = `❌ *Lista não encontrada* ou foi deletada.`;
         } else if (err.message.includes("Unauthorized")) {
-          errorMsg = `❌ Você não tem permissão para adicionar a essa lista`;
+          errorMsg = `❌ *Sem permissão* para adicionar a essa lista.`;
+        } else {
+          errorMsg = `❌ *Erro ao adicionar:* ${err.message}`;
         }
 
         await ctx.reply(errorMsg);
