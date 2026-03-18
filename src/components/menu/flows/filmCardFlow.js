@@ -17,7 +17,7 @@ const RATING_OPTIONS = [0.5, 1, 1.5, 2, 2.5, 3, 3.5, 4, 4.5, 5];
 
 const filmCardFlow = createFlow("film-card", {
   root: {
-    title: "O que deseja fazer?",
+    title: "💡 O que deseja fazer?",
     dynamic: true,
     handler: async (ctx) => {
       const movieInfo = ctx.state?.context?.movieInfo;
@@ -31,17 +31,17 @@ const filmCardFlow = createFlow("film-card", {
       const options = [];
       if (!watched) {
         options.push({
-          label: "Marcar como assistido",
+          label: "✅ Marcar como assistido",
           action: "exec",
           handler: "markWatchedFilm",
         });
       }
       options.push(
-        { label: "Avaliar", action: "exec", handler: "askRatingFilm" },
-        { label: "Adicionar à lista", action: "exec", handler: "addFilmToList" }
+        { label: "⭐ Avaliar", action: "exec", handler: "askRatingFilm" },
+        { label: "📋 Adicionar à lista", action: "exec", handler: "addFilmToList" }
       );
       return {
-        title: "O que deseja fazer?",
+        title: "💡 O que deseja fazer?",
         options,
       };
     },

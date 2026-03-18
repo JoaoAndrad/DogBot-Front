@@ -164,8 +164,10 @@ async function executeAction(result, client) {
     switch (actionType) {
       case "menu_spotify":
       case "menu":
-        // Menu action: execute directly based on backend decision
-        // Para estatísticas, usar quem votou ao invés de quem criou o menu
+        // State was saved under the userId that started the flow (poll metadata).
+        // Use that for load/save state so we find the correct context (e.g. filmTitle).
+        const stateUserId = data.userId || result.voterId;
+        // Resolve voter to @c.us (or UUID for list flows) for handler/API use.
         let menuUserId = result.voterId || data.userId;
 
         // Resolver o userId para obter @c.us ao invés de @lid
@@ -227,7 +229,8 @@ async function executeAction(result, client) {
         logger.debug(`[processor] Menu action data:`, {
           flowId: data.flowId,
           path: data.path,
-          userId: menuUserId,
+          stateUserId,
+          menuUserId,
           handler,
           target,
         });
@@ -242,9 +245,10 @@ async function executeAction(result, client) {
           const flow = flowManager.flows.get(data.flowId);
 
           if (flow && flow.handlers && flow.handlers[handler]) {
-            // Load any existing state for this flow
+            // Load state by the userId that started the flow (metadata), not the resolved voter,
+            // so we find the correct context (e.g. film-card filmTitle/tmdbId).
             const savedState = (await storage.getState(
-              menuUserId,
+              stateUserId,
               data.flowId,
             )) || {
               path: "/",
@@ -270,27 +274,27 @@ async function executeAction(result, client) {
             if (result && result.end) {
               const storage = require("../menu/storage");
               try {
-                await storage.deleteState(menuUserId, data.flowId);
+                await storage.deleteState(stateUserId, data.flowId);
                 logger.info(
-                  `[processor] Flow ${data.flowId} ended for ${menuUserId} - state cleaned up`,
+                  `[processor] Flow ${data.flowId} ended for ${stateUserId} - state cleaned up`,
                 );
               } catch (cleanupErr) {
                 // Log cleanup failure but don't mask the successful flow completion
                 logger.warn(
-                  `[processor] Failed to clean up state for ${data.flowId}/${menuUserId}:`,
+                  `[processor] Failed to clean up state for ${data.flowId}/${stateUserId}:`,
                   cleanupErr.message,
                 );
               }
             } else {
               // Handler completed but flow continues (end: false)
-              // Save updated state and re-render if path changed
+              // Save updated state and re-render if path changed (use stateUserId so next vote finds same state)
               const flowManager = require("../menu/flowManager");
               if (ctx.state && ctx.state.path) {
                 try {
                   logger.info(
                     `[processor] Saving state and navigating to ${ctx.state.path}`,
                   );
-                  await storage.saveState(menuUserId, data.flowId, ctx.state);
+                  await storage.saveState(stateUserId, data.flowId, ctx.state);
 
                   if (result && result.noRender) {
                     logger.info(
@@ -299,11 +303,11 @@ async function executeAction(result, client) {
                     break;
                   }
 
-                  // Re-render the new menu path
+                  // Re-render the new menu path (stateUserId so next poll metadata matches state key)
                   await flowManager._renderNode(
                     client,
                     poll.chatId,
-                    menuUserId,
+                    stateUserId,
                     data.flowId,
                     ctx.state.path,
                   );
@@ -322,14 +326,14 @@ async function executeAction(result, client) {
           }
         } else if (target) {
           logger.info(
-            `[processor] Navigating to: ${target} for user ${menuUserId}`,
+            `[processor] Navigating to: ${target} for user ${stateUserId}`,
           );
           const flowManager = require("../menu/flowManager");
-          // Navigate to target path by re-rendering
+          // Navigate to target path by re-rendering (stateUserId so poll metadata matches state)
           await flowManager._renderNode(
             client,
             poll.chatId,
-            menuUserId,
+            stateUserId,
             data.flowId,
             target,
           );

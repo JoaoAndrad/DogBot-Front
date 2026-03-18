@@ -22,7 +22,16 @@ module.exports = {
       const info = ctx.info || {};
       const client = ctx.client;
 
-      const userId = info.from || msg.from;
+      // Resolve to @c.us so flow state and votes use the same key (like listas.js)
+      let userId = info.from || msg.from;
+      try {
+        const contact = await msg.getContact();
+        if (contact && contact.id && contact.id._serialized) {
+          userId = contact.id._serialized;
+        }
+      } catch (err) {
+        logger.warn(`[Filme] getContact failed, using raw id: ${err.message}`);
+      }
 
       // Extract query from message text
       const text = msg.body || "";
