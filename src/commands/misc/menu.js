@@ -3,12 +3,14 @@ const testFlow = require("../../components/menu/flows/testFlow");
 const spotifyFlow = require("../../components/menu/flows/spotifyFlow");
 const listsFlow = require("../../components/menu/flows/listsFlow");
 const addFilmFlow = require("../../components/menu/flows/addFilmFlow");
+const filmCardFlow = require("../../components/menu/flows/filmCardFlow");
 
 // Register flows on load
 flowManager.registerFlow(testFlow);
 flowManager.registerFlow(spotifyFlow);
 flowManager.registerFlow(listsFlow);
 flowManager.registerFlow(addFilmFlow);
+flowManager.registerFlow(filmCardFlow);
 
 module.exports = {
   name: "menu",

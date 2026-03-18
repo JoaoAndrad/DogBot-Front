@@ -4,6 +4,7 @@
  */
 
 const movieClient = require("../../services/movieClient");
+const flowManager = require("../../components/menu/flowManager");
 const {
   downloadAndConvertToWebp,
   sendBufferAsSticker,
@@ -72,18 +73,13 @@ module.exports = {
 
       const overview = movieInfo.overview ? movieInfo.overview : "";
 
-      // Build the formatted message
+      // Build the formatted message (no tracejado, no command tips)
       const message = `📽️ ${title}${year}
 
 ${rating}
 ${watched} | ${userRating}
 
-━━━━━━━━━━━━━━━━━━━━━━
-${overview}
-━━━━━━━━━━━━━━━━━━━━━━
-
-💡 /assisti ${movie.tmdbId} - Marcar como assistido
-💡 /avaliacao ${movie.tmdbId} - Adicionar avaliação`;
+${overview}`;
 
       // Send the message
       await reply(message);
@@ -103,6 +99,20 @@ ${overview}
           logger.warn(`[Filme] Failed to send poster sticker: ${err.message}`);
           // Don't fail the whole command if sticker fails
         }
+      }
+
+      // Start film-card flow (poll: Marcar como assistido / Avaliar / Adicionar à lista)
+      const filmTitle = `${movieInfo.title}${movieInfo.year ? ` (${movieInfo.year})` : ""}`;
+      try {
+        await flowManager.startFlow(client, msg.from, userId, "film-card", {
+          initialContext: {
+            tmdbId: movie.tmdbId,
+            movieInfo,
+            filmTitle,
+          },
+        });
+      } catch (err) {
+        logger.warn(`[Filme] Failed to start film-card flow: ${err.message}`);
       }
 
       return;

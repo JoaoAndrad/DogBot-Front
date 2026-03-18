@@ -14,49 +14,72 @@ const addFilmFlow = createFlow("add-film", {
     dynamic: true,
     handler: async (ctx) => {
       try {
-        // Get film search data from initial context
+        const userId = ctx.userId;
         const filmName = ctx.state?.context?.filmName;
+        const tmdbId = ctx.state?.context?.tmdbId;
 
-        if (!filmName) {
-          return {
-            title: "❌ Erro: Nome do filme não fornecido",
-            options: [{ label: "🔙 Voltar", action: "back" }],
-          };
+        let film;
+        let filmTitle;
+
+        if (tmdbId) {
+          // From film-card: use tmdbId, skip search
+          logger.info(`[AddFilmFlow🔍] Usando tmdbId: ${tmdbId}`);
+          try {
+            film = await movieClient.getMovieInfo(userId, tmdbId);
+            filmTitle =
+              ctx.state.context.filmTitle ||
+              `${film.title}${film.year ? ` (${film.year})` : ""}`;
+            ctx.state.context.tmdbId = tmdbId;
+            ctx.state.context.filmTitle = filmTitle;
+            ctx.state.context.filmData = film;
+          } catch (err) {
+            logger.warn(`[AddFilmFlow❌] Filme não encontrado por ID: ${tmdbId}`);
+            return {
+              title: `❌ Filme com ID ${tmdbId} não encontrado`,
+              options: [{ label: "🔙 Voltar", action: "back" }],
+            };
+          }
+          logger.info(
+            `[AddFilmFlow✅] Filme carregado: ${filmTitle} (tmdbId: ${tmdbId})`,
+          );
+        } else {
+          if (!filmName) {
+            return {
+              title: "❌ Erro: Nome do filme não fornecido",
+              options: [{ label: "🔙 Voltar", action: "back" }],
+            };
+          }
+
+          logger.info(`[AddFilmFlow🔍] Buscando filme: "${filmName}"`);
+
+          const searchResults = await movieClient.searchMovies(filmName, {
+            type: "multi",
+            page: 1,
+          });
+
+          const results = Array.isArray(searchResults)
+            ? searchResults
+            : searchResults?.results || [];
+          if (!results || results.length === 0) {
+            logger.warn(`[AddFilmFlow❌] Filme não encontrado: "${filmName}"`);
+            return {
+              title: `❌ Nenhum filme encontrado para: "${filmName}"`,
+              options: [{ label: "🔙 Voltar", action: "back" }],
+            };
+          }
+
+          film = results[0];
+          filmTitle = `${film.title}${film.year ? ` (${film.year})` : ""}`;
+          logger.info(
+            `[AddFilmFlow✅] Filme encontrado: ${filmTitle} (tmdbId: ${film.tmdbId})`,
+          );
+
+          ctx.state.context.tmdbId = film.tmdbId;
+          ctx.state.context.filmTitle = filmTitle;
+          ctx.state.context.filmData = film;
         }
-
-        logger.info(`[AddFilmFlow🔍] Buscando filme: "${filmName}"`);
-
-        // Search for film
-        const searchResults = await movieClient.searchMovies(filmName, {
-          type: "multi",
-          page: 1,
-        });
-
-        // searchResults can be either an array or { results: [] }
-        const results = Array.isArray(searchResults)
-          ? searchResults
-          : searchResults?.results || [];
-        if (!results || results.length === 0) {
-          logger.warn(`[AddFilmFlow❌] Filme não encontrado: "${filmName}"`);
-          return {
-            title: `❌ Nenhum filme encontrado para: "${filmName}"`,
-            options: [{ label: "🔙 Voltar", action: "back" }],
-          };
-        }
-
-        const film = results[0];
-        const filmTitle = `${film.title}${film.year ? ` (${film.year})` : ""}`;
-        logger.info(
-          `[AddFilmFlow✅] Filme encontrado: ${filmTitle} (tmdbId: ${film.tmdbId})`,
-        );
-
-        // Save film data to context for next step
-        ctx.state.context.tmdbId = film.tmdbId;
-        ctx.state.context.filmTitle = filmTitle;
-        ctx.state.context.filmData = film;
 
         // Get lists for user or group
-        const userId = ctx.userId;
         const chatId = ctx.chatId || ctx.from;
         const isGroup = chatId && String(chatId).endsWith("@g.us");
         const groupChatId = isGroup ? chatId : null;
