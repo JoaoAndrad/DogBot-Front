@@ -11,6 +11,24 @@ const { handleAddFilmFlow } = require("./addFilmFlowHandler");
 const mediaHelper = require("../utils/mediaHelper");
 const stickerHelper = require("../utils/stickerHelper");
 
+// Cache de lookup por identificador (evita muitos GET /api/users/lookup para o mesmo usuário em sequência)
+const USER_LOOKUP_CACHE_TTL_MS = 60 * 1000; // 1 minuto
+const userLookupCache = new Map(); // identifier -> { userId, ts }
+
+function getCachedUserId(identifier) {
+  const key = String(identifier || "").trim().toLowerCase();
+  if (!key) return null;
+  const entry = userLookupCache.get(key);
+  if (!entry || Date.now() - entry.ts > USER_LOOKUP_CACHE_TTL_MS) return null;
+  return entry.userId;
+}
+
+function setCachedUserId(identifier, userId) {
+  const key = String(identifier || "").trim().toLowerCase();
+  if (!key || !userId) return;
+  userLookupCache.set(key, { userId, ts: Date.now() });
+}
+
 async function handle(context) {
   // Accept either context.info (legacy) or context.msg (whatsapp-web.js)
   const info = context.info || {};
@@ -231,28 +249,21 @@ async function handle(context) {
     actualNumber = author ? author.replace(/@lid$/i, "") : null;
   }
 
-  // Do early lookup to get actual database userId for flow management
+  // Do early lookup to get actual database userId for flow management (com cache para evitar muitos requests)
   let dbUserId = null;
   try {
-    if (actualNumber && !isGroup) {
-      const earlyLookup = await backendClient.sendToBackend(
-        `/api/users/lookup?identifier=${encodeURIComponent(actualNumber)}`,
-        null,
-        "GET",
-      );
-      if (earlyLookup && earlyLookup.found) {
-        dbUserId = earlyLookup.userId;
-      }
-    }
-    // In group, also resolve author to backend userId so conversation flows (e.g. list-creation from /listas) find state stored under UUID
-    if (actualNumber && isGroup && dbUserId == null) {
-      const groupLookup = await backendClient.sendToBackend(
-        `/api/users/lookup?identifier=${encodeURIComponent(actualNumber)}`,
-        null,
-        "GET",
-      );
-      if (groupLookup && groupLookup.found) {
-        dbUserId = groupLookup.userId;
+    if (actualNumber) {
+      dbUserId = getCachedUserId(actualNumber);
+      if (!dbUserId) {
+        const lookup = await backendClient.sendToBackend(
+          `/api/users/lookup?identifier=${encodeURIComponent(actualNumber)}`,
+          null,
+          "GET",
+        );
+        if (lookup && lookup.found) {
+          dbUserId = lookup.userId;
+          setCachedUserId(actualNumber, dbUserId);
+        }
       }
     }
   } catch (err) {
@@ -644,17 +655,24 @@ async function handle(context) {
           }
 
           if (cmdActualNumber) {
-            if (!isConfissao) {
-              logger.debug(
-                `[Handler] Verificando cadastro para: ${cmdActualNumber}`,
+            const cached = getCachedUserId(cmdActualNumber);
+            if (cached) {
+              lookupResult = { found: true, userId: cached };
+            } else {
+              if (!isConfissao) {
+                logger.debug(
+                  `[Handler] Verificando cadastro para: ${cmdActualNumber}`,
+                );
+              }
+              lookupResult = await backendClient.sendToBackend(
+                `/api/users/lookup?identifier=${encodeURIComponent(cmdActualNumber)}`,
+                null,
+                "GET",
               );
+              if (lookupResult && lookupResult.found) {
+                setCachedUserId(cmdActualNumber, lookupResult.userId);
+              }
             }
-            lookupResult = await backendClient.sendToBackend(
-              `/api/users/lookup?identifier=${encodeURIComponent(cmdActualNumber)}`,
-              null,
-              "GET",
-            );
-
             if (!isConfissao) {
               logger.debug(`[Handler] Resultado lookup:`, lookupResult);
             }
