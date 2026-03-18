@@ -95,13 +95,14 @@ module.exports = {
           title: r.title ?? r.name ?? "",
           year: r.year ?? (r.release_date ? r.release_date.slice(0, 4) : null),
         }));
+        // Enviar dica do TMDB logo para não esperar o startFlow (poll)
+        await reply(
+          "Caso não esteja na lista abaixo, acesse https://www.themoviedb.org/search e envie o código do filme (estará na url) (ex.: /filme 2287).",
+        );
         try {
           await flowManager.startFlow(client, msg.from, userId, "film-search", {
             initialContext: { candidates, userId },
           });
-          await reply(
-            "Ou pesquise em https://www.themoviedb.org/search e envie o código do filme (ex.: /filme 2287).",
-          );
         } catch (err) {
           logger.warn(`[Filme] Failed to start film-search flow: ${err.message}`);
         }
