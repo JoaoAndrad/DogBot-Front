@@ -111,14 +111,14 @@ const addFilmFlow = createFlow("add-film", {
             `📽️ *${filmTitle}*\n\n` +
             `*Você ainda não tem listas!*\n\n` +
             `Crie sua primeira lista:\n` +
-            `\`\`\`\n/criar-lista nome da lista\n\`\`\`\n` +
+            `\`/criar-lista nome da lista\`\n\n` +
             `Ou use: \`/listas\`\n\n` +
             `_💡 Listas criadas no privado são só suas. Em grupo, ficam visíveis para todos os integrantes do grupo, para uma lista só sua, crie aqui no privado._`;
           const msgGroup =
             `📽️ *${filmTitle}*\n\n` +
             `*Ainda não há listas neste grupo!*\n\n` +
             `Alguém pode criar a primeira:\n` +
-            `\`\`\`\n/criar-lista nome da lista\n\`\`\`\n` +
+            `\`/criar-lista nome da lista\`\n\n` +
             `Ou use: \`/listas\`\n\n` +
             `_💡 Listas no grupo são visíveis para todos os integrantes. Para lista só sua, crie no meu privado._`;
           return {

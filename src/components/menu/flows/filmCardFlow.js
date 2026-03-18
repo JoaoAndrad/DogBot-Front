@@ -55,12 +55,15 @@ const filmCardFlow = createFlow("film-card", {
 
   "/rating": {
     title: "Sua nota (0,5 a 5):",
-    options: RATING_OPTIONS.map((r) => ({
-      label: `${r}⭐`,
-      action: "exec",
-      handler: "rateFilm",
-      data: { rating: r },
-    })),
+    options: [
+      ...RATING_OPTIONS.map((r) => ({
+        label: `${r}⭐`,
+        action: "exec",
+        handler: "rateFilm",
+        data: { rating: r },
+      })),
+      { label: "🔙 Voltar", action: "back" },
+    ],
   },
 
   handlers: {
