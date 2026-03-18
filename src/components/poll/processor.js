@@ -192,11 +192,16 @@ async function executeAction(result, client) {
           );
         }
 
-        // For list-related handlers, resolve to backend User UUID via API
-        if (data.flowId === "add-film" || data.flowId === "lists") {
+        // For flows that call backend APIs with userId (MovieRating, lists), resolve to backend User UUID
+        if (
+          data.flowId === "add-film" ||
+          data.flowId === "lists" ||
+          data.flowId === "film-card" ||
+          data.flowId === "film-search"
+        ) {
           try {
             logger.debug(
-              `[processor] Resolving user to UUID for list flow: ${menuUserId}`,
+              `[processor] Resolving user to UUID for ${data.flowId}: ${menuUserId}`,
             );
             const fetch = require("node-fetch");
             const backendUrl =
@@ -211,7 +216,7 @@ async function executeAction(result, client) {
               if (lookupData.success && lookupData.user && lookupData.user.id) {
                 const resolvedUUID = lookupData.user.id;
                 logger.info(
-                  `[processor] Resolved identifier ${menuUserId} to UUID ${resolvedUUID} for list flow`,
+                  `[processor] Resolved identifier ${menuUserId} to UUID ${resolvedUUID} for ${data.flowId}`,
                 );
                 menuUserId = resolvedUUID;
               }

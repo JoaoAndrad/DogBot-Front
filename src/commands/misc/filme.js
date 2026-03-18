@@ -77,7 +77,7 @@ ${overview}`;
           try {
             const posterBuffer = await downloadImageToBuffer(movieInfo.posterUrl);
             if (posterBuffer) {
-              await sendBufferAsSticker(client, msg.from, posterBuffer);
+              await sendBufferAsSticker(client, msg.from, posterBuffer, { fullOnly: true });
             }
           } catch (err) {
             logger.warn(`[Filme] Failed to send poster sticker: ${err.message}`);
@@ -171,7 +171,7 @@ ${overview}`;
           logger.info(`[Filme] Sending poster sticker for ${movieInfo.title}`);
           const posterBuffer = await downloadImageToBuffer(movieInfo.posterUrl);
           if (posterBuffer) {
-            await sendBufferAsSticker(client, msg.from, posterBuffer);
+            await sendBufferAsSticker(client, msg.from, posterBuffer, { fullOnly: true });
           }
         } catch (err) {
           logger.warn(`[Filme] Failed to send poster sticker: ${err.message}`);

@@ -126,7 +126,7 @@ const filmCardFlow = createFlow("film-card", {
           try {
             const posterBuffer = await downloadImageToBuffer(movieInfo.posterUrl);
             if (posterBuffer) {
-              await sendBufferAsSticker(client, chatId, posterBuffer);
+              await sendBufferAsSticker(client, chatId, posterBuffer, { fullOnly: true });
             }
           } catch (e) {
             logger.warn("[FilmCardFlow] poster sticker:", e.message);

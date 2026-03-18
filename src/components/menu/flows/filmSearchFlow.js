@@ -77,7 +77,7 @@ ${overview}`;
         try {
           const posterBuffer = await downloadImageToBuffer(movieInfo.posterUrl);
           if (posterBuffer) {
-            await sendBufferAsSticker(client, chatId, posterBuffer);
+            await sendBufferAsSticker(client, chatId, posterBuffer, { fullOnly: true });
           }
         } catch (err) {
           logger.warn(`[FilmSearchFlow] poster sticker: ${err.message}`);

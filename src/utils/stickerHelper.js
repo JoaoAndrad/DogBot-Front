@@ -564,7 +564,8 @@ async function sendCompositeSticker(client, chatId, tracks) {
 
 /**
  * Convert a Buffer (image) to WebP sticker and send as sticker (or fallback to image).
- * Options: { filename?, quoted?: messageObject }
+ * Options: { filename?, quoted?, fullOnly? }
+ * - fullOnly: if true, send only the full image (contain with padding), no cropped version
  */
 async function sendBufferAsSticker(client, chatId, buffer, opts = {}) {
   try {
@@ -597,6 +598,38 @@ async function sendBufferAsSticker(client, chatId, buffer, opts = {}) {
         "[StickerHelper] ensureUploadQpl threw: " +
           (e && e.message ? e.message : String(e)),
       );
+    }
+
+    // fullOnly: only send the complete image (contain with padding), no crop
+    if (opts.fullOnly) {
+      const containBuf = await image
+        .clone()
+        .resize(512, 512, {
+          fit: "contain",
+          background: { r: 0, g: 0, b: 0, alpha: 0 },
+        })
+        .webp({ quality: 80 })
+        .toBuffer();
+      const media = buildMedia(containBuf, opts.filename || "sticker.webp");
+      try {
+        await client.sendMessage(chatId, media, {
+          sendMediaAsSticker: true,
+          ...(opts.quoted ? { quoted: opts.quoted } : {}),
+        });
+        logger.info("[StickerHelper] ✅ Full-only sticker sent successfully");
+        return true;
+      } catch (sendErr) {
+        logger.error(
+          `[StickerHelper] Error sending full-only sticker: ${sendErr && sendErr.stack ? sendErr.stack : String(sendErr)}`,
+        );
+        try {
+          await client.sendMessage(chatId, media, opts.quoted ? { quoted: opts.quoted } : {});
+          return true;
+        } catch (fallbackErr) {
+          logger.error(`[StickerHelper] Fallback failed: ${fallbackErr && fallbackErr.stack ? fallbackErr.stack : String(fallbackErr)}`);
+          return false;
+        }
+      }
     }
 
     // If dual stickers requested by heuristics or by option, send both
