@@ -7,6 +7,7 @@
 
 const { createFlow } = require("../flowBuilder");
 const listClient = require("../../../services/listClient");
+const movieClient = require("../../../services/movieClient");
 const conversationState = require("../../../services/conversationState");
 const {
   downloadImageToBuffer,
@@ -164,8 +165,7 @@ const listsFlow = createFlow("lists", {
           };
         }
 
-        const userId =
-          ctx.state?.context?._backendUserId || ctx.userId;
+        const userId = ctx.state?.context?._backendUserId || ctx.userId;
         const list = await listClient.getList(listId, userId);
         const stats = await listClient.getListStats(listId);
 
@@ -241,8 +241,7 @@ const listsFlow = createFlow("lists", {
           };
         }
 
-        const userId =
-          ctx.state?.context?._backendUserId || ctx.userId;
+        const userId = ctx.state?.context?._backendUserId || ctx.userId;
         const list = await listClient.getList(listId, userId, 1);
 
         if (list.items.length === 0) {
@@ -367,8 +366,7 @@ const listsFlow = createFlow("lists", {
           };
         }
 
-        const userId =
-          ctx.state?.context?._backendUserId || ctx.userId;
+        const userId = ctx.state?.context?._backendUserId || ctx.userId;
         const list = await listClient.getList(listId, userId);
         const itemCount = list.items?.length || 0;
 
@@ -579,9 +577,24 @@ const listsFlow = createFlow("lists", {
         const isCurrentlyWatched = item?.watched || false;
         const newWatchedStatus = !isCurrentlyWatched;
 
-        const userId =
-          ctx.state?.context?._backendUserId || ctx.userId;
+        const userId = ctx.state?.context?._backendUserId || ctx.userId;
         await listClient.markWatched(itemId, userId, newWatchedStatus);
+
+        // Sincronizar com MovieRating para /filme mostrar o mesmo estado (plano alternativo)
+        if (item?.tmdbId && newWatchedStatus) {
+          try {
+            await movieClient.markWatched(userId, item.tmdbId, {
+              title: item.title,
+              year: item.year,
+              posterUrl: item.posterUrl,
+            });
+          } catch (e) {
+            console.warn(
+              "[ListsFlow] Sync to MovieRating after markWatched failed:",
+              e.message,
+            );
+          }
+        }
 
         // Atualizar item local
         if (item) {
@@ -688,18 +701,13 @@ const listsFlow = createFlow("lists", {
         }
 
         const numRating = Number(rating);
-        if (
-          Number.isNaN(numRating) ||
-          numRating < 0.5 ||
-          numRating > 5
-        ) {
+        if (Number.isNaN(numRating) || numRating < 0.5 || numRating > 5) {
           await ctx.reply("❌ Nota inválida. Use um valor entre 0,5 e 5.");
           ctx.state.path = "/item-detail";
           return { end: false };
         }
 
-        const userId =
-          ctx.state?.context?._backendUserId || ctx.userId;
+        const userId = ctx.state?.context?._backendUserId || ctx.userId;
 
         // Marcar como assistido ao avaliar (alinhado ao filmCard)
         try {
@@ -719,10 +727,31 @@ const listsFlow = createFlow("lists", {
           ctx.state.context.selectedItem.item.watched = true;
         }
 
+        // Sincronizar com MovieRating para /filme mostrar a mesma nota (plano alternativo)
+        if (item?.tmdbId) {
+          try {
+            await movieClient.markWatched(userId, item.tmdbId, {
+              title: item.title,
+              year: item.year,
+              posterUrl: item.posterUrl,
+            });
+            await movieClient.rateMovie(userId, item.tmdbId, numRating, {
+              title: item.title,
+              year: item.year,
+              posterUrl: item.posterUrl,
+            });
+          } catch (e) {
+            console.warn(
+              "[ListsFlow] Sync to MovieRating after rate failed:",
+              e.message,
+            );
+          }
+        }
+
         const stars = "⭐".repeat(Math.round(numRating));
         const titleStr = formatMovieTitle(item);
         await ctx.reply(
-          `⭐ *${titleStr}*\n\n${stars} ${numRating}/5\n\n✅ Avaliação salva com sucesso!`
+          `⭐ *${titleStr}*\n\n${stars} ${numRating}/5\n\n✅ Avaliação salva com sucesso!`,
         );
 
         if (item?.posterUrl) {
