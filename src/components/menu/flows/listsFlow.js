@@ -339,8 +339,14 @@ const listsFlow = createFlow("lists", {
      */
     selectList: async (ctx) => {
       try {
-        const { listId, listTitle } = ctx.option?.data || {};
+        // Data comes from ctx.data (backend response) with poll option data
+        const { listId, listTitle } = ctx.data || {};
+
         if (!listId) {
+          console.error(
+            "[ListsFlow] selectList missing listId. ctx.data:",
+            ctx.data,
+          );
           await ctx.reply("❌ Erro ao selecionar lista");
           return { end: false };
         }
