@@ -342,22 +342,34 @@ const listsFlow = createFlow("lists", {
         // Data comes from ctx.data (backend response) with poll option data
         const { listId, listTitle } = ctx.data || {};
 
+        console.info(
+          `[ListsFlow👆] Handler selectList chamado para userId=${ctx.userId}`,
+        );
+        console.debug(`[ListsFlow👆] ctx.data:`, JSON.stringify(ctx.data));
+
         if (!listId) {
           console.error(
-            "[ListsFlow] selectList missing listId. ctx.data:",
-            ctx.data,
+            `[ListsFlow❌] listId faltando! ctx.data: ${JSON.stringify(
+              ctx.data,
+            )}`,
           );
-          await ctx.reply("❌ Erro ao selecionar lista");
+          await ctx.reply("❌ Erro ao selecionar lista (dados incompletos)");
           return { end: false };
         }
+
+        console.info(
+          `[ListsFlow✅] Lista selecionada: ${listTitle} (${listId})`,
+        );
 
         // Ensure state exists (may be null from processor)
         if (!ctx.state) {
           ctx.state = { path: "/", history: [], context: {} };
+          console.debug(`[ListsFlow📝] State inicializado`);
         }
 
         ctx.selectedList = { listId, listTitle };
         ctx.state.path = "/list-detail";
+        console.debug(`[ListsFlow📝] Navegando para: /list-detail`);
         if (!ctx.state.history.includes("/")) {
           ctx.state.history.push("/");
         }

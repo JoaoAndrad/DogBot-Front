@@ -24,7 +24,7 @@ const addFilmFlow = createFlow("add-film", {
           };
         }
 
-        logger.info(`[AddFilmFlow] Buscando filme: "${filmName}"`);
+        logger.info(`[AddFilmFlow🔍] Buscando filme: "${filmName}"`);
 
         // Search for film
         const searchResults = await movieClient.searchMovies(filmName, {
@@ -37,6 +37,7 @@ const addFilmFlow = createFlow("add-film", {
           ? searchResults
           : searchResults?.results || [];
         if (!results || results.length === 0) {
+          logger.warn(`[AddFilmFlow❌] Filme não encontrado: "${filmName}"`);
           return {
             title: `❌ Nenhum filme encontrado para: "${filmName}"`,
             options: [{ label: "🔙 Voltar", action: "back" }],
@@ -45,6 +46,9 @@ const addFilmFlow = createFlow("add-film", {
 
         const film = results[0];
         const filmTitle = `${film.title}${film.year ? ` (${film.year})` : ""}`;
+        logger.info(
+          `[AddFilmFlow✅] Filme encontrado: ${filmTitle} (tmdbId: ${film.tmdbId})`,
+        );
 
         // Save film data to context for next step
         ctx.state.context.tmdbId = film.tmdbId;
@@ -101,20 +105,26 @@ const addFilmFlow = createFlow("add-film", {
         ctx.state.context.lists = lists;
 
         // Create poll options with all necessary film data
-        const options = lists.map((list) => ({
-          label:
-            `📋 ${list.title} (${list._count.items} items)` +
-            (isGroup && list.owner ? ` - ${list.owner.push_name}` : ""),
-          action: "exec",
-          handler: "selectList",
-          data: {
+        const options = lists.map((list) => {
+          const optionData = {
             listId: list.id,
             listIndex: lists.indexOf(list),
             tmdbId: film.tmdbId,
             filmTitle,
             filmData: film,
-          },
-        }));
+          };
+          logger.debug(
+            `[AddFilmFlow📋] Option data: ${JSON.stringify({ listId: list.id, tmdbId: film.tmdbId, filmTitle })}`,
+          );
+          return {
+            label:
+              `📋 ${list.title} (${list._count.items} items)` +
+              (isGroup && list.owner ? ` - ${list.owner.push_name}` : ""),
+            action: "exec",
+            handler: "selectList",
+            data: optionData,
+          };
+        });
 
         options.push({ label: "🔙 Voltar", action: "back" });
 
@@ -142,18 +152,23 @@ const addFilmFlow = createFlow("add-film", {
         // Data comes from ctx.data (backend response) with all poll option data
         const { listId, tmdbId, filmTitle, filmData } = ctx.data || {};
 
-        logger.info(
-          `[AddFilmFlow] selectList received: listId=${listId}, tmdbId=${tmdbId}, filmTitle=${filmTitle}`,
+        logger.info(`[AddFilmFlow👆] Handler selectList chamado`);
+        logger.debug(
+          `[AddFilmFlow👆] Contexto: userId=${ctx.userId}, chatId=${ctx.chatId}, flowId=${ctx.flowId}`,
+        );
+        logger.debug(
+          `[AddFilmFlow👆] Dados recebidos: listId=${listId}, tmdbId=${tmdbId}, filmTitle=${filmTitle}`,
         );
 
         if (!listId || !tmdbId) {
           logger.error(
-            `[AddFilmFlow] Missing required data in ctx.data:`,
-            ctx.data,
+            `[AddFilmFlow❌] Dados faltando! ctx.data:`,
+            JSON.stringify(ctx.data),
           );
-          await ctx.reply("❌ Erro ao processar seleção");
+          await ctx.reply("❌ Erro ao processar seleção (dados incompletos)");
           return { end: false };
         }
+        logger.info(`[AddFilmFlow✅] Dados validados: pronto para adicionar`);
 
         logger.info(
           `[AddFilmFlow] Adicionando filme ${tmdbId} (${filmTitle}) à lista ${listId}`,
