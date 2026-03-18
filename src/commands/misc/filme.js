@@ -6,7 +6,7 @@
 const movieClient = require("../../services/movieClient");
 const flowManager = require("../../components/menu/flowManager");
 const {
-  downloadAndConvertToWebp,
+  downloadImageToBuffer,
   sendBufferAsSticker,
 } = require("../../utils/stickerHelper");
 const logger = require("../../utils/logger");
@@ -75,10 +75,7 @@ ${overview}`;
         await reply(message);
         if (movieInfo.posterUrl) {
           try {
-            const posterBuffer = await downloadAndConvertToWebp(
-              movieInfo.posterUrl,
-              tmdbId,
-            );
+            const posterBuffer = await downloadImageToBuffer(movieInfo.posterUrl);
             if (posterBuffer) {
               await sendBufferAsSticker(client, msg.from, posterBuffer);
             }
@@ -97,9 +94,9 @@ ${overview}`;
         return;
       }
 
-      // Search for the movie
+      // Search for the movie (only movies, no TV series)
       const searchData = await movieClient.searchMovies(query, {
-        type: "multi",
+        type: "movie",
         page: 1,
       });
 
@@ -111,9 +108,6 @@ ${overview}`;
       // Desambiguação (Opção A): 2+ resultados e query curta → lista "Qual destes?"
       const ambiguous = searchResults.length >= 2 && query.length <= 20;
       if (ambiguous) {
-        await reply(
-          "Ou pesquise em https://www.themoviedb.org/search e envie o código do filme (ex.: /filme 2287).",
-        );
         const candidates = searchResults.slice(0, 5).map((r) => ({
           tmdbId: r.tmdbId ?? r.id,
           title: r.title ?? r.name ?? "",
@@ -123,6 +117,9 @@ ${overview}`;
           await flowManager.startFlow(client, msg.from, userId, "film-search", {
             initialContext: { candidates, userId },
           });
+          await reply(
+            "Ou pesquise em https://www.themoviedb.org/search e envie o código do filme (ex.: /filme 2287).",
+          );
         } catch (err) {
           logger.warn(`[Filme] Failed to start film-search flow: ${err.message}`);
         }
@@ -172,10 +169,7 @@ ${overview}`;
       if (movieInfo.posterUrl) {
         try {
           logger.info(`[Filme] Sending poster sticker for ${movieInfo.title}`);
-          const posterBuffer = await downloadAndConvertToWebp(
-            movieInfo.posterUrl,
-            movie.tmdbId,
-          );
+          const posterBuffer = await downloadImageToBuffer(movieInfo.posterUrl);
           if (posterBuffer) {
             await sendBufferAsSticker(client, msg.from, posterBuffer);
           }

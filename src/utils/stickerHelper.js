@@ -129,6 +129,24 @@ if (!fs.existsSync(TEMP_DIR)) {
 }
 
 /**
+ * Download image from URL to raw buffer (no resize). Use for posters so
+ * sendBufferAsSticker can send dual stickers (crop + full) when aspect !== 1.
+ * @param {string} imageUrl - URL of the image to download
+ * @returns {Promise<Buffer|null>} Raw image buffer or null
+ */
+async function downloadImageToBuffer(imageUrl) {
+  try {
+    if (!imageUrl) return null;
+    const response = await fetch(imageUrl);
+    if (!response.ok) return null;
+    return await response.buffer();
+  } catch (e) {
+    logger.warn("[StickerHelper] downloadImageToBuffer: " + e.message);
+    return null;
+  }
+}
+
+/**
  * Download image from URL, convert to WebP, and return as buffer
  * @param {string} imageUrl - URL of the image to download
  * @param {string} trackId - Track ID for caching purposes
@@ -705,6 +723,7 @@ async function sendBufferAsSticker(client, chatId, buffer, opts = {}) {
 module.exports = {
   sendTrackSticker,
   downloadAndConvertToWebp,
+  downloadImageToBuffer,
   sendCompositeSticker,
   downloadAndResize,
   sendBufferAsSticker,

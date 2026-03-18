@@ -8,7 +8,7 @@ const { createFlow } = require("../flowBuilder");
 const movieClient = require("../../../services/movieClient");
 const flowManager = require("../flowManager");
 const {
-  downloadAndConvertToWebp,
+  downloadImageToBuffer,
   sendBufferAsSticker,
 } = require("../../../utils/stickerHelper");
 const logger = require("../../../utils/logger");
@@ -124,10 +124,7 @@ const filmCardFlow = createFlow("film-card", {
         );
         if (movieInfo.posterUrl) {
           try {
-            const posterBuffer = await downloadAndConvertToWebp(
-              movieInfo.posterUrl,
-              tmdbId
-            );
+            const posterBuffer = await downloadImageToBuffer(movieInfo.posterUrl);
             if (posterBuffer) {
               await sendBufferAsSticker(client, chatId, posterBuffer);
             }
