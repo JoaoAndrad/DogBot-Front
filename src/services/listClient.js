@@ -41,11 +41,19 @@ async function getUserLists(userIdOrGroupId, page = 1, groupChatId = null) {
       groupChatId ||
       (String(userIdOrGroupId).endsWith("@g.us") ? userIdOrGroupId : null);
 
+    // userId é sempre o primeiro parâmetro (userIdOrGroupId), a menos que ele mesmo seja um groupId
+    const userId = String(userIdOrGroupId).endsWith("@g.us")
+      ? null
+      : userIdOrGroupId;
+
     let query;
     if (targetGroupId) {
+      // Always include userId for authentication, even when querying group lists
       query =
         "/api/lists?groupChatId=" +
         encodeURIComponent(targetGroupId) +
+        "&userId=" +
+        encodeURIComponent(userId) +
         "&page=" +
         page;
     } else {
