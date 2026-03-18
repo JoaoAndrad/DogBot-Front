@@ -238,9 +238,20 @@ async function executeAction(result, client) {
           );
           // Execute handler directly by getting flow from flowManager
           const flowManager = require("../menu/flowManager");
+          const storage = require("../menu/storage");
           const flow = flowManager.flows.get(data.flowId);
 
           if (flow && flow.handlers && flow.handlers[handler]) {
+            // Load any existing state for this flow
+            const savedState = (await storage.getState(
+              menuUserId,
+              data.flowId,
+            )) || {
+              path: "/",
+              history: [],
+              context: {},
+            };
+
             // Create context expected by handlers
             const ctx = {
               userId: menuUserId,
@@ -248,7 +259,7 @@ async function executeAction(result, client) {
               client,
               reply: (text) => client.sendMessage(poll.chatId, text),
               flowId: data.flowId,
-              state: null, // State will be fetched by handler if needed
+              state: savedState,
               data: data,
             };
 
@@ -269,6 +280,32 @@ async function executeAction(result, client) {
                   `[processor] Failed to clean up state for ${data.flowId}/${menuUserId}:`,
                   cleanupErr.message,
                 );
+              }
+            } else {
+              // Handler completed but flow continues (end: false)
+              // Save updated state and re-render if path changed
+              const flowManager = require("../menu/flowManager");
+              if (ctx.state && ctx.state.path) {
+                try {
+                  logger.info(
+                    `[processor] Saving state and navigating to ${ctx.state.path}`,
+                  );
+                  await storage.saveState(menuUserId, data.flowId, ctx.state);
+
+                  // Re-render the new menu path
+                  await flowManager._renderNode(
+                    client,
+                    poll.chatId,
+                    menuUserId,
+                    data.flowId,
+                    ctx.state.path,
+                  );
+                } catch (stateErr) {
+                  logger.error(
+                    `[processor] Error saving state or rendering:`,
+                    stateErr.message,
+                  );
+                }
               }
             }
           } else {
