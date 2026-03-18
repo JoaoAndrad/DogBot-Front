@@ -711,6 +711,65 @@ async function handle(context) {
 
   // fallback: numeric reply to vote for latest poll in this chat
   try {
+    const ratingNumeric = body.match(/^\s*([0-5])\s*$/);
+    if (ratingNumeric && from && flowUserId && context.client) {
+      try {
+        const menuStorage = require("../components/menu/storage");
+        const flowManager = require("../components/menu/flowManager");
+
+        const menuState = await menuStorage.getState(flowUserId, "lists");
+        const awaiting = menuState?.context?.awaitingRating;
+        if (awaiting?.itemId) {
+          const rating = parseInt(ratingNumeric[1], 10);
+          await backendClient.sendToBackend(
+            `/api/lists/items/${awaiting.itemId}/rating`,
+            { userId: flowUserId, rating },
+            "PATCH",
+          );
+
+          const updatedState = {
+            ...(menuState || { path: "/", history: [], context: {} }),
+            context: {
+              ...(menuState?.context || {}),
+              awaitingRating: null,
+              selectedItem: menuState?.context?.selectedItem
+                ? {
+                    ...menuState.context.selectedItem,
+                    item: {
+                      ...menuState.context.selectedItem.item,
+                      rating,
+                    },
+                  }
+                : menuState?.context?.selectedItem || null,
+            },
+            path: "/item-detail",
+          };
+
+          await menuStorage.saveState(flowUserId, "lists", updatedState);
+
+          await reply(
+            rating > 0
+              ? `⭐ Nota atualizada para ${rating}/5`
+              : "⭐ Nota removida",
+          );
+
+          await flowManager._renderNode(
+            context.client,
+            from,
+            flowUserId,
+            "lists",
+            "/item-detail",
+          );
+          return;
+        }
+      } catch (ratingErr) {
+        logger.error(
+          "Erro ao processar nota numérica do flow lists:",
+          ratingErr,
+        );
+      }
+    }
+
     const numeric = body.match(/^\s*([1-9][0-9]*)\s*$/);
     if (numeric && from) {
       const idx = parseInt(numeric[1], 10) - 1;

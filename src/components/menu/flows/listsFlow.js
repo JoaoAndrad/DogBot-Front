@@ -7,6 +7,10 @@
 
 const { createFlow } = require("../flowBuilder");
 const listClient = require("../../../services/listClient");
+const {
+  downloadAndConvertToWebp,
+  sendBufferAsSticker,
+} = require("../../../utils/stickerHelper");
 
 /**
  * Format título + year para exibição
@@ -506,6 +510,25 @@ const listsFlow = createFlow("lists", {
           ctx.state.history.push("/list-items");
         }
         ctx.state.path = "/item-detail";
+
+        // Best-effort poster sticker send (do not break flow on failure)
+        if (item?.posterUrl) {
+          try {
+            const webpBuffer = await downloadAndConvertToWebp(
+              item.posterUrl,
+              itemId,
+            );
+            if (webpBuffer) {
+              await sendBufferAsSticker(ctx.client, ctx.chatId, webpBuffer);
+            }
+          } catch (stickerErr) {
+            console.warn(
+              "[ListsFlow] Failed to send poster sticker:",
+              stickerErr.message,
+            );
+          }
+        }
+
         return { end: false };
       } catch (err) {
         console.error("[ListsFlow] selectItem error:", err.message);
@@ -606,6 +629,13 @@ const listsFlow = createFlow("lists", {
         const itemId = selectedItem.itemId;
         const item = selectedItem.item;
 
+        if (!ctx.state) {
+          ctx.state = { path: "/", history: [], context: {} };
+        }
+        if (!ctx.state.context) {
+          ctx.state.context = {};
+        }
+
         // Get selected rating from poll option (passed via context)
         let rating = ctx.data?.rating;
 
@@ -628,10 +658,11 @@ const listsFlow = createFlow("lists", {
               "5️⃣ cinco\n" +
               "0️⃣ sem nota",
           );
-          if (ctx.state) {
-            ctx.state.path = "/rate-item-select"; // Move to rating selection state
-          }
-          return { end: false };
+          ctx.state.context.awaitingRating = {
+            itemId,
+            promptAt: new Date().toISOString(),
+          };
+          return { end: false, noRender: true };
         }
 
         // Rating is provided, update it
@@ -653,6 +684,7 @@ const listsFlow = createFlow("lists", {
         if (ctx.state?.context?.selectedItem?.item) {
           ctx.state.context.selectedItem.item.rating = rating;
         }
+        ctx.state.context.awaitingRating = null;
         if (ctx.state) {
           ctx.state.path = "/item-detail";
         }

@@ -292,6 +292,13 @@ async function executeAction(result, client) {
                   );
                   await storage.saveState(menuUserId, data.flowId, ctx.state);
 
+                  if (result && result.noRender) {
+                    logger.info(
+                      `[processor] noRender=true for ${data.flowId}; skipping re-render`,
+                    );
+                    break;
+                  }
+
                   // Re-render the new menu path
                   await flowManager._renderNode(
                     client,
