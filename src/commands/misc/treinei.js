@@ -94,21 +94,28 @@ module.exports = {
       if (result.success) {
         await msg.reply(result.message || "🔥 Treino registrado!");
 
-        // Notify other groups
-        await workoutNotificationService.notifyWorkoutToGroups(
+        const groupChatIds = await workoutNotificationService.getGroupsWithTrackingForUser(
           ctx.client,
           senderNumber,
-          result.stats,
-          from, // Exclude current group
-          displayName, // Pass displayName
         );
 
-        // Update ranking in group where logged
+        // Notify all groups (including current)
+        await workoutNotificationService.sendWorkoutMessageToGroups(
+          ctx.client,
+          groupChatIds,
+          result.stats,
+          displayName,
+        );
+
+        // Update description in all groups the user is in
         setTimeout(async () => {
-          try {
-            await groupRankingService.updateGroupRanking(from);
-          } catch (err) {
-            logger.error("[treinei] Error updating ranking:", err);
+          for (const chatId of groupChatIds) {
+            try {
+              await groupRankingService.updateGroupRanking(chatId);
+              await new Promise((r) => setTimeout(r, 500));
+            } catch (err) {
+              logger.error("[treinei] Error updating ranking for " + chatId, err);
+            }
           }
         }, 1000);
       } else if (result.error === "workout_already_logged_today") {

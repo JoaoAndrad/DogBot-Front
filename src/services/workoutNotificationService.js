@@ -2,6 +2,67 @@ const backendClient = require("./backendClient");
 const logger = require("../utils/logger");
 
 /**
+ * Get list of group chat IDs where the user is a member and workout tracking is enabled.
+ * Used to notify and update description in all those groups after /treinei.
+ * @param {Object} client - WhatsApp client instance
+ * @param {string} senderNumber - User's WhatsApp number (without @c.us)
+ * @returns {Promise<string[]>} Array of group chat IDs
+ */
+async function getGroupsWithTrackingForUser(client, senderNumber) {
+  const chatIds = [];
+  try {
+    const chats = await client.getChats();
+    const groups = chats.filter(
+      (c) => c.isGroup || String(c.id._serialized).endsWith("@g.us"),
+    );
+    const cleanSender = String(senderNumber).replace(/@c\.us$/i, "");
+
+    for (const group of groups) {
+      try {
+        const groupChatId = group.id._serialized;
+        const settings = await backendClient.sendToBackend(
+          `/api/workouts/groups/${encodeURIComponent(groupChatId)}/settings`,
+          null,
+          "GET",
+        );
+        if (!settings || !settings.workoutTrackingEnabled) continue;
+
+        const participants = group.participants || [];
+        const isMember = participants.some((p) => {
+          const num = p.id?.user || p.id?._serialized?.replace(/@c\.us$/i, "") || "";
+          return num === cleanSender || num.includes(cleanSender) || cleanSender.includes(num);
+        });
+        if (isMember) chatIds.push(groupChatId);
+      } catch (err) {
+        logger.debug(`[workoutNotification] Skip group ${group.id?._serialized}: ${err?.message}`);
+      }
+    }
+  } catch (err) {
+    logger.error("[workoutNotification] getGroupsWithTrackingForUser error:", err);
+  }
+  return chatIds;
+}
+
+/**
+ * Send workout message to a list of group chat IDs (used after /treinei to notify all groups).
+ * @param {Object} client - WhatsApp client instance
+ * @param {string[]} chatIds - Group chat IDs to notify
+ * @param {Object} stats - Workout stats (streak, etc.)
+ * @param {string} displayName - User display name
+ */
+async function sendWorkoutMessageToGroups(client, chatIds, stats, displayName) {
+  const message = `🏋️ ${displayName || "Usuário"} registrou um treino!\n🔥 Sequência: ${stats.streak} dia${stats.streak > 1 ? "s" : ""}`;
+  for (const groupChatId of chatIds) {
+    try {
+      await client.sendMessage(groupChatId, message);
+      await new Promise((r) => setTimeout(r, 300));
+    } catch (err) {
+      logger.error(`[workoutNotification] Error sending to ${groupChatId}:`, err?.message);
+    }
+  }
+}
+
+/**
  * Notify workout to all groups where user is a member
  * @param {Object} client - WhatsApp client instance
  * @param {string} senderNumber - User's WhatsApp number
@@ -107,5 +168,7 @@ async function notifyWorkoutToGroups(
 }
 
 module.exports = {
+  getGroupsWithTrackingForUser,
+  sendWorkoutMessageToGroups,
   notifyWorkoutToGroups,
 };
