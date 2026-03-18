@@ -182,6 +182,7 @@ async function deleteList(listId, userId) {
  * @param {string} userId - User ID
  * @param {object} options - {title?, year?, posterUrl?}
  * @returns {Promise<object>} Item adicionado
+ * @throws {Error} Backend error with status and body attached
  */
 async function addToList(listId, tmdbId, userId, options = {}) {
   try {
@@ -190,9 +191,11 @@ async function addToList(listId, tmdbId, userId, options = {}) {
       tmdbId,
       ...options,
     });
+    console.log("[ListClient] ✅ Item added to list", { listId, tmdbId });
     return response;
   } catch (err) {
-    console.error("[ListClient] Add to list error:", err.message);
+    console.error("[ListClient] ❌ Add to list error:", err.message, err.body);
+    // Re-throw with full error context for caller to handle
     throw err;
   }
 }

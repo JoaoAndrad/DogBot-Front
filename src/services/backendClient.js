@@ -23,6 +23,27 @@ async function sendToBackend(path, body, method = "POST") {
   }
 
   const res = await fetch(url + path, options);
+
+  // Validate HTTP status: anything non-2xx is an error
+  if (!res.ok) {
+    let errorBody;
+    try {
+      errorBody = await res.json();
+    } catch {
+      errorBody = { error: "Failed to parse error response" };
+    }
+
+    const msg =
+      errorBody?.error ||
+      errorBody?.message ||
+      res.statusText ||
+      "Unknown error";
+    const err = new Error(`HTTP ${res.status}: ${msg}`);
+    err.status = res.status;
+    err.body = errorBody;
+    throw err;
+  }
+
   return res.json();
 }
 

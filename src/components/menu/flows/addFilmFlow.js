@@ -75,8 +75,9 @@ const addFilmFlow = createFlow("add-film", {
             ? `${list.owner.push_name}`
             : "Desconhecido";
           const visibility = list.isPublic ? "🔓 Pública" : "🔒 Privada";
+          const itemCount = list._count?.items || 0;
           logger.debug(
-            `[AddFilmFlow📋] Lista ${idx + 1}: "${list.title}" | ID: ${list.id} | Items: ${list._count.items} | Owner: ${ownerInfo} | ${visibility}`,
+            `[AddFilmFlow📋] Lista ${idx + 1}: "${list.title}" | ID: ${list.id} | Items ANTES: ${itemCount} | Owner: ${ownerInfo} | ${visibility}`,
           );
         });
 
@@ -182,7 +183,7 @@ const addFilmFlow = createFlow("add-film", {
         logger.info(`[AddFilmFlow✅] Dados validados: pronto para adicionar`);
 
         logger.info(
-          `[AddFilmFlow] Adicionando filme ${tmdbId} (${filmTitle}) à lista ${listId}`,
+          `[AddFilmFlow🎬] Adicionando filme ${tmdbId} (${filmTitle}) à lista ${listId}`,
         );
 
         // Add film to list with safe data extraction
@@ -195,15 +196,57 @@ const addFilmFlow = createFlow("add-film", {
         };
 
         logger.info(
-          `[AddFilmFlow] Payload para adicionar: ${JSON.stringify(
+          `[AddFilmFlow📦] Payload para adicionar: ${JSON.stringify(
             filmDataPayload,
           )}`,
         );
 
-        await listClient.addToList(listId, tmdbId, ctx.userId, filmDataPayload);
+        let addResult;
+        try {
+          addResult = await listClient.addToList(
+            listId,
+            tmdbId,
+            ctx.userId,
+            filmDataPayload,
+          );
+          logger.info(`[AddFilmFlow✅] Filme adicionado com sucesso!`);
+        } catch (err) {
+          // Backend error - throw so handler catches and reports failure
+          logger.error(
+            `[AddFilmFlow❌] Backend falhou ao adicionar filme:`,
+            err.message,
+          );
+          throw err;
+        }
 
-        logger.info(`[AddFilmFlow] ✅ Filme adicionado com sucesso!`);
+        logger.info(
+          `[AddFilmFlow📊] Resultado do backend: ${JSON.stringify(addResult)}`,
+        );
 
+        // Verify: Fetch updated list to confirm item was added
+        logger.debug(
+          `[AddFilmFlow🔍] Verificando se item foi realmente adicionado...`,
+        );
+        try {
+          const updatedLists = await listClient.getUserLists(
+            ctx.userId,
+            1,
+            String(ctx.chatId).endsWith("@g.us") ? ctx.chatId : null,
+          );
+          const updatedList = updatedLists.find((l) => l.id === listId);
+          if (updatedList) {
+            const newItemCount = updatedList._count?.items || 0;
+            logger.info(
+              `[AddFilmFlow📊] Item count DEPOIS: ${newItemCount} (lista: ${updatedList.title})`,
+            );
+          }
+        } catch (verifyErr) {
+          logger.debug(
+            `[AddFilmFlow🔍] Não conseguiu verificar lista atualizada: ${verifyErr.message}`,
+          );
+        }
+
+        // SUCCESS: Only now send success message after confirmed persistence
         await ctx.reply(
           `✅ *${filmTitle}* adicionado com sucesso!\n\n` +
             `🎬 Agora está na lista\n\n` +
@@ -212,12 +255,25 @@ const addFilmFlow = createFlow("add-film", {
 
         return { end: true };
       } catch (err) {
-        logger.error("[AddFilmFlow] selectList error:", err.message);
-        await ctx.reply(`❌ Erro ao adicionar filme: ${err.message}`);
+        logger.error(`[AddFilmFlow❌] selectList error:`, err.message);
+        logger.debug(`[AddFilmFlow🔍] Stack: ${err.stack}`);
 
-        if (err.message.includes("already")) {
-          await ctx.reply(`⚠️ Este filme já está nesta lista!`);
+        // FAILURE: Send error message to user - NO success message
+        let errorMsg = `❌ Erro ao adicionar filme: ${err.message}`;
+
+        // Provide helpful context for common errors
+        if (
+          err.message.includes("already in list") ||
+          err.message.includes("already")
+        ) {
+          errorMsg = `⚠️ Este filme já está nesta lista!`;
+        } else if (err.message.includes("not found")) {
+          errorMsg = `❌ Lista não encontrada ou foi deletada`;
+        } else if (err.message.includes("Unauthorized")) {
+          errorMsg = `❌ Você não tem permissão para adicionar a essa lista`;
         }
+
+        await ctx.reply(errorMsg);
 
         return { end: true };
       }

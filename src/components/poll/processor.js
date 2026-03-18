@@ -167,20 +167,61 @@ async function executeAction(result, client) {
         // Menu action: execute directly based on backend decision
         // Para estatísticas, usar quem votou ao invés de quem criou o menu
         let menuUserId = result.voterId || data.userId;
-        
+
         // Resolver o userId para obter @c.us ao invés de @lid
         try {
           const msg = await chat.fetchMessages({ limit: 50 });
-          const voteMsg = msg.find(m => m.author === result.voterId || m.from === result.voterId);
+          const voteMsg = msg.find(
+            (m) => m.author === result.voterId || m.from === result.voterId,
+          );
           if (voteMsg) {
             const contact = await voteMsg.getContact();
             if (contact && contact.id && contact.id._serialized) {
               menuUserId = contact.id._serialized;
-              logger.debug(`[processor] Resolved voter ${result.voterId} to ${menuUserId}`);
+              logger.debug(
+                `[processor] Resolved voter ${result.voterId} to ${menuUserId}`,
+              );
             }
           }
         } catch (err) {
-          logger.warn(`[processor] Could not resolve voter contact:`, err.message);
+          logger.warn(
+            `[processor] Could not resolve voter contact:`,
+            err.message,
+          );
+        }
+
+        // For list-related handlers, resolve to backend User UUID via API
+        if (data.flowId === "add-film" || data.flowId === "lists") {
+          try {
+            logger.debug(
+              `[processor] Resolving user to UUID for list flow: ${menuUserId}`,
+            );
+            const fetch = require("node-fetch");
+            const backendUrl =
+              process.env.BACKEND_URL || "http://localhost:8000";
+            const lookupRes = await fetch(
+              `${backendUrl}/api/users/by-identifier/${encodeURIComponent(menuUserId)}`,
+              { method: "GET" },
+            );
+
+            if (lookupRes.ok) {
+              const lookupData = await lookupRes.json();
+              if (lookupData.success && lookupData.user && lookupData.user.id) {
+                const resolvedUUID = lookupData.user.id;
+                logger.info(
+                  `[processor] Resolved identifier ${menuUserId} to UUID ${resolvedUUID} for list flow`,
+                );
+                menuUserId = resolvedUUID;
+              }
+            } else {
+              logger.warn(
+                `[processor] Could not resolve user to UUID: status ${lookupRes.status}`,
+              );
+            }
+          } catch (err) {
+            logger.warn(`[processor] Error resolving user UUID:`, err.message);
+            // Continue with current menuUserId if UUID resolution fails
+          }
         }
 
         logger.debug(`[processor] Menu action data:`, {
@@ -217,10 +258,18 @@ async function executeAction(result, client) {
             // Check if flow should end
             if (result && result.end) {
               const storage = require("../menu/storage");
-              await storage.deleteState(menuUserId, data.flowId);
-              logger.info(
-                `[processor] Flow ${data.flowId} ended for ${menuUserId}`,
-              );
+              try {
+                await storage.deleteState(menuUserId, data.flowId);
+                logger.info(
+                  `[processor] Flow ${data.flowId} ended for ${menuUserId} - state cleaned up`,
+                );
+              } catch (cleanupErr) {
+                // Log cleanup failure but don't mask the successful flow completion
+                logger.warn(
+                  `[processor] Failed to clean up state for ${data.flowId}/${menuUserId}:`,
+                  cleanupErr.message,
+                );
+              }
             }
           } else {
             logger.warn(

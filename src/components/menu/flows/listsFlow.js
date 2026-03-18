@@ -495,6 +495,70 @@ const listsFlow = createFlow("lists", {
     },
 
     /**
+     * Adicionar/Atualizar nota (rating) de um item
+     */
+    rateItem: async (ctx) => {
+      try {
+        if (!ctx.selectedItem?.itemId) {
+          await ctx.reply("❌ Erro: Item não selecionado");
+          return { end: false };
+        }
+
+        const itemId = ctx.selectedItem.itemId;
+        const item = ctx.selectedItem.item;
+
+        // Get selected rating from poll option (passed via context)
+        let rating = ctx.data?.rating;
+
+        // If no rating in context, ask user via quick reply
+        if (!rating && ctx.data?.option) {
+          // Extract rating from option label (e.g., "⭐⭐⭐ 3/5")
+          const optionLabel = ctx.data.option.label || "";
+          const ratingMatch = optionLabel.match(/(\d+)\/5/);
+          rating = ratingMatch ? parseInt(ratingMatch[1]) : null;
+        }
+
+        // If still no rating, show rating menu
+        if (!rating && rating !== 0) {
+          await ctx.reply(
+            "⭐ Qual é sua nota para este filme?\n\n" +
+              "1️⃣ um\n" +
+              "2️⃣ dois\n" +
+              "3️⃣ três\n" +
+              "4️⃣ quatro\n" +
+              "5️⃣ cinco\n" +
+              "0️⃣ sem nota",
+          );
+          ctx.path = "/rate-item-select"; // Move to rating selection state
+          return { end: false };
+        }
+
+        // Rating is provided, update it
+        await listClient.addRating(itemId, ctx.userId, rating);
+
+        // Update local item
+        if (item) {
+          item.rating = rating;
+        }
+
+        const msg =
+          rating > 0
+            ? `⭐ Nota atualizada para ${rating}/5`
+            : "⭐ Nota removida";
+
+        await ctx.reply(msg);
+
+        // Stay on item-detail
+        ctx.path = "/item-detail";
+        return { end: false };
+      } catch (err) {
+        console.error("[ListsFlow] Rate item error:", err.message);
+        await ctx.reply("❌ Erro ao adicionar nota");
+        return { end: false };
+      }
+    },
+
+    /**
      * Criar nova lista - instrui o usuário a usar comando
      */
     createList: async (ctx) => {
