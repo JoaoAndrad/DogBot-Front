@@ -139,7 +139,7 @@ const addFilmFlow = createFlow("add-film", {
           const groupSummary = Object.entries(listsByOwner)
             .map(([owner, ownerLists]) => {
               const listTitles = ownerLists
-                .map((l) => `"${l.title}" (${l._count.items} items)`)
+                .map((l) => `"${l.title}" (${l._count?.items ?? 0} items)`)
                 .join(", ");
               return `  👤 ${owner}: ${listTitles}`;
             })
@@ -159,19 +159,15 @@ const addFilmFlow = createFlow("add-film", {
             filmTitle,
             filmData: film,
           };
-          logger.debug(
-            `[AddFilmFlow📋] Option data: ${JSON.stringify({ listId: list.id, tmdbId: film.tmdbId, filmTitle })}`,
-          );
           return {
             label:
-              `📋 ${list.title} (${list._count.items} items)` +
+              `📋 ${list.title} (${list._count?.items ?? 0} items)` +
               (isGroup && list.owner ? ` - ${list.owner.push_name}` : ""),
             action: "exec",
             handler: "selectList",
             data: optionData,
           };
         });
-
         options.push({ label: "🔙 Voltar", action: "back" });
 
         return {
@@ -198,14 +194,6 @@ const addFilmFlow = createFlow("add-film", {
         // Data comes from ctx.data (backend response) with all poll option data
         const { listId, tmdbId, filmTitle, filmData } = ctx.data || {};
 
-        logger.info(`[AddFilmFlow👆] Handler selectList chamado`);
-        logger.debug(
-          `[AddFilmFlow👆] Contexto: userId=${ctx.userId}, chatId=${ctx.chatId}, flowId=${ctx.flowId}`,
-        );
-        logger.debug(
-          `[AddFilmFlow👆] Dados recebidos: listId=${listId}, tmdbId=${tmdbId}, filmTitle=${filmTitle}`,
-        );
-
         if (!listId || !tmdbId) {
           logger.error(
             `[AddFilmFlow❌] Dados faltando! ctx.data:`,
@@ -214,11 +202,6 @@ const addFilmFlow = createFlow("add-film", {
           await ctx.reply("❌ Erro ao processar seleção (dados incompletos)");
           return { end: false };
         }
-        logger.info(`[AddFilmFlow✅] Dados validados: pronto para adicionar`);
-
-        logger.info(
-          `[AddFilmFlow🎬] Adicionando filme ${tmdbId} (${filmTitle}) à lista ${listId}`,
-        );
 
         // Add film to list with safe data extraction
         const filmDataPayload = {
@@ -229,21 +212,13 @@ const addFilmFlow = createFlow("add-film", {
           mediaType: filmData?.mediaType || "movie",
         };
 
-        logger.info(
-          `[AddFilmFlow📦] Payload para adicionar: ${JSON.stringify(
-            filmDataPayload,
-          )}`,
-        );
-
-        let addResult;
         try {
-          addResult = await listClient.addToList(
+          await listClient.addToList(
             listId,
             tmdbId,
             ctx.userId,
             filmDataPayload,
           );
-          logger.info(`[AddFilmFlow✅] Filme adicionado com sucesso!`);
         } catch (err) {
           // Backend error - throw so handler catches and reports failure
           logger.error(
@@ -253,34 +228,7 @@ const addFilmFlow = createFlow("add-film", {
           throw err;
         }
 
-        logger.info(
-          `[AddFilmFlow📊] Resultado do backend: ${JSON.stringify(addResult)}`,
-        );
-
-        // Verify: Fetch updated list to confirm item was added
-        logger.debug(
-          `[AddFilmFlow🔍] Verificando se item foi realmente adicionado...`,
-        );
-        try {
-          const updatedLists = await listClient.getUserLists(
-            ctx.userId,
-            1,
-            String(ctx.chatId).endsWith("@g.us") ? ctx.chatId : null,
-          );
-          const updatedList = updatedLists.find((l) => l.id === listId);
-          if (updatedList) {
-            const newItemCount = updatedList._count?.items || 0;
-            logger.info(
-              `[AddFilmFlow📊] Item count DEPOIS: ${newItemCount} (lista: ${updatedList.title})`,
-            );
-          }
-        } catch (verifyErr) {
-          logger.debug(
-            `[AddFilmFlow🔍] Não conseguiu verificar lista atualizada: ${verifyErr.message}`,
-          );
-        }
-
-        // SUCCESS: Only now send success message after confirmed persistence
+        // SUCCESS: send success message
         await ctx.reply(
           `✅ *${filmTitle}* adicionado com sucesso!\n\n` +
             `🎬 Agora está na lista\n\n` +
@@ -302,23 +250,7 @@ const addFilmFlow = createFlow("add-film", {
         ) {
           errorMsg = `⚠️ Este filme já está nesta lista!`;
         } else if (err.message.includes("not found")) {
-          errorMsg = `❌ Lista não encontrada ou foi deletada`;        if (lists.length === 0) {
-          const msgPrivate =
-            `📽️ *${filmTitle}*\n\n` +
-            `Você ainda não tem listas!\n\n` +
-            `Crie sua primeira lista com:\n` +
-            `/criar-lista nome da lista\n\n` +
-            `💡 Listas que você criar aqui no privado são só suas. Se criar uma lista em um grupo, ela fica visível para todos do grupo, para uma lista só sua, crie aqui no meu privado.`;
-          const msgGroup =
-            `📽️ *${filmTitle}*\n\n` +
-            `Ainda não há listas neste grupo!\n\n` +
-            `Alguém pode criar a primeira com:\n` +
-            `/criar-lista nome da lista\n\n` +
-            `💡 Listas criadas no grupo são visíveis para todos. Para uma lista só sua, crie no meu privado.`;
-          return {
-            title: isGroup ? msgGroup : msgPrivate,
-            skipPoll: true,
-          };
+          errorMsg = `❌ Lista não encontrada ou foi deletada`;
         } else if (err.message.includes("Unauthorized")) {
           errorMsg = `❌ Você não tem permissão para adicionar a essa lista`;
         }
