@@ -92,7 +92,7 @@ const listsFlow = createFlow("lists", {
         const options = lists.map((list) => ({
           label:
             `📋 ${list.title} (${list._count.items} items)` +
-            (isGroup && list.owner ? ` - ${list.owner.pushName}` : ""),
+            (isGroup && list.owner ? ` - ${list.owner.push_name}` : ""),
           action: "exec",
           handler: "selectList",
           data: { listId: list.id, listTitle: list.title },
