@@ -123,7 +123,11 @@ const listsFlow = createFlow("lists", {
           title:
             "❌ Erro ao carregar listas.\n\n" + "Tente novamente ou volte.",
           options: [
-            { label: "🔄 Tentar novamente", action: "exec", handler: "root" },
+            {
+              label: "🔄 Tentar novamente",
+              action: "exec",
+              handler: "retryRoot",
+            },
             { label: "🔙 Voltar", action: "back" },
           ],
           skipPoll: false,
@@ -190,7 +194,11 @@ const listsFlow = createFlow("lists", {
         return {
           title: "❌ Erro ao carregar lista",
           options: [
-            { label: "🔄 Tentar novamente", action: "exec", handler: "root" },
+            {
+              label: "🔄 Tentar novamente",
+              action: "exec",
+              handler: "retryListDetail",
+            },
             { label: "🔙 Voltar", action: "back" },
           ],
         };
@@ -346,6 +354,38 @@ const listsFlow = createFlow("lists", {
   },
 
   handlers: {
+    /**
+     * Retry loading root (reediting current node)
+     */
+    retryRoot: async (ctx) => {
+      try {
+        // Simply reset path to root and let it re-render
+        if (ctx.state) {
+          ctx.state.path = "/";
+        }
+        return { end: false };
+      } catch (err) {
+        console.error("[ListsFlow] retryRoot error:", err.message);
+        await ctx.reply("❌ Erro ao tentar novamente");
+        return { end: false };
+      }
+    },
+
+    /**
+     * Retry loading list detail (re-render current node)
+     */
+    retryListDetail: async (ctx) => {
+      try {
+        // Path stays in /list-detail, which will re-render the node
+        // and attempt to load the list data again
+        return { end: false };
+      } catch (err) {
+        console.error("[ListsFlow] retryListDetail error:", err.message);
+        await ctx.reply("❌ Erro ao tentar novamente");
+        return { end: false };
+      }
+    },
+
     /**
      * Selecionar uma lista para visualizar
      */
