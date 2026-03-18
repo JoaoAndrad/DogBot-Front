@@ -69,6 +69,17 @@ const addFilmFlow = createFlow("add-film", {
           `[AddFilmFlow] ✅ Fetched ${lists.length} lists. isGroup=${isGroup}`,
         );
 
+        // Log detailed info about each list
+        lists.forEach((list, idx) => {
+          const ownerInfo = list.owner
+            ? `${list.owner.push_name}`
+            : "Desconhecido";
+          const visibility = list.isPublic ? "🔓 Pública" : "🔒 Privada";
+          logger.debug(
+            `[AddFilmFlow📋] Lista ${idx + 1}: "${list.title}" | ID: ${list.id} | Items: ${list._count.items} | Owner: ${ownerInfo} | ${visibility}`,
+          );
+        });
+
         if (lists.length === 0) {
           return {
             title:
@@ -93,7 +104,7 @@ const addFilmFlow = createFlow("add-film", {
           const groupSummary = Object.entries(listsByOwner)
             .map(([owner, ownerLists]) => {
               const listTitles = ownerLists
-                .map((l) => `"${l.title}"`)
+                .map((l) => `"${l.title}" (${l._count.items} items)`)
                 .join(", ");
               return `  👤 ${owner}: ${listTitles}`;
             })

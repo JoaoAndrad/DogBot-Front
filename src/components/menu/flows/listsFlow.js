@@ -42,6 +42,18 @@ const listsFlow = createFlow("lists", {
 
         const lists = await listClient.getUserLists(ctx.userId, 1, groupChatId);
 
+        // Log detailed info about each list
+        console.log(`[ListsFlow📊] Listas carregadas: ${lists.length}`);
+        lists.forEach((list, idx) => {
+          const ownerInfo = list.owner
+            ? `${list.owner.push_name}`
+            : "Desconhecido";
+          const visibility = list.isPublic ? "🔓 Pública" : "🔒 Privada";
+          console.log(
+            `[ListsFlow📋] Lista ${idx + 1}: "${list.title}" | ID: ${list.id} | Items: ${list._count.items} | Owner: ${ownerInfo} | ${visibility}`,
+          );
+        });
+
         // Format logging for group lists
         if (isGroup && lists.length > 0) {
           // Group lists by owner
@@ -59,7 +71,7 @@ const listsFlow = createFlow("lists", {
           const groupSummary = Object.entries(listsByOwner)
             .map(([owner, ownerLists]) => {
               const listTitles = ownerLists
-                .map((l) => `"${l.title}"`)
+                .map((l) => `"${l.title}" (${l._count.items} items)`)
                 .join(", ");
               return `  👤 ${owner}: ${listTitles}`;
             })
