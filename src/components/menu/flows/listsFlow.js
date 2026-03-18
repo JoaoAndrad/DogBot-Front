@@ -141,12 +141,16 @@ const listsFlow = createFlow("lists", {
     dynamic: true,
     handler: async (ctx) => {
       try {
-        const { listId } = ctx.selectedList || {};
+        const { listId } = ctx.selectedList || ctx.state?.selectedList || {};
         if (!listId) {
           return {
             title: "❌ Erro: Lista não selecionada",
             options: [
-              { label: "🔄 Tentar novamente", action: "exec", handler: "root" },
+              {
+                label: "🔄 Tentar novamente",
+                action: "exec",
+                handler: "retryListDetail",
+              },
               { label: "🔙 Voltar", action: "back" },
             ],
           };
@@ -420,6 +424,9 @@ const listsFlow = createFlow("lists", {
         }
 
         ctx.selectedList = { listId, listTitle };
+        // Persist selectedList into state so subsequent renders can access it
+        if (!ctx.state) ctx.state = { path: "/", history: [], context: {} };
+        ctx.state.selectedList = ctx.selectedList;
         ctx.state.path = "/list-detail";
         console.debug(`[ListsFlow📝] Navegando para: /list-detail`);
         if (!ctx.state.history.includes("/")) {
