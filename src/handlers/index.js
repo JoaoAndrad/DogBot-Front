@@ -244,6 +244,17 @@ async function handle(context) {
         dbUserId = earlyLookup.userId;
       }
     }
+    // In group, also resolve author to backend userId so conversation flows (e.g. list-creation from /listas) find state stored under UUID
+    if (actualNumber && isGroup && dbUserId == null) {
+      const groupLookup = await backendClient.sendToBackend(
+        `/api/users/lookup?identifier=${encodeURIComponent(actualNumber)}`,
+        null,
+        "GET",
+      );
+      if (groupLookup && groupLookup.found) {
+        dbUserId = groupLookup.userId;
+      }
+    }
   } catch (err) {
     logger.debug("[Handler] Error in early lookup:", err.message);
   }

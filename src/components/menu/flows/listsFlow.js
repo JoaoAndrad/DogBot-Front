@@ -95,8 +95,8 @@ const listsFlow = createFlow("lists", {
         if (lists.length === 0) {
           return {
             title: isGroup
-              ? "📽️ Nenhuma lista no grupo ainda!\n\n Use `/criar-lista nome` para criar sua primeira lista."
-              : "📽️ Você ainda não tem listas!\n\n Use `/criar-lista nome` para criar sua primeira lista.",
+              ? "📽️ Nenhuma lista no grupo ainda!\n\n Toque em *Criar nova lista* abaixo e, na sua próxima mensagem, envie o nome da lista."
+              : "📽️ Você ainda não tem listas!\n\n Toque em *Criar nova lista* abaixo e, na sua próxima mensagem, envie o nome da lista.",
             options: [
               {
                 label: "➕ Criar nova lista",

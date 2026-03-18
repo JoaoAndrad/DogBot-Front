@@ -54,7 +54,7 @@ async function handleListFlow(userId, body, state, reply, context) {
       if (!newList) {
         conversationState.clearState(userId);
         return reply(
-          "❌ Erro ao criar lista. Tente novamente com /criar-lista",
+          "❌ Erro ao criar lista. Abra /listas e toque em "Criar nova lista" novamente",
         );
       }
 
@@ -72,7 +72,7 @@ async function handleListFlow(userId, body, state, reply, context) {
       conversationState.clearState(userId);
       return reply(
         `❌ Erro ao criar lista: ${err.message}\n\n` +
-          `Tente novamente com /criar-lista`,
+          `Abra /listas e toque em "Criar nova lista" novamente`,
       );
     }
   }

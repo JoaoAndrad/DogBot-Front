@@ -166,8 +166,7 @@ async function executeAction(result, client) {
       case "menu":
         // State is keyed by the flow owner (who started the flow). Prefer data.userId from
         // backend so any user can vote without "session expired" when voter !== owner.
-        const stateUserId =
-          data.userId != null ? data.userId : result.voterId;
+        const stateUserId = data.userId != null ? data.userId : result.voterId;
         // Resolve voter to @c.us (or UUID for list flows) for handler/API use.
         let menuUserId = result.voterId || data.userId;
 
@@ -305,28 +304,32 @@ async function executeAction(result, client) {
             // Evitar "dados do filme ou nota não encontrados" / "Sessão expirada": se o fluxo
             // é de filme e o contexto necessário está vazio, avisar e não executar o handler.
             if (data.flowId === "film-card") {
-              const ctxEmpty = !savedState.context || typeof savedState.context !== "object";
-              const needFilmData = ["markWatchedFilm", "rateFilm"].includes(handler);
+              const ctxEmpty =
+                !savedState.context || typeof savedState.context !== "object";
+              const needFilmData = ["markWatchedFilm", "rateFilm"].includes(
+                handler,
+              );
               const needFilmTitle = handler === "addFilmToList";
               const hasFilmData =
                 !ctxEmpty &&
                 savedState.context.tmdbId &&
                 savedState.context.movieInfo;
-              const hasFilmTitle =
-                !ctxEmpty && savedState.context.filmTitle;
+              const hasFilmTitle = !ctxEmpty && savedState.context.filmTitle;
               if (
                 (needFilmData && !hasFilmData) ||
                 (needFilmTitle && !hasFilmTitle)
               ) {
                 await client.sendMessage(
                   poll.chatId,
-                  "❌ O contexto desta enquete expirou ou não está disponível. Quem abriu o filme pode usar /filme (nome do filme) novamente para começar.",
+                  "❌ O contexto desta enquete expirou ou não está disponível. Utilize /filme (nome do filme) novamente para começar.",
                 );
                 break;
               }
               // Evitar FK violation: quem vota precisa estar registrado no backend (UUID).
               if (
-                (handler === "markWatchedFilm" || handler === "rateFilm" || handler === "addFilmToList") &&
+                (handler === "markWatchedFilm" ||
+                  handler === "rateFilm" ||
+                  handler === "addFilmToList") &&
                 !userResolvedToUuid
               ) {
                 await client.sendMessage(
@@ -341,7 +344,13 @@ async function executeAction(result, client) {
             if (
               data.flowId === "lists" &&
               !userResolvedToUuid &&
-              ["toggleWatched", "rateItem", "removeItem", "confirmDeleteList", "deleteList"].includes(handler)
+              [
+                "toggleWatched",
+                "rateItem",
+                "removeItem",
+                "confirmDeleteList",
+                "deleteList",
+              ].includes(handler)
             ) {
               await client.sendMessage(
                 poll.chatId,
