@@ -55,6 +55,20 @@ async function getMovieInfo(userId, tmdbId) {
 }
 
 /**
+ * Get movie info with all users' ratings (for film card: show everyone who rated/watched)
+ * @param {string} tmdbId - TMDb movie ID
+ * @returns {Promise<object>} { title, year, overview, voteAverage, posterUrl, ratings: [{ displayName, watched, rating, watchedAt, ratedAt }, ...] }
+ */
+async function getMovieInfoWithAllRatings(tmdbId) {
+  const response = await sendToBackend(
+    `/api/movies/${tmdbId}/ratings`,
+    null,
+    "GET",
+  );
+  return response;
+}
+
+/**
  * Get user's watched movies
  * @param {number} userId - User ID
  * @param {object} options - { rated?, page?, pageSize? }
@@ -131,6 +145,7 @@ module.exports = {
   markWatched,
   rateMovie,
   getMovieInfo,
+  getMovieInfoWithAllRatings,
   getWatchedMovies,
   getMovieStats,
   getTopRatedMovies,

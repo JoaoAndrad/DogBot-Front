@@ -81,8 +81,9 @@ const filmCardFlow = createFlow("film-card", {
           year: movieInfo.year,
           posterUrl: movieInfo.posterUrl,
         });
+        const displayName = ctx.voterDisplayName || "Você";
         await ctx.reply(
-          `✅ *${movieInfo.title}${movieInfo.year ? ` (${movieInfo.year})` : ""}*\n\nMarcado como assistido! 🎬`
+          `✅ *${movieInfo.title}${movieInfo.year ? ` (${movieInfo.year})` : ""}*\n\nMarcado como assistido para *${displayName}*! 🎬`
         );
       } catch (err) {
         logger.error("[FilmCardFlow] markWatched error:", err.message);
@@ -90,7 +91,7 @@ const filmCardFlow = createFlow("film-card", {
         return { end: true };
       }
       try {
-        const refreshed = await movieClient.getMovieInfo(userId, tmdbId);
+        const refreshed = await movieClient.getMovieInfoWithAllRatings(tmdbId);
         state.context.movieInfo = refreshed;
         state.path = "/";
       } catch (err) {
@@ -129,8 +130,9 @@ const filmCardFlow = createFlow("film-card", {
           posterUrl: movieInfo.posterUrl,
         });
         const stars = "⭐".repeat(Math.round(numRating));
+        const displayName = ctx.voterDisplayName || "Você";
         await ctx.reply(
-          `⭐ *${movieInfo.title}${movieInfo.year ? ` (${movieInfo.year})` : ""}*\n\n${stars} ${numRating}/5\n\n✅ Avaliação salva com sucesso!`
+          `⭐ *${movieInfo.title}${movieInfo.year ? ` (${movieInfo.year})` : ""}*\n\n${stars} ${numRating}/5\n\n✅ Avaliação salva para *${displayName}* com sucesso!`
         );
         if (movieInfo.posterUrl) {
           try {
@@ -148,7 +150,7 @@ const filmCardFlow = createFlow("film-card", {
         return { end: true };
       }
       try {
-        const refreshed = await movieClient.getMovieInfo(userId, tmdbId);
+        const refreshed = await movieClient.getMovieInfoWithAllRatings(tmdbId);
         state.context.movieInfo = refreshed;
         state.path = "/";
       } catch (err) {

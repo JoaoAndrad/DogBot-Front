@@ -17,8 +17,9 @@ function formatDateUTC3(d) {
 }
 
 /**
- * Build the film card text (title, TMDb, assistido por / nota, overview, viewings).
- * @param {object} movieInfo - From getMovieInfo: title, year, voteAverage, overview, userRating, userDisplayName, viewings
+ * Build the film card text (title, TMDb, assistido por / nota de cada usuário, overview).
+ * @param {object} movieInfo - From getMovieInfoWithAllRatings: title, year, voteAverage, overview, ratings[];
+ *   or getMovieInfo: userRating, userDisplayName, viewings (legacy single-user)
  * @returns {string}
  */
 function formatFilmCardMessage(movieInfo) {
@@ -29,33 +30,51 @@ function formatFilmCardMessage(movieInfo) {
     : "⭐ *TMDb:* N/A";
   const overview = movieInfo.overview ? movieInfo.overview : "";
 
-  const ur = movieInfo.userRating || {};
-  const watched = ur.watched;
-  const displayName =
-    (movieInfo.userDisplayName || "Você").replace(/"/g, '\\"') || "Você";
-  const ratingVal = ur.rating;
-  const ratedAt = ur.ratedAt;
-  const watchedAt = ur.watchedAt;
-
-  let statusLine;
-  if (!watched) {
-    statusLine = "❌ *Não assistido* | 👤 *Sua nota:* Sem avaliação";
+  let statusLines;
+  const ratingsList = movieInfo.ratings;
+  if (ratingsList && Array.isArray(ratingsList) && ratingsList.length > 0) {
+    statusLines = ratingsList
+      .filter((r) => r.watched)
+      .map((r) => {
+        const displayName = (r.displayName || "Usuário").replace(/"/g, '\\"');
+        const dateStr = formatDateUTC3(r.ratedAt || r.watchedAt);
+        const noteStr =
+          r.rating != null
+            ? `👤 *Nota:* ${"⭐".repeat(Math.round(r.rating))} (${r.rating}/5) (${dateStr})`
+            : `👤 *Nota:* Sem avaliação (${dateStr})`;
+        return `✅ Assistido por "${displayName}" | ${noteStr}`;
+      })
+      .join("\n");
+    if (!statusLines) {
+      statusLines = "❌ *Ninguém assistiu ainda*";
+    }
   } else {
-    const dateStr = formatDateUTC3(ratedAt || watchedAt);
-    const noteStr =
-      ratingVal != null
-        ? `👤 *Nota:* ${"⭐".repeat(Math.round(ratingVal))} (${ratingVal}/5) (${dateStr})`
-        : `👤 *Nota:* Sem avaliação (${dateStr})`;
-    statusLine = `✅ Assistido por "${displayName}" | ${noteStr}`;
+    const ur = movieInfo.userRating || {};
+    const watched = ur.watched;
+    const displayName =
+      (movieInfo.userDisplayName || "Você").replace(/"/g, '\\"') || "Você";
+    const ratingVal = ur.rating;
+    const ratedAt = ur.ratedAt;
+    const watchedAt = ur.watchedAt;
+    if (!watched) {
+      statusLines = "❌ *Não assistido* | 👤 *Sua nota:* Sem avaliação";
+    } else {
+      const dateStr = formatDateUTC3(ratedAt || watchedAt);
+      const noteStr =
+        ratingVal != null
+          ? `👤 *Nota:* ${"⭐".repeat(Math.round(ratingVal))} (${ratingVal}/5) (${dateStr})`
+          : `👤 *Nota:* Sem avaliação (${dateStr})`;
+      statusLines = `✅ Assistido por "${displayName}" | ${noteStr}`;
+    }
   }
 
   let message = `📽️ ${title}${year}
 
 ${rating}
-${statusLine}
+${statusLines}
 `;
   const viewings = movieInfo.viewings || [];
-  if (viewings.length > 0) {
+  if (viewings.length > 0 && !ratingsList) {
     const lines = viewings.map((v) => {
       const d = formatDateUTC3(v.viewedAt);
       return v.source === "rate" ? `${d} (avaliado)` : d;

@@ -48,7 +48,7 @@ const filmSearchFlow = createFlow("film-search", {
       }
       let movieInfo;
       try {
-        movieInfo = await movieClient.getMovieInfo(userId, String(tmdbId));
+        movieInfo = await movieClient.getMovieInfoWithAllRatings(String(tmdbId));
       } catch (e) {
         await ctx.reply(`❌ Filme com ID ${tmdbId} não encontrado.`);
         return { end: true };

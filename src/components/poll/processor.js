@@ -194,6 +194,7 @@ async function executeAction(result, client) {
 
         // For flows that call backend APIs with userId (MovieRating, lists), resolve to backend User UUID
         let userResolvedToUuid = false;
+        let voterDisplayName = null;
         if (
           data.flowId === "add-film" ||
           data.flowId === "lists" ||
@@ -216,6 +217,10 @@ async function executeAction(result, client) {
               const lookupData = await lookupRes.json();
               if (lookupData.success && lookupData.user && lookupData.user.id) {
                 const resolvedUUID = lookupData.user.id;
+                voterDisplayName =
+                  lookupData.user.display_name ||
+                  lookupData.user.push_name ||
+                  "Usuário";
                 logger.info(
                   `[processor] Resolved identifier ${menuUserId} to UUID ${resolvedUUID} for ${data.flowId}`,
                 );
@@ -368,6 +373,7 @@ async function executeAction(result, client) {
               flowId: data.flowId,
               state: savedState,
               data: data,
+              voterDisplayName: voterDisplayName || undefined,
             };
 
             // Execute handler with context

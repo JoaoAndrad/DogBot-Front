@@ -53,7 +53,7 @@ module.exports = {
         const tmdbId = query;
         let movieInfo;
         try {
-          movieInfo = await movieClient.getMovieInfo(userId, tmdbId);
+          movieInfo = await movieClient.getMovieInfoWithAllRatings(tmdbId);
         } catch (e) {
           return reply(`❌ Filme com ID ${tmdbId} não encontrado.`);
         }
@@ -123,12 +123,12 @@ module.exports = {
 
       const movie = searchResults[0];
 
-      // Get full info
+      // Get full info (all users' ratings for card)
       let movieInfo;
       try {
-        movieInfo = await movieClient.getMovieInfo(userId, movie.tmdbId);
+        movieInfo = await movieClient.getMovieInfoWithAllRatings(movie.tmdbId);
       } catch {
-        // Fallback if user rating fetch fails
+        // Fallback if fetch fails
         movieInfo = movie;
       }
 
