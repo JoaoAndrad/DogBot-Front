@@ -123,6 +123,11 @@ const listsFlow = createFlow("lists", {
             action: "exec",
             handler: "listItems",
           },
+          {
+            label: "🗑️ Deletar lista",
+            action: "exec",
+            handler: "deleteList",
+          },
           { label: "🔙 Voltar", action: "back" },
         ];
 
@@ -241,6 +246,49 @@ const listsFlow = createFlow("lists", {
           { label: "🔙 Voltar", action: "back" },
         ],
       };
+    },
+  },
+
+  "/delete-list-confirm": {
+    title: "🗑️ Confirmar Deleção",
+    dynamic: true,
+    handler: async (ctx) => {
+      try {
+        const { listId, listTitle } = ctx.selectedList || {};
+        if (!listId) {
+          return {
+            title: "❌ Erro: Lista não selecionada",
+            options: [{ label: "🔙 Voltar", action: "back" }],
+          };
+        }
+
+        const list = await listClient.getList(listId, ctx.userId);
+        const itemCount = list.items?.length || 0;
+
+        const title =
+          `⚠️ *Deletar Lista: ${listTitle}?*\n\n` +
+          `Esta ação é irreversível!\n\n` +
+          `📊 Items na lista: ${itemCount}\n\n` +
+          `Tem certeza que deseja deletar essa lista?`;
+
+        return {
+          title,
+          options: [
+            {
+              label: "✅ Sim, deletar",
+              action: "exec",
+              handler: "confirmDeleteList",
+            },
+            { label: "❌ Cancelar", action: "back" },
+          ],
+        };
+      } catch (err) {
+        console.error("[ListsFlow] Delete confirm error:", err.message);
+        return {
+          title: "❌ Erro ao confirmar deleção",
+          options: [{ label: "🔙 Voltar", action: "back" }],
+        };
+      }
     },
   },
 
@@ -383,6 +431,56 @@ const listsFlow = createFlow("lists", {
         console.error("[ListsFlow] createList error:", err.message);
         await ctx.reply("❌ Erro ao processar comando");
         return { end: true };
+      }
+    },
+
+    /**
+     * Deletar lista - navega para confirmação
+     */
+    deleteList: async (ctx) => {
+      try {
+        if (!ctx.selectedList?.listId) {
+          await ctx.reply("❌ Erro: Lista não selecionada");
+          return { end: false };
+        }
+
+        ctx.path = "/delete-list-confirm";
+        if (!ctx.history.includes("/list-detail")) {
+          ctx.history.push("/list-detail");
+        }
+        return { end: false };
+      } catch (err) {
+        console.error("[ListsFlow] deleteList error:", err.message);
+        await ctx.reply("❌ Erro ao deletar lista");
+        return { end: false };
+      }
+    },
+
+    /**
+     * Confirmar deleção de lista
+     */
+    confirmDeleteList: async (ctx) => {
+      try {
+        if (!ctx.selectedList?.listId) {
+          await ctx.reply("❌ Erro: Lista não selecionada");
+          return { end: false };
+        }
+
+        const listId = ctx.selectedList.listId;
+        const listTitle = ctx.selectedList.listTitle;
+
+        await listClient.deleteList(listId, ctx.userId);
+        await ctx.reply(`✅ Lista "${listTitle}" foi deletada com sucesso!`);
+
+        // Volta pro menu raiz
+        ctx.path = "/";
+        ctx.history = [];
+        ctx.selectedList = null;
+        return { end: false };
+      } catch (err) {
+        console.error("[ListsFlow] confirmDeleteList error:", err.message);
+        await ctx.reply(`❌ Erro ao deletar lista: ${err.message}`);
+        return { end: false };
       }
     },
   },

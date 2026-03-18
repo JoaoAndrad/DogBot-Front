@@ -14,7 +14,7 @@ module.exports = {
   description: "📝 Criar uma nova lista de filmes/séries",
 
   async execute(context) {
-    const { message, reply, client, lookupResult } = context;
+    const { message, reply, client, lookupResult, info } = context;
     const msg = message;
     let userId = lookupResult?.userId || msg.author || msg.from;
     if (!lookupResult?.userId) {
@@ -28,14 +28,24 @@ module.exports = {
       }
     }
 
+    // Detect if this is a group chat
+    const from = msg.from || info.from;
+    const isGroup = !!(msg.isGroup || info.is_group || from?.endsWith("@g.us"));
+    const groupChatId = isGroup ? from : null;
+
     const body = msg.body || "";
     const args = body.replace(/^\/criar-?lista\s*/i, "").trim();
 
     // If user provided a name directly, create it immediately
     if (args) {
       try {
-        logger.info(`[criar-lista] Criando lista com nome: "${args}"`);
-        const newList = await listClient.createList(userId, { title: args });
+        logger.info(
+          `[criar-lista] Criando lista com nome: "${args}" ${groupChatId ? `para grupo: ${groupChatId}` : "(privada)"}`,
+        );
+        const newList = await listClient.createList(userId, {
+          title: args,
+          groupChatId,
+        });
 
         if (!newList) {
           return reply("❌ Erro ao criar lista. Tente novamente.");
