@@ -33,7 +33,9 @@ const addFilmFlow = createFlow("add-film", {
             ctx.state.context.filmTitle = filmTitle;
             ctx.state.context.filmData = film;
           } catch (err) {
-            logger.warn(`[AddFilmFlow❌] Filme não encontrado por ID: ${tmdbId}`);
+            logger.warn(
+              `[AddFilmFlow❌] Filme não encontrado por ID: ${tmdbId}`,
+            );
             return {
               title: `❌ *Filme não encontrado* (ID ${tmdbId})`,
               options: [{ label: "🔙 Voltar", action: "back" }],
@@ -111,14 +113,14 @@ const addFilmFlow = createFlow("add-film", {
             `Crie sua primeira lista:\n` +
             `\`\`\`\n/criar-lista nome da lista\n\`\`\`\n` +
             `Ou use: \`/listas\`\n\n` +
-            `_💡 Listas criadas no privado são só suas. Em grupo, ficam visíveis para todos — para lista só sua, crie aqui no privado._`;
+            `_💡 Listas criadas no privado são só suas. Em grupo, ficam visíveis para todos os integrantes do grupo, para uma lista só sua, crie aqui no privado._`;
           const msgGroup =
             `📽️ *${filmTitle}*\n\n` +
             `*Ainda não há listas neste grupo!*\n\n` +
             `Alguém pode criar a primeira:\n` +
             `\`\`\`\n/criar-lista nome da lista\n\`\`\`\n` +
             `Ou use: \`/listas\`\n\n` +
-            `_💡 Listas no grupo são visíveis para todos. Para lista só sua, crie no meu privado._`;
+            `_💡 Listas no grupo são visíveis para todos os integrantes. Para lista só sua, crie no meu privado._`;
           return {
             title: isGroup ? msgGroup : msgPrivate,
             skipPoll: true,
@@ -178,7 +180,8 @@ const addFilmFlow = createFlow("add-film", {
       } catch (err) {
         logger.error("[AddFilmFlow] Root handler error:", err.message);
         return {
-          title: "❌ *Erro ao buscar filme.*\n\nUse \`/listas\` para ver suas listas.",
+          title:
+            "❌ *Erro ao buscar filme.*\n\nUse \`/listas\` para ver suas listas.",
           skipPoll: true,
         };
       }
@@ -199,7 +202,9 @@ const addFilmFlow = createFlow("add-film", {
             `[AddFilmFlow❌] Dados faltando! ctx.data:`,
             JSON.stringify(ctx.data),
           );
-          await ctx.reply("❌ *Erro* ao processar seleção (dados incompletos).");
+          await ctx.reply(
+            "❌ *Erro* ao processar seleção (dados incompletos).",
+          );
           return { end: false };
         }
 
