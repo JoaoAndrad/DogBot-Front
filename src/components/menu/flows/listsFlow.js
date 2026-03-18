@@ -48,7 +48,7 @@ const listsFlow = createFlow("lists", {
           const listsByOwner = {};
           lists.forEach((list) => {
             const ownerName =
-              list.owner?.pushName || list.ownerUserId || "Desconhecido";
+              list.owner?.push_name || list.ownerUserId || "Desconhecido";
             if (!listsByOwner[ownerName]) {
               listsByOwner[ownerName] = [];
             }

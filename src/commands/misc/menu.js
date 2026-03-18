@@ -2,11 +2,13 @@ const flowManager = require("../../components/menu/flowManager");
 const testFlow = require("../../components/menu/flows/testFlow");
 const spotifyFlow = require("../../components/menu/flows/spotifyFlow");
 const listsFlow = require("../../components/menu/flows/listsFlow");
+const addFilmFlow = require("../../components/menu/flows/addFilmFlow");
 
 // Register flows on load
 flowManager.registerFlow(testFlow);
 flowManager.registerFlow(spotifyFlow);
 flowManager.registerFlow(listsFlow);
+flowManager.registerFlow(addFilmFlow);
 
 module.exports = {
   name: "menu",

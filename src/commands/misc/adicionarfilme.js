@@ -3,8 +3,7 @@
  * Usage: /adicionarfilme Nome do Filme
  */
 
-const conversationState = require("../../services/conversationState");
-const { handleAddFilmFlow } = require("../../handlers/addFilmFlowHandler");
+const flowManager = require("../../components/menu/flowManager");
 const logger = require("../../utils/logger");
 
 module.exports = {
@@ -13,7 +12,7 @@ module.exports = {
   description: "➕ Adicionar um filme a uma lista",
 
   async execute(context) {
-    const { message, reply, lookupResult } = context;
+    const { client, message, reply, lookupResult } = context;
     const msg = message;
     let userId = lookupResult?.userId || msg.author || msg.from;
     if (!lookupResult?.userId) {
@@ -37,15 +36,12 @@ module.exports = {
       );
     }
 
-    // Start interactive flow
+    // Start interactive flow with poll-based list selection
     try {
-      conversationState.startFlow(userId, "add-film", { filmName });
-      const state = conversationState.getState(userId);
+      logger.info(`[adicionarfilme] Starting add-film flow for: "${filmName}"`);
 
-      return handleAddFilmFlow(userId, filmName, state, reply, {
-        client: context.client,
-        message: msg,
-        chatId: msg.from,
+      await flowManager.startFlow(client, msg.from, userId, "add-film", {
+        initialContext: { filmName },
       });
     } catch (err) {
       logger.error("[adicionarfilme] Error starting flow:", err.message);
