@@ -14,18 +14,18 @@ module.exports = {
   description: "📝 Criar uma nova lista de filmes/séries",
 
   async execute(context) {
-    const { message, reply, client } = context;
+    const { message, reply, client, lookupResult } = context;
     const msg = message;
-    let userId = msg.author || msg.from;
-
-    // Try to get accurate user ID
-    try {
-      const contact = await msg.getContact();
-      if (contact && contact.id && contact.id._serialized) {
-        userId = contact.id._serialized;
+    let userId = lookupResult?.userId || msg.author || msg.from;
+    if (!lookupResult?.userId) {
+      try {
+        const contact = await msg.getContact();
+        if (contact && contact.id && contact.id._serialized) {
+          userId = contact.id._serialized;
+        }
+      } catch (err) {
+        logger.debug("[criar-lista] Error getting contact:", err.message);
       }
-    } catch (err) {
-      logger.debug("[criar-lista] Error getting contact:", err.message);
     }
 
     const body = msg.body || "";

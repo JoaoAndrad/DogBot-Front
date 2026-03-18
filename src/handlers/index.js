@@ -231,16 +231,36 @@ async function handle(context) {
     actualNumber = author ? author.replace(/@lid$/i, "") : null;
   }
 
-  //logger.debug(`[Handler] Verificando fluxo ativo para: ${actualNumber}`);
+  // Do early lookup to get actual database userId for flow management
+  let dbUserId = null;
+  try {
+    if (actualNumber && !isGroup) {
+      const earlyLookup = await backendClient.sendToBackend(
+        `/api/users/lookup?identifier=${encodeURIComponent(actualNumber)}`,
+        null,
+        "GET",
+      );
+      if (earlyLookup && earlyLookup.found) {
+        dbUserId = earlyLookup.userId;
+      }
+    }
+  } catch (err) {
+    logger.debug("[Handler] Error in early lookup:", err.message);
+  }
 
-  if (actualNumber && conversationState.hasActiveFlow(actualNumber)) {
-    const state = conversationState.getState(actualNumber);
+  // Use database userId for flow checking if available, fallback to actualNumber
+  const flowUserId = dbUserId || actualNumber;
+
+  //logger.debug(`[Handler] Verificando fluxo ativo para: ${flowUserId}`);
+
+  if (flowUserId && conversationState.hasActiveFlow(flowUserId)) {
+    const state = conversationState.getState(flowUserId);
     logger.debug(
-      `[Handler] Fluxo ativo detectado para ${actualNumber}: ${state.flowType}`,
+      `[Handler] Fluxo ativo detectado para ${flowUserId}: ${state.flowType}`,
     );
 
     if (state.flowType === "cadastro") {
-      return await handleCadastroFlow(actualNumber, body, state, reply, {
+      return await handleCadastroFlow(flowUserId, body, state, reply, {
         author,
         isGroup,
         from,
@@ -250,7 +270,7 @@ async function handle(context) {
     }
 
     if (state.flowType === "meta") {
-      return await handleMetaFlow(actualNumber, body, state, reply, {
+      return await handleMetaFlow(flowUserId, body, state, reply, {
         author,
         isGroup,
         from,
@@ -260,7 +280,7 @@ async function handle(context) {
     }
 
     if (state.flowType === "list-creation") {
-      return await handleListFlow(actualNumber, body, state, reply, {
+      return await handleListFlow(flowUserId, body, state, reply, {
         author,
         isGroup,
         from,
@@ -271,7 +291,7 @@ async function handle(context) {
     }
 
     if (state.flowType === "add-film") {
-      return await handleAddFilmFlow(actualNumber, body, state, reply, {
+      return await handleAddFilmFlow(flowUserId, body, state, reply, {
         author,
         isGroup,
         from,
@@ -563,70 +583,85 @@ async function handle(context) {
     const requiresRegistration = !publicCommands.includes(cmdName);
 
     // Check if user exists before executing command (unless public command)
+    let lookupResult = null;
     if (requiresRegistration) {
       try {
-        const author = msg.author || msg.from || info.from;
-        const isGroup = !!(msg && msg.isGroup) || !!info.is_group;
+        // Try to reuse early lookup if available, otherwise do new lookup
+        if (dbUserId) {
+          // We already did lookup for flow checking, construct result
+          lookupResult = { found: true, userId: dbUserId };
+          const author = msg.author || msg.from || info.from;
+          const isGroup = !!(msg && msg.isGroup) || !!info.is_group;
+          const isConfissao = body && /^\s*\/?confiss[aã]o\b/i.test(body);
+          if (!isConfissao) {
+            logger.debug(`[Handler] Reutilizando lookup: ${lookupResult}`);
+          }
+        } else {
+          // Not in group, need to do fresh lookup
+          const author = msg.author || msg.from || info.from;
+          const isGroup = !!(msg && msg.isGroup) || !!info.is_group;
 
-        // Check if it's confissao command to skip debug logs
-        const isConfissao = body && /^\s*\/?confiss[aã]o\b/i.test(body);
+          // Check if it's confissao command to skip debug logs
+          const isConfissao = body && /^\s*\/?confiss[aã]o\b/i.test(body);
 
-        // Try to get actual phone number from contact
-        let actualNumber = null;
-        try {
-          const contact = await msg.getContact();
-          if (contact && contact.id && contact.id._serialized) {
-            actualNumber = contact.id._serialized;
+          // Try to get actual phone number from contact
+          let cmdActualNumber = null;
+          try {
+            const contact = await msg.getContact();
+            if (contact && contact.id && contact.id._serialized) {
+              cmdActualNumber = contact.id._serialized;
+              if (!isConfissao) {
+                logger.debug(`[Handler] Número do contato: ${cmdActualNumber}`);
+              }
+            }
+          } catch (err) {
             if (!isConfissao) {
-              logger.debug(`[Handler] Número do contato: ${actualNumber}`);
+              logger.debug(`[Handler] Erro ao buscar contato:`, err.message);
             }
           }
-        } catch (err) {
-          if (!isConfissao) {
-            logger.debug(`[Handler] Erro ao buscar contato:`, err.message);
+
+          // Fallback: use from/author if contact fetch failed
+          if (!cmdActualNumber) {
+            if (!isGroup) {
+              cmdActualNumber = from;
+            } else {
+              cmdActualNumber = author ? author.replace(/@lid$/i, "") : null;
+            }
+            if (!isConfissao) {
+              logger.debug(`[Handler] Usando fallback: ${cmdActualNumber}`);
+            }
+          }
+
+          if (cmdActualNumber) {
+            if (!isConfissao) {
+              logger.debug(
+                `[Handler] Verificando cadastro para: ${cmdActualNumber}`,
+              );
+            }
+            lookupResult = await backendClient.sendToBackend(
+              `/api/users/lookup?identifier=${encodeURIComponent(cmdActualNumber)}`,
+              null,
+              "GET",
+            );
+
+            if (!isConfissao) {
+              logger.debug(`[Handler] Resultado lookup:`, lookupResult);
+            }
           }
         }
 
-        // Fallback: use from/author if contact fetch failed
-        if (!actualNumber) {
-          if (!isGroup) {
-            actualNumber = from;
+        if (!lookupResult || !lookupResult.found) {
+          const isGroup = !!(msg && msg.isGroup) || !!info.is_group;
+          if (isGroup) {
+            await reply(
+              "hmmm parece que não te conheço... venha no meu privado e digite /cadastro",
+            );
           } else {
-            actualNumber = author ? author.replace(/@lid$/i, "") : null;
-          }
-          if (!isConfissao) {
-            logger.debug(`[Handler] Usando fallback: ${actualNumber}`);
-          }
-        }
-
-        if (actualNumber) {
-          if (!isConfissao) {
-            logger.debug(
-              `[Handler] Verificando cadastro para: ${actualNumber}`,
+            await reply(
+              "É necessário enviar /cadastro no privado antes de utilizar qualquer comando",
             );
           }
-          const lookupRes = await backendClient.sendToBackend(
-            `/api/users/lookup?identifier=${encodeURIComponent(actualNumber)}`,
-            null,
-            "GET",
-          );
-
-          if (!isConfissao) {
-            logger.debug(`[Handler] Resultado lookup:`, lookupRes);
-          }
-
-          if (!lookupRes || !lookupRes.found) {
-            if (isGroup) {
-              await reply(
-                "hmmm parece que não te conheço... venha no meu privado e digite /cadastro",
-              );
-            } else {
-              await reply(
-                "É necessário enviar /cadastro no privado antes de utilizar qualquer comando",
-              );
-            }
-            return;
-          }
+          return;
         }
       } catch (err) {
         logger.error("Erro ao verificar usuário:", err);
@@ -646,6 +681,7 @@ async function handle(context) {
       reply,
       args,
       services: { backend: backendClient, spotify: spotifyService },
+      lookupResult,
     };
 
     botMetricsReporter
