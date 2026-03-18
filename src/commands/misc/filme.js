@@ -39,8 +39,62 @@ module.exports = {
 
       if (!query) {
         return reply(
-          "❌ Usage: /filme nome_do_filme\n\nExample: /filme Inception",
+          "❌ Usage: /filme nome_do_filme ou /filme código_tmdb\n\nExample: /filme Inception ou /filme 27205",
         );
+      }
+
+      // Query is only digits → treat as tmdbId (direct lookup, no search/disambiguation)
+      if (/^\d+$/.test(query)) {
+        const tmdbId = query;
+        let movieInfo;
+        try {
+          movieInfo = await movieClient.getMovieInfo(userId, tmdbId);
+        } catch (e) {
+          return reply(`❌ Filme com ID ${tmdbId} não encontrado.`);
+        }
+        const title = `*${movieInfo.title}*`;
+        const year = movieInfo.year ? ` (${movieInfo.year})` : "";
+        const rating = movieInfo.voteAverage
+          ? `⭐ *TMDb:* ${(movieInfo.voteAverage / 2).toFixed(1)}/5`
+          : "⭐ *TMDb:* N/A";
+        const watched =
+          movieInfo.userRating && movieInfo.userRating.watched
+            ? "✅ *Assistido*"
+            : "❌ *Não Assistido*";
+        const userRating =
+          movieInfo.userRating && movieInfo.userRating.rating
+            ? `👤 *Sua nota:* ${"⭐".repeat(movieInfo.userRating.rating)} (${movieInfo.userRating.rating}/5)`
+            : "👤 *Sua nota:* Sem avaliação";
+        const overview = movieInfo.overview ? movieInfo.overview : "";
+        const message = `📽️ ${title}${year}
+
+${rating}
+${watched} | ${userRating}
+
+${overview}`;
+        await reply(message);
+        if (movieInfo.posterUrl) {
+          try {
+            const posterBuffer = await downloadAndConvertToWebp(
+              movieInfo.posterUrl,
+              tmdbId,
+            );
+            if (posterBuffer) {
+              await sendBufferAsSticker(client, msg.from, posterBuffer);
+            }
+          } catch (err) {
+            logger.warn(`[Filme] Failed to send poster sticker: ${err.message}`);
+          }
+        }
+        const filmTitle = `${movieInfo.title}${movieInfo.year ? ` (${movieInfo.year})` : ""}`;
+        try {
+          await flowManager.startFlow(client, msg.from, userId, "film-card", {
+            initialContext: { tmdbId, movieInfo, filmTitle },
+          });
+        } catch (err) {
+          logger.warn(`[Filme] Failed to start film-card flow: ${err.message}`);
+        }
+        return;
       }
 
       // Search for the movie
@@ -52,6 +106,27 @@ module.exports = {
       const searchResults = searchData.results || [];
       if (!searchResults || searchResults.length === 0) {
         return reply(`❌ Nenhum filme encontrado para: ${query}`);
+      }
+
+      // Desambiguação (Opção A): 2+ resultados e query curta → lista "Qual destes?"
+      const ambiguous = searchResults.length >= 2 && query.length <= 20;
+      if (ambiguous) {
+        await reply(
+          "Ou pesquise em https://www.themoviedb.org/search e envie o código do filme (ex.: /filme 2287).",
+        );
+        const candidates = searchResults.slice(0, 5).map((r) => ({
+          tmdbId: r.tmdbId ?? r.id,
+          title: r.title ?? r.name ?? "",
+          year: r.year ?? (r.release_date ? r.release_date.slice(0, 4) : null),
+        }));
+        try {
+          await flowManager.startFlow(client, msg.from, userId, "film-search", {
+            initialContext: { candidates, userId },
+          });
+        } catch (err) {
+          logger.warn(`[Filme] Failed to start film-search flow: ${err.message}`);
+        }
+        return;
       }
 
       const movie = searchResults[0];

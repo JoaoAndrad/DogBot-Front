@@ -4,6 +4,7 @@ const spotifyFlow = require("../../components/menu/flows/spotifyFlow");
 const listsFlow = require("../../components/menu/flows/listsFlow");
 const addFilmFlow = require("../../components/menu/flows/addFilmFlow");
 const filmCardFlow = require("../../components/menu/flows/filmCardFlow");
+const filmSearchFlow = require("../../components/menu/flows/filmSearchFlow");
 
 // Register flows on load
 flowManager.registerFlow(testFlow);
@@ -11,6 +12,7 @@ flowManager.registerFlow(spotifyFlow);
 flowManager.registerFlow(listsFlow);
 flowManager.registerFlow(addFilmFlow);
 flowManager.registerFlow(filmCardFlow);
+flowManager.registerFlow(filmSearchFlow);
 
 module.exports = {
   name: "menu",
