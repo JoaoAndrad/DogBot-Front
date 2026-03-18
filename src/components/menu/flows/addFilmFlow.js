@@ -100,14 +100,20 @@ const addFilmFlow = createFlow("add-film", {
         // Save lists to context
         ctx.state.context.lists = lists;
 
-        // Create poll options
+        // Create poll options with all necessary film data
         const options = lists.map((list) => ({
           label:
             `📋 ${list.title} (${list._count.items} items)` +
             (isGroup && list.owner ? ` - ${list.owner.push_name}` : ""),
           action: "exec",
           handler: "selectList",
-          data: { listId: list.id, listIndex: lists.indexOf(list) },
+          data: {
+            listId: list.id,
+            listIndex: lists.indexOf(list),
+            tmdbId: film.tmdbId,
+            filmTitle,
+            filmData: film,
+          },
         }));
 
         options.push({ label: "🔙 Voltar", action: "back" });
@@ -133,10 +139,12 @@ const addFilmFlow = createFlow("add-film", {
      */
     selectList: async (ctx) => {
       try {
-        const { listId } = ctx.option?.data || {};
-        const { tmdbId, filmTitle, filmData } = ctx.state?.context || {};
+        const { listId, tmdbId, filmTitle, filmData } = ctx.option?.data || {};
 
         if (!listId || !tmdbId) {
+          logger.error(
+            `[AddFilmFlow] Missing required data: listId=${listId}, tmdbId=${tmdbId}`,
+          );
           await ctx.reply("❌ Erro ao processar seleção");
           return { end: false };
         }
