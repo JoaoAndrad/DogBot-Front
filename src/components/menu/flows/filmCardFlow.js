@@ -35,6 +35,12 @@ const filmCardFlow = createFlow("film-card", {
           action: "exec",
           handler: "markWatchedFilm",
         });
+      } else {
+        options.push({
+          label: "📽️ Registrar mais uma visualização",
+          action: "exec",
+          handler: "markWatchedFilm",
+        });
       }
       options.push(
         { label: "⭐ Avaliar", action: "exec", handler: "askRatingFilm" },

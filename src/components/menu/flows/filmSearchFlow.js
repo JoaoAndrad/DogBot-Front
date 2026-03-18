@@ -6,6 +6,7 @@
 const { createFlow } = require("../flowBuilder");
 const movieClient = require("../../../services/movieClient");
 const flowManager = require("../flowManager");
+const { formatFilmCardMessage } = require("../../../utils/filmCardFormatter");
 const {
   downloadImageToBuffer,
   sendBufferAsSticker,
@@ -52,26 +53,7 @@ const filmSearchFlow = createFlow("film-search", {
         await ctx.reply(`❌ Filme com ID ${tmdbId} não encontrado.`);
         return { end: true };
       }
-      const title = `*${movieInfo.title}*`;
-      const year = movieInfo.year ? ` (${movieInfo.year})` : "";
-      const rating = movieInfo.voteAverage
-        ? `⭐ *TMDb:* ${(movieInfo.voteAverage / 2).toFixed(1)}/5`
-        : "⭐ *TMDb:* N/A";
-      const watched =
-        movieInfo.userRating && movieInfo.userRating.watched
-          ? "✅ *Assistido*"
-          : "❌ *Assistido*";
-      const userRating =
-        movieInfo.userRating && movieInfo.userRating.rating
-          ? `👤 *Sua nota:* ${"⭐".repeat(movieInfo.userRating.rating)} (${movieInfo.userRating.rating}/5)`
-          : "👤 *Sua nota:* Sem avaliação";
-      const overview = movieInfo.overview ? movieInfo.overview : "";
-      const message = `📽️ ${title}${year}
-
-${rating}
-${watched} | ${userRating}
-
-${overview}`;
+      const message = formatFilmCardMessage(movieInfo);
       await ctx.reply(message);
       if (movieInfo.posterUrl) {
         try {

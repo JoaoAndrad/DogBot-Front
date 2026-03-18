@@ -5,6 +5,7 @@
 
 const movieClient = require("../../services/movieClient");
 const flowManager = require("../../components/menu/flowManager");
+const { formatFilmCardMessage } = require("../../utils/filmCardFormatter");
 const {
   downloadImageToBuffer,
   sendBufferAsSticker,
@@ -52,26 +53,7 @@ module.exports = {
         } catch (e) {
           return reply(`❌ Filme com ID ${tmdbId} não encontrado.`);
         }
-        const title = `*${movieInfo.title}*`;
-        const year = movieInfo.year ? ` (${movieInfo.year})` : "";
-        const rating = movieInfo.voteAverage
-          ? `⭐ *TMDb:* ${(movieInfo.voteAverage / 2).toFixed(1)}/5`
-          : "⭐ *TMDb:* N/A";
-        const watched =
-          movieInfo.userRating && movieInfo.userRating.watched
-            ? "✅ *Assistido*"
-            : "❌ *Não Assistido*";
-        const userRating =
-          movieInfo.userRating && movieInfo.userRating.rating
-            ? `👤 *Sua nota:* ${"⭐".repeat(movieInfo.userRating.rating)} (${movieInfo.userRating.rating}/5)`
-            : "👤 *Sua nota:* Sem avaliação";
-        const overview = movieInfo.overview ? movieInfo.overview : "";
-        const message = `📽️ ${title}${year}
-
-${rating}
-${watched} | ${userRating}
-
-${overview}`;
+        const message = formatFilmCardMessage(movieInfo);
         await reply(message);
         if (movieInfo.posterUrl) {
           try {
@@ -137,32 +119,7 @@ ${overview}`;
         movieInfo = movie;
       }
 
-      // Format response with improved formatting
-      const title = `*${movieInfo.title}*`;
-      const year = movieInfo.year ? ` (${movieInfo.year})` : "";
-      const rating = movieInfo.voteAverage
-        ? `⭐ *TMDb:* ${(movieInfo.voteAverage / 2).toFixed(1)}/5`
-        : "⭐ *TMDb:* N/A";
-      const watched =
-        movieInfo.userRating && movieInfo.userRating.watched
-          ? "✅ *Assistido*"
-          : "❌ *Assistido*";
-      const userRating =
-        movieInfo.userRating && movieInfo.userRating.rating
-          ? `👤 *Sua nota:* ${"⭐".repeat(movieInfo.userRating.rating)} (${movieInfo.userRating.rating}/5)`
-          : "👤 *Sua nota:* Sem avaliação";
-
-      const overview = movieInfo.overview ? movieInfo.overview : "";
-
-      // Build the formatted message (no tracejado, no command tips)
-      const message = `📽️ ${title}${year}
-
-${rating}
-${watched} | ${userRating}
-
-${overview}`;
-
-      // Send the message
+      const message = formatFilmCardMessage(movieInfo);
       await reply(message);
 
       // Send poster as sticker if available
