@@ -6,6 +6,8 @@ const conversationState = require("../services/conversationState");
 const botMetricsReporter = require("../services/botMetricsReporter");
 const { handleCadastroFlow } = require("./cadastroFlowHandler");
 const { handleMetaFlow } = require("./metaFlowHandler");
+const { handleListFlow } = require("./listFlowHandler");
+const { handleAddFilmFlow } = require("./addFilmFlowHandler");
 const mediaHelper = require("../utils/mediaHelper");
 const stickerHelper = require("../utils/stickerHelper");
 
@@ -254,6 +256,28 @@ async function handle(context) {
         from,
         pushName: (msg && msg._data && msg._data.notifyName) || info.pushName,
         client: context.client,
+      });
+    }
+
+    if (state.flowType === "list-creation") {
+      return await handleListFlow(actualNumber, body, state, reply, {
+        author,
+        isGroup,
+        from,
+        pushName: (msg && msg._data && msg._data.notifyName) || info.pushName,
+        client: context.client,
+        message: msg,
+      });
+    }
+
+    if (state.flowType === "add-film") {
+      return await handleAddFilmFlow(actualNumber, body, state, reply, {
+        author,
+        isGroup,
+        from,
+        pushName: (msg && msg._data && msg._data.notifyName) || info.pushName,
+        client: context.client,
+        message: msg,
       });
     }
   }

@@ -41,7 +41,7 @@ const listsFlow = createFlow("lists", {
             options: [
               {
                 label: "➕ Criar nova lista",
-                action: "back",
+                action: "exec",
                 handler: "createList",
               },
               { label: "🔙 Voltar", action: "back" },
@@ -365,6 +365,24 @@ const listsFlow = createFlow("lists", {
         console.error("[ListsFlow] Remove item error:", err.message);
         await ctx.reply("❌ Erro ao remover item");
         return { end: false };
+      }
+    },
+
+    /**
+     * Criar nova lista - instrui o usuário a usar comando
+     */
+    createList: async (ctx) => {
+      try {
+        await ctx.reply(
+          "📝 Para criar uma lista, use:\n\n" +
+            "`/criar-lista nome-da-lista`\n\n" +
+            "Exemplo: `/criar-lista Filmes Favoritos`",
+        );
+        return { end: true };
+      } catch (err) {
+        console.error("[ListsFlow] createList error:", err.message);
+        await ctx.reply("❌ Erro ao processar comando");
+        return { end: true };
       }
     },
   },
