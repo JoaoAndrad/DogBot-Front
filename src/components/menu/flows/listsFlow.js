@@ -9,9 +9,11 @@ const { createFlow } = require("../flowBuilder");
 const listClient = require("../../../services/listClient");
 const conversationState = require("../../../services/conversationState");
 const {
-  downloadAndConvertToWebp,
+  downloadImageToBuffer,
   sendBufferAsSticker,
 } = require("../../../utils/stickerHelper");
+
+const RATING_OPTIONS = [0.5, 1, 1.5, 2, 2.5, 3, 3.5, 4, 4.5, 5];
 
 /**
  * Format título + year para exibição
@@ -325,7 +327,7 @@ const listsFlow = createFlow("lists", {
           {
             label: "⭐ Adicionar nota",
             action: "exec",
-            handler: "rateItem",
+            handler: "askRatingItem",
           },
           {
             label: "❌ Remover da lista",
@@ -336,6 +338,19 @@ const listsFlow = createFlow("lists", {
         ],
       };
     },
+  },
+
+  "/rating-item": {
+    title: "Sua nota (0,5 a 5):",
+    options: [
+      ...RATING_OPTIONS.map((r) => ({
+        label: `${r}⭐`,
+        action: "exec",
+        handler: "rateItem",
+        data: { rating: r },
+      })),
+      { label: "🔙 Voltar", action: "back" },
+    ],
   },
 
   "/delete-list-confirm": {
@@ -522,15 +537,14 @@ const listsFlow = createFlow("lists", {
         }
         ctx.state.path = "/item-detail";
 
-        // Best-effort poster sticker send (do not break flow on failure)
+        // Best-effort poster sticker (fullOnly, sem redimensionar — alinhado ao filmCard)
         if (item?.posterUrl) {
           try {
-            const webpBuffer = await downloadAndConvertToWebp(
-              item.posterUrl,
-              itemId,
-            );
-            if (webpBuffer) {
-              await sendBufferAsSticker(ctx.client, ctx.chatId, webpBuffer);
+            const posterBuffer = await downloadImageToBuffer(item.posterUrl);
+            if (posterBuffer) {
+              await sendBufferAsSticker(ctx.client, ctx.chatId, posterBuffer, {
+                fullOnly: true,
+              });
             }
           } catch (stickerErr) {
             console.warn(
@@ -565,16 +579,19 @@ const listsFlow = createFlow("lists", {
         const isCurrentlyWatched = item?.watched || false;
         const newWatchedStatus = !isCurrentlyWatched;
 
-        await listClient.markWatched(itemId, ctx.userId, newWatchedStatus);
+        const userId =
+          ctx.state?.context?._backendUserId || ctx.userId;
+        await listClient.markWatched(itemId, userId, newWatchedStatus);
 
         // Atualizar item local
         if (item) {
           item.watched = newWatchedStatus;
         }
 
+        const titleStr = item ? formatMovieTitle(item) : "Item";
         const msg = newWatchedStatus
-          ? "✅ Marcado como assistido"
-          : "↩️ Marcado como NÃO assistido";
+          ? `✅ *${titleStr}*\n\nMarcado como assistido! 🎬`
+          : `↩️ *${titleStr}*\n\nMarcado como NÃO assistido`;
 
         await ctx.reply(msg);
 
@@ -589,6 +606,29 @@ const listsFlow = createFlow("lists", {
       } catch (err) {
         console.error("[ListsFlow] Toggle watched error:", err.message);
         await ctx.reply("❌ Erro ao atualizar status");
+        return { end: false };
+      }
+    },
+
+    /**
+     * Navegar para o nó de avaliação (enquete 0,5 a 5), alinhado ao filmCard
+     */
+    askRatingItem: async (ctx) => {
+      try {
+        if (!ctx.state) {
+          ctx.state = { path: "/", history: [], context: {} };
+        }
+        if (!ctx.state.history) {
+          ctx.state.history = [];
+        }
+        if (!ctx.state.history.includes("/item-detail")) {
+          ctx.state.history.push("/item-detail");
+        }
+        ctx.state.path = "/rating-item";
+        return { end: false };
+      } catch (err) {
+        console.error("[ListsFlow] askRatingItem error:", err.message);
+        await ctx.reply("❌ Erro ao abrir avaliação");
         return { end: false };
       }
     },
@@ -626,10 +666,11 @@ const listsFlow = createFlow("lists", {
     },
 
     /**
-     * Adicionar/Atualizar nota (rating) de um item
+     * Aplicar nota escolhida na enquete (0,5 a 5). Alinhado ao filmCard: marca como assistido ao avaliar, mensagem + sticker fullOnly.
      */
     rateItem: async (ctx) => {
       try {
+        const rating = ctx.data?.rating;
         const selectedItem =
           ctx.selectedItem || ctx.state?.context?.selectedItem;
         if (!selectedItem?.itemId) {
@@ -640,69 +681,69 @@ const listsFlow = createFlow("lists", {
         const itemId = selectedItem.itemId;
         const item = selectedItem.item;
 
-        if (!ctx.state) {
-          ctx.state = { path: "/", history: [], context: {} };
-        }
-        if (!ctx.state.context) {
-          ctx.state.context = {};
-        }
-
-        // Get selected rating from poll option (passed via context)
-        let rating = ctx.data?.rating;
-
-        // If no rating in context, ask user via quick reply
-        if (!rating && ctx.data?.option) {
-          // Extract rating from option label (e.g., "⭐⭐⭐ 3/5")
-          const optionLabel = ctx.data.option.label || "";
-          const ratingMatch = optionLabel.match(/(\d+)\/5/);
-          rating = ratingMatch ? parseInt(ratingMatch[1]) : null;
-        }
-
-        // If still no rating, show rating menu
-        if (!rating && rating !== 0) {
-          await ctx.reply(
-            "⭐ Qual é sua nota para este filme?\n\n" +
-              "1️⃣ um\n" +
-              "2️⃣ dois\n" +
-              "3️⃣ três\n" +
-              "4️⃣ quatro\n" +
-              "5️⃣ cinco\n" +
-              "0️⃣ sem nota",
-          );
-          ctx.state.context.awaitingRating = {
-            itemId,
-            promptAt: new Date().toISOString(),
-          };
-          return { end: false, noRender: true };
-        }
-
-        // Rating is provided, update it
-        await listClient.addRating(itemId, ctx.userId, rating);
-
-        // Update local item
-        if (item) {
-          item.rating = rating;
-        }
-
-        const msg =
-          rating > 0
-            ? `⭐ Nota atualizada para ${rating}/5`
-            : "⭐ Nota removida";
-
-        await ctx.reply(msg);
-
-        // Stay on item-detail
-        if (ctx.state?.context?.selectedItem?.item) {
-          ctx.state.context.selectedItem.item.rating = rating;
-        }
-        ctx.state.context.awaitingRating = null;
-        if (ctx.state) {
+        if (rating == null || rating === undefined) {
+          await ctx.reply("❌ Erro: nota não encontrada. Tente novamente.");
           ctx.state.path = "/item-detail";
+          return { end: false };
         }
+
+        const numRating = Number(rating);
+        if (
+          Number.isNaN(numRating) ||
+          numRating < 0.5 ||
+          numRating > 5
+        ) {
+          await ctx.reply("❌ Nota inválida. Use um valor entre 0,5 e 5.");
+          ctx.state.path = "/item-detail";
+          return { end: false };
+        }
+
+        const userId =
+          ctx.state?.context?._backendUserId || ctx.userId;
+
+        // Marcar como assistido ao avaliar (alinhado ao filmCard)
+        try {
+          await listClient.markWatched(itemId, userId, true);
+        } catch (e) {
+          console.warn("[ListsFlow] markWatched before rate:", e.message);
+        }
+
+        await listClient.addRating(itemId, userId, numRating);
+
+        if (item) {
+          item.rating = numRating;
+          item.watched = true;
+        }
+        if (ctx.state?.context?.selectedItem?.item) {
+          ctx.state.context.selectedItem.item.rating = numRating;
+          ctx.state.context.selectedItem.item.watched = true;
+        }
+
+        const stars = "⭐".repeat(Math.round(numRating));
+        const titleStr = formatMovieTitle(item);
+        await ctx.reply(
+          `⭐ *${titleStr}*\n\n${stars} ${numRating}/5\n\n✅ Avaliação salva com sucesso!`
+        );
+
+        if (item?.posterUrl) {
+          try {
+            const posterBuffer = await downloadImageToBuffer(item.posterUrl);
+            if (posterBuffer) {
+              await sendBufferAsSticker(ctx.client, ctx.chatId, posterBuffer, {
+                fullOnly: true,
+              });
+            }
+          } catch (e) {
+            console.warn("[ListsFlow] poster sticker after rate:", e.message);
+          }
+        }
+
+        ctx.state.path = "/item-detail";
         return { end: false };
       } catch (err) {
         console.error("[ListsFlow] Rate item error:", err.message);
         await ctx.reply("❌ Erro ao adicionar nota");
+        ctx.state.path = "/item-detail";
         return { end: false };
       }
     },
