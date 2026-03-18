@@ -1,26 +1,38 @@
 /**
  * commands/misc/avaliacao.js — Rate a movie/series
- * Usage: /avaliacao tmdbId
- * Flow: search movie → confirm → send poll (1-5 stars) → save rating
+ * Usage: /avaliacao tmdbId rating (1-5)
+ * Or: /avaliacao tmdbId (will ask for rating)
  */
 
 const movieClient = require("../../services/movieClient");
 
 module.exports = {
   name: "avaliacao",
-  pattern: /^\/avaliacao\s+(\d+|\S+)/i,
   description: "⭐ Rate a movie/series (1-5 stars)",
 
-  async handler(client, msg, match) {
+  async execute(ctx) {
     try {
-      const chatId = msg.from;
-      const userId = msg.from;
-      const input = match[1]?.trim();
+      const msg = ctx.message;
+      const reply = ctx.reply;
+      const info = ctx.info || {};
+
+      const userId = info.from || msg.from;
+
+      // Extract from message text
+      const text = msg.body || "";
+      const parts = text
+        .replace(/^\/avaliacao\s+/i, "")
+        .trim()
+        .split(/\s+/);
+      const input = parts[0];
+      const ratingArg = parts[1];
 
       if (!input) {
-        return client.sendMessage(
-          chatId,
-          "❌ Usage: /avaliacao tmdbId\n\nExample: /avaliacao 27205",
+        return reply(
+          "❌ Usage: /avaliacao tmdbId [rating]\n\n" +
+            "Example:\n" +
+            "/avaliacao 27205 5\n" +
+            "/avaliacao Inception 4",
         );
       }
 
@@ -37,10 +49,7 @@ module.exports = {
 
         const searchResults = searchData.results || [];
         if (!searchResults || searchResults.length === 0) {
-          return client.sendMessage(
-            chatId,
-            `❌ Nenhum filme encontrado para: ${input}`,
-          );
+          return reply(`❌ Nenhum filme encontrado para: ${input}`);
         }
 
         const movie = searchResults[0];
@@ -51,88 +60,45 @@ module.exports = {
         try {
           movieInfo = await movieClient.getMovieInfo(tmdbId);
         } catch {
-          return client.sendMessage(
-            chatId,
-            `❌ Filme com ID ${tmdbId} não encontrado`,
-          );
+          return reply(`❌ Filme com ID ${tmdbId} não encontrado`);
         }
       }
 
-      // Send poll for rating
-      const title =
-        `⭐ Como você avalia *${movieInfo.title}${movieInfo.year ? ` (${movieInfo.year})` : ""}*?\n\n` +
-        `Selecione uma nota de 1 a 5 estrelas`;
-
-      const options = [
-        { name: "⭐ 1 - Péssimo", value: "1" },
-        { name: "⭐⭐ 2 - Ruim", value: "2" },
-        { name: "⭐⭐⭐ 3 - Regular", value: "3" },
-        { name: "⭐⭐⭐⭐ 4 - Bom", value: "4" },
-        { name: "⭐⭐⭐⭐⭐ 5 - Excelente", value: "5" },
-      ];
-
-      const poll = await client.sendPoll(chatId, title, options, {
-        allowMultipleAnswers: false,
-      });
-
-      // Store poll context for later
-      if (global.pollContexts === undefined) {
-        global.pollContexts = {};
-      }
-
-      global.pollContexts[poll.id] = {
-        type: "movie_rating",
-        tmdbId,
-        movieTitle: movieInfo.title,
-        year: movieInfo.year,
-        posterUrl: movieInfo.posterUrl,
-        userId,
-        chatId,
-      };
-
-      return null;
-    } catch (err) {
-      console.error("[Avaliacao Command] Error:", err.message);
-      return client.sendMessage(
-        msg.from,
-        `❌ Erro ao criar avaliação: ${err.message}`,
-      );
-    }
-  },
-
-  /**
-   * Handle poll response
-   */
-  async handlePollResponse(client, pollResponse, context) {
-    try {
-      const rating = parseInt(context?.movieTitle ? pollResponse.votes[0] : 0);
-
-      if (!rating || rating < 1 || rating > 5) {
-        return client.sendMessage(
-          context.chatId,
-          "❌ Nota inválida. Por favor selecione de 1 a 5.",
+      // Check if rating was provided
+      if (!ratingArg) {
+        return reply(
+          `📽️ *${movieInfo.title}${movieInfo.year ? ` (${movieInfo.year})` : ""}*\n\n` +
+            `Responda com a nota de 1 a 5:\n` +
+            `/avaliacao ${tmdbId} 1\n` +
+            `/avaliacao ${tmdbId} 2\n` +
+            `/avaliacao ${tmdbId} 3\n` +
+            `/avaliacao ${tmdbId} 4\n` +
+            `/avaliacao ${tmdbId} 5`,
         );
       }
 
+      // Validate rating
+      const rating = parseInt(ratingArg);
+      if (isNaN(rating) || rating < 1 || rating > 5) {
+        return reply("❌ Nota inválida. Por favor, use um número de 1 a 5.");
+      }
+
       // Save rating
-      await movieClient.rateMovie(context.tmdbId, rating, {
-        title: context.movieTitle,
-        year: context.year,
-        posterUrl: context.posterUrl,
+      await movieClient.rateMovie(tmdbId, rating, {
+        title: movieInfo.title,
+        year: movieInfo.year,
+        posterUrl: movieInfo.posterUrl,
       });
 
       const message =
-        `⭐ *${context.movieTitle}${context.year ? ` (${context.year})` : ""}*\n` +
+        `⭐ *${movieInfo.title}${movieInfo.year ? ` (${movieInfo.year})` : ""}*\n` +
         `Sua avaliação: ${"⭐".repeat(rating)} ${rating}/5\n\n` +
         `✅ Filme salvo com sucesso!`;
 
-      return client.sendMessage(context.chatId, message);
+      return reply(message);
     } catch (err) {
-      console.error("[Avaliacao Handler] Error:", err.message);
-      return client.sendMessage(
-        context.chatId,
-        `❌ Erro ao salvar avaliação: ${err.message}`,
-      );
+      console.error("[Avaliacao Command] Error:", err.message);
+      return ctx.reply(`❌ Erro ao salvar avaliação: ${err.message}`);
     }
   },
 };

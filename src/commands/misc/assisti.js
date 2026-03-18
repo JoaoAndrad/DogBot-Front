@@ -1,26 +1,28 @@
 /**
  * commands/misc/assisti.js — Mark movie as watched
- * Usage: /assisti tmdbId
+ * Usage: /assisti tmdbId or /assisti "movie name"
  */
 
 const movieClient = require("../../services/movieClient");
 
 module.exports = {
   name: "assisti",
-  pattern: /^\/assisti\s+(\d+|\S+)/i,
   description: "✅ Mark a movie/series as watched",
 
-  async handler(client, msg, match) {
+  async execute(ctx) {
     try {
-      const chatId = msg.from;
-      const userId = msg.from;
-      const input = match[1]?.trim();
+      const msg = ctx.message;
+      const reply = ctx.reply;
+      const info = ctx.info || {};
+
+      const userId = info.from || msg.from;
+
+      // Extract input from message text
+      const text = msg.body || "";
+      const input = text.replace(/^\/assisti\s+/i, "").trim();
 
       if (!input) {
-        return client.sendMessage(
-          chatId,
-          "❌ Usage: /assisti tmdbId\n\nExample: /assisti 27205",
-        );
+        return reply("❌ Usage: /assisti tmdbId\n\nExample: /assisti 27205");
       }
 
       // Determine if input is a number (tmdbId) or a search query
@@ -36,10 +38,7 @@ module.exports = {
 
         const searchResults = searchData.results || [];
         if (!searchResults || searchResults.length === 0) {
-          return client.sendMessage(
-            chatId,
-            `❌ Nenhum filme encontrado para: ${input}`,
-          );
+          return reply(`❌ Nenhum filme encontrado para: ${input}`);
         }
 
         const movie = searchResults[0];
@@ -50,10 +49,7 @@ module.exports = {
         try {
           movieInfo = await movieClient.getMovieInfo(tmdbId);
         } catch {
-          return client.sendMessage(
-            chatId,
-            `❌ Filme com ID ${tmdbId} não encontrado`,
-          );
+          return reply(`❌ Filme com ID ${tmdbId} não encontrado`);
         }
       }
 
@@ -68,13 +64,10 @@ module.exports = {
         `✅ *${movieInfo.title}${movieInfo.year ? ` (${movieInfo.year})` : ""}* marcado como assistido!\n\n` +
         `💡 Use /avaliacao ${tmdbId} para avaliar este filme`;
 
-      return client.sendMessage(chatId, message);
+      return reply(message);
     } catch (err) {
       console.error("[Assisti Command] Error:", err.message);
-      return client.sendMessage(
-        msg.from,
-        `❌ Erro ao marcar como assistido: ${err.message}`,
-      );
+      return ctx.reply(`❌ Erro ao marcar como assistido: ${err.message}`);
     }
   },
 };
