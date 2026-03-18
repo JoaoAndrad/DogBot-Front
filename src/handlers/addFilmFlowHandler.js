@@ -13,9 +13,12 @@ const logger = require("../utils/logger");
 
 async function handleAddFilmFlow(userId, body, state, reply, context) {
   const { step, data } = state;
+  const chatId = context?.chatId;
+  const isGroup = chatId && String(chatId).endsWith("@g.us");
+  const groupChatId = isGroup ? chatId : null;
 
   logger.info(
-    `[AddFilmFlow] Handler chamado para userId=${userId}, step=${step}, body="${body}"`,
+    `[AddFilmFlow] Handler chamado para userId=${userId}, step=${step}, body="${body}", isGroup=${isGroup}, groupChatId=${groupChatId}`,
   );
 
   // Step 0: Search film and show list options
@@ -52,8 +55,28 @@ async function handleAddFilmFlow(userId, body, state, reply, context) {
         filmData: film,
       });
 
-      // Get user lists
-      const lists = await listClient.getUserLists(userId);
+      // Get user or group lists
+      const lists = await listClient.getUserLists(userId, 1, groupChatId);
+
+      // Log group list detection
+      if (isGroup && lists.length > 0) {
+        const listsByOwner = {};
+        lists.forEach((list) => {
+          const ownerName =
+            list.owner?.pushName || list.ownerUserId || "Desconhecido";
+          if (!listsByOwner[ownerName]) {
+            listsByOwner[ownerName] = [];
+          }
+          listsByOwner[ownerName].push(list);
+        });
+        const groupSummary = Object.entries(listsByOwner)
+          .map(([owner, ownerLists]) => {
+            const listTitles = ownerLists.map((l) => `"${l.title}"`).join(", ");
+            return `  👤 ${owner}: ${listTitles}`;
+          })
+          .join("\n");
+        logger.info(`📋 Listas de usuários do grupo:\n${groupSummary}`);
+      }
 
       if (lists.length === 0) {
         conversationState.clearState(userId);

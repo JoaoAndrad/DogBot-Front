@@ -45,6 +45,7 @@ module.exports = {
       return handleAddFilmFlow(userId, filmName, state, reply, {
         client: context.client,
         message: msg,
+        chatId: msg.from,
       });
     } catch (err) {
       logger.error("[adicionarfilme] Error starting flow:", err.message);
