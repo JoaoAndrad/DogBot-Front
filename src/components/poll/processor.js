@@ -164,9 +164,10 @@ async function executeAction(result, client) {
     switch (actionType) {
       case "menu_spotify":
       case "menu":
-        // State was saved under the userId that started the flow (poll metadata).
-        // Use that for load/save state so we find the correct context (e.g. filmTitle).
-        const stateUserId = data.userId || result.voterId;
+        // State is keyed by the flow owner (who started the flow). Prefer data.userId from
+        // backend so any user can vote without "session expired" when voter !== owner.
+        const stateUserId =
+          data.userId != null ? data.userId : result.voterId;
         // Resolve voter to @c.us (or UUID for list flows) for handler/API use.
         let menuUserId = result.voterId || data.userId;
 
@@ -241,12 +242,11 @@ async function executeAction(result, client) {
         });
 
         // "back" action: pop history and re-render previous node (state lives in frontend)
-        // Use poll.metadata.userId so we load/save the same key used when this poll was created
+        // stateUserId is already flow owner (data.userId) so use it for state key
         if (action === "back") {
           const flowManager = require("../menu/flowManager");
           const storage = require("../menu/storage");
-          const stateKey =
-            (poll && poll.metadata && poll.metadata.userId) || stateUserId;
+          const stateKey = stateUserId;
           const savedState = await storage.getState(stateKey, data.flowId);
           if (!savedState) {
             logger.warn(
