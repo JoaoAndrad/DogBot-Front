@@ -47,14 +47,14 @@ module.exports = {
       } else {
         // Fetch details by ID
         try {
-          movieInfo = await movieClient.getMovieInfo(tmdbId);
+          movieInfo = await movieClient.getMovieInfo(userId, tmdbId);
         } catch {
           return reply(`❌ Filme com ID ${tmdbId} não encontrado`);
         }
       }
 
       // Mark as watched
-      const result = await movieClient.markWatched(tmdbId, {
+      const result = await movieClient.markWatched(userId, tmdbId, {
         title: movieInfo.title,
         year: movieInfo.year,
         posterUrl: movieInfo.posterUrl,

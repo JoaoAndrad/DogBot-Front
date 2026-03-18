@@ -29,9 +29,8 @@ module.exports = {
 
       if (!input) {
         return reply(
-          "❌ Usage: /avaliacao tmdbId [rating]\n\n" +
-            "Example:\n" +
-            "/avaliacao 27205 5\n" +
+          "❌ Use: /avaliacao (nome do filme) + nota (de 1 a 5))\n\n" +
+            "Exemplo:\n" +
             "/avaliacao Inception 4",
         );
       }
@@ -58,7 +57,7 @@ module.exports = {
       } else {
         // Fetch details by ID
         try {
-          movieInfo = await movieClient.getMovieInfo(tmdbId);
+          movieInfo = await movieClient.getMovieInfo(userId, tmdbId);
         } catch {
           return reply(`❌ Filme com ID ${tmdbId} não encontrado`);
         }
@@ -84,7 +83,7 @@ module.exports = {
       }
 
       // Save rating
-      await movieClient.rateMovie(tmdbId, rating, {
+      await movieClient.rateMovie(userId, tmdbId, rating, {
         title: movieInfo.title,
         year: movieInfo.year,
         posterUrl: movieInfo.posterUrl,

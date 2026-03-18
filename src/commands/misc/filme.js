@@ -43,7 +43,7 @@ module.exports = {
       // Get full info
       let movieInfo;
       try {
-        movieInfo = await movieClient.getMovieInfo(movie.tmdbId);
+        movieInfo = await movieClient.getMovieInfo(userId, movie.tmdbId);
       } catch {
         // Fallback if user rating fetch fails
         movieInfo = movie;
@@ -53,17 +53,17 @@ module.exports = {
       const title = `*${movieInfo.title}*`;
       const year = movieInfo.year ? ` (${movieInfo.year})` : "";
       const rating = movieInfo.voteAverage
-        ? `\n⭐ *TMDb Rating:* ${(movieInfo.voteAverage / 2).toFixed(1)}/5`
+        ? `\n⭐ *TMDb Nota:* ${(movieInfo.voteAverage / 2).toFixed(1)}/5`
         : "";
       const overview = movieInfo.overview ? `\n\n${movieInfo.overview}` : "";
       const userRating =
         movieInfo.userRating && movieInfo.userRating.rating
-          ? `\n👤 *Your Rating:* ${movieInfo.userRating.rating}/5`
+          ? `\n👤 *Sua nota:* ${movieInfo.userRating.rating}/5`
           : "";
       const watched =
         movieInfo.userRating && movieInfo.userRating.watched
-          ? `\n✅ *Watched:* Sim`
-          : "\n❌ *Watched:* Não";
+          ? `\n✅ *Assistido:* Sim`
+          : "\n❌ *Assistido:* Não";
 
       const message =
         `📽️ ${title}${year}${rating}${overview}${watched}${userRating}` +
