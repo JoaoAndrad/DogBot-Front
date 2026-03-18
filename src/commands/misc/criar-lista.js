@@ -35,7 +35,7 @@ module.exports = {
     if (args) {
       try {
         logger.info(`[criar-lista] Criando lista com nome: "${args}"`);
-        const newList = await listClient.createList(args, userId);
+        const newList = await listClient.createList(userId, { title: args });
 
         if (!newList) {
           return reply("❌ Erro ao criar lista. Tente novamente.");

@@ -35,7 +35,11 @@ async function searchMovies(query, page = 1) {
  */
 async function getUserLists(userId, page = 1) {
   try {
-    const response = await sendToBackend("/api/lists", { userId, page }, "GET");
+    const response = await sendToBackend(
+      "/api/lists?userId=" + encodeURIComponent(userId) + "&page=" + page,
+      null,
+      "GET",
+    );
     return response.lists || [];
   } catch (err) {
     console.error("[ListClient] Get user lists error:", err.message);

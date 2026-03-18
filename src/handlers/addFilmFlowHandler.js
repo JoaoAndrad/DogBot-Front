@@ -106,7 +106,7 @@ async function handleAddFilmFlow(userId, body, state, reply, context) {
       );
 
       // Add film to list
-      await listClient.addItemToList(selectedList.id, userId, tmdbId, {
+      await listClient.addToList(selectedList.id, tmdbId, userId, {
         title: filmData.title,
         year: filmData.year,
         posterUrl: filmData.posterUrl,
