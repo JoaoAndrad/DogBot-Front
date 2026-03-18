@@ -33,6 +33,10 @@ module.exports = {
     const isGroup = !!(msg.isGroup || info.is_group || from?.endsWith("@g.us"));
     const groupChatId = isGroup ? from : null;
 
+    logger.info(
+      `[criar-lista] Detectado: isGroup=${isGroup}, groupChatId=${groupChatId}, from=${from}, msg.isGroup=${msg.isGroup}`,
+    );
+
     const body = msg.body || "";
     const args = body.replace(/^\/criar-?lista\s*/i, "").trim();
 
@@ -42,10 +46,18 @@ module.exports = {
         logger.info(
           `[criar-lista] Criando lista com nome: "${args}" ${groupChatId ? `para grupo: ${groupChatId}` : "(privada)"}`,
         );
+        logger.info(
+          `[criar-lista] 📋 Payload: userId=${userId}, title=${args}, groupChatId=${groupChatId}`,
+        );
+
         const newList = await listClient.createList(userId, {
           title: args,
           groupChatId,
         });
+
+        logger.info(
+          `[criar-lista] ✅ List created: ${newList.id}, groupChatId=${newList.groupChatId}`,
+        );
 
         if (!newList) {
           return reply("❌ Erro ao criar lista. Tente novamente.");

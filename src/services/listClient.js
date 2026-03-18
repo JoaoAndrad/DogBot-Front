@@ -56,15 +56,20 @@ async function getUserLists(userIdOrGroupId, page = 1, groupChatId = null) {
         encodeURIComponent(userId) +
         "&page=" +
         page;
+      console.log(`[ListClient] 🔍 Query group lists: ${query}`);
     } else {
       query =
         "/api/lists?userId=" +
         encodeURIComponent(userIdOrGroupId) +
         "&page=" +
         page;
+      console.log(`[ListClient] 🔍 Query user lists: ${query}`);
     }
 
     const response = await sendToBackend(query, null, "GET");
+    console.log(
+      `[ListClient] ✅ Response: ${response.lists?.length || 0} lists received`,
+    );
     return response.lists || [];
   } catch (err) {
     console.error("[ListClient] Get user lists error:", err.message);
@@ -115,20 +120,37 @@ async function getListStats(listId) {
 /**
  * Create uma nova lista
  * @param {string} userId - Owner user ID
- * @param {object} data - {title, description?, isPublic?}
- * @returns {Promise<object>} Lista criada
+ * @param {object} options - { title, description?, isPublic?, groupChatId? }
+ * @returns {Promise<object>} Nova lista criada
  */
-async function createList(userId, { title, description, isPublic = false }) {
+async function createList(
+  userId,
+  { title, description, isPublic = false, groupChatId = null },
+) {
   try {
-    const response = await sendToBackend("/api/lists", {
+    console.log(
+      `[ListClient] Creating list: title="${title}", userId=${userId}, groupChatId=${groupChatId}, isPublic=${isPublic}`,
+    );
+
+    const payload = {
       userId,
       title,
       description,
       isPublic,
-    });
+    };
+
+    if (groupChatId) {
+      payload.groupChatId = groupChatId;
+      console.log(
+        `[ListClient] ✅ Including groupChatId in payload: ${groupChatId}`,
+      );
+    }
+
+    const response = await sendToBackend("/api/lists", payload);
+    console.log(`[ListClient] ✅ List created successfully: ${response.id}`);
     return response;
   } catch (err) {
-    console.error("[ListClient] Create list error:", err.message);
+    console.error("[ListClient] ❌ Create list error:", err.message);
     throw err;
   }
 }

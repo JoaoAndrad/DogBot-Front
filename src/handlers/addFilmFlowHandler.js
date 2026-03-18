@@ -56,26 +56,40 @@ async function handleAddFilmFlow(userId, body, state, reply, context) {
       });
 
       // Get user or group lists
+      logger.info(
+        `[AddFilmFlow] 📋 Fetching lists... isGroup=${isGroup}, groupChatId=${groupChatId}, userId=${userId}`,
+      );
       const lists = await listClient.getUserLists(userId, 1, groupChatId);
+      logger.info(
+        `[AddFilmFlow] ✅ Fetched ${lists.length} lists. isGroup=${isGroup}`,
+      );
 
       // Log group list detection
-      if (isGroup && lists.length > 0) {
-        const listsByOwner = {};
-        lists.forEach((list) => {
-          const ownerName =
-            list.owner?.pushName || list.ownerUserId || "Desconhecido";
-          if (!listsByOwner[ownerName]) {
-            listsByOwner[ownerName] = [];
-          }
-          listsByOwner[ownerName].push(list);
-        });
-        const groupSummary = Object.entries(listsByOwner)
-          .map(([owner, ownerLists]) => {
-            const listTitles = ownerLists.map((l) => `"${l.title}"`).join(", ");
-            return `  👤 ${owner}: ${listTitles}`;
-          })
-          .join("\n");
-        logger.info(`📋 Listas de usuários do grupo:\n${groupSummary}`);
+      if (isGroup) {
+        if (lists.length > 0) {
+          const listsByOwner = {};
+          lists.forEach((list) => {
+            const ownerName =
+              list.owner?.push_name || list.ownerUserId || "Desconhecido";
+            if (!listsByOwner[ownerName]) {
+              listsByOwner[ownerName] = [];
+            }
+            listsByOwner[ownerName].push(list);
+          });
+          const groupSummary = Object.entries(listsByOwner)
+            .map(([owner, ownerLists]) => {
+              const listTitles = ownerLists
+                .map((l) => `"${l.title}"`)
+                .join(", ");
+              return `  👤 ${owner}: ${listTitles}`;
+            })
+            .join("\n");
+          logger.info(`📋 Listas de usuários do grupo:\n${groupSummary}`);
+        } else {
+          logger.warn(
+            `[AddFilmFlow] ⚠️ Nenhuma lista encontrada no grupo ${groupChatId}`,
+          );
+        }
       }
 
       if (lists.length === 0) {
