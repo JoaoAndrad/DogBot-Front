@@ -143,12 +143,13 @@ const addFilmFlow = createFlow("add-film", {
         const { listId, tmdbId, filmTitle, filmData } = ctx.data || {};
 
         logger.info(
-          `[AddFilmFlow] selectList - data: listId=${listId}, tmdbId=${tmdbId}, filmTitle=${filmTitle}`,
+          `[AddFilmFlow] selectList received: listId=${listId}, tmdbId=${tmdbId}, filmTitle=${filmTitle}`,
         );
 
         if (!listId || !tmdbId) {
           logger.error(
-            `[AddFilmFlow] Missing required data: listId=${listId}, tmdbId=${tmdbId}`,
+            `[AddFilmFlow] Missing required data in ctx.data:`,
+            ctx.data,
           );
           await ctx.reply("❌ Erro ao processar seleção");
           return { end: false };
@@ -158,13 +159,22 @@ const addFilmFlow = createFlow("add-film", {
           `[AddFilmFlow] Adicionando filme ${tmdbId} (${filmTitle}) à lista ${listId}`,
         );
 
-        // Add film to list
-        await listClient.addToList(listId, tmdbId, ctx.userId, {
-          title: filmData.title,
-          year: filmData.year,
-          posterUrl: filmData.posterUrl,
-          mediaType: filmData.mediaType,
-        });
+        // Add film to list with safe data extraction
+        const filmDataPayload = {
+          title:
+            filmData?.title || filmTitle?.split("(")[0].trim() || "Unknown", // Fallback from title
+          year: filmData?.year,
+          posterUrl: filmData?.posterUrl,
+          mediaType: filmData?.mediaType || "movie",
+        };
+
+        logger.info(
+          `[AddFilmFlow] Payload para adicionar: ${JSON.stringify(
+            filmDataPayload,
+          )}`,
+        );
+
+        await listClient.addToList(listId, tmdbId, ctx.userId, filmDataPayload);
 
         logger.info(`[AddFilmFlow] ✅ Filme adicionado com sucesso!`);
 

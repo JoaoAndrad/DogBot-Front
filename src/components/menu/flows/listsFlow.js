@@ -351,9 +351,16 @@ const listsFlow = createFlow("lists", {
           return { end: false };
         }
 
+        // Ensure state exists (may be null from processor)
+        if (!ctx.state) {
+          ctx.state = { path: "/", history: [], context: {} };
+        }
+
         ctx.selectedList = { listId, listTitle };
-        ctx.path = "/list-detail";
-        if (!ctx.history.includes("/")) ctx.history.push("/");
+        ctx.state.path = "/list-detail";
+        if (!ctx.state.history.includes("/")) {
+          ctx.state.history.push("/");
+        }
 
         return { end: false };
       } catch (err) {
