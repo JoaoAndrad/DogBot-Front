@@ -580,7 +580,8 @@ const listsFlow = createFlow("lists", {
         const userId = ctx.state?.context?._backendUserId || ctx.userId;
         await listClient.markWatched(itemId, userId, newWatchedStatus);
 
-        // Sincronizar com MovieRating para /filme mostrar o mesmo estado (plano alternativo)
+        // Assistido na lista é independente do /filme (MovieRating). Só sincronizamos
+        // para o geral quando o usuário marca assistido aqui — não o contrário.
         if (item?.tmdbId && newWatchedStatus) {
           try {
             await movieClient.markWatched(userId, item.tmdbId, {
