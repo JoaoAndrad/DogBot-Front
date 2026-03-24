@@ -1,6 +1,6 @@
 /**
- * commands/misc/livro.js — Buscar livro (Google Livros; legado Open Library)
- * Uso: /livro nome | /livro gb:volumeId | URL Google Livros | ISBN | OL45883W
+ * commands/misc/livro.js — Buscar livro (Open Library por nome; Google Livros para gb:/ISBN)
+ * Uso: /livro nome | /livro ol:OL…W | /livro gb:… | URL books.google | ISBN
  */
 
 const bookClient = require("../../services/bookClient");
@@ -13,7 +13,7 @@ const {
 const logger = require("../../utils/logger");
 const { truncateForPoll } = require("../../utils/titleNormalize");
 
-/** Lista de enquete: título, ano e opcionalmente editora (Google ou Wikipédia). */
+/** Lista de enquete: título, ano e opcionalmente editora (metadados da API). */
 function formatBookPollLine(title, year, publisher) {
   const t = String(title || "").trim() || "Sem título";
   const y = year != null && String(year).trim() !== "" ? String(year).trim() : "";
@@ -59,7 +59,7 @@ function extractDirectBookIdFromQuery(query) {
 module.exports = {
   name: "livro",
   aliases: ["book", "livros"],
-  description: "📖 Buscar livro e ver cartão (Google Livros)",
+  description: "📖 Buscar livro e ver cartão (Open Library)",
 
   async execute(ctx) {
     const t0 = Date.now();
@@ -94,10 +94,10 @@ module.exports = {
       if (!query) {
         return reply(
           "📖 *Como usar o /livro*\n\n" +
-            "• _Buscar por nome:_\n`/livro Romeu e Julieta`\n" +
-            "• _ID Google Livros:_\n`/livro gb:xxxxxxxx` ou cole o link `books.google.com/...id=...`\n" +
-            "• _ISBN:_\n`/livro 978-...`\n" +
-            "• _Legado Open Library:_\n`/livro OL2160489W`",
+            "• _Buscar por nome:_\n`/livro Romeu e Julieta` _(Open Library)_\n" +
+            "• _ID Open Library:_\n`/livro ol:OL2160489W` ou link `openlibrary.org/works/OL…W`\n" +
+            "• _ID Google Livros (opcional):_\n`/livro gb:…` ou link `books.google.com/...id=...`\n" +
+            "• _ISBN:_\n`/livro 978-...` _(resolve via Google Livros)_",
         );
       }
 
@@ -244,7 +244,7 @@ module.exports = {
         await reply(
           `📖 *Qual destes?*\n\n${listLines}\n\n` +
             "_Responda à enquete abaixo._\n\n" +
-            "Se não estiver na lista, abra https://books.google.com , localize o livro e envie o link ou `/livro gb:ID` (id na URL).",
+            "Se não estiver na lista, abra https://openlibrary.org e envie `/livro ol:OL…W` (id na URL da obra) ou, se preferir, https://books.google.com com `/livro gb:ID`.",
         );
         try {
           await flowManager.startFlow(client, msg.from, userId, "book-search", {
