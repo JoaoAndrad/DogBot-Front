@@ -89,6 +89,8 @@ module.exports = {
         return;
       }
 
+      await reply(`🔍 Procurando por "${query}" no meu banco de dados...`);
+
       // Search for the movie (only movies, no TV series)
       const searchData = await movieClient.searchMovies(query, {
         type: "movie",

@@ -94,6 +94,8 @@ module.exports = {
         return;
       }
 
+      await reply(`🔍 Procurando por "${query}" no meu banco de dados...`);
+
       const searchResp = await bookClient.searchBooks(query, 12);
       const searchResults = searchResp.results || [];
       if (!searchResults.length) {
