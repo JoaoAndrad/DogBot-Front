@@ -11,10 +11,14 @@ const {
   sendBufferAsSticker,
 } = require("../../utils/stickerHelper");
 const logger = require("../../utils/logger");
-const {
-  normalizeBookTitleForList,
-  truncateForPoll,
-} = require("../../utils/titleNormalize");
+const { truncateForPoll } = require("../../utils/titleNormalize");
+
+/** Lista de enquete: nome como na API + ano (plano livros PT / popularidade). */
+function formatBookPollLine(title, year) {
+  const t = String(title || "").trim() || "Sem título";
+  const y = year != null && String(year).trim() !== "" ? String(year).trim() : "";
+  return y ? `${t} (${y})` : t;
+}
 
 function uniqueCandidatesByWorkId(results) {
   const seen = new Set();
@@ -230,7 +234,7 @@ module.exports = {
         const listLines = candidates
           .map(
             (c, i) =>
-              `${i + 1}. ${truncateForPoll(normalizeBookTitleForList(c.title, c.year))}`,
+              `${i + 1}. ${truncateForPoll(formatBookPollLine(c.title, c.year))}`,
           )
           .join("\n");
         await reply(
