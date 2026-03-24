@@ -1,7 +1,7 @@
 /**
  * components/menu/flows/filmCardFlow.js — Flow do cartão do filme (enquete após /filme)
- * Opções: Marcar como assistido (se não assistido), Avaliar, Adicionar à lista.
- * Ao marcar ou avaliar, reenvia a enquete (sem "Marcar como assistido").
+ * Opções conforme estado: marcar assistido / mais uma visualização; avaliar / alterar avaliação.
+ * Avaliar chama markWatched antes de rateMovie (marca como visto automaticamente).
  */
 
 const { createFlow } = require("../flowBuilder");
@@ -14,6 +14,39 @@ const {
 const logger = require("../../../utils/logger");
 
 const RATING_OPTIONS = [0.5, 1, 1.5, 2, 2.5, 3, 3.5, 4, 4.5, 5];
+
+function formatRatingForMenu(num) {
+  if (num == null || Number.isNaN(Number(num))) return "";
+  const n = Number(num);
+  return n % 1 === 0 ? String(Math.round(n)) : String(n);
+}
+
+/** Deriva estado do usuário a partir de movieInfo.userRating (API /ratings?userId=) */
+function getViewerListState(movieInfo) {
+  const ur = movieInfo?.userRating;
+  const watched = Boolean(ur?.watched);
+  const r = ur?.rating;
+  const hasRating = r != null && Number(r) > 0;
+  return {
+    watched,
+    hasRating,
+    ratingDisplay: hasRating ? formatRatingForMenu(r) : "",
+    alreadyEngaged: watched || hasRating,
+  };
+}
+
+async function refreshMovieCardContext(state, tmdbId, userId) {
+  if (!tmdbId || !userId) return;
+  try {
+    const refreshed = await movieClient.getMovieInfoWithAllRatings(
+      tmdbId,
+      userId,
+    );
+    state.context.movieInfo = refreshed;
+  } catch (err) {
+    logger.warn("[FilmCardFlow] refresh movieInfo:", err.message);
+  }
+}
 
 const filmCardFlow = createFlow("film-card", {
   root: {
@@ -28,9 +61,10 @@ const filmCardFlow = createFlow("film-card", {
           skipPoll: true,
         };
       }
-      const watched = movieInfo.userRating && movieInfo.userRating.watched;
+      const { alreadyEngaged, hasRating, ratingDisplay } =
+        getViewerListState(movieInfo);
       const options = [];
-      if (!watched) {
+      if (!alreadyEngaged) {
         options.push({
           label: "✅ Marcar como assistido",
           action: "exec",
@@ -43,9 +77,16 @@ const filmCardFlow = createFlow("film-card", {
           handler: "markWatchedFilm",
         });
       }
+      const rateLabel = hasRating
+        ? `⭐ Alterar avaliação (atual: ${ratingDisplay}/5)`
+        : "⭐ Avaliar";
       options.push(
-        { label: "⭐ Avaliar", action: "exec", handler: "askRatingFilm" },
-        { label: "📋 Adicionar à lista", action: "exec", handler: "addFilmToList" }
+        { label: rateLabel, action: "exec", handler: "askRatingFilm" },
+        {
+          label: "📋 Adicionar à lista",
+          action: "exec",
+          handler: "addFilmToList",
+        },
       );
       return {
         title: "💡 O que deseja fazer?",
@@ -56,15 +97,26 @@ const filmCardFlow = createFlow("film-card", {
 
   "/rating": {
     title: "Sua nota (0,5 a 5):",
-    options: [
-      ...RATING_OPTIONS.map((r) => ({
-        label: `${r}⭐`,
-        action: "exec",
-        handler: "rateFilm",
-        data: { rating: r },
-      })),
-      { label: "🔙 Voltar", action: "back" },
-    ],
+    dynamic: true,
+    handler: async (ctx) => {
+      const movieInfo = ctx.state?.context?.movieInfo;
+      const { hasRating, ratingDisplay } = getViewerListState(movieInfo);
+      const title = hasRating
+        ? `Alterar sua nota (atual: ${ratingDisplay}/5)`
+        : "Sua nota (0,5 a 5):";
+      return {
+        title,
+        options: [
+          ...RATING_OPTIONS.map((r) => ({
+            label: `${r}⭐`,
+            action: "exec",
+            handler: "rateFilm",
+            data: { rating: r },
+          })),
+          { label: "🔙 Voltar", action: "back" },
+        ],
+      };
+    },
   },
 
   handlers: {
@@ -83,20 +135,15 @@ const filmCardFlow = createFlow("film-card", {
         });
         const displayName = ctx.voterDisplayName || "Você";
         await ctx.reply(
-          `✅ *${movieInfo.title}${movieInfo.year ? ` (${movieInfo.year})` : ""}*\n\nMarcado como assistido para *${displayName}*! 🎬`
+          `✅ *${movieInfo.title}${movieInfo.year ? ` (${movieInfo.year})` : ""}*\n\nMarcado como assistido para *${displayName}*! 🎬`,
         );
       } catch (err) {
         logger.error("[FilmCardFlow] markWatched error:", err.message);
         await ctx.reply(`❌ Erro ao marcar como assistido: ${err.message}`);
         return { end: true };
       }
-      try {
-        const refreshed = await movieClient.getMovieInfoWithAllRatings(tmdbId);
-        state.context.movieInfo = refreshed;
-        state.path = "/";
-      } catch (err) {
-        logger.warn("[FilmCardFlow] refresh after markWatched:", err.message);
-      }
+      await refreshMovieCardContext(state, tmdbId, userId);
+      state.path = "/";
       return { end: false };
     },
 
@@ -119,6 +166,7 @@ const filmCardFlow = createFlow("film-card", {
         return { end: true };
       }
       try {
+        // Marca como visto automaticamente ao avaliar (alinhado ao /filme e listas)
         await movieClient.markWatched(userId, tmdbId, {
           title: movieInfo.title,
           year: movieInfo.year,
@@ -131,15 +179,22 @@ const filmCardFlow = createFlow("film-card", {
         });
         const stars = "⭐".repeat(Math.round(numRating));
         const displayName = ctx.voterDisplayName || "Você";
-        const ratingStr = numRating % 1 === 0 ? String(Math.round(numRating)) : String(numRating);
+        const ratingStr =
+          numRating % 1 === 0
+            ? String(Math.round(numRating))
+            : String(numRating);
         await ctx.reply(
-          `⭐ *${movieInfo.title}${movieInfo.year ? ` (${movieInfo.year})` : ""}*\n\n${stars} ${ratingStr}/5\n\n✅ Avaliação salva para *${displayName}* com sucesso!`
+          `⭐ *${movieInfo.title}${movieInfo.year ? ` (${movieInfo.year})` : ""}*\n\n${stars} ${ratingStr}/5\n\n✅ Avaliação salva para *${displayName}* com sucesso!\n✅ Também marcado como visto.`,
         );
         if (movieInfo.posterUrl) {
           try {
-            const posterBuffer = await downloadImageToBuffer(movieInfo.posterUrl);
+            const posterBuffer = await downloadImageToBuffer(
+              movieInfo.posterUrl,
+            );
             if (posterBuffer) {
-              await sendBufferAsSticker(client, chatId, posterBuffer, { fullOnly: true });
+              await sendBufferAsSticker(client, chatId, posterBuffer, {
+                fullOnly: true,
+              });
             }
           } catch (e) {
             logger.warn("[FilmCardFlow] poster sticker:", e.message);
@@ -150,13 +205,8 @@ const filmCardFlow = createFlow("film-card", {
         await ctx.reply(`❌ Erro ao salvar avaliação: ${err.message}`);
         return { end: true };
       }
-      try {
-        const refreshed = await movieClient.getMovieInfoWithAllRatings(tmdbId);
-        state.context.movieInfo = refreshed;
-        state.path = "/";
-      } catch (err) {
-        logger.warn("[FilmCardFlow] refresh after rate:", err.message);
-      }
+      await refreshMovieCardContext(state, tmdbId, userId);
+      state.path = "/";
       return { end: false };
     },
 

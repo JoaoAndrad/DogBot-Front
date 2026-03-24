@@ -57,14 +57,15 @@ async function getMovieInfo(userId, tmdbId) {
 /**
  * Get movie info with all users' ratings (for film card: show everyone who rated/watched)
  * @param {string} tmdbId - TMDb movie ID
- * @returns {Promise<object>} { title, year, overview, voteAverage, posterUrl, ratings: [{ displayName, watched, rating, watchedAt, ratedAt }, ...] }
+ * @param {string} [userId] - Optional viewer id (UUID or WhatsApp); adds userRating for film-card menu
+ * @returns {Promise<object>} TMDb fields + ratings[] + optional userRating
  */
-async function getMovieInfoWithAllRatings(tmdbId) {
-  const response = await sendToBackend(
-    `/api/movies/${tmdbId}/ratings`,
-    null,
-    "GET",
-  );
+async function getMovieInfoWithAllRatings(tmdbId, userId) {
+  let path = `/api/movies/${encodeURIComponent(tmdbId)}/ratings`;
+  if (userId) {
+    path += `?userId=${encodeURIComponent(userId)}`;
+  }
+  const response = await sendToBackend(path, null, "GET");
   return response;
 }
 

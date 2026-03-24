@@ -53,7 +53,10 @@ module.exports = {
         const tmdbId = query;
         let movieInfo;
         try {
-          movieInfo = await movieClient.getMovieInfoWithAllRatings(tmdbId);
+          movieInfo = await movieClient.getMovieInfoWithAllRatings(
+            tmdbId,
+            userId,
+          );
         } catch (e) {
           return reply(`❌ Filme com ID ${tmdbId} não encontrado.`);
         }
@@ -126,7 +129,10 @@ module.exports = {
       // Get full info (all users' ratings for card)
       let movieInfo;
       try {
-        movieInfo = await movieClient.getMovieInfoWithAllRatings(movie.tmdbId);
+        movieInfo = await movieClient.getMovieInfoWithAllRatings(
+          movie.tmdbId,
+          userId,
+        );
       } catch {
         // Fallback if fetch fails
         movieInfo = movie;
