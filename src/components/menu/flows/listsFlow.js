@@ -161,6 +161,64 @@ const listsFlow = createFlow("lists", {
     },
   },
 
+  "/create-list-kind": {
+    title: "📋 Nova lista\n\nÉ para filmes ou livros?",
+    options: [
+      {
+        label: "📽️ Filmes",
+        action: "exec",
+        handler: "createListPickMovie",
+      },
+      {
+        label: "📖 Livros",
+        action: "exec",
+        handler: "createListPickBook",
+      },
+      { label: "🔙 Voltar", action: "back" },
+    ],
+  },
+
+  "/create-list-confirm": {
+    title: "📋 Confirmar lista",
+    dynamic: true,
+    handler: async (ctx) => {
+      const c = ctx.state?.context?.createListConfirm;
+      if (!c?.listName || !c?.listKind) {
+        return {
+          title:
+            "❌ Dados em falta. Abra */listas* e use *Criar nova lista* de novo.",
+          skipPoll: true,
+        };
+      }
+      const kindLabel = c.listKind === "book" ? "livros" : "filmes";
+      const namePlain = String(c.listName).replace(/[*_`]/g, "");
+      return {
+        title:
+          `📋 *Confirmar criação*\n\n` +
+          `Tipo: *${kindLabel}*\n` +
+          `Nome: ${namePlain}\n\n` +
+          `O que deseja fazer?`,
+        options: [
+          {
+            label: "Confirmar",
+            action: "exec",
+            handler: "confirmCreateListDraft",
+          },
+          {
+            label: "Enviar novo nome",
+            action: "exec",
+            handler: "retryCreateListName",
+          },
+          {
+            label: "Cancelar criação de lista",
+            action: "exec",
+            handler: "cancelCreateListDraft",
+          },
+        ],
+      };
+    },
+  },
+
   "/list-detail": {
     title: "📋 Detalhes da Lista",
     dynamic: true,
@@ -823,27 +881,145 @@ const listsFlow = createFlow("lists", {
     },
 
     /**
-     * Criar nova lista - instrui o usuário a usar comando
+     * Criar nova lista — enquete filmes vs livros
      */
     createList: async (ctx) => {
       try {
-        conversationState.startFlow(ctx.userId, "list-creation", {
-          chatId: ctx.chatId,
-          isGroup: String(ctx.chatId || "").endsWith("@g.us"),
-          source: "lists-menu",
-        });
-
-        await ctx.reply(
-          "📋 *Nova lista*\n\n" +
-            "É para *filmes* ou *livros*?\n\n" +
-            "Responda com uma palavra: *filmes* ou *livros*.",
-        );
-        return { end: true };
+        if (!ctx.state) {
+          ctx.state = { path: "/", history: [], context: {} };
+        }
+        ctx.state.history.push(ctx.state.path || "/");
+        ctx.state.path = "/create-list-kind";
+        return { end: false };
       } catch (err) {
         console.error("[ListsFlow] createList error:", err.message);
         await ctx.reply("❌ Erro ao processar comando");
         return { end: true };
       }
+    },
+
+    createListPickMovie: async (ctx) => {
+      try {
+        const isGroup = String(ctx.chatId || "").endsWith("@g.us");
+        conversationState.startFlow(ctx.userId, "list-creation", {
+          chatId: ctx.chatId,
+          isGroup,
+          source: "lists-menu",
+        });
+        conversationState.updateData(ctx.userId, { listKind: "movie" });
+        conversationState.setStep(ctx.userId, 1);
+        await ctx.reply(
+          "✅ Lista de *filmes*.\n\n" +
+            "Digite o *nome* da lista (máx. 50 caracteres):\n\n" +
+            "_Ex.: Clássicos, Para assistir no fim de semana_",
+        );
+        return { end: true };
+      } catch (err) {
+        console.error("[ListsFlow] createListPickMovie error:", err.message);
+        await ctx.reply("❌ Erro ao processar");
+        return { end: true };
+      }
+    },
+
+    createListPickBook: async (ctx) => {
+      try {
+        const isGroup = String(ctx.chatId || "").endsWith("@g.us");
+        conversationState.startFlow(ctx.userId, "list-creation", {
+          chatId: ctx.chatId,
+          isGroup,
+          source: "lists-menu",
+        });
+        conversationState.updateData(ctx.userId, { listKind: "book" });
+        conversationState.setStep(ctx.userId, 1);
+        await ctx.reply(
+          "✅ Lista de *livros*.\n\n" +
+            "Digite o *nome* da lista (máx. 50 caracteres):\n\n" +
+            "_Ex.: Leituras 2025, Ficção científica_",
+        );
+        return { end: true };
+      } catch (err) {
+        console.error("[ListsFlow] createListPickBook error:", err.message);
+        await ctx.reply("❌ Erro ao processar");
+        return { end: true };
+      }
+    },
+
+    confirmCreateListDraft: async (ctx) => {
+      const c = ctx.state?.context?.createListConfirm;
+      if (!c?.listName || !c?.listKind) {
+        await ctx.reply("❌ Sessão inválida. Use */listas* de novo.");
+        return { end: true };
+      }
+      const listKind = c.listKind === "book" ? "book" : "movie";
+      const groupChatId = c.isGroup ? c.chatId : null;
+      try {
+        const newList = await listClient.createList(ctx.userId, {
+          title: String(c.listName).trim(),
+          groupChatId,
+          listKind,
+        });
+        if (!newList) {
+          conversationState.clearState(ctx.userId);
+          await ctx.reply(
+            "❌ Erro ao criar lista. Tente */listas* → *Criar nova lista*.",
+          );
+          return { end: true };
+        }
+        conversationState.clearState(ctx.userId);
+        const filmTip =
+          listKind === "movie"
+            ? "• Use `/filme` para buscar e adicionar filmes\n"
+            : "";
+        const bookTip =
+          listKind === "book"
+            ? "• Use `/livro` para buscar e adicionar livros\n"
+            : "";
+        await ctx.reply(
+          `✅ *Lista criada com sucesso!*\n\n` +
+            `${listKindIcon(listKind)} ${newList.title}\n\n` +
+            `${filmTip}${bookTip}` +
+            `• Use \`/listas\` para gerenciar`,
+        );
+      } catch (err) {
+        console.error("[ListsFlow] confirmCreateListDraft:", err.message);
+        conversationState.clearState(ctx.userId);
+        await ctx.reply(
+          `❌ Erro ao criar lista: ${err.message}\n\n` +
+            "Tente */listas* → *Criar nova lista*.",
+        );
+      }
+      return { end: true };
+    },
+
+    retryCreateListName: async (ctx) => {
+      const c = ctx.state?.context?.createListConfirm;
+      if (!c?.listKind || !c.chatId) {
+        await ctx.reply("❌ Sessão inválida. Use */listas* de novo.");
+        return { end: true };
+      }
+      const listKind = c.listKind === "book" ? "book" : "movie";
+      conversationState.startFlow(ctx.userId, "list-creation", {
+        chatId: c.chatId,
+        isGroup: !!c.isGroup,
+        source: "lists-menu",
+      });
+      conversationState.updateData(ctx.userId, { listKind });
+      conversationState.setStep(ctx.userId, 1);
+      const hint =
+        listKind === "book"
+          ? "_Ex.: Leituras 2025, Ficção científica_"
+          : "_Ex.: Clássicos, Para assistir no fim de semana_";
+      await ctx.reply(
+        `Digite o *nome* desejado para a lista (máx. 50 caracteres):\n\n` +
+          hint,
+      );
+      return { end: true };
+    },
+
+    cancelCreateListDraft: async (ctx) => {
+      conversationState.clearState(ctx.userId);
+      await ctx.reply("❌ Criação da lista cancelada.");
+      return { end: true };
     },
 
     /**

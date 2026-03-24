@@ -55,6 +55,19 @@ function nextStep(userId) {
 }
 
 /**
+ * Set step explicitly (e.g. skip pergunta por enquete e ir direto ao nome)
+ * @param {string} userId
+ * @param {number} step
+ */
+function setStep(userId, step) {
+  const state = states.get(userId);
+  if (state && Number.isInteger(step) && step >= 0) {
+    state.step = step;
+    states.set(userId, state);
+  }
+}
+
+/**
  * Clear conversation state for a user
  * @param {string} userId - User identifier
  */
@@ -76,6 +89,7 @@ module.exports = {
   getState,
   updateData,
   nextStep,
+  setStep,
   clearState,
   hasActiveFlow,
 };

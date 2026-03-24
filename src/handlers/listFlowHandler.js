@@ -3,12 +3,8 @@
  */
 
 const conversationState = require("../services/conversationState");
-const listClient = require("../services/listClient");
+const flowManager = require("../components/menu/flowManager");
 const logger = require("../utils/logger");
-
-function listKindIcon(kind) {
-  return kind === "book" ? "📖" : "📽️";
-}
 
 function parseListKind(body) {
   const b = String(body || "")
@@ -40,13 +36,13 @@ async function handleListFlow(userId, body, state, reply, context) {
 
   logger.info(`[ListFlow] step=${step}, body="${body}" userId=${userId}`);
 
-  // Step 0: resposta = filmes ou livros
+  // Step 0: legado (texto); fluxo novo usa enquete em /listas
   if (step === 0) {
     const kind = parseListKind(body);
     if (!kind) {
       return reply(
-        "❌ Responda só *filmes* ou *livros*.\n\n" +
-          "Qual tipo de lista você quer criar?",
+        "❌ Abra */listas*, toque em *Criar nova lista* e escolha na enquete *Filmes* ou *Livros*.\n\n" +
+          "Ou responda aqui só *filmes* ou *livros*.",
       );
     }
     conversationState.updateData(userId, { listKind: kind });
@@ -62,7 +58,7 @@ async function handleListFlow(userId, body, state, reply, context) {
     );
   }
 
-  // Step 1: nome da lista
+  // Step 1: nome da lista → enquete de confirmação no fluxo /listas
   if (step === 1) {
     const listName = String(body || "").trim();
     const listKind = data?.listKind === "book" ? "book" : "movie";
@@ -75,44 +71,34 @@ async function handleListFlow(userId, body, state, reply, context) {
       return reply("❌ O nome da lista deve ter no máximo 50 caracteres.");
     }
 
-    try {
-      const groupChatId = context?.isGroup ? context?.from : null;
-      const newList = await listClient.createList(userId, {
-        title: listName,
-        groupChatId,
-        listKind,
-      });
-
-      if (!newList) {
-        conversationState.clearState(userId);
-        return reply(
-          '❌ Erro ao criar lista. Abra /listas e toque em "Criar nova lista" novamente',
-        );
-      }
-
-      conversationState.clearState(userId);
-
-      const filmTip =
-        listKind === "movie"
-          ? "• Use `/filme` para buscar e adicionar filmes\n"
-          : "";
-      const bookTip =
-        listKind === "book"
-          ? "• Use `/livro` para buscar e adicionar livros\n"
-          : "";
-
+    const chatId = context?.chatId || context?.from;
+    if (!context?.client || !chatId) {
+      logger.error("[ListFlow] Sem client/chatId para abrir enquete de confirmação");
       return reply(
-        `✅ *Lista criada com sucesso!*\n\n` +
-          `${listKindIcon(listKind)} ${newList.title}\n\n` +
-          `${filmTip}${bookTip}` +
-          `• Use \`/listas\` para gerenciar`,
+        "❌ Não foi possível abrir a confirmação. Tente */listas* de novo.",
       );
-    } catch (err) {
-      logger.error("[ListFlow] Erro ao criar lista:", err.message);
+    }
+
+    try {
+      await flowManager.startFlow(context.client, chatId, userId, "lists", {
+        initialContext: {
+          createListConfirm: {
+            listKind,
+            listName,
+            chatId,
+            isGroup: !!context.isGroup,
+          },
+        },
+        initialPath: "/create-list-confirm",
+        initialHistory: [],
+      });
       conversationState.clearState(userId);
+      return reply("👇 Confirme na enquete abaixo.");
+    } catch (err) {
+      logger.error("[ListFlow] Erro ao abrir confirmação:", err.message);
       return reply(
-        `❌ Erro ao criar lista: ${err.message}\n\n` +
-          'Abra /listas e toque em "Criar nova lista" novamente',
+        `❌ Erro ao abrir confirmação: ${err.message}\n\n` +
+          "Tente */listas* → *Criar nova lista*.",
       );
     }
   }

@@ -33,7 +33,7 @@ class FlowManager {
    * @param {string} chatId - Chat ID to send poll to
    * @param {string} userId - User ID for state tracking
    * @param {string} flowId - Flow to start
-   * @param {object} options - { initialContext, replyPrivate }
+   * @param {object} options - { initialContext, initialPath, initialHistory }
    */
   async startFlow(client, chatId, userId, flowId, options = {}) {
     const flow = this.flows.get(flowId);
@@ -43,17 +43,24 @@ class FlowManager {
 
     console.log(`[FlowManager] Starting flow ${flowId} for user ${userId}`);
 
+    const initialPath =
+      typeof options.initialPath === "string" && options.initialPath.startsWith("/")
+        ? options.initialPath
+        : "/";
+    const initialHistory = Array.isArray(options.initialHistory)
+      ? options.initialHistory
+      : [];
+
     // Save initial state
     const expiresAt = new Date(Date.now() + 30 * 60 * 1000); // 30 minutes
     await storage.saveState(userId, flowId, {
-      path: "/",
-      history: [],
+      path: initialPath,
+      history: initialHistory,
       context: options.initialContext || {},
       expiresAt: expiresAt.toISOString(),
     });
 
-    // Render root node
-    await this._renderNode(client, chatId, userId, flowId, "/");
+    await this._renderNode(client, chatId, userId, flowId, initialPath);
   }
 
   /**
