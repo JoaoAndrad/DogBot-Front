@@ -11,6 +11,22 @@ const {
   sendBufferAsSticker,
 } = require("../../utils/stickerHelper");
 const logger = require("../../utils/logger");
+const {
+  normalizeBookTitleForList,
+  truncateForPoll,
+} = require("../../utils/titleNormalize");
+
+function uniqueCandidatesByWorkId(results) {
+  const seen = new Set();
+  const out = [];
+  for (const r of results || []) {
+    const id = r && r.workId;
+    if (!id || seen.has(id)) continue;
+    seen.add(id);
+    out.push(r);
+  }
+  return out;
+}
 
 function extractWorkIdFromQuery(query) {
   let s = String(query).trim().replace(/^ol:/i, "");
@@ -32,7 +48,8 @@ module.exports = {
       const info = ctx.info || {};
       const client = ctx.client;
 
-      let userId = info.from || msg.from;
+      /* Em grupo, msg.from é o @g.us; o autor da mensagem é msg.author (como em listas.js). */
+      let userId = info.from || msg.author || msg.from;
       try {
         const contact = await msg.getContact();
         if (contact && contact.id && contact.id._serialized) {
@@ -104,14 +121,70 @@ module.exports = {
 
       const ambiguous = searchResults.length >= 2 && query.length <= 20;
       if (ambiguous) {
-        const candidates = searchResults.slice(0, 5).map((r) => ({
-          workId: r.workId,
-          title: r.title,
-          year: r.year,
-          posterUrl: r.posterUrl ?? null,
-        }));
+        const candidates = uniqueCandidatesByWorkId(searchResults)
+          .slice(0, 5)
+          .map((r) => ({
+            workId: r.workId,
+            title: r.title,
+            year: r.year,
+            posterUrl: r.posterUrl ?? null,
+          }));
+        if (candidates.length < 2) {
+          const book = uniqueCandidatesByWorkId(searchResults)[0];
+          if (!book) {
+            return reply(`❌ Nenhum livro encontrado para: ${query}`);
+          }
+          let bookInfo;
+          try {
+            bookInfo = await bookClient.getBookInfoWithAllRatings(
+              book.workId,
+              userId,
+              {
+                title: book.title,
+                year: book.year,
+                posterUrl: book.posterUrl,
+              },
+            );
+          } catch {
+            bookInfo = book;
+          }
+          await reply(formatBookCardMessage(bookInfo));
+          if (bookInfo.posterUrl) {
+            try {
+              const buf = await downloadImageToBuffer(bookInfo.posterUrl);
+              if (buf) {
+                await sendBufferAsSticker(client, msg.from, buf, {
+                  fullOnly: true,
+                });
+              }
+            } catch (err) {
+              logger.warn(`[Livro] sticker: ${err.message}`);
+            }
+          }
+          const bookTitle = `${bookInfo.title}${bookInfo.year ? ` (${bookInfo.year})` : ""}`;
+          try {
+            await flowManager.startFlow(client, msg.from, userId, "book-card", {
+              initialContext: {
+                workId: book.workId,
+                bookInfo,
+                bookTitle,
+              },
+            });
+          } catch (err) {
+            logger.warn(`[Livro] book-card: ${err.message}`);
+          }
+          return;
+        }
+        const listLines = candidates
+          .map(
+            (c, i) =>
+              `${i + 1}. ${truncateForPoll(normalizeBookTitleForList(c.title, c.year))}`,
+          )
+          .join("\n");
         await reply(
-          "Se não estiver na lista, busque em https://openlibrary.org e envie o código da obra (ex.: `/livro OL2160489W`).",
+          `📖 *Qual destes?*\n\n${listLines}\n\n` +
+            "_Responda à enquete abaixo._\n\n" +
+            "Se não estiver na lista, busque em https://openlibrary.org e envie o código da obra (ex.: `/livro OL2160489W`).",
         );
         try {
           await flowManager.startFlow(client, msg.from, userId, "book-search", {

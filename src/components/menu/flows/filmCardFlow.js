@@ -12,6 +12,21 @@ const {
   sendBufferAsSticker,
 } = require("../../../utils/stickerHelper");
 const logger = require("../../../utils/logger");
+const { truncateForPoll } = require("../../../utils/titleNormalize");
+
+function filmWorkLabel(ctx, movieInfo) {
+  const ft = ctx.state?.context?.filmTitle;
+  if (ft && String(ft).trim()) return String(ft).trim();
+  const t =
+    movieInfo?.title && String(movieInfo.title).trim()
+      ? String(movieInfo.title).trim()
+      : null;
+  if (!t) return "esta obra";
+  const y = movieInfo?.year;
+  return y != null && String(y).trim() !== ""
+    ? `${t} (${String(y).trim()})`
+    : t;
+}
 
 const RATING_OPTIONS = [0.5, 1, 1.5, 2, 2.5, 3, 3.5, 4, 4.5, 5];
 
@@ -71,8 +86,11 @@ const filmCardFlow = createFlow("film-card", {
           handler: "markWatchedFilm",
         });
       } else {
+        const work = filmWorkLabel(ctx, movieInfo);
         options.push({
-          label: "📽️ Registrar mais uma visualização",
+          label: truncateForPoll(
+            `📽️ Registrar mais uma visualização para "${work}"`,
+          ),
           action: "exec",
           handler: "markWatchedFilm",
         });

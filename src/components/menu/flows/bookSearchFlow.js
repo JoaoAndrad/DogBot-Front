@@ -11,30 +11,57 @@ const {
   sendBufferAsSticker,
 } = require("../../../utils/stickerHelper");
 const logger = require("../../../utils/logger");
+const {
+  normalizeBookTitleForList,
+  truncateForPoll,
+} = require("../../../utils/titleNormalize");
+
+function dedupeCandidatesByWorkId(list) {
+  const seen = new Set();
+  const out = [];
+  for (const c of list || []) {
+    const id = c && c.workId;
+    if (!id || seen.has(id)) continue;
+    seen.add(id);
+    out.push(c);
+  }
+  return out;
+}
 
 const bookSearchFlow = createFlow("book-search", {
   root: {
     title: "Qual destes?",
     dynamic: true,
     handler: async (ctx) => {
-      const candidates = ctx.state?.context?.candidates || [];
+      const raw = ctx.state?.context?.candidates || [];
+      const candidates = dedupeCandidatesByWorkId(raw).slice(0, 5);
       if (!candidates.length) {
         return {
           title: "❌ Nenhum resultado para escolher",
           options: [],
         };
       }
-      const options = candidates.slice(0, 5).map((c) => ({
-        label: `${c.title}${c.year ? ` (${c.year})` : ""}`,
-        action: "exec",
-        handler: "selectBook",
-        data: {
-          workId: c.workId,
-          title: c.title,
-          year: c.year ?? null,
-          posterUrl: c.posterUrl ?? null,
-        },
-      }));
+      const usedLabels = new Set();
+      const options = candidates.map((c) => {
+        let label = truncateForPoll(
+          normalizeBookTitleForList(c.title, c.year),
+        );
+        if (usedLabels.has(label)) {
+          label = truncateForPoll(`${label} · ${c.workId || "?"}`);
+        }
+        usedLabels.add(label);
+        return {
+          label,
+          action: "exec",
+          handler: "selectBook",
+          data: {
+            workId: c.workId,
+            title: c.title,
+            year: c.year ?? null,
+            posterUrl: c.posterUrl ?? null,
+          },
+        };
+      });
       return {
         title: "Qual destes?",
         options,

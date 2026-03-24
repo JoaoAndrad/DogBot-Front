@@ -25,7 +25,7 @@ module.exports = {
       const client = ctx.client;
 
       // Resolve to @c.us so flow state and votes use the same key (like listas.js)
-      let userId = info.from || msg.from;
+      let userId = info.from || msg.author || msg.from;
       try {
         const contact = await msg.getContact();
         if (contact && contact.id && contact.id._serialized) {

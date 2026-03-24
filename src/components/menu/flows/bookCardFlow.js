@@ -10,6 +10,18 @@ const {
   sendBufferAsSticker,
 } = require("../../../utils/stickerHelper");
 const logger = require("../../../utils/logger");
+const { truncateForPoll } = require("../../../utils/titleNormalize");
+
+function bookWorkLabel(ctx, bookInfo) {
+  const bt = ctx.state?.context?.bookTitle;
+  if (bt && String(bt).trim()) return String(bt).trim();
+  const t = bookInfo?.title && String(bookInfo.title).trim();
+  if (!t) return "esta obra";
+  const y = bookInfo?.year;
+  return y != null && String(y).trim() !== ""
+    ? `${t} (${String(y).trim()})`
+    : t;
+}
 
 const RATING_OPTIONS = [0.5, 1, 1.5, 2, 2.5, 3, 3.5, 4, 4.5, 5];
 
@@ -74,8 +86,11 @@ const bookCardFlow = createFlow("book-card", {
           handler: "markReadBook",
         });
       } else {
+        const work = bookWorkLabel(ctx, bookInfo);
         options.push({
-          label: "📖 Registrar mais uma leitura",
+          label: truncateForPoll(
+            `📖 Registrar mais uma leitura para "${work}"`,
+          ),
           action: "exec",
           handler: "markReadBook",
         });

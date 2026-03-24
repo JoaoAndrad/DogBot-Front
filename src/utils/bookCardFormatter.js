@@ -3,6 +3,7 @@
  */
 
 const UTC3 = "America/Sao_Paulo";
+const { normalizeBookTitleDisplay } = require("./titleNormalize");
 
 function formatRatingValue(n) {
   if (n == null || Number.isNaN(n)) return "";
@@ -25,7 +26,7 @@ function formatDateUTC3(d) {
  * @param {object} bookInfo - from getBookInfoWithAllRatings
  */
 function formatBookCardMessage(bookInfo) {
-  const title = `*${bookInfo.title}*`;
+  const title = `*${normalizeBookTitleDisplay(bookInfo.title)}*`;
   const year = bookInfo.year ? ` (${bookInfo.year})` : "";
   const workId = bookInfo.workId || "";
   const olLine = workId
