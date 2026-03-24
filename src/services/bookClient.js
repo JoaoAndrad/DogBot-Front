@@ -26,12 +26,18 @@ async function getBookInfo(userId, workId) {
   return sendToBackend(path, null, "GET");
 }
 
-async function getBookInfoWithAllRatings(workId, userId) {
-  let path = `/api/books/${encodeURIComponent(workId)}/ratings`;
-  if (userId) {
-    path += `?userId=${encodeURIComponent(userId)}`;
-  }
-  return sendToBackend(path, null, "GET");
+async function getBookInfoWithAllRatings(workId, userId, fallback = null) {
+  const path = `/api/books/${encodeURIComponent(workId)}/ratings`;
+  const params = new URLSearchParams();
+  if (userId) params.set("userId", userId);
+  if (fallback?.title) params.set("fallbackTitle", String(fallback.title));
+  if (fallback?.year != null && fallback.year !== "")
+    params.set("fallbackYear", String(fallback.year));
+  if (fallback?.posterUrl)
+    params.set("fallbackPoster", String(fallback.posterUrl));
+  const qs = params.toString();
+  const url = qs ? `${path}?${qs}` : path;
+  return sendToBackend(url, null, "GET");
 }
 
 async function searchBooks(query, limit = 10) {

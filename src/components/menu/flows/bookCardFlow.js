@@ -34,10 +34,16 @@ function getViewerBookState(bookInfo) {
 
 async function refreshBookCardContext(state, workId, userId) {
   if (!workId || !userId) return;
+  const bi = state.context?.bookInfo;
+  const fallback =
+    bi?.title && String(bi.title).trim()
+      ? { title: bi.title, year: bi.year, posterUrl: bi.posterUrl }
+      : null;
   try {
     const refreshed = await bookClient.getBookInfoWithAllRatings(
       workId,
       userId,
+      fallback,
     );
     state.context.bookInfo = refreshed;
   } catch (err) {

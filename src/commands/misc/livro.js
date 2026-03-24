@@ -106,6 +106,7 @@ module.exports = {
           workId: r.workId,
           title: r.title,
           year: r.year,
+          posterUrl: r.posterUrl ?? null,
         }));
         await reply(
           "Se não estiver na lista, busque em https://openlibrary.org e envie o código da obra (ex.: `/livro OL2160489W`).",
@@ -126,6 +127,11 @@ module.exports = {
         bookInfo = await bookClient.getBookInfoWithAllRatings(
           book.workId,
           userId,
+          {
+            title: book.title,
+            year: book.year,
+            posterUrl: book.posterUrl,
+          },
         );
       } catch {
         bookInfo = book;

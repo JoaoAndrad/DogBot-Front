@@ -28,7 +28,12 @@ const bookSearchFlow = createFlow("book-search", {
         label: `${c.title}${c.year ? ` (${c.year})` : ""}`,
         action: "exec",
         handler: "selectBook",
-        data: { workId: c.workId },
+        data: {
+          workId: c.workId,
+          title: c.title,
+          year: c.year ?? null,
+          posterUrl: c.posterUrl ?? null,
+        },
       }));
       return {
         title: "Qual destes?",
@@ -45,9 +50,21 @@ const bookSearchFlow = createFlow("book-search", {
         await ctx.reply("❌ Livro não identificado.");
         return { end: true };
       }
+      const fallback =
+        data?.title && String(data.title).trim()
+          ? {
+              title: data.title,
+              year: data.year,
+              posterUrl: data.posterUrl,
+            }
+          : null;
       let bookInfo;
       try {
-        bookInfo = await bookClient.getBookInfoWithAllRatings(workId, userId);
+        bookInfo = await bookClient.getBookInfoWithAllRatings(
+          workId,
+          userId,
+          fallback,
+        );
       } catch (e) {
         await ctx.reply(`❌ Livro com ID ${workId} não encontrado.`);
         return { end: true };
