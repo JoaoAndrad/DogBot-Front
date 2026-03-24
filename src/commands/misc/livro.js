@@ -55,11 +55,13 @@ module.exports = {
   description: "📖 Buscar livro e ver cartão (Google Livros)",
 
   async execute(ctx) {
+    const t0 = Date.now();
     try {
       const msg = ctx.message;
       const reply = ctx.reply;
       const info = ctx.info || {};
       const client = ctx.client;
+      const chatId = msg.from;
 
       /* Em grupo, msg.from é o @g.us; o autor da mensagem é msg.author (como em listas.js). */
       let userId = info.from || msg.author || msg.from;
@@ -75,6 +77,13 @@ module.exports = {
       const text = (msg.body || "").trim();
       const query = text.replace(/^\/(livro|book|livros)\s*/i, "").trim();
 
+      console.log("[Livro] execute", {
+        query: query || "(vazio)",
+        chatId,
+        userId,
+        infoKeys: info && typeof info === "object" ? Object.keys(info) : [],
+      });
+
       if (!query) {
         return reply(
           "📖 *Como usar o /livro*\n\n" +
@@ -87,6 +96,7 @@ module.exports = {
 
       const directWorkId = extractDirectBookIdFromQuery(query);
       if (directWorkId) {
+        console.log("[Livro] ramo ID direto", { directWorkId, ms: Date.now() - t0 });
         let bookInfo;
         try {
           bookInfo = await bookClient.getBookInfoWithAllRatings(
@@ -94,6 +104,11 @@ module.exports = {
             userId,
           );
         } catch (e) {
+          console.error("[Livro] getBookInfoWithAllRatings falhou", {
+            directWorkId,
+            message: e.message,
+            status: e.status,
+          });
           return reply(`❌ Livro não encontrado para: ${directWorkId}`);
         }
 
@@ -127,14 +142,37 @@ module.exports = {
 
       await reply(`🔍 Procurando por "${query}" no meu banco de dados...`);
 
-      const searchResp = await bookClient.searchBooks(query, 12);
+      const tSearch = Date.now();
+      let searchResp;
+      try {
+        searchResp = await bookClient.searchBooks(query, 12);
+      } catch (e) {
+        console.error("[Livro] searchBooks exceção", {
+          query,
+          message: e.message,
+          status: e.status,
+          body: e.body,
+        });
+        throw e;
+      }
       const searchResults = searchResp.results || [];
+      console.log("[Livro] searchBooks ok", {
+        query,
+        resultCount: searchResults.length,
+        ms: Date.now() - tSearch,
+        totalMs: Date.now() - t0,
+      });
+
       if (!searchResults.length) {
+        console.log("[Livro] sem resultados — a terminar");
         return reply(`❌ Nenhum livro encontrado para: ${query}`);
       }
 
       const ambiguous = searchResults.length >= 2 && query.length <= 20;
       if (ambiguous) {
+        console.log("[Livro] ramo desambiguação (enquete)", {
+          candidatos: Math.min(uniqueCandidatesByWorkId(searchResults).length, 5),
+        });
         const candidates = uniqueCandidatesByWorkId(searchResults)
           .slice(0, 5)
           .map((r) => ({
@@ -207,9 +245,14 @@ module.exports = {
         } catch (err) {
           logger.warn(`[Livro] book-search: ${err.message}`);
         }
+        console.log("[Livro] book-search flow iniciado", { ms: Date.now() - t0 });
         return;
       }
 
+      console.log("[Livro] ramo resultado único", {
+        workId: searchResults[0]?.workId,
+        title: searchResults[0]?.title,
+      });
       const book = searchResults[0];
       let bookInfo;
       try {
@@ -253,7 +296,13 @@ module.exports = {
         logger.warn(`[Livro] book-card: ${err.message}`);
       }
     } catch (err) {
-      console.error("[Livro] Error:", err.message);
+      console.error("[Livro] execute falhou", {
+        message: err.message,
+        stack: err.stack,
+        status: err.status,
+        body: err.body,
+        ms: Date.now() - t0,
+      });
       return ctx.reply(`❌ Erro ao buscar livro: ${err.message}`);
     }
   },

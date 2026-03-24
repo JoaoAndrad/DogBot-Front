@@ -22,7 +22,18 @@ async function sendToBackend(path, body, method = "POST") {
     options.body = JSON.stringify(body);
   }
 
-  const res = await fetch(url + path, options);
+  let res;
+  try {
+    res = await fetch(url + path, options);
+  } catch (netErr) {
+    console.error("[backendClient] fetch falhou (rede/DNS)", {
+      method,
+      path: path.slice(0, 200),
+      baseUrl: url,
+      message: netErr.message,
+    });
+    throw netErr;
+  }
 
   // Validate HTTP status: anything non-2xx is an error
   if (!res.ok) {
@@ -38,6 +49,13 @@ async function sendToBackend(path, body, method = "POST") {
       errorBody?.message ||
       res.statusText ||
       "Unknown error";
+    console.error("[backendClient] resposta HTTP não OK", {
+      method,
+      path: path.slice(0, 200),
+      status: res.status,
+      message: msg,
+      body: errorBody,
+    });
     const err = new Error(`HTTP ${res.status}: ${msg}`);
     err.status = res.status;
     err.body = errorBody;

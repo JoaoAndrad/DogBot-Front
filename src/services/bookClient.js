@@ -42,7 +42,29 @@ async function getBookInfoWithAllRatings(workId, userId, fallback = null) {
 
 async function searchBooks(query, limit = 10) {
   const params = new URLSearchParams({ q: query, limit: String(limit) });
-  return sendToBackend(`/api/books/search?${params}`, null, "GET");
+  const path = `/api/books/search?${params}`;
+  const t0 = Date.now();
+  try {
+    const data = await sendToBackend(path, null, "GET");
+    const list = data.results || [];
+    console.log("[bookClient] searchBooks OK", {
+      query: String(query).slice(0, 80),
+      limit,
+      resultCount: list.length,
+      ms: Date.now() - t0,
+    });
+    return data;
+  } catch (e) {
+    console.error("[bookClient] searchBooks falhou", {
+      query: String(query).slice(0, 80),
+      limit,
+      ms: Date.now() - t0,
+      message: e.message,
+      status: e.status,
+      body: e.body,
+    });
+    throw e;
+  }
 }
 
 module.exports = {
