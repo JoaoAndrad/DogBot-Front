@@ -13,11 +13,14 @@ const {
 const logger = require("../../utils/logger");
 const { truncateForPoll } = require("../../utils/titleNormalize");
 
-/** Lista de enquete: nome como na API + ano (plano livros PT / popularidade). */
-function formatBookPollLine(title, year) {
+/** Lista de enquete: título, ano e opcionalmente editora (Google ou Wikipédia). */
+function formatBookPollLine(title, year, publisher) {
   const t = String(title || "").trim() || "Sem título";
   const y = year != null && String(year).trim() !== "" ? String(year).trim() : "";
-  return y ? `${t} (${y})` : t;
+  const pub = publisher != null && String(publisher).trim() ? String(publisher).trim() : "";
+  let line = y ? `${t} (${y})` : t;
+  if (pub) line += ` · ${pub}`;
+  return line;
 }
 
 function uniqueCandidatesByWorkId(results) {
@@ -183,6 +186,7 @@ module.exports = {
             workId: r.workId,
             title: r.title,
             year: r.year,
+            publisher: r.publisher ?? null,
             posterUrl: r.posterUrl ?? null,
           }));
         if (candidates.length < 2) {
@@ -234,7 +238,7 @@ module.exports = {
         const listLines = candidates
           .map(
             (c, i) =>
-              `${i + 1}. ${truncateForPoll(formatBookPollLine(c.title, c.year))}`,
+              `${i + 1}. ${truncateForPoll(formatBookPollLine(c.title, c.year, c.publisher))}`,
           )
           .join("\n");
         await reply(

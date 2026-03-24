@@ -13,11 +13,17 @@ function normalizeBookTitleDisplay(title) {
   return stripDiacritics(String(title || "").trim()).toLowerCase();
 }
 
-/** Título para lista/enquete: sem acento, minúsculas, ano opcional. */
-function normalizeBookTitleForList(title, year) {
+/** Título para lista/enquete: sem acento, minúsculas; ano e editora opcionais. */
+function normalizeBookTitleForList(title, year, publisher) {
   const t = normalizeBookTitleDisplay(title);
   const y = year != null && String(year).trim() !== "" ? String(year).trim() : "";
-  return y ? `${t} (${y})` : t;
+  const pub =
+    publisher != null && String(publisher).trim()
+      ? stripDiacritics(String(publisher).trim()).toLowerCase()
+      : "";
+  let line = y ? `${t} (${y})` : t;
+  if (pub) line += ` · ${pub}`;
+  return line;
 }
 
 /** Limite seguro para opções de enquete no WhatsApp (evita texto vazio/truncado estranho). */

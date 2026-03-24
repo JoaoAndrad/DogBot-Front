@@ -44,7 +44,7 @@ const bookSearchFlow = createFlow("book-search", {
       const usedLabels = new Set();
       const options = candidates.map((c) => {
         let label = truncateForPoll(
-          normalizeBookTitleForList(c.title, c.year),
+          normalizeBookTitleForList(c.title, c.year, c.publisher),
         );
         if (usedLabels.has(label)) {
           label = truncateForPoll(`${label} · ${c.workId || "?"}`);
