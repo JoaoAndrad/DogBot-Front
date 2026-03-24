@@ -32,9 +32,15 @@ async function searchMovies(query, page = 1) {
  * @param {string} userIdOrGroupId - User ID or Group Chat ID (@g.us)
  * @param {number} page - Página
  * @param {string?} groupChatId - Opcional: se fornecido, busca listas do grupo em vez de listas do usuário
+ * @param {string?} listKind - Opcional: "movie" | "book" filtra no backend
  * @returns {Promise<array>} Array de listas
  */
-async function getUserLists(userIdOrGroupId, page = 1, groupChatId = null) {
+async function getUserLists(
+  userIdOrGroupId,
+  page = 1,
+  groupChatId = null,
+  listKind = null,
+) {
   try {
     // Se groupChatId for explicitamente fornecido, use-o. Caso contrário, detecte pelo userIdOrGroupId
     const targetGroupId =
@@ -47,6 +53,11 @@ async function getUserLists(userIdOrGroupId, page = 1, groupChatId = null) {
       : userIdOrGroupId;
 
     let query;
+    const kindQs =
+      listKind === "book" || listKind === "movie"
+        ? `&listKind=${encodeURIComponent(listKind)}`
+        : "";
+
     if (targetGroupId) {
       // Always include userId for authentication, even when querying group lists
       query =
@@ -55,14 +66,16 @@ async function getUserLists(userIdOrGroupId, page = 1, groupChatId = null) {
         "&userId=" +
         encodeURIComponent(userId) +
         "&page=" +
-        page;
+        page +
+        kindQs;
       console.log(`[ListClient] 🔍 Query group lists: ${query}`);
     } else {
       query =
         "/api/lists?userId=" +
         encodeURIComponent(userIdOrGroupId) +
         "&page=" +
-        page;
+        page +
+        kindQs;
       console.log(`[ListClient] 🔍 Query user lists: ${query}`);
     }
 
@@ -125,11 +138,17 @@ async function getListStats(listId) {
  */
 async function createList(
   userId,
-  { title, description, isPublic = false, groupChatId = null },
+  {
+    title,
+    description,
+    isPublic = false,
+    groupChatId = null,
+    listKind = "movie",
+  },
 ) {
   try {
     console.log(
-      `[ListClient] Creating list: title="${title}", userId=${userId}, groupChatId=${groupChatId}, isPublic=${isPublic}`,
+      `[ListClient] Creating list: title="${title}", userId=${userId}, groupChatId=${groupChatId}, isPublic=${isPublic}, listKind=${listKind}`,
     );
 
     const payload = {
@@ -137,6 +156,8 @@ async function createList(
       title,
       description,
       isPublic,
+      listKind:
+        listKind === "book" || listKind === "movie" ? listKind : "movie",
     };
 
     if (groupChatId) {

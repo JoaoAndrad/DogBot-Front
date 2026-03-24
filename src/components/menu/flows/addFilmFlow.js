@@ -89,9 +89,16 @@ const addFilmFlow = createFlow("add-film", {
         logger.info(
           `[AddFilmFlow] 📋 Fetching lists... isGroup=${isGroup}, groupChatId=${groupChatId}, userId=${userId}`,
         );
-        const lists = await listClient.getUserLists(userId, 1, groupChatId);
+        const allLists = await listClient.getUserLists(
+          userId,
+          1,
+          groupChatId,
+        );
+        const lists = allLists.filter(
+          (l) => (l.listKind || "movie") === "movie",
+        );
         logger.info(
-          `[AddFilmFlow] ✅ Fetched ${lists.length} lists. isGroup=${isGroup}`,
+          `[AddFilmFlow] ✅ Fetched ${lists.length} movie lists (of ${allLists.length}). isGroup=${isGroup}`,
         );
 
         // Log detailed info about each list
@@ -109,18 +116,14 @@ const addFilmFlow = createFlow("add-film", {
         if (lists.length === 0) {
           const msgPrivate =
             `📽️ *${filmTitle}*\n\n` +
-            `*Você ainda não tem listas!*\n\n` +
-            `Crie sua primeira lista:\n` +
-            `\`/criar-lista nome da lista\`\n\n` +
-            `Ou use: \`/listas\`\n\n` +
-            `_💡 Listas criadas no privado são só suas. Em grupo, ficam visíveis para todos os integrantes do grupo, para uma lista só sua, crie aqui no privado._`;
+            `*Você não tem listas de filmes!*\n\n` +
+            `Em \`/listas\`, crie uma lista e escolha *filmes* quando o bot perguntar o tipo.\n\n` +
+            `_💡 Listas de livros não aparecem aqui._`;
           const msgGroup =
             `📽️ *${filmTitle}*\n\n` +
-            `*Ainda não há listas neste grupo!*\n\n` +
-            `Alguém pode criar a primeira:\n` +
-            `\`/criar-lista nome da lista\`\n\n` +
-            `Ou use: \`/listas\`\n\n` +
-            `_💡 Listas no grupo são visíveis para todos os integrantes. Para lista só sua, crie no meu privado._`;
+            `*Não há listas de filmes neste grupo.*\n\n` +
+            `Crie uma em \`/listas\` (tipo *filmes*).\n\n` +
+            `_Listas de livros são separadas._`;
           return {
             title: isGroup ? msgGroup : msgPrivate,
             skipPoll: true,

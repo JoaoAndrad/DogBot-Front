@@ -8,7 +8,7 @@ const flowManager = require("../../components/menu/flowManager");
 module.exports = {
   name: "listas",
   aliases: ["lista", "movies", "filmes", "séries"],
-  description: "📽️ Gerenciar listas de filmes e séries",
+  description: "📋 Gerenciar listas de filmes e livros",
 
   async execute(context) {
     const { client, message, reply } = context;

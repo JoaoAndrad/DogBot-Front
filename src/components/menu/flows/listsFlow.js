@@ -33,9 +33,13 @@ function formatRating(rating) {
   return `${stars} ${rating}/5`;
 }
 
+function listKindIcon(kind) {
+  return (kind || "movie") === "book" ? "📖" : "📽️";
+}
+
 const listsFlow = createFlow("lists", {
   root: {
-    title: "📽️ Minhas Listas",
+    title: "📋 Minhas listas (filmes e livros)",
     dynamic: true,
     handler: async (ctx) => {
       try {
@@ -95,8 +99,8 @@ const listsFlow = createFlow("lists", {
         if (lists.length === 0) {
           return {
             title: isGroup
-              ? "📽️ Nenhuma lista no grupo ainda!\n\n Toque em *Criar nova lista* abaixo e, na sua próxima mensagem, envie o nome da lista."
-              : "📽️ Você ainda não tem listas!\n\n Toque em *Criar nova lista* abaixo e, na sua próxima mensagem, envie o nome da lista.",
+              ? "📋 Nenhuma lista no grupo ainda!\n\n Toque em *Criar nova lista*. O bot vai perguntar se é lista de *filmes* ou *livros*, depois o nome."
+              : "📋 Você ainda não tem listas!\n\n Toque em *Criar nova lista*. O bot pergunta se é *filmes* ou *livros*, depois o nome da lista.",
             options: [
               {
                 label: "➕ Criar nova lista",
@@ -111,17 +115,23 @@ const listsFlow = createFlow("lists", {
 
         const options = lists.map((list) => ({
           label:
-            `📋 ${list.title} (${list._count.items} items)` +
+            `${listKindIcon(list.listKind)} ${list.title} (${list._count.items} items)` +
             (isGroup && list.owner ? ` - ${list.owner.push_name}` : ""),
           action: "exec",
           handler: "selectList",
-          data: { listId: list.id, listTitle: list.title },
+          data: {
+            listId: list.id,
+            listTitle: list.title,
+            listKind: list.listKind || "movie",
+          },
         }));
 
         options.push({ label: "🔙 Voltar", action: "back" });
 
         return {
-          title: isGroup ? "📽️ Listas do Grupo" : "📽️ Minhas Listas",
+          title: isGroup
+            ? "📋 Listas do grupo (filmes e livros)"
+            : "📋 Minhas listas (filmes e livros)",
           options,
           skipPoll: false,
         };
@@ -168,6 +178,8 @@ const listsFlow = createFlow("lists", {
         const userId = ctx.state?.context?._backendUserId || ctx.userId;
         const list = await listClient.getList(listId, userId);
         const stats = await listClient.getListStats(listId);
+        const kind = list.listKind || "movie";
+        const doneLabel = kind === "book" ? "Lidos" : "Assistidos";
 
         const itemsText = list.items
           .slice(0, 5)
@@ -179,18 +191,18 @@ const listsFlow = createFlow("lists", {
           .join("\n");
 
         const title =
-          `📋 *${list.title}*\n\n` +
+          `${listKindIcon(kind)} *${list.title}*\n\n` +
           `📊 Stats:\n` +
           `- Total: ${stats.total} items\n` +
-          `- Assistidos: ${stats.watched}/${stats.total}\n` +
+          `- ${doneLabel}: ${stats.watched}/${stats.total}\n` +
           `- Nota média: ${stats.avgRating > 0 ? formatRating(Math.round(stats.avgRating)) : "Sem avaliações"}\n\n` +
           (itemsText
-            ? `🎬 Últimos items:\n${itemsText}\n\n`
+            ? `${listKindIcon(kind)} Últimos items:\n${itemsText}\n\n`
             : "Nenhum item na lista\n\n");
 
         const options = [
           {
-            label: "📽️ Ver todos os items",
+            label: `${listKindIcon(kind)} Ver todos os items`,
             action: "exec",
             handler: "listItems",
           },
@@ -243,14 +255,16 @@ const listsFlow = createFlow("lists", {
 
         const userId = ctx.state?.context?._backendUserId || ctx.userId;
         const list = await listClient.getList(listId, userId, 1);
+        const kind = list.listKind || "movie";
+        const addHint =
+          kind === "book"
+            ? "Use /livro para buscar e adicionar."
+            : "Use /filme para buscar e adicionar.";
 
         if (list.items.length === 0) {
           return {
-            title: `📽️ ${list.title}\n\nNenhum item na lista ainda.`,
-            options: [
-              { label: "✄️ Adicionar filme", action: "back" },
-              { label: "🔙 Voltar", action: "back" },
-            ],
+            title: `${listKindIcon(kind)} ${list.title}\n\nNenhum item na lista ainda.\n\n_${addHint}_`,
+            options: [{ label: "🔙 Voltar", action: "back" }],
           };
         }
 
@@ -267,7 +281,7 @@ const listsFlow = createFlow("lists", {
         options.push({ label: "🔙 Voltar", action: "back" });
 
         return {
-          title: `📋 ${list.title} (${list.items.length} items)`,
+          title: `${listKindIcon(kind)} ${list.title} (${list.items.length} items)`,
           options,
         };
       } catch (err) {
@@ -307,9 +321,30 @@ const listsFlow = createFlow("lists", {
         };
       }
 
+      const listKind =
+        ctx.state?.context?.selectedList?.listKind ||
+        (item.tmdbId && String(item.tmdbId).toLowerCase().startsWith("ol:")
+          ? "book"
+          : "movie");
+      const isBook = listKind === "book";
+      const statusLine = isBook
+        ? item.watched
+          ? "✅ Lido"
+          : "❌ Não lido"
+        : item.watched
+          ? "✅ Assistido"
+          : "❌ Não assistido";
+      const toggleSeen = isBook
+        ? item.watched
+          ? "↩️ Marcar como não lido"
+          : "✅ Marcar como lido"
+        : item.watched
+          ? "↩️ Marcar como não assistido"
+          : "✅ Marcar como assistido";
+
       const title =
-        `🎬 ${formatMovieTitle(item)}\n\n` +
-        `Status: ${item.watched ? "✅ Assistido" : "❌ Não assistido"}\n` +
+        `${isBook ? "📖" : "🎬"} ${formatMovieTitle(item)}\n\n` +
+        `Status: ${statusLine}\n` +
         (item.rating ? `Nota: ${formatRating(item.rating)}\n` : "") +
         (item.overview ? `\n📝 ${item.overview.slice(0, 100)}...` : "");
 
@@ -317,9 +352,7 @@ const listsFlow = createFlow("lists", {
         title,
         options: [
           {
-            label: item.watched
-              ? "↩️ Marcar como não assistido"
-              : "✅ Marcar como assistido",
+            label: toggleSeen,
             action: "exec",
             handler: "toggleWatched",
           },
@@ -436,7 +469,7 @@ const listsFlow = createFlow("lists", {
     selectList: async (ctx) => {
       try {
         // Data comes from ctx.data (backend response) with poll option data
-        const { listId, listTitle } = ctx.data || {};
+        const { listId, listTitle, listKind } = ctx.data || {};
 
         console.info(
           `[ListsFlow👆] Handler selectList chamado para userId=${ctx.userId}`,
@@ -466,7 +499,11 @@ const listsFlow = createFlow("lists", {
           ctx.state.context = {};
         }
 
-        ctx.selectedList = { listId, listTitle };
+        ctx.selectedList = {
+          listId,
+          listTitle,
+          listKind: listKind || "movie",
+        };
         // Persist selectedList into context, which is what storage persists
         ctx.state.context.selectedList = ctx.selectedList;
         ctx.state.context.selectedItem = null;
@@ -783,15 +820,17 @@ const listsFlow = createFlow("lists", {
      */
     createList: async (ctx) => {
       try {
-        // Start interactive list-creation flow and wait for user text input.
         conversationState.startFlow(ctx.userId, "list-creation", {
           chatId: ctx.chatId,
           isGroup: String(ctx.chatId || "").endsWith("@g.us"),
           source: "lists-menu",
         });
-        conversationState.nextStep(ctx.userId); // move to step that consumes list name
 
-        await ctx.reply("Qual o nome que deseja dar para a sua nova lista?");
+        await ctx.reply(
+          "📋 *Nova lista*\n\n" +
+            "É para *filmes* ou *livros*?\n\n" +
+            "Responda com uma palavra: *filmes* ou *livros*.",
+        );
         return { end: true };
       } catch (err) {
         console.error("[ListsFlow] createList error:", err.message);

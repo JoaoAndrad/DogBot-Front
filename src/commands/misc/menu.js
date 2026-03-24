@@ -5,14 +5,20 @@ const listsFlow = require("../../components/menu/flows/listsFlow");
 const addFilmFlow = require("../../components/menu/flows/addFilmFlow");
 const filmCardFlow = require("../../components/menu/flows/filmCardFlow");
 const filmSearchFlow = require("../../components/menu/flows/filmSearchFlow");
+const bookCardFlow = require("../../components/menu/flows/bookCardFlow");
+const bookSearchFlow = require("../../components/menu/flows/bookSearchFlow");
+const addBookFlow = require("../../components/menu/flows/addBookFlow");
 
 // Register flows on load
 flowManager.registerFlow(testFlow);
 flowManager.registerFlow(spotifyFlow);
 flowManager.registerFlow(listsFlow);
 flowManager.registerFlow(addFilmFlow);
+flowManager.registerFlow(addBookFlow);
 flowManager.registerFlow(filmCardFlow);
 flowManager.registerFlow(filmSearchFlow);
+flowManager.registerFlow(bookCardFlow);
+flowManager.registerFlow(bookSearchFlow);
 
 module.exports = {
   name: "menu",

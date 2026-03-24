@@ -197,9 +197,12 @@ async function executeAction(result, client) {
         let voterDisplayName = null;
         if (
           data.flowId === "add-film" ||
+          data.flowId === "add-book" ||
           data.flowId === "lists" ||
           data.flowId === "film-card" ||
-          data.flowId === "film-search"
+          data.flowId === "film-search" ||
+          data.flowId === "book-card" ||
+          data.flowId === "book-search"
         ) {
           try {
             logger.debug(
@@ -340,6 +343,42 @@ async function executeAction(result, client) {
                 await client.sendMessage(
                   poll.chatId,
                   "❌ Para salvar avaliação ou marcar como assistido você precisa estar registrado no bot. Envie /cadastro no meu PRIVADO primeiro",
+                );
+                break;
+              }
+            }
+
+            if (data.flowId === "book-card") {
+              const ctxEmpty =
+                !savedState.context || typeof savedState.context !== "object";
+              const needBookData = ["markReadBook", "rateBookHandler"].includes(
+                handler,
+              );
+              const needBookTitle = handler === "addBookToList";
+              const hasBookData =
+                !ctxEmpty &&
+                savedState.context.workId &&
+                savedState.context.bookInfo;
+              const hasBookTitle = !ctxEmpty && savedState.context.bookTitle;
+              if (
+                (needBookData && !hasBookData) ||
+                (needBookTitle && !hasBookTitle)
+              ) {
+                await client.sendMessage(
+                  poll.chatId,
+                  "❌ O contexto desta enquete expirou. Use /livro (nome do livro) novamente para começar.",
+                );
+                break;
+              }
+              if (
+                (handler === "markReadBook" ||
+                  handler === "rateBookHandler" ||
+                  handler === "addBookToList") &&
+                !userResolvedToUuid
+              ) {
+                await client.sendMessage(
+                  poll.chatId,
+                  "❌ Para salvar avaliação ou marcar como lido você precisa estar registrado no bot. Envie /cadastro no meu PRIVADO primeiro",
                 );
                 break;
               }
