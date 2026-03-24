@@ -89,7 +89,10 @@ ${statusLines}
     });
     message += "\n" + lines.join("\n") + "\n";
   }
-  message += "\n" + overview;
+  if (overview) {
+    /* Duplo newline: sinopse com parágrafos (\n\n da wiki) não fica colada ao bloco de cima no WhatsApp */
+    message += `\n\n${overview}`;
+  }
   return message;
 }
 
