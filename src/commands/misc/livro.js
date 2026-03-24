@@ -1,6 +1,6 @@
 /**
- * commands/misc/livro.js — Buscar livro (Open Library)
- * Uso: /livro nome ou /livro OL45883W
+ * commands/misc/livro.js — Buscar livro (Google Livros; legado Open Library)
+ * Uso: /livro nome | /livro gb:volumeId | URL Google Livros | ISBN | OL45883W
  */
 
 const bookClient = require("../../services/bookClient");
@@ -28,18 +28,31 @@ function uniqueCandidatesByWorkId(results) {
   return out;
 }
 
-function extractWorkIdFromQuery(query) {
-  let s = String(query).trim().replace(/^ol:/i, "");
-  const m = s.match(/OL\d+W/i);
-  if (!m) return null;
-  const id = m[0].toUpperCase();
-  return /^OL\d+W$/.test(id) ? id : null;
+function extractDirectBookIdFromQuery(query) {
+  const s = String(query || "").trim();
+  if (!s) return null;
+  if (/^gb:/i.test(s)) {
+    const rest = s.replace(/^gb:/i, "").trim();
+    if (/^[a-zA-Z0-9_-]{4,64}$/.test(rest)) return rest;
+    return null;
+  }
+  const urlMatch = s.match(/[?&]id=([a-zA-Z0-9_-]+)/);
+  if (urlMatch) return urlMatch[1];
+  const olPart = s.replace(/^ol:/i, "").trim();
+  const olM = olPart.match(/\bOL\d+W\b/i);
+  if (olM) {
+    const id = olM[0].toUpperCase();
+    return /^OL\d+W$/.test(id) ? id : null;
+  }
+  const isbn = s.replace(/[-\s]/g, "").toUpperCase();
+  if (/^(97[89]\d{10}|\d{10}|\d{9}X)$/.test(isbn)) return s.trim();
+  return null;
 }
 
 module.exports = {
   name: "livro",
   aliases: ["book", "livros"],
-  description: "📖 Buscar livro e ver cartão (Open Library)",
+  description: "📖 Buscar livro e ver cartão (Google Livros)",
 
   async execute(ctx) {
     try {
@@ -66,12 +79,13 @@ module.exports = {
         return reply(
           "📖 *Como usar o /livro*\n\n" +
             "• _Buscar por nome:_\n`/livro Romeu e Julieta`\n" +
-            "• _Buscar por ID da obra (Open Library, na URL openlibrary.org/works/…):_\n`/livro OL2160489W`\n\n" +
-            "Ex.: https://openlibrary.org/works/OL2160489W → `/livro OL2160489W`",
+            "• _ID Google Livros:_\n`/livro gb:xxxxxxxx` ou cole o link `books.google.com/...id=...`\n" +
+            "• _ISBN:_\n`/livro 978-...`\n" +
+            "• _Legado Open Library:_\n`/livro OL2160489W`",
         );
       }
 
-      const directWorkId = extractWorkIdFromQuery(query);
+      const directWorkId = extractDirectBookIdFromQuery(query);
       if (directWorkId) {
         let bookInfo;
         try {
@@ -80,7 +94,7 @@ module.exports = {
             userId,
           );
         } catch (e) {
-          return reply(`❌ Livro com ID ${directWorkId} não encontrado.`);
+          return reply(`❌ Livro não encontrado para: ${directWorkId}`);
         }
 
         await reply(formatBookCardMessage(bookInfo));
@@ -184,7 +198,7 @@ module.exports = {
         await reply(
           `📖 *Qual destes?*\n\n${listLines}\n\n` +
             "_Responda à enquete abaixo._\n\n" +
-            "Se não estiver na lista, busque em https://openlibrary.org e envie o código da obra (ex.: `/livro OL2160489W`).",
+            "Se não estiver na lista, abra https://books.google.com , localize o livro e envie o link ou `/livro gb:ID` (id na URL).",
         );
         try {
           await flowManager.startFlow(client, msg.from, userId, "book-search", {

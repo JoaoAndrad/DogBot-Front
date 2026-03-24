@@ -42,7 +42,7 @@ async function getBookInfoWithAllRatings(workId, userId, fallback = null) {
 
 async function searchBooks(query, limit = 10) {
   const params = new URLSearchParams({ q: query, limit: String(limit) });
-  return sendToBackend(`/api/books/search/openlibrary?${params}`, null, "GET");
+  return sendToBackend(`/api/books/search?${params}`, null, "GET");
 }
 
 module.exports = {

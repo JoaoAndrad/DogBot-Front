@@ -386,11 +386,12 @@ const listsFlow = createFlow("lists", {
         };
       }
 
+      const tid = item.tmdbId && String(item.tmdbId).toLowerCase();
+      const tmdbLooksBook =
+        tid && (tid.startsWith("ol:") || tid.startsWith("gb:"));
       const listKind =
         ctx.state?.context?.selectedList?.listKind ||
-        (item.tmdbId && String(item.tmdbId).toLowerCase().startsWith("ol:")
-          ? "book"
-          : "movie");
+        (tmdbLooksBook ? "book" : "movie");
       const isBook = listKind === "book";
       const statusLine = isBook
         ? item.watched

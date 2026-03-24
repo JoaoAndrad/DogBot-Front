@@ -91,7 +91,7 @@ const addBookFlow = createFlow("add-book", {
 
         ctx.state.context.lists = lists;
 
-        const olTmdbId = `ol:${book.workId || ctx.state.context.workId}`;
+        const olTmdbId = `gb:${book.workId || ctx.state.context.workId}`;
 
         const options = lists.map((list) => {
           const optionData = {

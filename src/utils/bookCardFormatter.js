@@ -29,8 +29,10 @@ function formatBookCardMessage(bookInfo) {
   const title = `*${normalizeBookTitleDisplay(bookInfo.title)}*`;
   const year = bookInfo.year ? ` (${bookInfo.year})` : "";
   const workId = bookInfo.workId || "";
-  const olLine = workId
-    ? `📖 *Open Library:* https://openlibrary.org/works/${workId}`
+  const bookLinkLine = workId
+    ? /^OL\d+W$/i.test(String(workId).trim())
+      ? `📖 *Open Library (legado):* https://openlibrary.org/works/${workId}`
+      : `📖 *Google Livros:* https://books.google.com/books?id=${encodeURIComponent(workId)}`
     : "";
   const usersAvgLine =
     bookInfo.usersAverage != null
@@ -79,7 +81,7 @@ function formatBookCardMessage(bookInfo) {
 
   let message = `📖 ${title}${year}
 
-${olLine}${usersAvgLine ? (olLine ? "\n" : "") + usersAvgLine : ""}
+${bookLinkLine}${usersAvgLine ? (bookLinkLine ? "\n" : "") + usersAvgLine : ""}
 ${statusLines}
 `;
   const readings = bookInfo.readings || [];
