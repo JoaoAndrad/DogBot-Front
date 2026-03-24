@@ -113,18 +113,25 @@ const listsFlow = createFlow("lists", {
           };
         }
 
-        const options = lists.map((list) => ({
-          label:
-            `${listKindIcon(list.listKind)} ${list.title} (${list._count.items} items)` +
-            (isGroup && list.owner ? ` - ${list.owner.push_name}` : ""),
-          action: "exec",
-          handler: "selectList",
-          data: {
-            listId: list.id,
-            listTitle: list.title,
-            listKind: list.listKind || "movie",
+        const options = [
+          {
+            label: "➕ Criar nova lista",
+            action: "exec",
+            handler: "createList",
           },
-        }));
+          ...lists.map((list) => ({
+            label:
+              `${listKindIcon(list.listKind)} ${list.title} (${list._count.items} items)` +
+              (isGroup && list.owner ? ` - ${list.owner.push_name}` : ""),
+            action: "exec",
+            handler: "selectList",
+            data: {
+              listId: list.id,
+              listTitle: list.title,
+              listKind: list.listKind || "movie",
+            },
+          })),
+        ];
 
         options.push({ label: "🔙 Voltar", action: "back" });
 
