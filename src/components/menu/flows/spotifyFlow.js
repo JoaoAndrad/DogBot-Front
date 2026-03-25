@@ -555,7 +555,7 @@ const spotifyFlow = createFlow("spotify", {
           "❌ Erro ao executar Todos: " + (e && e.message ? e.message : e),
         );
       }
-      return { end: false };
+      return { end: false, noRender: true };
     },
 
     historyRelative: async (ctx, data) => {
@@ -645,7 +645,7 @@ const spotifyFlow = createFlow("spotify", {
       } catch (e) {
         await ctx.reply("❌ Erro ao consultar histórico: " + (e.message || e));
       }
-      return { end: false };
+      return { end: false, noRender: true };
     },
 
     stats: async (ctx, data) => {
@@ -941,7 +941,7 @@ const spotifyFlow = createFlow("spotify", {
           "❌ Erro ao obter estatísticas: " + (e && e.message ? e.message : e),
         );
       }
-      return { end: false };
+      return { end: false, noRender: true };
     },
 
     statsMonth: async (ctx, data) => {
@@ -1039,7 +1039,7 @@ const spotifyFlow = createFlow("spotify", {
             (e && e.message ? e.message : e),
         );
       }
-      return { end: false };
+      return { end: false, noRender: true };
     },
 
     showMonth: async (ctx, data) => {
