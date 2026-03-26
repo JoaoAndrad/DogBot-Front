@@ -1,0 +1,316 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Resumo de filmes</title>
+    <style>
+      @import url("https://fonts.googleapis.com/css2?family=League+Spartan:wght@400;500;700;800;900&display=swap");
+
+      body {
+        background-color: #000;
+        color: #fff;
+        font-family: "League Spartan", sans-serif;
+        margin: 0;
+        padding: 0;
+        display: flex;
+        justify-content: center;
+        align-items: flex-start;
+        overflow-x: hidden;
+        width: 1080px;
+        min-height: 1920px;
+        box-sizing: border-box;
+      }
+
+      .container {
+        width: 100%;
+        max-width: 1080px;
+        position: relative;
+        display: flex;
+        flex-direction: column;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      .mosaic-container {
+        position: relative;
+        height: 680px;
+        width: 1080px;
+        margin: 0;
+        overflow: hidden;
+      }
+
+      .album {
+        position: absolute;
+        box-sizing: border-box;
+        background-size: cover;
+        background-position: center;
+        background-repeat: no-repeat;
+      }
+
+      .alb-1 {
+        background-color: #720018;
+        width: 340px;
+        height: 340px;
+        top: 0;
+        left: 0;
+        z-index: 1;
+      }
+      .alb-2 {
+        background-color: #1aab4e;
+        width: 340px;
+        height: 340px;
+        top: 0;
+        left: 245px;
+        z-index: 1;
+      }
+      .alb-3 {
+        background-color: #3b4cca;
+        width: 340px;
+        height: 340px;
+        top: 0;
+        left: 490px;
+        z-index: 1;
+      }
+      .alb-4 {
+        background-color: #728ebb;
+        width: 350px;
+        height: 340px;
+        top: 0;
+        left: 735px;
+        z-index: 1;
+      }
+      .alb-5 {
+        background-color: #a04ba0;
+        width: 290px;
+        height: 320px;
+        top: 310px;
+        left: 0;
+        z-index: 2;
+      }
+      .alb-6 {
+        background-color: #ffcc00;
+        width: 300px;
+        height: 320px;
+        top: 290px;
+        left: 220px;
+        z-index: 3;
+      }
+      .alb-7 {
+        background-color: #b3d828;
+        width: 300px;
+        height: 320px;
+        top: 305px;
+        left: 460px;
+        z-index: 4;
+      }
+      .alb-8 {
+        background-color: #2bc3f3;
+        width: 320px;
+        height: 320px;
+        top: 280px;
+        left: 760px;
+        z-index: 5;
+      }
+
+      h1 {
+        text-align: center;
+        font-size: 3.2rem;
+        margin: 40px 0 30px 0;
+        font-weight: 800;
+        letter-spacing: -0.5px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        padding: 0 60px;
+      }
+
+      .subtitle {
+        text-align: center;
+        font-size: 3.5rem;
+        font-weight: 800;
+        margin-bottom: 80px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        padding: 0 60px;
+      }
+
+      .green-text {
+        color: #00c853;
+      }
+
+      .info-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        column-gap: 80px;
+        row-gap: 0;
+        align-items: start;
+        width: 100%;
+        padding: 0 80px 60px 80px;
+        box-sizing: border-box;
+        margin-top: 0;
+      }
+
+      .column {
+        min-width: 0;
+        max-width: 100%;
+      }
+
+      .column h2 {
+        font-size: 2.8rem;
+        margin: 0 0 40px 0;
+        font-weight: 800;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      ul {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+      }
+
+      li.movie-line {
+        font-size: 2.4rem;
+        margin-bottom: 28px;
+        font-weight: 700;
+        line-height: 1.35;
+        overflow: visible;
+        white-space: normal;
+      }
+
+      .rating-item-title--truncate {
+        display: block;
+        max-width: 100%;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .plays {
+        display: block;
+        font-size: 2rem;
+        color: #ddd;
+        font-weight: 500;
+        margin-top: 6px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .stats-row {
+        grid-column: 1 / -1;
+        margin-top: 80px;
+        font-size: 2.8rem;
+        font-weight: 700;
+        display: flex;
+        align-items: flex-start;
+        gap: 40px;
+      }
+
+      .stats-row .stats-label {
+        font-weight: 800;
+        white-space: nowrap;
+      }
+
+      .stats-row .stats-values {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        font-weight: 600;
+      }
+
+      .stats-row .stats-values .stat-item {
+        display: block;
+      }
+
+      .stat-accent {
+        color: #00c853;
+      }
+
+      .logo {
+        position: absolute;
+        right: 60px;
+        bottom: 60px;
+        width: 100px;
+        height: 100px;
+        opacity: 0.8;
+        z-index: 1000;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <div class="mosaic-container">
+        {{#each mosaicTiles}}
+        <div
+          class="album alb-{{indexPlusOne @index}}"
+          style="{{#if this.url}}background-image: url('{{this.url}}');{{else}}background-color: {{this.fallbackColor}};{{/if}}"
+        ></div>
+        {{/each}}
+      </div>
+
+      <h1>Meu resumo de filmes {{formatPeriod period}}</h1>
+
+      <div class="subtitle">
+        Filmes assistidos:
+        <span class="green-text">{{filmsWatched}}</span>
+      </div>
+
+      <div class="info-grid">
+        <div class="column">
+          <h2>Últimos filmes avaliados</h2>
+          <ul>
+            {{#each lastRated}}
+            <li class="movie-line">
+              <span class="rating-item-title--truncate"
+                >{{indexPlusOne @index}} {{this.title}}</span
+              >
+              <span class="plays"
+                ><span class="green-text">{{this.ratingSlash5}}</span> ·
+                {{this.dateLabel}}</span
+              >
+            </li>
+            {{/each}}
+          </ul>
+        </div>
+
+        <div class="column">
+          <h2>Últimos filmes assistidos</h2>
+          <ul>
+            {{#each lastWatched}}
+            <li class="movie-line">
+              <span class="rating-item-title--truncate"
+                >{{indexPlusOne @index}} {{this.title}}</span
+              >
+              <span class="plays"
+                >Assistido em {{this.watchedDateLabel}}</span
+              >
+            </li>
+            {{/each}}
+          </ul>
+        </div>
+
+        <div class="stats-row">
+          <span class="stats-label">Estatísticas:</span>
+          <div class="stats-values">
+            <span class="stat-item"
+              ><span class="stat-accent">{{statFilmsWatched}}</span> filmes
+              assistidos</span
+            >
+            <span class="stat-item"
+              ><span class="stat-accent">{{statRatings}}</span> avaliações</span
+            >
+            <span class="stat-item">{{statHours}}</span>
+          </div>
+        </div>
+      </div>
+
+      {{#if logoBase64}}
+      <img src="{{logoBase64}}" alt="Logo" class="logo" />
+      {{/if}}
+    </div>
+  </body>
+</html>

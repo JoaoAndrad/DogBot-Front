@@ -18,10 +18,19 @@ const ratingsTemplatePath = path.join(
   "templates",
   "stats-ratings-card.html",
 );
+const moviesTemplatePath = path.join(
+  __dirname,
+  "..",
+  "..",
+  "templates",
+  "stats-movies-card.html",
+);
 const tplSrc = fs.readFileSync(templatePath, "utf8");
 const tpl = Handlebars.compile(tplSrc);
 const ratingsTplSrc = fs.readFileSync(ratingsTemplatePath, "utf8");
 const ratingsTpl = Handlebars.compile(ratingsTplSrc);
+const moviesTplSrc = fs.readFileSync(moviesTemplatePath, "utf8");
+const moviesTpl = Handlebars.compile(moviesTplSrc);
 
 // Register helper to display 1-based index
 Handlebars.registerHelper("indexPlusOne", function (index) {
@@ -138,6 +147,84 @@ function formatRatingSlash10(n) {
   return `${s}/10`;
 }
 
+/** Nota escala 0–5 para o cartão de filmes */
+function formatRatingSlash5(n) {
+  if (n == null || !Number.isFinite(Number(n))) return "—/5";
+  const x = Number(n);
+  const s = Number.isInteger(x)
+    ? String(x)
+    : x.toFixed(1).replace(".", ",");
+  return `${s}/5`;
+}
+
+const MOSAIC_FALLBACK_COLORS = [
+  "#720018",
+  "#1aab4e",
+  "#3b4cca",
+  "#728ebb",
+  "#a04ba0",
+  "#ffcc00",
+  "#b3d828",
+  "#2bc3f3",
+];
+
+/**
+ * Prepara payload do GET /api/movies/period-stats para stats-movies-card.html.
+ * `data` pode incluir `periodDisplay` (rótulo) e `logoPath`.
+ */
+function normalizeMoviesTemplateData(data) {
+  const summary = data.summary || {};
+  const period =
+    data.periodDisplay != null && String(data.periodDisplay).trim() !== ""
+      ? String(data.periodDisplay).trim()
+      : data.period != null
+        ? String(data.period)
+        : "período";
+  const urls = Array.isArray(data.mosaicPosterUrls) ? data.mosaicPosterUrls : [];
+  const mosaicTiles = Array.from({ length: 8 }, (_, i) => ({
+    url: urls[i] || null,
+    fallbackColor: MOSAIC_FALLBACK_COLORS[i % MOSAIC_FALLBACK_COLORS.length],
+  }));
+  const filmsWatched =
+    summary.filmsWatchedDistinct != null
+      ? String(summary.filmsWatchedDistinct)
+      : "0";
+  const lastRated = (data.lastRated || []).map((r) => ({
+    ...r,
+    ratingSlash5: formatRatingSlash5(r.rating),
+  }));
+  const lastWatched = data.lastWatched || [];
+  const statFilmsWatched =
+    summary.filmsWatchedDistinct != null
+      ? String(summary.filmsWatchedDistinct)
+      : "0";
+  const statRatings =
+    summary.ratingsInPeriod != null ? String(summary.ratingsInPeriod) : "0";
+  let statHours = "— h estimadas";
+  if (
+    summary.estimatedHours != null &&
+    Number.isFinite(Number(summary.estimatedHours)) &&
+    Number(summary.estimatedHours) > 0
+  ) {
+    const h = Number(summary.estimatedHours);
+    const s = Number.isInteger(h)
+      ? String(h)
+      : h.toFixed(1).replace(".", ",");
+    statHours = `~${s} h estimadas`;
+  }
+  return {
+    ...data,
+    period,
+    mosaicTiles,
+    filmsWatched,
+    lastRated,
+    lastWatched,
+    statFilmsWatched,
+    statRatings,
+    statHours,
+  };
+}
+
 /**
  * Prepara dados da API `kind=rating` para o template stats-ratings-card.html.
  */
@@ -164,6 +251,53 @@ function normalizeRatingsTemplateData(data) {
       t.listenedInPeriodLabel != null ? t.listenedInPeriodLabel : "—",
   }));
   return out;
+}
+
+async function renderMoviesCard(data, opts = {}) {
+  const payload = normalizeMoviesTemplateData(data);
+  if (payload.logoPath) {
+    const exists = fs.existsSync(payload.logoPath);
+    if (exists) {
+      try {
+        const logoBuffer = fs.readFileSync(payload.logoPath);
+        payload.logoBase64 = `data:image/png;base64,${logoBuffer.toString("base64")}`;
+      } catch (err) {
+        console.error("[statsMoviesCard] Erro ao converter logo:", err);
+        payload.logoBase64 = "";
+      }
+    } else {
+      payload.logoBase64 = "";
+    }
+  } else {
+    payload.logoBase64 = "";
+  }
+
+  const html = moviesTpl(payload);
+  let browser = null;
+  let page = null;
+  try {
+    browser = await getBrowser();
+    page = await browser.newPage();
+    const viewport = {
+      width: opts.width ?? DEFAULT_CARD_VIEWPORT.width,
+      height: opts.height ?? DEFAULT_CARD_VIEWPORT.height,
+      deviceScaleFactor:
+        opts.deviceScaleFactor ?? DEFAULT_CARD_VIEWPORT.deviceScaleFactor,
+    };
+    await page.setViewport(viewport);
+    await page.setContent(html, { waitUntil: "networkidle0" });
+    const buffer = await page.screenshot({
+      type: "png",
+      fullPage: true,
+    });
+    await logPngDimensions(buffer, "statsMoviesCard", viewport.deviceScaleFactor);
+    await page.close();
+    return buffer;
+  } catch (error) {
+    console.error("[statsMoviesCard] Erro durante renderização:", error);
+    if (page) await page.close().catch(() => {});
+    throw error;
+  }
 }
 
 async function renderRatingsCard(data, opts = {}) {
@@ -336,5 +470,6 @@ async function renderCard(data, opts = {}) {
 module.exports = {
   renderCard,
   renderRatingsCard,
+  renderMoviesCard,
   DEFAULT_CARD_VIEWPORT,
 };

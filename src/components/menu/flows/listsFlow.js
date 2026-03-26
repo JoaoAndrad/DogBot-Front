@@ -6,6 +6,7 @@
  */
 
 const { createFlow } = require("../flowBuilder");
+const flowManager = require("../flowManager");
 const listClient = require("../../../services/listClient");
 const movieClient = require("../../../services/movieClient");
 const conversationState = require("../../../services/conversationState");
@@ -103,6 +104,11 @@ const listsFlow = createFlow("lists", {
               : "📋 Você ainda não tem listas!\n\n Toque em *Criar nova lista*. O bot pergunta se é *filmes* ou *livros*, depois o nome da lista.",
             options: [
               {
+                label: "📊 Resumo de filmes (período)",
+                action: "exec",
+                handler: "openMovieStats",
+              },
+              {
                 label: "➕ Criar nova lista",
                 action: "exec",
                 handler: "createList",
@@ -114,6 +120,11 @@ const listsFlow = createFlow("lists", {
         }
 
         const options = [
+          {
+            label: "📊 Resumo de filmes (período)",
+            action: "exec",
+            handler: "openMovieStats",
+          },
           {
             label: "➕ Criar nova lista",
             action: "exec",
@@ -1021,6 +1032,20 @@ const listsFlow = createFlow("lists", {
       conversationState.clearState(ctx.userId);
       await ctx.reply("❌ Criação da lista cancelada.");
       return { end: true };
+    },
+
+    /**
+     * Abre o flow de resumo de filmes por período (cartão PNG se houver atividade).
+     */
+    openMovieStats: async (ctx) => {
+      try {
+        await flowManager.startFlow(ctx.client, ctx.chatId, ctx.userId, "movies");
+        return { end: true };
+      } catch (err) {
+        console.error("[ListsFlow] openMovieStats:", err.message);
+        await ctx.reply("❌ Não foi possível abrir o resumo de filmes.");
+        return { end: false };
+      }
     },
 
     /**
