@@ -423,6 +423,15 @@
         overflow: visible;
         text-overflow: clip;
         font-size: 3.5rem;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+        gap: 20px;
+      }
+      .ratings-card .ratings-summary-line {
+        width: 100%;
       }
       .ratings-card .column h2.title-wrap {
         white-space: normal;
@@ -490,10 +499,14 @@
       <h1 class="title-wrap">Meu Relatório de Avaliações {{formatPeriod period}}</h1>
 
       <div class="subtitle ratings-summary">
-        Média de avaliação:
-        <span class="green-text">{{avgRatingDisplay}}</span>
-        &nbsp;|&nbsp; Total de avaliações:
-        <span class="green-text">{{totalRatingsDisplay}}</span>
+        <div class="ratings-summary-line">
+          Média de avaliação:
+          <span class="green-text">{{avgRatingDisplay}}</span>
+        </div>
+        <div class="ratings-summary-line">
+          Total de avaliações:
+          <span class="green-text">{{totalRatingsDisplay}}</span>
+        </div>
       </div>
 
       <div class="info-grid">
