@@ -205,16 +205,17 @@ function buildRatingStarsHtml5(rating) {
 const MOSAIC_EMPTY_COLOR = "#000";
 
 /**
- * Índices 0–7 (cards 1–8) onde colocar as n primeiras imagens, espalhadas.
- * n=2 → cards 2 e 6; n=4 → cards 1,4,6,8 (plan).
+ * Índices 0–7 (= cards 1–8): onde colocar cada URL na ordem recebida.
+ * O layout HTML usa position:absolute e z-index por card; as células sobrepoem-se.
+ * Estes presets apenas escolhem posições mais espalhadas (ex. n=1: card 7; n=2: 2 e 8).
  */
 const MOSAIC_SCATTER_BY_COUNT = {
-  1: [4],
-  2: [1, 5],
-  3: [0, 4, 7],
-  4: [0, 3, 5, 7],
-  5: [0, 2, 4, 5, 7],
-  6: [0, 1, 3, 4, 5, 7],
+  1: [6],
+  2: [1, 7],
+  3: [0, 5, 7],
+  4: [0, 5, 2, 7],
+  5: [0, 2, 5, 7, 6],
+  6: [0, 2, 3, 5, 7, 6],
   7: [0, 1, 2, 3, 4, 5, 6],
   8: [0, 1, 2, 3, 4, 5, 6, 7],
 };
