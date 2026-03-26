@@ -74,12 +74,33 @@ Handlebars.registerHelper("formatPeriod", function (period) {
 
 let browserInstance = null;
 
-/** Mesmo viewport para stats-card e stats-ratings-card (story 1080×1920). */
+/**
+ * Viewport lógico (CSS px) para stats-card e stats-ratings-card — story 9:16.
+ * - O Puppeteer multiplica pela deviceScaleFactor: com 2, o PNG costuma sair
+ *   com largura ~2160px (1080×2), não 1080px.
+ * - fullPage: true captura a altura total do documento; pode ser > 1920px se
+ *   o conteúdo crescer (cada cartão pode ter altura de PNG diferente).
+ */
 const DEFAULT_CARD_VIEWPORT = {
   width: 1080,
   height: 1920,
   deviceScaleFactor: 2,
 };
+
+async function logPngDimensions(buffer, label, deviceScaleFactor) {
+  const dpr =
+    deviceScaleFactor != null
+      ? deviceScaleFactor
+      : DEFAULT_CARD_VIEWPORT.deviceScaleFactor;
+  try {
+    const meta = await sharp(buffer).metadata();
+    console.log(
+      `[${label}] PNG: ${meta.width}×${meta.height}px (DPR=${dpr})`,
+    );
+  } catch (e) {
+    console.warn(`[${label}] Dimensões PNG:`, e && e.message ? e.message : e);
+  }
+}
 
 async function getBrowser() {
   if (browserInstance && browserInstance.isConnected()) {
@@ -185,6 +206,7 @@ async function renderRatingsCard(data, opts = {}) {
       type: "png",
       fullPage: true,
     });
+    await logPngDimensions(buffer, "statsRatingsCard", viewport.deviceScaleFactor);
     await page.close();
     return buffer;
   } catch (error) {
@@ -291,6 +313,7 @@ async function renderCard(data, opts = {}) {
       type: "png",
       fullPage: true,
     });
+    await logPngDimensions(buffer, "statsCard", viewport.deviceScaleFactor);
     console.log(
       "[statsCard] Screenshot capturado, tamanho:",
       buffer.length,
@@ -310,4 +333,8 @@ async function renderCard(data, opts = {}) {
   }
 }
 
-module.exports = { renderCard, renderRatingsCard };
+module.exports = {
+  renderCard,
+  renderRatingsCard,
+  DEFAULT_CARD_VIEWPORT,
+};
