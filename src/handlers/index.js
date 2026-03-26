@@ -8,6 +8,7 @@ const { handleCadastroFlow } = require("./cadastroFlowHandler");
 const { handleMetaFlow } = require("./metaFlowHandler");
 const { handleListFlow } = require("./listFlowHandler");
 const { handleAddFilmFlow } = require("./addFilmFlowHandler");
+const { handleIncomingTextMessage } = require("../components/menu/handleIncomingText");
 const mediaHelper = require("../utils/mediaHelper");
 const stickerHelper = require("../utils/stickerHelper");
 
@@ -321,6 +322,34 @@ async function handle(context) {
         client: context.client,
         message: msg,
       });
+    }
+  }
+
+  // Film card: texto com data após "Sim" na enquete (conversationState + /api/menu/state)
+  if (
+    body &&
+    !isGroup &&
+    !(body.startsWith("/") || body.startsWith("!"))
+  ) {
+    const filmDateCandidates = [flowUserId, from, actualNumber].filter(
+      Boolean,
+    );
+    let filmViewingDateWait = false;
+    for (const k of [...new Set(filmDateCandidates)]) {
+      const s = conversationState.getState(k);
+      if (s?.flowType === "film-viewing-date") {
+        filmViewingDateWait = true;
+        break;
+      }
+    }
+    if (filmViewingDateWait) {
+      const handled = await handleIncomingTextMessage(
+        context.client,
+        from,
+        flowUserId || actualNumber,
+        body,
+      );
+      if (handled) return;
     }
   }
 

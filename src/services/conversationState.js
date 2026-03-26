@@ -21,6 +21,24 @@ function startFlow(userId, flowType, initialData = {}) {
 }
 
 /**
+ * Mesmo estado em várias chaves (ex.: UUID do menu + @c.us do WhatsApp),
+ * para o processador de mensagens encontrar o fluxo com qualquer identificador.
+ * @param {string[]} userIds
+ */
+function startFlowWithAliases(userIds, flowType, initialData = {}) {
+  const ids = [...new Set(userIds.filter(Boolean))];
+  if (ids.length === 0) return;
+  const payload = {
+    flowType,
+    step: 0,
+    data: initialData,
+    startedAt: new Date(),
+    _aliasKeys: ids,
+  };
+  ids.forEach((id) => states.set(id, payload));
+}
+
+/**
  * Get current conversation state for a user
  * @param {string} userId - User identifier
  * @returns {object|null} - State object or null if no active flow
@@ -72,6 +90,11 @@ function setStep(userId, step) {
  * @param {string} userId - User identifier
  */
 function clearState(userId) {
+  const state = states.get(userId);
+  if (state && Array.isArray(state._aliasKeys) && state._aliasKeys.length > 0) {
+    state._aliasKeys.forEach((k) => states.delete(k));
+    return;
+  }
   states.delete(userId);
 }
 
@@ -86,6 +109,7 @@ function hasActiveFlow(userId) {
 
 module.exports = {
   startFlow,
+  startFlowWithAliases,
   getState,
   updateData,
   nextStep,

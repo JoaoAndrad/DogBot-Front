@@ -385,9 +385,18 @@ class FlowManager {
     const flowId = "film-card";
     const candidateIds = [];
     if (userId) candidateIds.push(userId);
+    if (chatId && chatId !== userId) candidateIds.push(chatId);
+
     const resolvedUuid = await resolveUserUuidForMenu(userId);
-    if (resolvedUuid && resolvedUuid !== userId) {
+    if (resolvedUuid && !candidateIds.includes(resolvedUuid)) {
       candidateIds.push(resolvedUuid);
+    }
+    const resolvedFromChat =
+      chatId && chatId !== userId
+        ? await resolveUserUuidForMenu(chatId)
+        : null;
+    if (resolvedFromChat && !candidateIds.includes(resolvedFromChat)) {
+      candidateIds.push(resolvedFromChat);
     }
 
     let state = null;
@@ -429,6 +438,17 @@ class FlowManager {
       flowId,
       "/viewing-date-confirm",
     );
+    try {
+      const conversationState = require("../../services/conversationState");
+      for (const k of [userId, chatId, stateUserId]) {
+        if (k && conversationState.getState(k)?.flowType === "film-viewing-date") {
+          conversationState.clearState(k);
+          break;
+        }
+      }
+    } catch (e) {
+      logger.warn("[film-card] clear conversationState:", e.message);
+    }
     return true;
   }
 }

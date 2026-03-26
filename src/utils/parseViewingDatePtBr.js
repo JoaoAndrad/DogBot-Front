@@ -6,9 +6,7 @@
 const SP_TZ = "America/Sao_Paulo";
 
 function stripAccents(s) {
-  return String(s)
-    .normalize("NFD")
-    .replace(/\p{M}/gu, "");
+  return String(s).normalize("NFD").replace(/\p{M}/gu, "");
 }
 
 /** Partes Y-M-D do relógio civil em São Paulo */

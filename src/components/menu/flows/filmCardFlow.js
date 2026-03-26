@@ -14,12 +14,33 @@ const {
 const logger = require("../../../utils/logger");
 const { truncateForPoll } = require("../../../utils/titleNormalize");
 const { formatDateDdMmYyyy } = require("../../../utils/parseViewingDatePtBr");
+const conversationState = require("../../../services/conversationState");
 
 function clearViewingDateFlags(state) {
   const c = state?.context;
   if (!c) return;
   delete c.awaitingViewingDateText;
   delete c.pendingViewingDateIso;
+}
+
+/** In-memory (como list-creation): UUID + chatId para o handler de texto encontrar o fluxo */
+function registerFilmViewingDateWait(ctx) {
+  const { userId, chatId } = ctx;
+  const keys = new Set([userId]);
+  if (chatId) keys.add(chatId);
+  conversationState.startFlowWithAliases([...keys], "film-viewing-date", {
+    filmCardStorageUserId: userId,
+    chatId,
+  });
+}
+
+function clearFilmViewingDateConversation(ctx) {
+  const { userId, chatId } = ctx;
+  [userId, chatId].filter(Boolean).forEach((k) => {
+    if (conversationState.getState(k)?.flowType === "film-viewing-date") {
+      conversationState.clearState(k);
+    }
+  });
 }
 
 function filmWorkLabel(ctx, movieInfo) {
@@ -283,6 +304,7 @@ const filmCardFlow = createFlow("film-card", {
     skipViewingDateAdjust: async (ctx) => {
       const { userId, state } = ctx;
       const { tmdbId } = state.context || {};
+      clearFilmViewingDateConversation(ctx);
       clearViewingDateFlags(state);
       if (tmdbId) {
         await refreshMovieCardContext(state, tmdbId, userId);
@@ -293,6 +315,7 @@ const filmCardFlow = createFlow("film-card", {
 
     startViewingDateInput: async (ctx) => {
       ctx.state.context.awaitingViewingDateText = true;
+      registerFilmViewingDateWait(ctx);
       await ctx.reply(
         "📝 *Envie a data* em que assistiu (uma mensagem só):\n\n" +
           "• `12/08/26` ou `12/08/2026`\n" +
@@ -307,6 +330,7 @@ const filmCardFlow = createFlow("film-card", {
     retryViewingDateInput: async (ctx) => {
       delete ctx.state.context.pendingViewingDateIso;
       ctx.state.context.awaitingViewingDateText = true;
+      registerFilmViewingDateWait(ctx);
       await ctx.reply("📝 Envie a *nova* data (mesmo formato de antes).");
       return { end: false, noRender: true };
     },
@@ -316,6 +340,7 @@ const filmCardFlow = createFlow("film-card", {
       const { tmdbId, pendingViewingDateIso } = state.context || {};
       if (!tmdbId || !pendingViewingDateIso) {
         await ctx.reply("❌ Dados da data perdidos. Use /filme de novo.");
+        clearFilmViewingDateConversation(ctx);
         clearViewingDateFlags(state);
         state.path = "/";
         return { end: false };
@@ -330,6 +355,7 @@ const filmCardFlow = createFlow("film-card", {
           `❌ Não foi possível salvar a data: ${err.message || err}`,
         );
       }
+      clearFilmViewingDateConversation(ctx);
       clearViewingDateFlags(state);
       await refreshMovieCardContext(state, tmdbId, userId);
       state.path = "/";
