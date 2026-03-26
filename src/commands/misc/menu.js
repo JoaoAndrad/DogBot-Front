@@ -9,12 +9,14 @@ const bookCardFlow = require("../../components/menu/flows/bookCardFlow");
 const bookSearchFlow = require("../../components/menu/flows/bookSearchFlow");
 const addBookFlow = require("../../components/menu/flows/addBookFlow");
 const movieFlow = require("../../components/menu/flows/movieFlow");
+const bookFlow = require("../../components/menu/flows/bookFlow");
 
 // Register flows on load
 flowManager.registerFlow(testFlow);
 flowManager.registerFlow(spotifyFlow);
 flowManager.registerFlow(listsFlow);
 flowManager.registerFlow(movieFlow);
+flowManager.registerFlow(bookFlow);
 flowManager.registerFlow(addFilmFlow);
 flowManager.registerFlow(addBookFlow);
 flowManager.registerFlow(filmCardFlow);

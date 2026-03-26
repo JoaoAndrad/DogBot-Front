@@ -25,12 +25,21 @@ const moviesTemplatePath = path.join(
   "templates",
   "stats-movies-card.html",
 );
+const booksTemplatePath = path.join(
+  __dirname,
+  "..",
+  "..",
+  "templates",
+  "stats-books-card.html",
+);
 const tplSrc = fs.readFileSync(templatePath, "utf8");
 const tpl = Handlebars.compile(tplSrc);
 const ratingsTplSrc = fs.readFileSync(ratingsTemplatePath, "utf8");
 const ratingsTpl = Handlebars.compile(ratingsTplSrc);
 const moviesTplSrc = fs.readFileSync(moviesTemplatePath, "utf8");
 const moviesTpl = Handlebars.compile(moviesTplSrc);
+const booksTplSrc = fs.readFileSync(booksTemplatePath, "utf8");
+const booksTpl = Handlebars.compile(booksTplSrc);
 
 // Register helper to display 1-based index
 Handlebars.registerHelper("indexPlusOne", function (index) {
@@ -262,6 +271,62 @@ function normalizeMoviesTemplateData(data) {
 }
 
 /**
+ * Prepara payload do GET /api/books/period-stats para stats-books-card.html.
+ * `data` pode incluir `periodDisplay` (rótulo) e `logoPath`.
+ */
+function normalizeBooksTemplateData(data) {
+  const summary = data.summary || {};
+  const period =
+    data.periodDisplay != null && String(data.periodDisplay).trim() !== ""
+      ? String(data.periodDisplay).trim()
+      : data.period != null
+        ? String(data.period)
+        : "período";
+  const urls = Array.isArray(data.mosaicCoverUrls) ? data.mosaicCoverUrls : [];
+  const mosaicTiles = Array.from({ length: 8 }, (_, i) => ({
+    url: urls[i] || null,
+    fallbackColor: MOSAIC_FALLBACK_COLORS[i % MOSAIC_FALLBACK_COLORS.length],
+  }));
+  const booksRead =
+    summary.booksReadDistinct != null
+      ? String(summary.booksReadDistinct)
+      : "0";
+  const lastRated = (data.lastRated || []).map((r) => ({
+    ...r,
+    ratingSlash5: formatRatingSlash5(r.rating),
+    ratingStarsHtml: buildRatingStarsHtml5(r.rating),
+  }));
+  const lastRead = data.lastRead || [];
+  const statBooksRead =
+    summary.booksReadDistinct != null
+      ? String(summary.booksReadDistinct)
+      : "0";
+  const statRatings =
+    summary.ratingsInPeriod != null ? String(summary.ratingsInPeriod) : "0";
+  let statPages = "— págs estimadas";
+  if (
+    summary.estimatedPages != null &&
+    Number.isFinite(Number(summary.estimatedPages)) &&
+    Number(summary.estimatedPages) > 0
+  ) {
+    const p = Number(summary.estimatedPages);
+    const s = Number.isInteger(p) ? String(p) : p.toFixed(0);
+    statPages = `~${s} págs estimadas`;
+  }
+  return {
+    ...data,
+    period,
+    mosaicTiles,
+    booksRead,
+    lastRated,
+    lastRead,
+    statBooksRead,
+    statRatings,
+    statPages,
+  };
+}
+
+/**
  * Prepara dados da API `kind=rating` para o template stats-ratings-card.html.
  */
 function normalizeRatingsTemplateData(data) {
@@ -331,6 +396,53 @@ async function renderMoviesCard(data, opts = {}) {
     return buffer;
   } catch (error) {
     console.error("[statsMoviesCard] Erro durante renderização:", error);
+    if (page) await page.close().catch(() => {});
+    throw error;
+  }
+}
+
+async function renderBooksCard(data, opts = {}) {
+  const payload = normalizeBooksTemplateData(data);
+  if (payload.logoPath) {
+    const exists = fs.existsSync(payload.logoPath);
+    if (exists) {
+      try {
+        const logoBuffer = fs.readFileSync(payload.logoPath);
+        payload.logoBase64 = `data:image/png;base64,${logoBuffer.toString("base64")}`;
+      } catch (err) {
+        console.error("[statsBooksCard] Erro ao converter logo:", err);
+        payload.logoBase64 = "";
+      }
+    } else {
+      payload.logoBase64 = "";
+    }
+  } else {
+    payload.logoBase64 = "";
+  }
+
+  const html = booksTpl(payload);
+  let browser = null;
+  let page = null;
+  try {
+    browser = await getBrowser();
+    page = await browser.newPage();
+    const viewport = {
+      width: opts.width ?? DEFAULT_CARD_VIEWPORT.width,
+      height: opts.height ?? DEFAULT_CARD_VIEWPORT.height,
+      deviceScaleFactor:
+        opts.deviceScaleFactor ?? DEFAULT_CARD_VIEWPORT.deviceScaleFactor,
+    };
+    await page.setViewport(viewport);
+    await page.setContent(html, { waitUntil: "networkidle0" });
+    const buffer = await page.screenshot({
+      type: "png",
+      fullPage: true,
+    });
+    await logPngDimensions(buffer, "statsBooksCard", viewport.deviceScaleFactor);
+    await page.close();
+    return buffer;
+  } catch (error) {
+    console.error("[statsBooksCard] Erro durante renderização:", error);
     if (page) await page.close().catch(() => {});
     throw error;
   }
@@ -507,5 +619,6 @@ module.exports = {
   renderCard,
   renderRatingsCard,
   renderMoviesCard,
+  renderBooksCard,
   DEFAULT_CARD_VIEWPORT,
 };

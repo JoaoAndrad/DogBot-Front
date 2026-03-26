@@ -109,6 +109,11 @@ const listsFlow = createFlow("lists", {
                 handler: "openMovieStats",
               },
               {
+                label: "📚 Resumo de livros (período)",
+                action: "exec",
+                handler: "openBookStats",
+              },
+              {
                 label: "➕ Criar nova lista",
                 action: "exec",
                 handler: "createList",
@@ -124,6 +129,11 @@ const listsFlow = createFlow("lists", {
             label: "📊 Resumo de filmes (período)",
             action: "exec",
             handler: "openMovieStats",
+          },
+          {
+            label: "📚 Resumo de livros (período)",
+            action: "exec",
+            handler: "openBookStats",
           },
           {
             label: "➕ Criar nova lista",
@@ -1044,6 +1054,20 @@ const listsFlow = createFlow("lists", {
       } catch (err) {
         console.error("[ListsFlow] openMovieStats:", err.message);
         await ctx.reply("❌ Não foi possível abrir o resumo de filmes.");
+        return { end: false };
+      }
+    },
+
+    /**
+     * Abre o flow de resumo de livros por período (cartão PNG se houver atividade).
+     */
+    openBookStats: async (ctx) => {
+      try {
+        await flowManager.startFlow(ctx.client, ctx.chatId, ctx.userId, "books");
+        return { end: true };
+      } catch (err) {
+        console.error("[ListsFlow] openBookStats:", err.message);
+        await ctx.reply("❌ Não foi possível abrir o resumo de livros.");
         return { end: false };
       }
     },

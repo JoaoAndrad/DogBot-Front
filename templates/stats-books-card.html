@@ -1,0 +1,393 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Resumo de livros</title>
+    <style>
+      @import url("https://fonts.googleapis.com/css2?family=League+Spartan:wght@400;500;700;800;900&display=swap");
+
+      body {
+        background-color: #000;
+        color: #fff;
+        font-family: "League Spartan", sans-serif;
+        margin: 0;
+        padding: 0;
+        display: flex;
+        justify-content: center;
+        align-items: flex-start;
+        overflow-x: hidden;
+        width: 1080px;
+        min-height: 1920px;
+        box-sizing: border-box;
+      }
+
+      .container {
+        width: 100%;
+        max-width: 1080px;
+        position: relative;
+        display: flex;
+        flex-direction: column;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      .mosaic-container {
+        position: relative;
+        height: 680px;
+        width: 1080px;
+        margin: 0;
+        overflow: hidden;
+      }
+
+      .album {
+        position: absolute;
+        box-sizing: border-box;
+        background-size: cover;
+        background-position: center;
+        background-repeat: no-repeat;
+      }
+
+      .alb-1 {
+        background-color: #720018;
+        width: 340px;
+        height: 340px;
+        top: 0;
+        left: 0;
+        z-index: 1;
+      }
+      .alb-2 {
+        background-color: #1aab4e;
+        width: 340px;
+        height: 340px;
+        top: 0;
+        left: 245px;
+        z-index: 1;
+      }
+      .alb-3 {
+        background-color: #3b4cca;
+        width: 340px;
+        height: 340px;
+        top: 0;
+        left: 490px;
+        z-index: 1;
+      }
+      .alb-4 {
+        background-color: #728ebb;
+        width: 350px;
+        height: 340px;
+        top: 0;
+        left: 735px;
+        z-index: 1;
+      }
+      .alb-5 {
+        background-color: #a04ba0;
+        width: 290px;
+        height: 320px;
+        top: 310px;
+        left: 0;
+        z-index: 2;
+      }
+      .alb-6 {
+        background-color: #ffcc00;
+        width: 300px;
+        height: 320px;
+        top: 290px;
+        left: 220px;
+        z-index: 3;
+      }
+      .alb-7 {
+        background-color: #b3d828;
+        width: 300px;
+        height: 320px;
+        top: 305px;
+        left: 460px;
+        z-index: 4;
+      }
+      .alb-8 {
+        background-color: #2bc3f3;
+        width: 320px;
+        height: 320px;
+        top: 280px;
+        left: 760px;
+        z-index: 5;
+      }
+
+      h1 {
+        text-align: center;
+        font-size: 3.2rem;
+        margin: 40px 0 30px 0;
+        font-weight: 800;
+        letter-spacing: -0.5px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        padding: 0 60px;
+      }
+
+      .subtitle {
+        text-align: center;
+        font-size: 3.5rem;
+        font-weight: 800;
+        margin-bottom: 80px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        padding: 0 60px;
+      }
+
+      .green-text {
+        color: #00c853;
+      }
+
+      .info-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        column-gap: 80px;
+        row-gap: 0;
+        align-items: start;
+        width: 100%;
+        padding: 0 80px 60px 80px;
+        box-sizing: border-box;
+        margin-top: 0;
+      }
+
+      .column {
+        min-width: 0;
+        max-width: 100%;
+      }
+
+      .column h2 {
+        font-size: 2.8rem;
+        margin: 0 0 40px 0;
+        font-weight: 800;
+        white-space: normal;
+        overflow: visible;
+        line-height: 1.25;
+        word-wrap: break-word;
+        overflow-wrap: break-word;
+      }
+
+      ul {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+      }
+
+      li.movie-line {
+        font-size: 2.4rem;
+        margin-bottom: 28px;
+        font-weight: 700;
+        line-height: 1.35;
+        overflow: visible;
+        white-space: normal;
+      }
+
+      .movie-title-multiline {
+        display: block;
+        max-width: 100%;
+        white-space: normal;
+        word-wrap: break-word;
+        overflow-wrap: break-word;
+        hyphens: auto;
+      }
+
+      .movie-star-row {
+        display: inline-flex;
+        align-items: center;
+        flex-wrap: nowrap;
+        gap: 0.08em;
+        vertical-align: middle;
+        line-height: 1;
+        font-family:
+          "Segoe UI Symbol",
+          "DejaVu Sans",
+          "Noto Sans Symbols 2",
+          "Apple Symbols",
+          "League Spartan",
+          sans-serif;
+      }
+
+      .movie-star-row--missing {
+        color: #888;
+      }
+
+      .movie-star {
+        font-size: 1em;
+        line-height: 1;
+      }
+
+      .movie-star--full {
+        color: #00c853;
+      }
+
+      .movie-star--empty {
+        color: #555;
+        opacity: 0.9;
+      }
+
+      .movie-star--half {
+        position: relative;
+        display: inline-block;
+        width: 1em;
+        height: 1em;
+        vertical-align: -0.05em;
+      }
+
+      .movie-star-half-bg {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 1em;
+        line-height: 1;
+        color: #555;
+        opacity: 0.9;
+      }
+
+      .movie-star-half-fg {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 50%;
+        height: 100%;
+        overflow: hidden;
+        z-index: 1;
+      }
+
+      .movie-star-half-fg-inner {
+        display: block;
+        width: 1em;
+        line-height: 1;
+        color: #00c853;
+      }
+
+      .plays {
+        display: block;
+        font-size: 2rem;
+        color: #ddd;
+        font-weight: 500;
+        margin-top: 8px;
+        overflow: visible;
+        white-space: normal;
+        line-height: 1.35;
+        word-wrap: break-word;
+        overflow-wrap: break-word;
+      }
+
+      .plays .movie-star-row {
+        font-size: 2.2rem;
+      }
+
+      .stats-row {
+        grid-column: 1 / -1;
+        margin-top: 80px;
+        font-size: 2.8rem;
+        font-weight: 700;
+        display: flex;
+        align-items: flex-start;
+        gap: 40px;
+      }
+
+      .stats-row .stats-label {
+        font-weight: 800;
+        white-space: nowrap;
+      }
+
+      .stats-row .stats-values {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        font-weight: 600;
+      }
+
+      .stats-row .stats-values .stat-item {
+        display: block;
+      }
+
+      .stat-accent {
+        color: #00c853;
+      }
+
+      .logo {
+        position: absolute;
+        right: 60px;
+        bottom: 60px;
+        width: 100px;
+        height: 100px;
+        opacity: 0.8;
+        z-index: 1000;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <div class="mosaic-container">
+        {{#each mosaicTiles}}
+        <div
+          class="album alb-{{indexPlusOne @index}}"
+          style="{{#if this.url}}background-image: url('{{this.url}}');{{else}}background-color: {{this.fallbackColor}};{{/if}}"
+        ></div>
+        {{/each}}
+      </div>
+
+      <h1>Meu resumo de livros {{formatPeriod period}}</h1>
+
+      <div class="subtitle">
+        Livros lidos:
+        <span class="green-text">{{booksRead}}</span>
+      </div>
+
+      <div class="info-grid">
+        <div class="column">
+          <h2>Últimos livros avaliados</h2>
+          <ul>
+            {{#each lastRated}}
+            <li class="movie-line">
+              <span class="movie-title-multiline"
+                >{{indexPlusOne @index}} {{this.title}}</span
+              >
+              <span class="plays"
+                >{{{this.ratingStarsHtml}}} · {{this.dateLabel}}</span
+              >
+            </li>
+            {{/each}}
+          </ul>
+        </div>
+
+        <div class="column">
+          <h2>Últimos livros lidos</h2>
+          <ul>
+            {{#each lastRead}}
+            <li class="movie-line">
+              <span class="movie-title-multiline"
+                >{{indexPlusOne @index}} {{this.title}}</span
+              >
+              <span class="plays"
+                >Lido em {{this.readDateLabel}}</span
+              >
+            </li>
+            {{/each}}
+          </ul>
+        </div>
+
+        <div class="stats-row">
+          <span class="stats-label">Estatísticas:</span>
+          <div class="stats-values">
+            <span class="stat-item"
+              ><span class="stat-accent">{{statBooksRead}}</span> livros
+              lidos (distintos)</span
+            >
+            <span class="stat-item"
+              ><span class="stat-accent">{{statRatings}}</span> avaliações</span
+            >
+            <span class="stat-item">{{statPages}}</span>
+          </div>
+        </div>
+      </div>
+
+      {{#if logoBase64}}
+      <img src="{{logoBase64}}" alt="Logo" class="logo" />
+      {{/if}}
+    </div>
+  </body>
+</html>
