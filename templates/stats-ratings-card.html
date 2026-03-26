@@ -469,11 +469,6 @@
         height: 32px;
         display: block;
       }
-      .ratings-card .duration-inline {
-        font-size: 1.65rem;
-        color: #888;
-        font-weight: 500;
-      }
     </style>
   </head>
   <body>
@@ -545,8 +540,7 @@
                     />
                   </svg>
                 </span>
-                <span class="rating-extra">{{this.durationLabel}}</span>
-                <span class="duration-inline">(duração da faixa)</span>
+                <span class="rating-extra">{{this.listenedInPeriodLabel}}</span>
               </div>
             </li>
             {{/each}}
@@ -554,11 +548,10 @@
         </div>
 
         <div class="stats-row">
-          <span class="stats-label">Estatísticas de avaliação:</span>
+          <span class="stats-label">Estatísticas:</span>
           <div class="stats-values">
-            <span class="stat-item">{{uniqueTracksRated}} músicas únicas avaliadas</span>
-            <span class="stat-item">{{uniqueArtistsRated}} artistas únicos avaliados</span>
-            <span class="stat-item">Tempo total (faixas): {{totalDurationMinutes}} minutos</span>
+            <span class="stat-item">{{uniqueTracksRated}} músicas avaliadas</span>
+            <span class="stat-item">{{uniqueArtistsRated}} artistas avaliados</span>
           </div>
         </div>
       </div>

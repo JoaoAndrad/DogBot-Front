@@ -74,6 +74,13 @@ Handlebars.registerHelper("formatPeriod", function (period) {
 
 let browserInstance = null;
 
+/** Mesmo viewport para stats-card e stats-ratings-card (story 1080×1920). */
+const DEFAULT_CARD_VIEWPORT = {
+  width: 1080,
+  height: 1920,
+  deviceScaleFactor: 2,
+};
+
 async function getBrowser() {
   if (browserInstance && browserInstance.isConnected()) {
     console.log("[statsCard] Reutilizando instância de browser existente");
@@ -121,7 +128,6 @@ function normalizeRatingsTemplateData(data) {
     rs.totalRatings != null ? String(rs.totalRatings) : "0";
   out.uniqueTracksRated = rs.uniqueTracks != null ? rs.uniqueTracks : 0;
   out.uniqueArtistsRated = rs.uniqueArtists != null ? rs.uniqueArtists : 0;
-  out.totalDurationMinutes = rs.totalDurationMinutes != null ? rs.totalDurationMinutes : 0;
   out.topRatedArtists = (data.topRatedArtists || []).map((a) => ({
     ...a,
     avgRatingDisplay: formatPtDecimal(a.avgRating),
@@ -133,6 +139,8 @@ function normalizeRatingsTemplateData(data) {
     ...t,
     ratingDisplay: formatPtDecimal(t.rating),
     ratingSlash10: formatRatingSlash10(t.rating),
+    listenedInPeriodLabel:
+      t.listenedInPeriodLabel != null ? t.listenedInPeriodLabel : "—",
   }));
   return out;
 }
@@ -165,10 +173,12 @@ async function renderRatingsCard(data, opts = {}) {
     browser = await getBrowser();
     page = await browser.newPage();
     const viewport = {
-      width: opts.width || 1600,
-      height: opts.height || 100,
-      deviceScaleFactor: 2,
+      width: opts.width ?? DEFAULT_CARD_VIEWPORT.width,
+      height: opts.height ?? DEFAULT_CARD_VIEWPORT.height,
+      deviceScaleFactor:
+        opts.deviceScaleFactor ?? DEFAULT_CARD_VIEWPORT.deviceScaleFactor,
     };
+    console.log("[statsRatingsCard] Configurando viewport:", viewport);
     await page.setViewport(viewport);
     await page.setContent(html, { waitUntil: "networkidle0" });
     const buffer = await page.screenshot({
@@ -264,9 +274,10 @@ async function renderCard(data, opts = {}) {
     page = await browser.newPage();
 
     const viewport = {
-      width: opts.width || 1600,
-      height: opts.height || 100,
-      deviceScaleFactor: 2,
+      width: opts.width ?? DEFAULT_CARD_VIEWPORT.width,
+      height: opts.height ?? DEFAULT_CARD_VIEWPORT.height,
+      deviceScaleFactor:
+        opts.deviceScaleFactor ?? DEFAULT_CARD_VIEWPORT.deviceScaleFactor,
     };
     console.log("[statsCard] Configurando viewport:", viewport);
     await page.setViewport(viewport);
