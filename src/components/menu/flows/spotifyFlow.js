@@ -3,7 +3,10 @@ const fetch = require("node-fetch");
 const spotifyClient = require("../../../services/spotifyClient");
 const polls = require("../../poll");
 const backendClient = require("../../../services/backendClient");
-const { renderCard } = require("../../../services/statsCardService");
+const {
+  renderCard,
+  renderRatingsCard,
+} = require("../../../services/statsCardService");
 const {
   sendTrackSticker,
   sendCompositeSticker,
@@ -933,6 +936,44 @@ const spotifyFlow = createFlow("spotify", {
           const { MessageMedia } = require("whatsapp-web.js");
           const media = new MessageMedia("image/png", img.toString("base64"));
           await ctx.client.sendMessage(ctx.chatId, media, { caption: "" });
+
+          // Relatório de avaliações (mesmo período): GET com kind=rating
+          try {
+            const ratingUrl = `${url}&kind=rating`;
+            const ratingRes = await fetch(ratingUrl, { method: "GET" });
+            const ratingJson = await ratingRes.json();
+            const totalRat =
+              ratingJson &&
+              ratingJson.ratingSummary &&
+              ratingJson.ratingSummary.totalRatings;
+            if (totalRat > 0) {
+              const ratingTemplateData = {
+                ...ratingJson,
+                logoPath,
+              };
+              const imgRatings = await renderRatingsCard(ratingTemplateData, {
+                width: 1080,
+                height: 1920,
+                outputWidth: 1080,
+              });
+              const mediaRatings = new MessageMedia(
+                "image/png",
+                imgRatings.toString("base64"),
+              );
+              await ctx.client.sendMessage(ctx.chatId, mediaRatings, {
+                caption: "",
+              });
+            } else {
+              await ctx.reply(
+                "_Nenhuma avaliação registrada neste período._",
+              );
+            }
+          } catch (ratingErr) {
+            console.warn(
+              "[spotifyFlow] stats rating card:",
+              ratingErr && ratingErr.message ? ratingErr.message : ratingErr,
+            );
+          }
         } catch (e) {
           await ctx.reply(final);
         }
@@ -1030,6 +1071,43 @@ const spotifyFlow = createFlow("spotify", {
           const { MessageMedia } = require("whatsapp-web.js");
           const media = new MessageMedia("image/png", img.toString("base64"));
           await ctx.client.sendMessage(ctx.chatId, media, { caption: "" });
+
+          try {
+            const ratingUrl = `${url}&kind=rating`;
+            const ratingRes = await fetch(ratingUrl, { method: "GET" });
+            const ratingJson = await ratingRes.json();
+            const totalRat =
+              ratingJson &&
+              ratingJson.ratingSummary &&
+              ratingJson.ratingSummary.totalRatings;
+            if (totalRat > 0) {
+              const ratingTemplateData = {
+                ...ratingJson,
+                logoPath,
+              };
+              const imgRatings = await renderRatingsCard(ratingTemplateData, {
+                width: 1080,
+                height: 1920,
+                outputWidth: 1080,
+              });
+              const mediaRatings = new MessageMedia(
+                "image/png",
+                imgRatings.toString("base64"),
+              );
+              await ctx.client.sendMessage(ctx.chatId, mediaRatings, {
+                caption: "",
+              });
+            } else {
+              await ctx.reply(
+                "_Nenhuma avaliação registrada neste período._",
+              );
+            }
+          } catch (ratingErr) {
+            console.warn(
+              "[spotifyFlow] statsMonth rating card:",
+              ratingErr && ratingErr.message ? ratingErr.message : ratingErr,
+            );
+          }
         } catch (e) {
           await ctx.reply("❌ Erro ao gerar card: " + (e.message || e));
         }

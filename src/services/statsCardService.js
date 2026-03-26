@@ -11,8 +11,17 @@ const templatePath = path.join(
   "templates",
   "stats-card.html",
 );
+const ratingsTemplatePath = path.join(
+  __dirname,
+  "..",
+  "..",
+  "templates",
+  "stats-ratings-card.html",
+);
 const tplSrc = fs.readFileSync(templatePath, "utf8");
 const tpl = Handlebars.compile(tplSrc);
+const ratingsTplSrc = fs.readFileSync(ratingsTemplatePath, "utf8");
+const ratingsTpl = Handlebars.compile(ratingsTplSrc);
 
 // Register helper to display 1-based index
 Handlebars.registerHelper("indexPlusOne", function (index) {
@@ -84,6 +93,81 @@ async function getBrowser() {
   console.log("[statsCard] Browser lançado com sucesso");
 
   return browserInstance;
+}
+
+function formatPtDecimal(n) {
+  if (n == null || !Number.isFinite(Number(n))) return "—";
+  return String(Number(n).toFixed(1)).replace(".", ",");
+}
+
+/**
+ * Prepara dados da API `kind=rating` para o template stats-ratings-card.html.
+ */
+function normalizeRatingsTemplateData(data) {
+  const rs = data.ratingSummary || {};
+  const out = { ...data };
+  out.avgRatingDisplay = formatPtDecimal(rs.avgRating);
+  out.totalRatingsDisplay =
+    rs.totalRatings != null ? String(rs.totalRatings) : "0";
+  out.uniqueTracksRated = rs.uniqueTracks != null ? rs.uniqueTracks : 0;
+  out.uniqueArtistsRated = rs.uniqueArtists != null ? rs.uniqueArtists : 0;
+  out.totalDurationMinutes = rs.totalDurationMinutes != null ? rs.totalDurationMinutes : 0;
+  out.topRatedArtists = (data.topRatedArtists || []).map((a) => ({
+    ...a,
+    avgRatingDisplay: formatPtDecimal(a.avgRating),
+  }));
+  out.topRatedTracks = (data.topRatedTracks || []).map((t) => ({
+    ...t,
+    ratingDisplay: formatPtDecimal(t.rating),
+  }));
+  return out;
+}
+
+async function renderRatingsCard(data, opts = {}) {
+  const payload = normalizeRatingsTemplateData(data);
+  console.log("[statsRatingsCard] Iniciando renderização");
+
+  if (payload.logoPath) {
+    const exists = fs.existsSync(payload.logoPath);
+    if (exists) {
+      try {
+        const logoBuffer = fs.readFileSync(payload.logoPath);
+        payload.logoBase64 = `data:image/png;base64,${logoBuffer.toString("base64")}`;
+      } catch (err) {
+        console.error("[statsRatingsCard] Erro ao converter logo:", err);
+        payload.logoBase64 = "";
+      }
+    } else {
+      payload.logoBase64 = "";
+    }
+  } else {
+    payload.logoBase64 = "";
+  }
+
+  const html = ratingsTpl(payload);
+  let browser = null;
+  let page = null;
+  try {
+    browser = await getBrowser();
+    page = await browser.newPage();
+    const viewport = {
+      width: opts.width || 1600,
+      height: opts.height || 100,
+      deviceScaleFactor: 2,
+    };
+    await page.setViewport(viewport);
+    await page.setContent(html, { waitUntil: "networkidle0" });
+    const buffer = await page.screenshot({
+      type: "png",
+      fullPage: true,
+    });
+    await page.close();
+    return buffer;
+  } catch (error) {
+    console.error("[statsRatingsCard] Erro durante renderização:", error);
+    if (page) await page.close().catch(() => {});
+    throw error;
+  }
 }
 
 async function renderCard(data, opts = {}) {
@@ -201,4 +285,4 @@ async function renderCard(data, opts = {}) {
   }
 }
 
-module.exports = { renderCard };
+module.exports = { renderCard, renderRatingsCard };
