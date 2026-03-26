@@ -37,11 +37,18 @@ async function sendToBackend(path, body, method = "POST") {
 
   // Validate HTTP status: anything non-2xx is an error
   if (!res.ok) {
+    const rawText = await res.text();
     let errorBody;
     try {
-      errorBody = await res.json();
+      errorBody = rawText ? JSON.parse(rawText) : {};
     } catch {
-      errorBody = { error: "Failed to parse error response" };
+      const snippet = rawText
+        ? rawText.slice(0, 500).replace(/\s+/g, " ")
+        : "(corpo vazio)";
+      errorBody = {
+        error: "Resposta não-JSON do backend",
+        rawSnippet: snippet,
+      };
     }
 
     const msg =
