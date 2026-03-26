@@ -445,12 +445,21 @@
         overflow: visible;
         text-overflow: clip;
         margin-bottom: 28px;
+        min-width: 0;
       }
       .ratings-card .rating-item-title {
         font-size: 2.6rem;
         font-weight: 700;
         line-height: 1.25;
         word-break: break-word;
+      }
+      /* Artistas e músicas: nomes longos com reticências */
+      .ratings-card .rating-item-title--truncate {
+        word-break: normal;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        max-width: 100%;
       }
       .ratings-card .rating-item-meta {
         font-size: 2rem;
@@ -496,7 +505,7 @@
         {{/if}} {{/each}}
       </div>
 
-      <h1 class="title-wrap">Meu Relatório de Avaliações {{formatPeriod period}}</h1>
+      <h1 class="title-wrap">Minhas avaliações {{formatPeriod period}}</h1>
 
       <div class="subtitle ratings-summary">
         <div class="ratings-summary-line">
@@ -515,7 +524,7 @@
           <ul>
             {{#each topRatedArtists}}
             <li class="rating-item">
-              <div class="rating-item-title">
+              <div class="rating-item-title rating-item-title--truncate">
                 {{indexPlusOne @index}} {{this.name}}
               </div>
               <div class="rating-item-meta">
@@ -540,7 +549,7 @@
           <ul>
             {{#each topRatedTracks}}
             <li class="rating-item">
-              <div class="rating-item-title">
+              <div class="rating-item-title rating-item-title--truncate">
                 {{indexPlusOne @index}} {{this.title}}
               </div>
               <div class="rating-item-meta">
@@ -563,8 +572,12 @@
         <div class="stats-row">
           <span class="stats-label">Estatísticas:</span>
           <div class="stats-values">
-            <span class="stat-item">{{uniqueTracksRated}} músicas avaliadas</span>
-            <span class="stat-item">{{uniqueArtistsRated}} artistas avaliados</span>
+            <span class="stat-item"
+              >{{uniqueTracksRated}} músicas avaliadas</span
+            >
+            <span class="stat-item"
+              >{{uniqueArtistsRated}} artistas avaliados</span
+            >
           </div>
         </div>
       </div>
