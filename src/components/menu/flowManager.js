@@ -160,6 +160,8 @@ class FlowManager {
         return;
       }
 
+      const pathBeforeHandler = state.path;
+
       const ctx = {
         userId,
         chatId,
@@ -181,8 +183,18 @@ class FlowManager {
           // Save updated state after handler execution
           await storage.saveState(userId, flowId, state);
 
-          // If handler altered path, render new node
-          if (state.path && state.path !== currentPath) {
+          // Só re-renderiza outro nó se o handler mudou o path de navegação.
+          // Se `currentPath` do metadata da enquete vier undefined, comparar com
+          // pathBeforeHandler — senão state.path !== currentPath reenvia a mesma enquete.
+          if (result && result.noRender) {
+            return;
+          }
+          const compareFrom =
+            currentPath != null ? currentPath : pathBeforeHandler;
+          if (
+            state.path &&
+            state.path !== compareFrom
+          ) {
             await this._renderNode(client, chatId, userId, flowId, state.path);
           }
         }

@@ -300,14 +300,15 @@ const filmCardFlow = createFlow("film-card", {
           "• *hoje*, *ontem*, *antes de ontem*\n\n" +
           "_Fuso: Brasil (horário de Brasília)._",
       );
-      return { end: false };
+      // Não reenviar a enquete do nó atual; aguardar mensagem de texto (flowManager).
+      return { end: false, noRender: true };
     },
 
     retryViewingDateInput: async (ctx) => {
       delete ctx.state.context.pendingViewingDateIso;
       ctx.state.context.awaitingViewingDateText = true;
       await ctx.reply("📝 Envie a *nova* data (mesmo formato de antes).");
-      return { end: false };
+      return { end: false, noRender: true };
     },
 
     confirmViewingDate: async (ctx) => {
