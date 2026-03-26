@@ -157,6 +157,41 @@ function formatRatingSlash5(n) {
   return `${s}/5`;
 }
 
+/**
+ * Cinco posições: ⭐ verdes conforme a nota; meia = metade esquerda da 3ª pintada (ex.: 2,5/5).
+ * Devolve HTML seguro gerado no servidor (usar {{{ratingStarsHtml}}} no Handlebars).
+ */
+function buildRatingStarsHtml5(rating) {
+  if (rating == null || !Number.isFinite(Number(rating))) {
+    return '<span class="movie-star-row movie-star-row--missing">—</span>';
+  }
+  const r = Math.max(0, Math.min(5, Number(rating)));
+  const fullCount = Math.floor(r);
+  const hasHalf = r - fullCount >= 0.5;
+  const emptyCount = 5 - fullCount - (hasHalf ? 1 : 0);
+
+  const parts = [];
+  for (let i = 0; i < fullCount; i++) {
+    parts.push(
+      '<span class="movie-star movie-star--full" aria-hidden="true">⭐</span>',
+    );
+  }
+  if (hasHalf) {
+    parts.push(
+      '<span class="movie-star movie-star--half" aria-hidden="true">' +
+        '<span class="movie-star-half-bg">☆</span>' +
+        '<span class="movie-star-half-fg"><span class="movie-star-half-fg-inner">⭐</span></span>' +
+        "</span>",
+    );
+  }
+  for (let i = 0; i < emptyCount; i++) {
+    parts.push(
+      '<span class="movie-star movie-star--empty" aria-hidden="true">☆</span>',
+    );
+  }
+  return '<span class="movie-star-row">' + parts.join("") + "</span>";
+}
+
 const MOSAIC_FALLBACK_COLORS = [
   "#720018",
   "#1aab4e",
@@ -192,6 +227,7 @@ function normalizeMoviesTemplateData(data) {
   const lastRated = (data.lastRated || []).map((r) => ({
     ...r,
     ratingSlash5: formatRatingSlash5(r.rating),
+    ratingStarsHtml: buildRatingStarsHtml5(r.rating),
   }));
   const lastWatched = data.lastWatched || [];
   const statFilmsWatched =

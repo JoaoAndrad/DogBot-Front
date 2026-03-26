@@ -161,9 +161,11 @@
         font-size: 2.8rem;
         margin: 0 0 40px 0;
         font-weight: 800;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
+        white-space: normal;
+        overflow: visible;
+        line-height: 1.25;
+        word-wrap: break-word;
+        overflow-wrap: break-word;
       }
 
       ul {
@@ -181,12 +183,75 @@
         white-space: normal;
       }
 
-      .rating-item-title--truncate {
+      .movie-title-multiline {
         display: block;
         max-width: 100%;
+        white-space: normal;
+        word-wrap: break-word;
+        overflow-wrap: break-word;
+        hyphens: auto;
+      }
+
+      .movie-star-row {
+        display: inline-flex;
+        align-items: center;
+        flex-wrap: nowrap;
+        gap: 0.08em;
+        vertical-align: middle;
+        line-height: 1;
+      }
+
+      .movie-star-row--missing {
+        color: #888;
+      }
+
+      .movie-star {
+        font-size: 1em;
+        line-height: 1;
+      }
+
+      .movie-star--full {
+        color: #00c853;
+      }
+
+      .movie-star--empty {
+        color: #555;
+        opacity: 0.9;
+      }
+
+      .movie-star--half {
+        position: relative;
+        display: inline-block;
+        width: 1em;
+        height: 1em;
+        vertical-align: -0.05em;
+      }
+
+      .movie-star-half-bg {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 1em;
+        line-height: 1;
+        color: #555;
+        opacity: 0.9;
+      }
+
+      .movie-star-half-fg {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 50%;
+        height: 100%;
         overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
+        z-index: 1;
+      }
+
+      .movie-star-half-fg-inner {
+        display: block;
+        width: 1em;
+        line-height: 1;
+        color: #00c853;
       }
 
       .plays {
@@ -194,10 +259,16 @@
         font-size: 2rem;
         color: #ddd;
         font-weight: 500;
-        margin-top: 6px;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
+        margin-top: 8px;
+        overflow: visible;
+        white-space: normal;
+        line-height: 1.35;
+        word-wrap: break-word;
+        overflow-wrap: break-word;
+      }
+
+      .plays .movie-star-row {
+        font-size: 2.2rem;
       }
 
       .stats-row {
@@ -265,12 +336,11 @@
           <ul>
             {{#each lastRated}}
             <li class="movie-line">
-              <span class="rating-item-title--truncate"
+              <span class="movie-title-multiline"
                 >{{indexPlusOne @index}} {{this.title}}</span
               >
               <span class="plays"
-                ><span class="green-text">{{this.ratingSlash5}}</span> ·
-                {{this.dateLabel}}</span
+                >{{{this.ratingStarsHtml}}} · {{this.dateLabel}}</span
               >
             </li>
             {{/each}}
@@ -282,7 +352,7 @@
           <ul>
             {{#each lastWatched}}
             <li class="movie-line">
-              <span class="rating-item-title--truncate"
+              <span class="movie-title-multiline"
                 >{{indexPlusOne @index}} {{this.title}}</span
               >
               <span class="plays"
