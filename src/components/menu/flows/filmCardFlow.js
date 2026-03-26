@@ -21,6 +21,7 @@ function clearViewingDateFlags(state) {
   if (!c) return;
   delete c.awaitingViewingDateText;
   delete c.pendingViewingDateIso;
+  delete c.flowViewingLogIds;
 }
 
 /** In-memory (como list-creation): UUID + chatId para o handler de texto encontrar o fluxo */
@@ -221,11 +222,13 @@ const filmCardFlow = createFlow("film-card", {
         return { end: true };
       }
       try {
-        await movieClient.markWatched(userId, tmdbId, {
+        state.context.flowViewingLogIds = [];
+        const mw = await movieClient.markWatched(userId, tmdbId, {
           title: movieInfo.title,
           year: movieInfo.year,
           posterUrl: movieInfo.posterUrl,
         });
+        if (mw?.viewingLogId) state.context.flowViewingLogIds.push(mw.viewingLogId);
         const displayName = ctx.voterDisplayName || "Você";
         await ctx.reply(
           `✅ *${movieInfo.title}${movieInfo.year ? ` (${movieInfo.year})` : ""}*\n\nMarcado como assistido para *${displayName}*! 🎬`,
@@ -258,17 +261,20 @@ const filmCardFlow = createFlow("film-card", {
         return { end: true };
       }
       try {
+        state.context.flowViewingLogIds = [];
         // Marca como visto automaticamente ao avaliar (alinhado ao /filme e listas)
-        await movieClient.markWatched(userId, tmdbId, {
+        const mw = await movieClient.markWatched(userId, tmdbId, {
           title: movieInfo.title,
           year: movieInfo.year,
           posterUrl: movieInfo.posterUrl,
         });
-        await movieClient.rateMovie(userId, tmdbId, numRating, {
+        if (mw?.viewingLogId) state.context.flowViewingLogIds.push(mw.viewingLogId);
+        const rm = await movieClient.rateMovie(userId, tmdbId, numRating, {
           title: movieInfo.title,
           year: movieInfo.year,
           posterUrl: movieInfo.posterUrl,
         });
+        if (rm?.viewingLogId) state.context.flowViewingLogIds.push(rm.viewingLogId);
         const stars = "⭐".repeat(Math.round(numRating));
         const displayName = ctx.voterDisplayName || "Você";
         const ratingStr =
@@ -346,7 +352,12 @@ const filmCardFlow = createFlow("film-card", {
         return { end: false };
       }
       try {
-        await movieClient.patchViewingLog(userId, tmdbId, pendingViewingDateIso);
+        await movieClient.patchViewingLog(
+          userId,
+          tmdbId,
+          pendingViewingDateIso,
+          state.context.flowViewingLogIds,
+        );
         const label = formatDateDdMmYyyy(new Date(pendingViewingDateIso));
         await ctx.reply(`✅ Data da visualização atualizada para *${label}*.`);
       } catch (err) {

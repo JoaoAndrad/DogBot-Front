@@ -26,20 +26,29 @@ function formatMovieTitle(movie) {
 }
 
 /** Após marcar assistido ou avaliar na lista: mesma enquete de data do /filme */
-async function maybeStartFilmCardViewingDatePrompt(ctx, item, userId) {
+async function maybeStartFilmCardViewingDatePrompt(
+  ctx,
+  item,
+  userId,
+  flowViewingLogIds = [],
+) {
   if (!item?.tmdbId) return;
   try {
     const movieInfo = await movieClient.getMovieInfoWithAllRatings(
       String(item.tmdbId),
       userId,
     );
+    const initialContext = {
+      movieInfo,
+      tmdbId: String(item.tmdbId),
+      filmTitle: formatMovieTitle(item),
+    };
+    if (Array.isArray(flowViewingLogIds) && flowViewingLogIds.length > 0) {
+      initialContext.flowViewingLogIds = [...flowViewingLogIds];
+    }
     await flowManager.startFlow(ctx.client, ctx.chatId, userId, "film-card", {
       initialPath: "/after-watch-prompt",
-      initialContext: {
-        movieInfo,
-        tmdbId: String(item.tmdbId),
-        filmTitle: formatMovieTitle(item),
-      },
+      initialContext,
     });
   } catch (e) {
     console.warn("[ListsFlow] film-card viewing date prompt:", e.message);
@@ -727,13 +736,15 @@ const listsFlow = createFlow("lists", {
 
         // Assistido na lista é independente do /filme (MovieRating). Só sincronizamos
         // para o geral quando o usuário marca assistido aqui — não o contrário.
+        let flowViewingLogIds = [];
         if (item?.tmdbId && newWatchedStatus) {
           try {
-            await movieClient.markWatched(userId, item.tmdbId, {
+            const mw = await movieClient.markWatched(userId, item.tmdbId, {
               title: item.title,
               year: item.year,
               posterUrl: item.posterUrl,
             });
+            if (mw?.viewingLogId) flowViewingLogIds.push(mw.viewingLogId);
           } catch (e) {
             console.warn(
               "[ListsFlow] Sync to MovieRating after markWatched failed:",
@@ -755,7 +766,12 @@ const listsFlow = createFlow("lists", {
         await ctx.reply(msg);
 
         if (item?.tmdbId && newWatchedStatus) {
-          await maybeStartFilmCardViewingDatePrompt(ctx, item, userId);
+          await maybeStartFilmCardViewingDatePrompt(
+            ctx,
+            item,
+            userId,
+            flowViewingLogIds,
+          );
         }
 
         // Volta pro detalhe do item
@@ -878,18 +894,21 @@ const listsFlow = createFlow("lists", {
         }
 
         // Sincronizar com MovieRating para /filme mostrar a mesma nota (plano alternativo)
+        let flowViewingLogIds = [];
         if (item?.tmdbId) {
           try {
-            await movieClient.markWatched(userId, item.tmdbId, {
+            const mw = await movieClient.markWatched(userId, item.tmdbId, {
               title: item.title,
               year: item.year,
               posterUrl: item.posterUrl,
             });
-            await movieClient.rateMovie(userId, item.tmdbId, numRating, {
+            if (mw?.viewingLogId) flowViewingLogIds.push(mw.viewingLogId);
+            const rm = await movieClient.rateMovie(userId, item.tmdbId, numRating, {
               title: item.title,
               year: item.year,
               posterUrl: item.posterUrl,
             });
+            if (rm?.viewingLogId) flowViewingLogIds.push(rm.viewingLogId);
           } catch (e) {
             console.warn(
               "[ListsFlow] Sync to MovieRating after rate failed:",
@@ -918,7 +937,12 @@ const listsFlow = createFlow("lists", {
         }
 
         if (item?.tmdbId) {
-          await maybeStartFilmCardViewingDatePrompt(ctx, item, userId);
+          await maybeStartFilmCardViewingDatePrompt(
+            ctx,
+            item,
+            userId,
+            flowViewingLogIds,
+          );
         }
 
         ctx.state.path = "/item-detail";

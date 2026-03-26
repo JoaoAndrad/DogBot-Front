@@ -143,19 +143,24 @@ async function removeRating(userId, tmdbId) {
 }
 
 /**
- * Ajusta a data (viewedAt) do último MovieViewingLog para o filme.
+ * Ajusta a data (viewedAt) dos MovieViewingLog do fluxo (ou o mais recente se ids vazios).
  * @param {string} userId
  * @param {string} tmdbId
  * @param {string} viewedAtIso - ISO 8601
+ * @param {string[]} [viewingLogIds] - IDs devolvidos por markWatched/rateMovie neste fluxo
  */
-async function patchViewingLog(userId, tmdbId, viewedAtIso) {
+async function patchViewingLog(userId, tmdbId, viewedAtIso, viewingLogIds) {
+  const payload = {
+    userId,
+    tmdbId,
+    viewedAt: viewedAtIso,
+  };
+  if (Array.isArray(viewingLogIds) && viewingLogIds.length > 0) {
+    payload.viewingLogIds = viewingLogIds;
+  }
   const response = await sendToBackend(
     "/api/movies/viewing-log",
-    {
-      userId,
-      tmdbId,
-      viewedAt: viewedAtIso,
-    },
+    payload,
     "PATCH",
   );
   return response;
