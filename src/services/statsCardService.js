@@ -100,6 +100,16 @@ function formatPtDecimal(n) {
   return String(Number(n).toFixed(1)).replace(".", ",");
 }
 
+/** Nota no formato "9,6/10" (vírgula decimal, escala 0–10). */
+function formatRatingSlash10(n) {
+  if (n == null || !Number.isFinite(Number(n))) return "—/10";
+  const x = Number(n);
+  const s = Number.isInteger(x)
+    ? String(x)
+    : x.toFixed(1).replace(".", ",");
+  return `${s}/10`;
+}
+
 /**
  * Prepara dados da API `kind=rating` para o template stats-ratings-card.html.
  */
@@ -115,10 +125,14 @@ function normalizeRatingsTemplateData(data) {
   out.topRatedArtists = (data.topRatedArtists || []).map((a) => ({
     ...a,
     avgRatingDisplay: formatPtDecimal(a.avgRating),
+    ratingSlash10: formatRatingSlash10(a.avgRating),
+    trackCountLabel:
+      a.trackCount != null ? `${a.trackCount} músicas` : "—",
   }));
   out.topRatedTracks = (data.topRatedTracks || []).map((t) => ({
     ...t,
     ratingDisplay: formatPtDecimal(t.rating),
+    ratingSlash10: formatRatingSlash10(t.rating),
   }));
   return out;
 }

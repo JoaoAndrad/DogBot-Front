@@ -16,7 +16,7 @@
         padding: 0;
         display: flex;
         justify-content: center;
-        align-items: flex-start;
+        align-items: flex-start; /* Alinha no topo */
         overflow-x: hidden;
         width: 1080px;
         min-height: 1920px;
@@ -33,11 +33,12 @@
         box-sizing: border-box;
       }
 
+      /* --- MOSAICO DE ÁLBUNS (POSICIONAMENTO ABSOLUTO) --- */
       .mosaic-container {
         position: relative;
-        height: 680px;
-        width: 1080px;
-        margin: 0;
+        height: 680px; /* Aumentado de 600px para 680px para acomodar os álbuns mais baixos */
+        width: 1080px; /* Largura total do Instagram Story */
+        margin: 0; /* Sem margem para colar nas bordas */
         overflow: hidden;
       }
 
@@ -49,78 +50,91 @@
         background-repeat: no-repeat;
       }
 
+      /* CONFIGURAÇÃO DAS CORES E POSIÇÕES BASEADA NA IMAGEM */
+
+      /* FILEIRA DE TRÁS (Cores escuras/topo) - Z-INDEX BAIXO */
       .alb-1 {
+        /* Vinho */
         background-color: #720018;
-        width: 340px;
+        width: 340px; /* Aumentado de 260px */
         height: 340px;
         top: 0;
         left: 0;
         z-index: 1;
       }
       .alb-2 {
+        /* Verde Bandeira */
         background-color: #1aab4e;
-        width: 340px;
+        width: 340px; /* Aumentado de 260px */
         height: 340px;
         top: 0;
-        left: 245px;
+        left: 245px; /* Ajustado para sobrepor levemente */
         z-index: 1;
       }
       .alb-3 {
+        /* Azul Royal */
         background-color: #3b4cca;
-        width: 340px;
+        width: 340px; /* Aumentado de 260px */
         height: 340px;
         top: 0;
-        left: 490px;
+        left: 490px; /* Ajustado para sobrepor levemente */
         z-index: 1;
       }
       .alb-4 {
+        /* Azul Acinzentado */
         background-color: #728ebb;
-        width: 350px;
-        height: 340px;
+        width: 350px; /* Aumentado de 280px */
+        height: 340px; /* Aumentado de 260px */
         top: 0;
-        left: 735px;
+        left: 735px; /* Ajustado */
         z-index: 1;
       }
 
+      /* FILEIRA DA FRENTE (Sobreposições) - Z-INDEX ALTO */
       .alb-5 {
+        /* Roxo */
         background-color: #a04ba0;
         width: 290px;
-        height: 320px;
-        top: 310px;
+        height: 320px; /* Aumentado de 300px */
+        top: 310px; /* Aumentado de 240px para descer mais */
         left: 0;
         z-index: 2;
       }
 
       .alb-6 {
+        /* Amarelo Ouro */
         background-color: #ffcc00;
         width: 300px;
-        height: 320px;
-        top: 290px;
+        height: 320px; /* Aumentado de 300px */
+        top: 290px; /* Aumentado de 220px */
         left: 220px;
         z-index: 3;
       }
 
       .alb-7 {
+        /* Verde Limão */
         background-color: #b3d828;
         width: 300px;
-        height: 320px;
-        top: 305px;
+        height: 320px; /* Aumentado de 300px */
+        top: 305px; /* Aumentado de 235px */
         left: 460px;
         z-index: 4;
       }
 
       .alb-8 {
+        /* Ciano */
         background-color: #2bc3f3;
-        width: 320px;
-        height: 320px;
-        top: 280px;
+        width: 320px; /* Aumentado para cobrir até a borda direita */
+        height: 320px; /* Aumentado de 300px */
+        top: 280px; /* Aumentado de 210px */
         left: 760px;
         z-index: 5;
       }
 
+      /* --- TIPOGRAFIA --- */
       h1 {
         text-align: center;
-        font-size: 3.2rem;
+        font-size: 3.2rem; /* Reduzido de 4rem para evitar quebra */
         margin: 40px 0 30px 0;
         font-weight: 800;
         letter-spacing: -0.5px;
@@ -132,35 +146,29 @@
 
       .subtitle {
         text-align: center;
-        font-size: 3.5rem;
+        font-size: 3.5rem; /* Aumentado de 2.8rem */
         font-weight: 800;
-        margin-bottom: 80px;
+        margin-bottom: 80px; /* Aumentado */
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
         padding: 0 60px;
       }
 
-      .subtitle.ratings-summary {
-        white-space: normal;
-        line-height: 1.35;
-        font-size: 2.8rem;
-        margin-bottom: 70px;
-      }
-
       .green-text {
         color: #00c853;
       }
 
+      /* --- GRID DE INFORMAÇÕES (2 COLUNAS) --- */
       .info-grid {
         display: grid;
         grid-template-columns: 1fr 1fr;
-        column-gap: 80px;
+        column-gap: 80px; /* Aumentado */
         row-gap: 0;
         align-items: start;
         justify-content: center;
         width: 100%;
-        padding: 0 80px 60px 80px;
+        padding: 0 80px 60px 80px; /* Aumentado padding */
         box-sizing: border-box;
         margin-top: 0;
       }
@@ -171,8 +179,8 @@
       }
 
       .column h2 {
-        font-size: 3.6rem;
-        margin: 0 0 40px 0;
+        font-size: 3.6rem; /* Aumentado de 2.8rem */
+        margin: 0 0 40px 0; /* Aumentado margin-bottom */
         font-weight: 800;
         overflow: hidden;
         text-overflow: ellipsis;
@@ -186,8 +194,8 @@
       }
 
       li {
-        font-size: 2.6rem;
-        margin-bottom: 24px;
+        font-size: 2.6rem; /* Aumentado de 2rem */
+        margin-bottom: 24px; /* Aumentado */
         font-weight: 700;
         line-height: 1.4;
         overflow: hidden;
@@ -197,7 +205,7 @@
 
       .plays {
         display: block;
-        font-size: 2rem;
+        font-size: 2rem; /* Aumentado de 1.5rem */
         color: #ddd;
         font-weight: 500;
         margin-top: 6px;
@@ -206,6 +214,7 @@
         white-space: nowrap;
       }
 
+      /* --- ESTATÍSTICAS (LINHA COMPLETA ABAIXO) --- */
       .stats-row {
         grid-column: 1 / -1;
         margin-top: 80px;
@@ -213,7 +222,7 @@
         font-weight: 700;
         display: flex;
         align-items: flex-start;
-        gap: 40px;
+        gap: 40px; /* Espaço entre "Estatísticas:" e os valores */
       }
 
       .stats-row .stats-label {
@@ -230,6 +239,139 @@
 
       .stats-row .stats-values .stat-item {
         display: block;
+      }
+
+      /* --- PLAYER CONTROLS (COLUNA 1) --- */
+      .player-container {
+        margin-top: 30px;
+        width: 100%;
+      }
+
+      .progress-bar {
+        width: 100%;
+        height: 5px;
+        background-color: #555;
+        border-radius: 3px;
+        position: relative;
+        margin-bottom: 18px;
+      }
+
+      .progress-active {
+        width: 30%;
+        height: 100%;
+        background-color: #fff;
+        border-radius: 3px;
+        position: relative;
+      }
+
+      .progress-dot {
+        position: absolute;
+        right: -7px;
+        top: -4px;
+        width: 13px;
+        height: 13px;
+        background-color: #fff;
+        border-radius: 50%;
+      }
+
+      .controls {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        font-size: 1.5rem;
+        width: 100%;
+      }
+
+      .play-button {
+        background: #fff;
+        color: #000;
+        border-radius: 50%;
+        width: 45px;
+        height: 45px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.2rem;
+        font-weight: 900;
+      }
+
+      .control-icon {
+        cursor: pointer;
+        opacity: 0.9;
+        font-size: 1.6rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 28px;
+        height: 28px;
+      }
+      .control-icon:hover {
+        opacity: 1;
+      }
+
+      /* --- WAVEFORM (COLUNA 3) --- */
+      .waveform-container {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        width: 100%;
+        gap: 0;
+        height: 60px;
+        margin-top: 40px;
+      }
+
+      .wave-bar {
+        width: 7px;
+        background-color: #fff;
+        border-radius: 3px;
+        flex-shrink: 0;
+      }
+
+      /* Alturas estáticas para simular a imagem - proporcionalmente aumentadas */
+      .w1 {
+        height: 20px;
+      }
+      .w2 {
+        height: 35px;
+      }
+      .w3 {
+        height: 55px;
+      }
+      .w4 {
+        height: 42px;
+      }
+      .w5 {
+        height: 28px;
+      }
+      .w6 {
+        height: 48px;
+      }
+      .w7 {
+        height: 35px;
+      }
+      .w8 {
+        height: 14px;
+      }
+      .w9 {
+        height: 42px;
+      }
+      .w10 {
+        height: 28px;
+      }
+      .w11 {
+        height: 55px;
+      }
+      .w12 {
+        height: 35px;
+      }
+      .w13 {
+        height: 20px;
+      }
+      .w14 {
+        height: 14px;
+      }
+      .w15 {
+        height: 28px;
       }
 
       @media (max-width: 700px) {
@@ -257,19 +399,85 @@
         }
       }
 
+      /* --- LOGO --- */
       .logo {
         position: absolute;
         right: 60px;
         bottom: 60px;
-        width: 100px;
+        width: 100px; /* Aumentado de 80px */
         height: 100px;
         opacity: 0.8;
         z-index: 1000;
       }
+
+      /* --- Ratings: títulos e itens com quebra de linha (mesmo canvas 1080×1920) --- */
+      .ratings-card h1.title-wrap {
+        white-space: normal;
+        overflow: visible;
+        text-overflow: clip;
+        line-height: 1.12;
+      }
+      .ratings-card .subtitle.ratings-summary {
+        white-space: normal;
+        line-height: 1.3;
+        overflow: visible;
+        text-overflow: clip;
+        font-size: 3.5rem;
+      }
+      .ratings-card .column h2.title-wrap {
+        white-space: normal;
+        overflow: visible;
+        text-overflow: clip;
+        line-height: 1.12;
+        hyphens: auto;
+      }
+      .ratings-card li.rating-item {
+        white-space: normal;
+        overflow: visible;
+        text-overflow: clip;
+        margin-bottom: 28px;
+      }
+      .ratings-card .rating-item-title {
+        font-size: 2.6rem;
+        font-weight: 700;
+        line-height: 1.25;
+        word-break: break-word;
+      }
+      .ratings-card .rating-item-meta {
+        font-size: 2rem;
+        color: #ddd;
+        font-weight: 500;
+        margin-top: 10px;
+        padding-left: 0.45em;
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 10px 12px;
+      }
+      .ratings-card .rating-out {
+        color: #fff;
+        font-weight: 600;
+      }
+      .ratings-card .star-icon {
+        display: inline-flex;
+        align-items: center;
+        line-height: 0;
+        flex-shrink: 0;
+      }
+      .ratings-card .star-icon svg {
+        width: 32px;
+        height: 32px;
+        display: block;
+      }
+      .ratings-card .duration-inline {
+        font-size: 1.65rem;
+        color: #888;
+        font-weight: 500;
+      }
     </style>
   </head>
   <body>
-    <div class="container">
+    <div class="container ratings-card">
       <div class="mosaic-container">
         {{#each albumImages}} {{#if @index}} {{#unless (gt @index 7)}}
         <div
@@ -284,7 +492,7 @@
         {{/if}} {{/each}}
       </div>
 
-      <h1>Meu Relatório de Avaliações {{formatPeriod period}}</h1>
+      <h1 class="title-wrap">Meu Relatório de Avaliações {{formatPeriod period}}</h1>
 
       <div class="subtitle ratings-summary">
         Média de avaliação:
@@ -295,24 +503,51 @@
 
       <div class="info-grid">
         <div class="column">
-          <h2>Artistas mais bem avaliados</h2>
+          <h2 class="title-wrap">Artistas mais bem avaliados:</h2>
           <ul>
             {{#each topRatedArtists}}
-            <li>
-              {{indexPlusOne @index}} {{this.name}}
-              <span class="plays">{{this.avgRatingDisplay}} · {{this.trackCount}} mús.</span>
+            <li class="rating-item">
+              <div class="rating-item-title">
+                {{indexPlusOne @index}} {{this.name}}
+              </div>
+              <div class="rating-item-meta">
+                <span class="rating-out">{{this.ratingSlash10}}</span>
+                <span class="star-icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <path
+                      fill="#00c853"
+                      d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"
+                    />
+                  </svg>
+                </span>
+                <span class="rating-extra">{{this.trackCountLabel}}</span>
+              </div>
             </li>
             {{/each}}
           </ul>
         </div>
 
         <div class="column">
-          <h2>Músicas mais bem avaliadas</h2>
+          <h2 class="title-wrap">Músicas mais bem avaliadas:</h2>
           <ul>
             {{#each topRatedTracks}}
-            <li>
-              {{indexPlusOne @index}} {{this.title}}
-              <span class="plays">{{this.ratingDisplay}} · {{this.durationLabel}}</span>
+            <li class="rating-item">
+              <div class="rating-item-title">
+                {{indexPlusOne @index}} {{this.title}}
+              </div>
+              <div class="rating-item-meta">
+                <span class="rating-out">{{this.ratingSlash10}}</span>
+                <span class="star-icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <path
+                      fill="#00c853"
+                      d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"
+                    />
+                  </svg>
+                </span>
+                <span class="rating-extra">{{this.durationLabel}}</span>
+                <span class="duration-inline">(duração da faixa)</span>
+              </div>
             </li>
             {{/each}}
           </ul>
