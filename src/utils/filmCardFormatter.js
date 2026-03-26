@@ -26,7 +26,8 @@ function formatDateUTC3(d) {
 /**
  * Build the film card text (title, TMDb, assistido por / nota de cada usuário, overview).
  * @param {object} movieInfo - From getMovieInfoWithAllRatings: title, year, voteAverage, overview, ratings[];
- *   or getMovieInfo: userRating, userDisplayName, viewings (legacy single-user)
+ *   ratings[].lastViewedAt = max(viewedAt) em MovieViewingLog (data “quando assistiu”); senão ratedAt/watchedAt.
+ *   ou getMovieInfo: userRating, userDisplayName, viewings (legacy single-user)
  * @returns {string}
  */
 function formatFilmCardMessage(movieInfo) {
@@ -48,7 +49,9 @@ function formatFilmCardMessage(movieInfo) {
       .filter((r) => r.watched)
       .map((r) => {
         const displayName = (r.displayName || "Usuário").replace(/"/g, '\\"');
-        const dateStr = formatDateUTC3(r.ratedAt || r.watchedAt);
+        const dateStr = formatDateUTC3(
+          r.lastViewedAt || r.ratedAt || r.watchedAt,
+        );
         const noteStr =
           r.rating != null
             ? `👤 *Nota:* ${"⭐".repeat(Math.round(r.rating))} (${formatRatingValue(r.rating)}/5) (${dateStr})`
@@ -67,10 +70,11 @@ function formatFilmCardMessage(movieInfo) {
     const ratingVal = ur.rating;
     const ratedAt = ur.ratedAt;
     const watchedAt = ur.watchedAt;
+    const lastViewedAt = ur.lastViewedAt;
     if (!watched) {
       statusLines = "❌ *Não assistido* | 👤 *Sua nota:* Sem avaliação";
     } else {
-      const dateStr = formatDateUTC3(ratedAt || watchedAt);
+      const dateStr = formatDateUTC3(lastViewedAt || ratedAt || watchedAt);
       const noteStr =
         ratingVal != null
           ? `👤 *Nota:* ${"⭐".repeat(Math.round(ratingVal))} (${formatRatingValue(ratingVal)}/5) (${dateStr})`
