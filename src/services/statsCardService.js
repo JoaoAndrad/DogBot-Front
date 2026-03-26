@@ -158,8 +158,8 @@ function formatRatingSlash5(n) {
 }
 
 /**
- * Cinco posições: ⭐ verdes conforme a nota; meia = metade esquerda da 3ª pintada (ex.: 2,5/5).
- * Devolve HTML seguro gerado no servidor (usar {{{ratingStarsHtml}}} no Handlebars).
+ * Cinco posições: estrelas cheias (★) verdes; vazias (☆) cinza; meia = metade esquerda da ★.
+ * Usa U+2605/U+2606 — o emoji ⭐ costuma virar caixa □ no Puppeteer/Chromium headless.
  */
 function buildRatingStarsHtml5(rating) {
   if (rating == null || !Number.isFinite(Number(rating))) {
@@ -173,20 +173,20 @@ function buildRatingStarsHtml5(rating) {
   const parts = [];
   for (let i = 0; i < fullCount; i++) {
     parts.push(
-      '<span class="movie-star movie-star--full" aria-hidden="true">⭐</span>',
+      '<span class="movie-star movie-star--full" aria-hidden="true">\u2605</span>',
     );
   }
   if (hasHalf) {
     parts.push(
       '<span class="movie-star movie-star--half" aria-hidden="true">' +
-        '<span class="movie-star-half-bg">☆</span>' +
-        '<span class="movie-star-half-fg"><span class="movie-star-half-fg-inner">⭐</span></span>' +
+        '<span class="movie-star-half-bg">\u2606</span>' +
+        '<span class="movie-star-half-fg"><span class="movie-star-half-fg-inner">\u2605</span></span>' +
         "</span>",
     );
   }
   for (let i = 0; i < emptyCount; i++) {
     parts.push(
-      '<span class="movie-star movie-star--empty" aria-hidden="true">☆</span>',
+      '<span class="movie-star movie-star--empty" aria-hidden="true">\u2606</span>',
     );
   }
   return '<span class="movie-star-row">' + parts.join("") + "</span>";
