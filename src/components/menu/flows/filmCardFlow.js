@@ -13,6 +13,14 @@ const {
 } = require("../../../utils/stickerHelper");
 const logger = require("../../../utils/logger");
 const { truncateForPoll } = require("../../../utils/titleNormalize");
+const { formatDateDdMmYyyy } = require("../../../utils/parseViewingDatePtBr");
+
+function clearViewingDateFlags(state) {
+  const c = state?.context;
+  if (!c) return;
+  delete c.awaitingViewingDateText;
+  delete c.pendingViewingDateIso;
+}
 
 function filmWorkLabel(ctx, movieInfo) {
   const ft = ctx.state?.context?.filmTitle;
@@ -113,6 +121,52 @@ const filmCardFlow = createFlow("film-card", {
     },
   },
 
+  "/after-watch-prompt": {
+    title:
+      "📅 Deseja alterar a data que viu esse filme?",
+    options: [
+      {
+        label: "Sim",
+        action: "exec",
+        handler: "startViewingDateInput",
+      },
+      {
+        label: "Ignorar / Manter data atual",
+        action: "exec",
+        handler: "skipViewingDateAdjust",
+      },
+    ],
+  },
+
+  "/viewing-date-confirm": {
+    dynamic: true,
+    handler: async (ctx) => {
+      const iso = ctx.state?.context?.pendingViewingDateIso;
+      if (!iso) {
+        return {
+          title: "❌ Data não encontrada. Use /filme de novo.",
+          skipPoll: true,
+        };
+      }
+      const label = formatDateDdMmYyyy(new Date(iso));
+      return {
+        title: `Confirma a data *${label}* para esta visualização?`,
+        options: [
+          {
+            label: "✅ Confirmar",
+            action: "exec",
+            handler: "confirmViewingDate",
+          },
+          {
+            label: "📅 Enviar outra data",
+            action: "exec",
+            handler: "retryViewingDateInput",
+          },
+        ],
+      };
+    },
+  },
+
   "/rating": {
     title: "Sua nota (0,5 a 5):",
     dynamic: true,
@@ -160,8 +214,7 @@ const filmCardFlow = createFlow("film-card", {
         await ctx.reply(`❌ Erro ao marcar como assistido: ${err.message}`);
         return { end: true };
       }
-      await refreshMovieCardContext(state, tmdbId, userId);
-      state.path = "/";
+      state.path = "/after-watch-prompt";
       return { end: false };
     },
 
@@ -223,6 +276,60 @@ const filmCardFlow = createFlow("film-card", {
         await ctx.reply(`❌ Erro ao salvar avaliação: ${err.message}`);
         return { end: true };
       }
+      state.path = "/after-watch-prompt";
+      return { end: false };
+    },
+
+    skipViewingDateAdjust: async (ctx) => {
+      const { userId, state } = ctx;
+      const { tmdbId } = state.context || {};
+      clearViewingDateFlags(state);
+      if (tmdbId) {
+        await refreshMovieCardContext(state, tmdbId, userId);
+      }
+      state.path = "/";
+      return { end: false };
+    },
+
+    startViewingDateInput: async (ctx) => {
+      ctx.state.context.awaitingViewingDateText = true;
+      await ctx.reply(
+        "📝 *Envie a data* em que assistiu (uma mensagem só):\n\n" +
+          "• `12/08/26` ou `12/08/2026`\n" +
+          "• `12/08` ou `12/8` (usa o ano atual)\n" +
+          "• *hoje*, *ontem*, *antes de ontem*\n\n" +
+          "_Fuso: Brasil (horário de Brasília)._",
+      );
+      return { end: false };
+    },
+
+    retryViewingDateInput: async (ctx) => {
+      delete ctx.state.context.pendingViewingDateIso;
+      ctx.state.context.awaitingViewingDateText = true;
+      await ctx.reply("📝 Envie a *nova* data (mesmo formato de antes).");
+      return { end: false };
+    },
+
+    confirmViewingDate: async (ctx) => {
+      const { userId, state } = ctx;
+      const { tmdbId, pendingViewingDateIso } = state.context || {};
+      if (!tmdbId || !pendingViewingDateIso) {
+        await ctx.reply("❌ Dados da data perdidos. Use /filme de novo.");
+        clearViewingDateFlags(state);
+        state.path = "/";
+        return { end: false };
+      }
+      try {
+        await movieClient.patchViewingLog(userId, tmdbId, pendingViewingDateIso);
+        const label = formatDateDdMmYyyy(new Date(pendingViewingDateIso));
+        await ctx.reply(`✅ Data da visualização atualizada para *${label}*.`);
+      } catch (err) {
+        logger.error("[FilmCardFlow] confirmViewingDate:", err.message);
+        await ctx.reply(
+          `❌ Não foi possível salvar a data: ${err.message || err}`,
+        );
+      }
+      clearViewingDateFlags(state);
       await refreshMovieCardContext(state, tmdbId, userId);
       state.path = "/";
       return { end: false };

@@ -25,6 +25,27 @@ function formatMovieTitle(movie) {
   return `${movie.title}${year}`;
 }
 
+/** Após marcar assistido ou avaliar na lista: mesma enquete de data do /filme */
+async function maybeStartFilmCardViewingDatePrompt(ctx, item, userId) {
+  if (!item?.tmdbId) return;
+  try {
+    const movieInfo = await movieClient.getMovieInfoWithAllRatings(
+      String(item.tmdbId),
+      userId,
+    );
+    await flowManager.startFlow(ctx.client, ctx.chatId, userId, "film-card", {
+      initialPath: "/after-watch-prompt",
+      initialContext: {
+        movieInfo,
+        tmdbId: String(item.tmdbId),
+        filmTitle: formatMovieTitle(item),
+      },
+    });
+  } catch (e) {
+    console.warn("[ListsFlow] film-card viewing date prompt:", e.message);
+  }
+}
+
 /**
  * Format rating para exibição (⭐ x/5)
  */
@@ -733,6 +754,10 @@ const listsFlow = createFlow("lists", {
 
         await ctx.reply(msg);
 
+        if (item?.tmdbId && newWatchedStatus) {
+          await maybeStartFilmCardViewingDatePrompt(ctx, item, userId);
+        }
+
         // Volta pro detalhe do item
         if (ctx.state?.context?.selectedItem?.item) {
           ctx.state.context.selectedItem.item.watched = newWatchedStatus;
@@ -890,6 +915,10 @@ const listsFlow = createFlow("lists", {
           } catch (e) {
             console.warn("[ListsFlow] poster sticker after rate:", e.message);
           }
+        }
+
+        if (item?.tmdbId) {
+          await maybeStartFilmCardViewingDatePrompt(ctx, item, userId);
         }
 
         ctx.state.path = "/item-detail";

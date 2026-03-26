@@ -338,6 +338,45 @@ class FlowManager {
     await storage.deleteState(userId, flowId);
     console.log(`[FlowManager] Flow ${flowId} cancelled for ${userId}`);
   }
+
+  /**
+   * Processa texto livre para ajuste de data de visualização (fluxo film-card).
+   * O processador de mensagens do bot deve chamar isto para mensagens que não são comandos.
+   * @returns {Promise<boolean>} true se a mensagem foi consumida
+   */
+  async handleOptionalTextMessage(client, chatId, userId, textBody) {
+    const flowId = "film-card";
+    const state = await storage.getState(userId, flowId);
+    if (!state?.context?.awaitingViewingDateText) {
+      return false;
+    }
+    const { parseViewingDatePtBr } = require("../../utils/parseViewingDatePtBr");
+    const trimmed = String(textBody || "").trim();
+    if (!trimmed) {
+      await client.sendMessage(
+        chatId,
+        "❌ Mensagem vazia. Envie uma data (ex: 12/08/26 ou *ontem*).",
+      );
+      return true;
+    }
+    const parsed = parseViewingDatePtBr(trimmed);
+    if (!parsed.ok) {
+      await client.sendMessage(chatId, `❌ ${parsed.reason}`);
+      return true;
+    }
+    state.context.awaitingViewingDateText = false;
+    state.context.pendingViewingDateIso = parsed.date.toISOString();
+    state.path = "/viewing-date-confirm";
+    await storage.saveState(userId, flowId, state);
+    await this._renderNode(
+      client,
+      chatId,
+      userId,
+      flowId,
+      "/viewing-date-confirm",
+    );
+    return true;
+  }
 }
 
 // Export singleton instance

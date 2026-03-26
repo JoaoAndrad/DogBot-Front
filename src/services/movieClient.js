@@ -142,6 +142,25 @@ async function removeRating(userId, tmdbId) {
   return response;
 }
 
+/**
+ * Ajusta a data (viewedAt) do último MovieViewingLog para o filme.
+ * @param {string} userId
+ * @param {string} tmdbId
+ * @param {string} viewedAtIso - ISO 8601
+ */
+async function patchViewingLog(userId, tmdbId, viewedAtIso) {
+  const response = await sendToBackend(
+    "/api/movies/viewing-log",
+    {
+      userId,
+      tmdbId,
+      viewedAt: viewedAtIso,
+    },
+    "PATCH",
+  );
+  return response;
+}
+
 module.exports = {
   markWatched,
   rateMovie,
@@ -152,4 +171,5 @@ module.exports = {
   getTopRatedMovies,
   searchMovies,
   removeRating,
+  patchViewingLog,
 };
