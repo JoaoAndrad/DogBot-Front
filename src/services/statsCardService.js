@@ -201,16 +201,47 @@ function buildRatingStarsHtml5(rating) {
   return '<span class="movie-star-row">' + parts.join("") + "</span>";
 }
 
-const MOSAIC_FALLBACK_COLORS = [
-  "#720018",
-  "#1aab4e",
-  "#3b4cca",
-  "#728ebb",
-  "#a04ba0",
-  "#ffcc00",
-  "#b3d828",
-  "#2bc3f3",
-];
+/** Células sem poster no mosaico dos cartões de estatísticas */
+const MOSAIC_EMPTY_COLOR = "#000";
+
+/**
+ * Índices 0–7 (cards 1–8) onde colocar as n primeiras imagens, espalhadas.
+ * n=2 → cards 2 e 6; n=4 → cards 1,4,6,8 (plan).
+ */
+const MOSAIC_SCATTER_BY_COUNT = {
+  1: [4],
+  2: [1, 5],
+  3: [0, 4, 7],
+  4: [0, 3, 5, 7],
+  5: [0, 2, 4, 5, 7],
+  6: [0, 1, 3, 4, 5, 7],
+  7: [0, 1, 2, 3, 4, 5, 6],
+  8: [0, 1, 2, 3, 4, 5, 6, 7],
+};
+
+/**
+ * @param {unknown[]} urls - URLs de poster/capa (máx. 8 usadas)
+ * @returns {{ url: string|null, fallbackColor: string }[]}
+ */
+function buildMosaicTiles(urls) {
+  const list = (Array.isArray(urls) ? urls : [])
+    .map((u) => (u != null && String(u).trim() !== "" ? String(u).trim() : null))
+    .filter(Boolean)
+    .slice(0, 8);
+  const n = list.length;
+  const empty = () => ({ url: null, fallbackColor: MOSAIC_EMPTY_COLOR });
+  const tiles = Array.from({ length: 8 }, empty);
+  if (n === 0) return tiles;
+  const slots = MOSAIC_SCATTER_BY_COUNT[n];
+  if (!slots || slots.length !== n) {
+    for (let i = 0; i < n; i++) tiles[i] = { url: list[i], fallbackColor: MOSAIC_EMPTY_COLOR };
+    return tiles;
+  }
+  for (let i = 0; i < n; i++) {
+    tiles[slots[i]] = { url: list[i], fallbackColor: MOSAIC_EMPTY_COLOR };
+  }
+  return tiles;
+}
 
 /**
  * Prepara payload do GET /api/movies/period-stats para stats-movies-card.html.
@@ -225,10 +256,7 @@ function normalizeMoviesTemplateData(data) {
         ? String(data.period)
         : "período";
   const urls = Array.isArray(data.mosaicPosterUrls) ? data.mosaicPosterUrls : [];
-  const mosaicTiles = Array.from({ length: 8 }, (_, i) => ({
-    url: urls[i] || null,
-    fallbackColor: MOSAIC_FALLBACK_COLORS[i % MOSAIC_FALLBACK_COLORS.length],
-  }));
+  const mosaicTiles = buildMosaicTiles(urls);
   const filmsWatched =
     summary.filmsWatchedDistinct != null
       ? String(summary.filmsWatchedDistinct)
@@ -283,10 +311,7 @@ function normalizeBooksTemplateData(data) {
         ? String(data.period)
         : "período";
   const urls = Array.isArray(data.mosaicCoverUrls) ? data.mosaicCoverUrls : [];
-  const mosaicTiles = Array.from({ length: 8 }, (_, i) => ({
-    url: urls[i] || null,
-    fallbackColor: MOSAIC_FALLBACK_COLORS[i % MOSAIC_FALLBACK_COLORS.length],
-  }));
+  const mosaicTiles = buildMosaicTiles(urls);
   const booksRead =
     summary.booksReadDistinct != null
       ? String(summary.booksReadDistinct)
@@ -351,6 +376,7 @@ function normalizeRatingsTemplateData(data) {
     listenedInPeriodLabel:
       t.listenedInPeriodLabel != null ? t.listenedInPeriodLabel : "—",
   }));
+  out.mosaicTiles = buildMosaicTiles(data.albumImages || []);
   return out;
 }
 
