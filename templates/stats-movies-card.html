@@ -200,12 +200,8 @@
         vertical-align: middle;
         line-height: 1;
         font-family:
-          "Segoe UI Symbol",
-          "DejaVu Sans",
-          "Noto Sans Symbols 2",
-          "Apple Symbols",
-          "League Spartan",
-          sans-serif;
+          "Segoe UI Symbol", "DejaVu Sans", "Noto Sans Symbols 2",
+          "Apple Symbols", "League Spartan", sans-serif;
       }
 
       .movie-star-row--missing {
@@ -339,7 +335,7 @@
 
       <div class="info-grid">
         <div class="column">
-          <h2>Últimos filmes avaliados</h2>
+          <h2>Melhores avaliados</h2>
           <ul>
             {{#each lastRated}}
             <li class="movie-line">
@@ -355,16 +351,14 @@
         </div>
 
         <div class="column">
-          <h2>Últimos filmes assistidos</h2>
+          <h2>Recentes</h2>
           <ul>
             {{#each lastWatched}}
             <li class="movie-line">
               <span class="movie-title-multiline"
                 >{{indexPlusOne @index}} {{this.title}}</span
               >
-              <span class="plays"
-                >Assistido em {{this.watchedDateLabel}}</span
-              >
+              <span class="plays">Assistido em {{this.watchedDateLabel}}</span>
             </li>
             {{/each}}
           </ul>
