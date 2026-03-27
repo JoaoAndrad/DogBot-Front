@@ -18,6 +18,12 @@ const {
 const RATING_OPTIONS = [0.5, 1, 1.5, 2, 2.5, 3, 3.5, 4, 4.5, 5];
 
 /**
+ * Paginação de items em /list-items: 9 items por página de API encaixa com
+ * ◀ Voltar + 9 items + Próxima + 🔙 Voltar = 12 opções.
+ */
+const LIST_ITEMS_PAGE_SIZE = 9;
+
+/**
  * Format título + year para exibição
  */
 function formatMovieTitle(movie) {
@@ -370,34 +376,91 @@ const listsFlow = createFlow("lists", {
         }
 
         const userId = ctx.state?.context?._backendUserId || ctx.userId;
-        const list = await listClient.getList(listId, userId, 1);
+        const listItemsPage = Math.max(
+          1,
+          Number(ctx.state?.context?.listItemsPage) || 1,
+        );
+        const list = await listClient.getList(
+          listId,
+          userId,
+          listItemsPage,
+          LIST_ITEMS_PAGE_SIZE,
+        );
         const kind = list.listKind || "movie";
         const addHint =
           kind === "book"
             ? "Use /livro para buscar e adicionar."
             : "Use /filme para buscar e adicionar.";
 
-        if (list.items.length === 0) {
+        let totalItems = list._count?.items ?? 0;
+        const pageSize = LIST_ITEMS_PAGE_SIZE;
+        let listItemsPageAdj = listItemsPage;
+        let items = list.items || [];
+        if (items.length === 0 && totalItems > 0) {
+          const lastPage = Math.max(1, Math.ceil(totalItems / pageSize));
+          listItemsPageAdj = Math.min(listItemsPage, lastPage);
+          if (listItemsPageAdj !== listItemsPage && ctx.state?.context) {
+            ctx.state.context.listItemsPage = listItemsPageAdj;
+          }
+          const listFix = await listClient.getList(
+            listId,
+            userId,
+            listItemsPageAdj,
+            LIST_ITEMS_PAGE_SIZE,
+          );
+          items = listFix.items || [];
+          totalItems = listFix._count?.items ?? totalItems;
+        }
+        const offset = (listItemsPageAdj - 1) * pageSize;
+        const hasMore = offset + items.length < totalItems;
+
+        if (totalItems === 0 || (listItemsPageAdj === 1 && items.length === 0)) {
           return {
             title: `${listKindIcon(kind)} ${list.title}\n\nNenhum item na lista ainda.\n\n_${addHint}_`,
             options: [{ label: "🔙 Voltar", action: "back" }],
           };
         }
 
-        const options = list.items.map((item, idx) => ({
-          label:
-            `${idx + 1}. ${formatMovieTitle(item)}` +
-            (item.watched ? " ✅" : "") +
-            (item.rating ? ` ${formatRating(item.rating)}` : ""),
-          action: "exec",
-          handler: "selectItem",
-          data: { itemId: item.id, item },
-        }));
+        const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
+        const pageHint =
+          totalPages > 1
+            ? `\n_Página ${listItemsPageAdj}/${totalPages} · ${totalItems} no total_`
+            : `\n_${totalItems} no total_`;
+
+        const options = [];
+        if (listItemsPageAdj > 1) {
+          options.push({
+            label: "⬅️ Anterior",
+            action: "exec",
+            handler: "listItemsPrevPage",
+          });
+        }
+
+        items.forEach((item, idx) => {
+          const globalIdx = offset + idx + 1;
+          options.push({
+            label:
+              `${globalIdx}. ${formatMovieTitle(item)}` +
+              (item.watched ? " ✅" : "") +
+              (item.rating ? ` ${formatRating(item.rating)}` : ""),
+            action: "exec",
+            handler: "selectItem",
+            data: { itemId: item.id, item },
+          });
+        });
+
+        if (hasMore) {
+          options.push({
+            label: "➡️ Próxima",
+            action: "exec",
+            handler: "listItemsNextPage",
+          });
+        }
 
         options.push({ label: "🔙 Voltar", action: "back" });
 
         return {
-          title: `${listKindIcon(kind)} ${list.title} (${list.items.length} items)`,
+          title: `${listKindIcon(kind)} ${list.title}${pageHint}`,
           options,
         };
       } catch (err) {
@@ -650,6 +713,10 @@ const listsFlow = createFlow("lists", {
         if (!ctx.state) {
           ctx.state = { path: "/", history: [], context: {} };
         }
+        if (!ctx.state.context) {
+          ctx.state.context = {};
+        }
+        ctx.state.context.listItemsPage = 1;
 
         ctx.state.path = "/list-items";
         if (!ctx.state.history.includes("/list-detail")) {
@@ -659,6 +726,44 @@ const listsFlow = createFlow("lists", {
       } catch (err) {
         console.error("[ListsFlow] listItems error:", err.message);
         await ctx.reply("❌ Erro ao carregar items");
+        return { end: false };
+      }
+    },
+
+    /** Próxima página de items (enquete) */
+    listItemsNextPage: async (ctx) => {
+      try {
+        if (!ctx.state) {
+          ctx.state = { path: "/list-items", history: [], context: {} };
+        }
+        if (!ctx.state.context) {
+          ctx.state.context = {};
+        }
+        const cur = Math.max(1, Number(ctx.state.context.listItemsPage) || 1);
+        ctx.state.context.listItemsPage = cur + 1;
+        ctx.state.path = "/list-items";
+        return { end: false };
+      } catch (err) {
+        console.error("[ListsFlow] listItemsNextPage:", err.message);
+        return { end: false };
+      }
+    },
+
+    /** Página anterior de items (enquete) */
+    listItemsPrevPage: async (ctx) => {
+      try {
+        if (!ctx.state) {
+          ctx.state = { path: "/list-items", history: [], context: {} };
+        }
+        if (!ctx.state.context) {
+          ctx.state.context = {};
+        }
+        const cur = Math.max(1, Number(ctx.state.context.listItemsPage) || 1);
+        ctx.state.context.listItemsPage = Math.max(1, cur - 1);
+        ctx.state.path = "/list-items";
+        return { end: false };
+      } catch (err) {
+        console.error("[ListsFlow] listItemsPrevPage:", err.message);
         return { end: false };
       }
     },

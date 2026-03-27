@@ -95,12 +95,17 @@ async function getUserLists(
  * @param {string} listId - List ID
  * @param {string} userId - User ID (para autorização)
  * @param {number} page - Página de items
+ * @param {number} [pageSize] - Itens por página (omitir = default do backend, ex. 50)
  * @returns {Promise<object>} Lista com items
  */
-async function getList(listId, userId, page = 1) {
+async function getList(listId, userId, page = 1, pageSize) {
   try {
+    const ps =
+      pageSize != null && Number.isFinite(Number(pageSize))
+        ? `&pageSize=${encodeURIComponent(String(pageSize))}`
+        : "";
     const response = await sendToBackend(
-      `/api/lists/${listId}?page=${page}&userId=${userId}`,
+      `/api/lists/${listId}?page=${page}&userId=${userId}${ps}`,
       null,
       "GET",
     );
