@@ -605,7 +605,18 @@ async function handle(context) {
     }
   }
 
-  if (body.startsWith("!") || body.startsWith("/")) {
+  // Location messages often carry map thumbnail as JPEG base64 starting with "/9j/";
+  // that would match body.startsWith("/") and be misread as a command.
+  const skipCommandFromPrefix =
+    msg.type === "location" ||
+    info.type === "location" ||
+    !!msg.location ||
+    body.startsWith("/9j/");
+
+  if (
+    !skipCommandFromPrefix &&
+    (body.startsWith("!") || body.startsWith("/"))
+  ) {
     isCommand = true;
     const raw = body.slice(1).split(/\s+/)[0];
     cmdName = normalizeCmdName(raw);
