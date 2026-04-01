@@ -35,6 +35,29 @@ async function resolveUserUuid(externalId) {
   }
 }
 
+/** Cartão "Top músicas": prioriza topTracks (tempo ouvido no período); fallback = repeats (só faixas repetidas). */
+function top5SongsForStatsCard(json) {
+  const top = json.topTracks;
+  if (Array.isArray(top) && top.length > 0) {
+    return top.slice(0, 5).map((r) => ({
+      song: (r.track && r.track.name) || "Desconhecida",
+      artist:
+        r.track && Array.isArray(r.track.artists)
+          ? r.track.artists.join(", ")
+          : (r.track && r.track.artists) || "",
+      plays: r.plays || 0,
+    }));
+  }
+  return (json.repeats || []).slice(0, 5).map((r) => ({
+    song: (r.track && r.track.name) || r.id || "Desconhecida",
+    artist:
+      r.track && Array.isArray(r.track.artists)
+        ? r.track.artists.join(", ")
+        : (r.track && r.track.artists) || "",
+    plays: r.count || r.plays || r.playCount || 0,
+  }));
+}
+
 function formatTrack(t) {
   if (!t) return "(nenhuma faixa)";
   const artists = Array.isArray(t.artists) ? t.artists.join(", ") : t.artists;
@@ -891,14 +914,7 @@ const spotifyFlow = createFlow("spotify", {
             top5Artists: (json.topArtists || [])
               .slice(0, 5)
               .map((a) => ({ name: a.name, plays: a.count || 0 })),
-            top5Songs: (json.repeats || []).slice(0, 5).map((r) => ({
-              song: (r.track && r.track.name) || r.id || "Desconhecida",
-              artist:
-                r.track && Array.isArray(r.track.artists)
-                  ? r.track.artists.join(", ")
-                  : (r.track && r.track.artists) || "",
-              plays: r.count || r.plays || r.playCount || 0,
-            })),
+            top5Songs: top5SongsForStatsCard(json),
             repeat: (json.repeats || []).slice(0, 3).map((r) => ({
               song: (r.track && r.track.name) || r.id || "Desconhecida",
               artist:
@@ -1052,14 +1068,7 @@ const spotifyFlow = createFlow("spotify", {
           top5Artists: (json.topArtists || [])
             .slice(0, 5)
             .map((a) => ({ name: a.name, plays: a.count || 0 })),
-          top5Songs: (json.repeats || []).slice(0, 5).map((r) => ({
-            song: (r.track && r.track.name) || r.id || "Desconhecida",
-            artist:
-              r.track && Array.isArray(r.track.artists)
-                ? r.track.artists.join(", ")
-                : (r.track && r.track.artists) || "",
-            plays: r.count || r.plays || r.playCount || 0,
-          })),
+          top5Songs: top5SongsForStatsCard(json),
         };
 
         try {
