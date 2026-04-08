@@ -583,12 +583,25 @@ async function handle(context) {
               await msg.reply(result.message || "🔥 Treino registrado!");
             }
 
-            // Notify other groups
+            // JID canónico do grupo (alinha com getChats) para não duplicar notificação no mesmo grupo
+            let excludeGroupChatId = from;
+            try {
+              if (typeof msg.getChat === "function") {
+                const chat = await msg.getChat();
+                if (chat?.id?._serialized) {
+                  excludeGroupChatId = chat.id._serialized;
+                }
+              }
+            } catch (e) {
+              /* usar from */
+            }
+
+            // Notify other groups (nunca o grupo onde o treino foi registado)
             await workoutNotificationService.notifyWorkoutToGroups(
               context.client,
               senderNumber,
               result.stats,
-              from, // Exclude current group
+              excludeGroupChatId,
               displayName, // Pass displayName
             );
 

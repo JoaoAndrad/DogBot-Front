@@ -1,6 +1,20 @@
 const backendClient = require("./backendClient");
 const logger = require("../utils/logger");
 
+/** Parte antes do @ do JID (ex.: grupo), para comparar origem vs getChats. */
+function groupJidKey(id) {
+  if (!id) return "";
+  const s = String(id).trim().toLowerCase();
+  const i = s.indexOf("@");
+  return i === -1 ? s : s.slice(0, i);
+}
+
+function isSameGroupChat(a, b) {
+  const ka = groupJidKey(a);
+  const kb = groupJidKey(b);
+  return ka.length > 0 && ka === kb;
+}
+
 /**
  * Get list of group chat IDs where the user is a member and workout tracking is enabled.
  * Used to notify and update description in all those groups after /treinei.
@@ -94,8 +108,8 @@ async function notifyWorkoutToGroups(
       try {
         const groupChatId = group.id._serialized;
 
-        // Skip the group where workout was logged
-        if (groupChatId === excludeChatId) {
+        // Não notificar o grupo onde o treino foi registado (from vs id._serialized podem diferir).
+        if (isSameGroupChat(groupChatId, excludeChatId)) {
           continue;
         }
 
