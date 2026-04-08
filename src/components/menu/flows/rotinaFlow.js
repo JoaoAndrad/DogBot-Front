@@ -117,13 +117,13 @@ const rotinaFlow = createFlow("rotina", {
       const uuid = await resolveEditorUuid(ctx.userId);
       if (!uuid) {
         await ctx.reply("❌ Não foi possível identificar o utilizador.");
-        return { end: true };
+        return { end: true, noRender: true };
       }
       try {
         const { routines } = await routineClient.getRoutines(ctx.chatId, uuid);
         if (!routines || !routines.length) {
           await ctx.reply("Nenhuma rotina neste chat.");
-          return {};
+          return { noRender: true };
         }
         const lines = routines.map(
           (r) =>
@@ -133,7 +133,7 @@ const rotinaFlow = createFlow("rotina", {
       } catch (e) {
         await ctx.reply(`❌ ${e.message || e}`);
       }
-      return {};
+      return { noRender: true };
     },
 
     leaveRotina: async (ctx) => {

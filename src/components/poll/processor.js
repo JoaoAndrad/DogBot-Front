@@ -226,7 +226,7 @@ async function executeAction(result, client) {
         if (action === "rotina_assign_ok" && data && data.flowId === "rotina") {
           const conversationState = require("../../services/conversationState");
           const {
-            finalizeCreateFromContext,
+            sendPrimaryConfirmPoll,
           } = require("../../handlers/rotinaFlowHandler");
           const stateUserId = data.userId;
           let st = conversationState.getState(stateUserId);
@@ -244,29 +244,85 @@ async function executeAction(result, client) {
             break;
           }
           try {
-            await finalizeCreateFromContext(
-              stateUserId,
+            const nextDraft = {
+              ...st.data.draft,
+              assigneeUserIds: data.assigneeUserIds || [],
+            };
+            conversationState.updateData(stateUserId, {
+              draft: nextDraft,
+              step: "await_final_confirm",
+              editReturnTo: undefined,
+            });
+            await sendPrimaryConfirmPoll(
+              client,
               poll.chatId,
-              st.data.draft,
-              data.assigneeUserIds,
+              stateUserId,
+              nextDraft,
+              true,
             );
-            conversationState.clearState(stateUserId);
-            if (data.chatId) conversationState.clearState(data.chatId);
-            await client.sendMessage(poll.chatId, "✅ Rotina criada.");
           } catch (e) {
-            logger.error("[processor] rotina_assign finalize", e);
+            logger.error("[processor] rotina_assign confirm", e);
             await client.sendMessage(
               poll.chatId,
-              `❌ Erro ao criar: ${e.message || e}`,
+              `❌ Erro: ${e.message || e}`,
             );
           }
         }
         break;
 
-      case "routine_checkin":
-      case "routine_checkin_retrospective":
-        logger.debug(`[processor] routine check-in recorded: ${action}`);
+      case "rotina_wizard":
+        {
+          const {
+            executeRotinaWizardAction,
+          } = require("../../handlers/rotinaFlowHandler");
+          await executeRotinaWizardAction(result, client);
+        }
         break;
+
+      case "routine_checkin":
+      case "routine_checkin_retrospective": {
+        const rr = result.routineResult;
+        const chatId = poll.chatId;
+        if (!chatId) break;
+
+        if (rr && rr.ok && rr.outcome === "self_done") {
+          await client.sendMessage(
+            chatId,
+            "✅ Registado: a rotina foi marcada como concluída para este dia.",
+          );
+        } else if (rr && rr.ok && rr.outcome === "not_yet") {
+          const voterJid = result.voterId;
+          try {
+            const c = voterJid
+              ? await client.getContactById(voterJid).catch(() => null)
+              : null;
+            if (c) {
+              const num = String(voterJid).split("@")[0] || "";
+              await client.sendMessage(
+                chatId,
+                `Certo @${num} novos lembretes serão enviados ao longo do dia até que a rotina seja realizada.`,
+                { mentions: [c] },
+              );
+            } else {
+              await client.sendMessage(
+                chatId,
+                "Certo — novos lembretes serão enviados ao longo do dia até que a rotina seja realizada.",
+              );
+            }
+          } catch (e) {
+            logger.warn("[processor] routine_checkin not_yet", e.message);
+            await client.sendMessage(
+              chatId,
+              "Certo — novos lembretes serão enviados ao longo do dia até que a rotina seja realizada.",
+            );
+          }
+        } else if (rr && !rr.ok && rr.reason === "already_completed") {
+          break;
+        } else {
+          logger.debug(`[processor] routine check-in: ${action}`, rr);
+        }
+        break;
+      }
 
       case "menu_spotify":
       case "menu":

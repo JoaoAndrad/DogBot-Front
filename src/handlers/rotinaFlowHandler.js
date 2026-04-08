@@ -4,7 +4,12 @@ const { parseRoutineDatePtBr } = require("../utils/parseRoutineDatePtBr");
 const { parseRoutineTimePtBr } = require("../utils/parseRoutineTimePtBr");
 const logger = require("../utils/logger");
 const polls = require("../components/poll");
-const flowManager = require("../components/menu/flowManager");
+const {
+  repeatKindLabel,
+  formatTimeMinutes,
+  formatYmdToBr,
+  formatRoutineSummaryFromApi,
+} = require("../utils/formatRoutineSummaryPt");
 
 async function resolveUuid(backendUrl, identifier) {
   try {
@@ -20,6 +25,35 @@ async function resolveUuid(backendUrl, identifier) {
   }
 }
 
+/** Mesmo critério que confissao.js (pickParticipantFromGroup): não listar o próprio bot. */
+async function getBotOwnJid(client) {
+  if (!client) return null;
+  try {
+    if (client.info && client.info.me && client.info.me._serialized) {
+      return client.info.me._serialized;
+    }
+    if (client.info && client.info.wid && client.info.wid._serialized) {
+      return client.info.wid._serialized;
+    }
+    if (client.info && client.info.wid) {
+      return `${client.info.wid}@c.us`;
+    }
+    if (typeof client.getMe === "function") {
+      const me = await client.getMe();
+      if (me && me._serialized) return me._serialized;
+      if (me && me.id && me.id._serialized) return me.id._serialized;
+    }
+  } catch (e) {
+    /* ignore */
+  }
+  return null;
+}
+
+function samePhone(a, b) {
+  const d = (x) => String(x || "").replace(/\D/g, "");
+  return d(a).length > 6 && d(b).length > 6 && d(a) === d(b);
+}
+
 async function sendAssignPoll(client, chatId, userId, draft) {
   const backendUrl = process.env.BACKEND_URL || "http://localhost:8000";
   const creatorUuid = await resolveUuid(backendUrl, userId);
@@ -30,6 +64,8 @@ async function sendAssignPoll(client, chatId, userId, draft) {
     );
     return;
   }
+
+  const botJid = await getBotOwnJid(client);
 
   const chat = await client.getChatById(chatId);
   const participants = Array.isArray(chat.participants)
@@ -42,7 +78,9 @@ async function sendAssignPoll(client, chatId, userId, draft) {
     const partId =
       p.id && p.id._serialized ? p.id._serialized : p.id || "";
     if (!partId || partId === userId) continue;
+    if (botJid && (partId === botJid || samePhone(partId, botJid))) continue;
     const contact = await client.getContactById(partId).catch(() => null);
+    if (contact && contact.isMe) continue;
     const label =
       (contact && (contact.pushname || contact.name)) ||
       partId.split("@")[0] ||
@@ -76,12 +114,282 @@ async function sendAssignPoll(client, chatId, userId, draft) {
   });
 }
 
+async function fetchUserLabel(backendUrl, userIdUuid) {
+  if (!userIdUuid) return "?";
+  try {
+    const fetch = require("node-fetch");
+    const res = await fetch(
+      `${backendUrl}/api/users/by-identifier/${encodeURIComponent(userIdUuid)}`,
+    );
+    if (!res.ok) return String(userIdUuid).slice(0, 8) + "…";
+    const j = await res.json();
+    const u = j && j.user;
+    if (!u) return "?";
+    return u.display_name || u.push_name || u.sender_number || "?";
+  } catch {
+    return "?";
+  }
+}
+
+async function buildDraftSummaryText(backendUrl, invokerWaId, draft, isGroup) {
+  const title = draft.title || "—";
+  const rep = repeatKindLabel(draft);
+  const start = formatYmdToBr(draft.startDate);
+  const time = formatTimeMinutes(draft.anchorTimeMinutes);
+  const creatorUuid = await resolveUuid(backendUrl, invokerWaId);
+  const creatorName = creatorUuid
+    ? await fetchUserLabel(backendUrl, creatorUuid)
+    : "?";
+
+  let peopleLine = "";
+  const ids = Array.isArray(draft.assigneeUserIds)
+    ? draft.assigneeUserIds
+    : [];
+  if (!isGroup) {
+    peopleLine = `• Criador: *${creatorName}*\n• Participantes: só você (chat privado).`;
+  } else if (ids.length === 0) {
+    peopleLine = `• Criador: *${creatorName}*\n• Participantes: *só o criador* (Somente a mim).`;
+  } else {
+    const labels = await Promise.all(
+      ids.map((id) => fetchUserLabel(backendUrl, id)),
+    );
+    peopleLine =
+      `• Criador: *${creatorName}*\n` +
+      `• Também na rotina: ${labels.map((x) => `*${x}*`).join(", ")}`;
+  }
+
+  return (
+    `📋 *Confirmar criação da rotina*\n\n` +
+    `• Nome: *${title}*\n` +
+    `• Repetição: ${rep}\n` +
+    `• Início: ${start}\n` +
+    `• Horário: ${time}\n\n` +
+    `${peopleLine}`
+  );
+}
+
+async function sendPrimaryConfirmPoll(client, chatId, userId, draft, isGroup) {
+  const backendUrl = process.env.BACKEND_URL || "http://localhost:8000";
+  const summary = await buildDraftSummaryText(
+    backendUrl,
+    userId,
+    draft,
+    isGroup,
+  );
+  await client.sendMessage(chatId, summary);
+  await polls.createPoll(
+    client,
+    chatId,
+    "Confirmar ou editar?",
+    ["✅ Confirmar criação", "✏️ Editar informação"],
+    {
+      metadata: {
+        actionType: "rotina_wizard",
+        wizardStep: "primary",
+        flowId: "rotina",
+        userId,
+        chatId,
+      },
+      options: { allowMultipleAnswers: false },
+    },
+  );
+}
+
+async function sendEditFieldPoll(client, chatId, userId, isGroup) {
+  const labels = [
+    "📝 Nome",
+    "📅 Data de início",
+    "⏰ Horário",
+    "🔁 Repetição",
+  ];
+  const fields = ["name", "startDate", "time", "repeat"];
+  if (isGroup) {
+    labels.push("👥 Participantes");
+    fields.push("assignees");
+  }
+  await polls.createPoll(client, chatId, "O que deseja editar?", labels, {
+    metadata: {
+      actionType: "rotina_wizard",
+      wizardStep: "edit_pick",
+      editFields: fields,
+      flowId: "rotina",
+      userId,
+      chatId,
+    },
+    options: { allowMultipleAnswers: false },
+  });
+}
+
+const REPEAT_EDIT_LABELS = [
+  "Todos os dias",
+  "A cada 2 dias",
+  "A cada 3 dias",
+  "Dias úteis",
+  "Semanal",
+  "Semana sim, semana não",
+  "Mensal",
+];
+
+const REPEAT_EDIT_CHOICES = [
+  { repeatKind: "daily" },
+  { repeatKind: "everyNDays", repeatEveryN: 2 },
+  { repeatKind: "everyNDays", repeatEveryN: 3 },
+  { repeatKind: "weekdays" },
+  { repeatKind: "weekly", weeklyDays: [] },
+  { repeatKind: "biweekly" },
+  { repeatKind: "monthly", monthlyDay: null },
+];
+
+async function sendRepeatEditPoll(client, chatId, userId) {
+  await polls.createPoll(
+    client,
+    chatId,
+    "🔁 Nova repetição",
+    REPEAT_EDIT_LABELS,
+    {
+      metadata: {
+        actionType: "rotina_wizard",
+        wizardStep: "repeat_pick",
+        repeatChoices: REPEAT_EDIT_CHOICES,
+        flowId: "rotina",
+        userId,
+        chatId,
+      },
+      options: { allowMultipleAnswers: false },
+    },
+  );
+}
+
+function getRotinaStateKey(data) {
+  return data.userId;
+}
+
 /**
- * @returns {Promise<boolean>} consumiu a mensagem
+ * Processador de votos rotina_wizard (chamado a partir de poll/processor).
  */
-function samePhone(a, b) {
-  const d = (x) => String(x || "").replace(/\D/g, "");
-  return d(a).length > 6 && d(b).length > 6 && d(a) === d(b);
+async function executeRotinaWizardAction(result, client) {
+  const { action, data } = result;
+  const chatId = data.chatId;
+  const stateUserId = data.userId;
+  if (!chatId || !stateUserId) return;
+
+  let st = conversationState.getState(stateUserId);
+  if (!st && data.chatId) st = conversationState.getState(data.chatId);
+  if (!st || st.flowType !== "rotina" || !st.data || !st.data.draft) {
+    await client.sendMessage(chatId, "❌ Sessão expirada. Use /rotina de novo.");
+    return;
+  }
+
+  const invoker = st.data.invokerUserId || stateUserId;
+  const isGroup = !!st.data.isGroup;
+  const draft = st.data.draft;
+
+  if (action === "rotina_wizard_confirm") {
+    try {
+      const creatorUuid = await resolveUuid(
+        process.env.BACKEND_URL || "http://localhost:8000",
+        invoker,
+      );
+      if (!creatorUuid) throw new Error("creator_not_found");
+      const created = await routineClient.createRoutine({
+        chatId,
+        title: draft.title,
+        repeatKind: draft.repeatKind,
+        repeatEveryN: draft.repeatEveryN,
+        weeklyDays: draft.weeklyDays || [],
+        monthlyDay: draft.monthlyDay,
+        startDate: draft.startDate,
+        anchorTimeMinutes: draft.anchorTimeMinutes,
+        createdByUserId: creatorUuid,
+        assigneeUserIds: isGroup ? draft.assigneeUserIds || [] : [],
+      });
+      conversationState.clearState(stateUserId);
+      if (data.chatId) conversationState.clearState(data.chatId);
+      const msg = formatRoutineSummaryFromApi(created);
+      await client.sendMessage(chatId, msg);
+    } catch (e) {
+      logger.error("[rotina] wizard confirm", e);
+      await client.sendMessage(
+        chatId,
+        `❌ Erro ao criar: ${e.message || e}`,
+      );
+    }
+    return;
+  }
+
+  if (action === "rotina_wizard_edit_menu") {
+    await sendEditFieldPoll(client, chatId, stateUserId, isGroup);
+    return;
+  }
+
+  if (action === "rotina_wizard_edit_field") {
+    const field = data.editField;
+    if (!field) {
+      await client.sendMessage(chatId, "❌ Opção inválida.");
+      return;
+    }
+    if (field === "name") {
+      conversationState.updateData(stateUserId, {
+        step: "await_name",
+        editReturnTo: "await_final_confirm",
+      });
+      await client.sendMessage(chatId, "Envie o *nome* da rotina (texto).");
+      return;
+    }
+    if (field === "startDate") {
+      conversationState.updateData(stateUserId, {
+        step: "await_start_date",
+        editReturnTo: "await_final_confirm",
+      });
+      await client.sendMessage(
+        chatId,
+        "📅 *Nova data de início* (ex.: `DD/MM/AAAA`, `hoje`).",
+      );
+      return;
+    }
+    if (field === "time") {
+      conversationState.updateData(stateUserId, {
+        step: "await_time",
+        editReturnTo: "await_final_confirm",
+      });
+      await client.sendMessage(
+        chatId,
+        "⏰ *Novo horário* (ex.: `08:00`, `meio dia`).",
+      );
+      return;
+    }
+    if (field === "repeat") {
+      conversationState.updateData(stateUserId, {
+        step: "await_repeat_edit_poll",
+      });
+      await sendRepeatEditPoll(client, chatId, stateUserId);
+      return;
+    }
+    if (field === "assignees" && isGroup) {
+      conversationState.updateData(stateUserId, {
+        step: "await_assign_poll",
+        editReturnTo: "await_final_confirm",
+      });
+      await sendAssignPoll(client, chatId, invoker, draft);
+      await client.sendMessage(
+        chatId,
+        "👆 Marque quem participa e *Continuar*.",
+      );
+      return;
+    }
+    return;
+  }
+
+  if (action === "rotina_wizard_repeat_applied") {
+    const ch = data.repeatChoice;
+    if (!ch) return;
+    const nextDraft = { ...draft, ...ch };
+    conversationState.updateData(stateUserId, {
+      draft: nextDraft,
+      step: "await_final_confirm",
+    });
+    await sendPrimaryConfirmPoll(client, chatId, stateUserId, nextDraft, isGroup);
+  }
 }
 
 async function authorMatchesInvoker(client, author, invoker) {
@@ -100,6 +408,7 @@ async function authorMatchesInvoker(client, author, invoker) {
   return false;
 }
 
+/** @returns {Promise<boolean>} consumiu a mensagem */
 async function handleRotinaFlow(userId, body, state, reply, context) {
   const data = state.data || {};
   const step = data.step || state.step;
@@ -125,8 +434,19 @@ async function handleRotinaFlow(userId, body, state, reply, context) {
     }
     data.draft = data.draft || {};
     data.draft.title = text;
+    if (data.editReturnTo === "await_final_confirm" && client) {
+      conversationState.updateData(userId, {
+        ...data,
+        draft: data.draft,
+        step: "await_final_confirm",
+        editReturnTo: undefined,
+      });
+      await sendPrimaryConfirmPoll(client, chatId, invoker, data.draft, isGroup);
+      return true;
+    }
     conversationState.updateData(userId, {
       ...data,
+      draft: data.draft,
       step: "await_start_date",
     });
     await reply(
@@ -142,8 +462,19 @@ async function handleRotinaFlow(userId, body, state, reply, context) {
       return true;
     }
     data.draft.startDate = p.date.toISOString().slice(0, 10);
+    if (data.editReturnTo === "await_final_confirm" && client) {
+      conversationState.updateData(userId, {
+        ...data,
+        draft: data.draft,
+        step: "await_final_confirm",
+        editReturnTo: undefined,
+      });
+      await sendPrimaryConfirmPoll(client, chatId, invoker, data.draft, isGroup);
+      return true;
+    }
     conversationState.updateData(userId, {
       ...data,
+      draft: data.draft,
       step: "await_time",
     });
     await reply("⏰ *Horário* principal (ex.: `08:00`, `meio dia`).");
@@ -158,9 +489,21 @@ async function handleRotinaFlow(userId, body, state, reply, context) {
     }
     data.draft.anchorTimeMinutes = p.anchorTimeMinutes;
 
+    if (data.editReturnTo === "await_final_confirm" && client) {
+      conversationState.updateData(userId, {
+        ...data,
+        draft: data.draft,
+        step: "await_final_confirm",
+        editReturnTo: undefined,
+      });
+      await sendPrimaryConfirmPoll(client, chatId, invoker, data.draft, isGroup);
+      return true;
+    }
+
     if (isGroup && client) {
       conversationState.updateData(userId, {
         ...data,
+        draft: data.draft,
         step: "await_assign_poll",
       });
       await sendAssignPoll(client, chatId, invoker, data.draft);
@@ -172,55 +515,17 @@ async function handleRotinaFlow(userId, body, state, reply, context) {
 
     conversationState.updateData(userId, {
       ...data,
-      step: "await_confirm",
+      draft: data.draft,
+      step: "await_final_confirm",
     });
-    const d = data.draft;
-    await reply(
-      `📋 *Resumo*\n• Nome: ${d.title}\n• Repetição: ${d.repeatKind}\n• Início: ${d.startDate}\n• Horário: ${Math.floor(d.anchorTimeMinutes / 60)}:${String(d.anchorTimeMinutes % 60).padStart(2, "0")}\n\nResponda *sim* ou *não* para criar.`,
-    );
+    await sendPrimaryConfirmPoll(client, chatId, invoker, data.draft, false);
     return true;
   }
 
-  if (step === "await_confirm") {
-    const low = text.toLowerCase();
-    if (!["sim", "s", "yes"].includes(low)) {
-      conversationState.clearState(userId);
-      await reply("Rotina cancelada.");
-      return true;
-    }
-    const stNow = conversationState.getState(userId);
-    const d = stNow && stNow.data && stNow.data.draft;
-    const backendUrl = process.env.BACKEND_URL || "http://localhost:8000";
-    const creatorUuid = await resolveUuid(backendUrl, invoker);
-    if (!creatorUuid) {
-      conversationState.clearState(userId);
-      await reply("❌ Utilizador não encontrado.");
-      return true;
-    }
-    if (!d || !d.title) {
-      conversationState.clearState(userId);
-      await reply("❌ Dados incompletos. Comece de novo com /rotina.");
-      return true;
-    }
-    try {
-      await routineClient.createRoutine({
-        chatId,
-        title: d.title,
-        repeatKind: d.repeatKind,
-        repeatEveryN: d.repeatEveryN,
-        weeklyDays: d.weeklyDays,
-        monthlyDay: d.monthlyDay,
-        startDate: d.startDate,
-        anchorTimeMinutes: d.anchorTimeMinutes,
-        createdByUserId: creatorUuid,
-        assigneeUserIds: [],
-      });
-      conversationState.clearState(userId);
-      await reply("✅ Rotina criada.");
-    } catch (e) {
-      logger.error("[rotina] create", e);
-      await reply(`❌ Erro: ${e.message || e}`);
-    }
+  if (step === "await_final_confirm" || step === "await_repeat_edit_poll") {
+    await reply(
+      "👆 Use a *enquete* acima para confirmar, editar ou escolher repetição.",
+    );
     return true;
   }
 
@@ -259,6 +564,8 @@ async function finalizeCreateFromContext(userId, chatId, draft, assigneeUserIds)
 module.exports = {
   handleRotinaFlow,
   sendAssignPoll,
+  sendPrimaryConfirmPoll,
+  executeRotinaWizardAction,
   finalizeCreateFromContext,
   resolveUuid,
 };

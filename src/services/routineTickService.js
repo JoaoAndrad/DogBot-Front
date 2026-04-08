@@ -1,6 +1,33 @@
 const logger = require("../utils/logger");
 const routineClient = require("./routineClient");
 
+const DEFAULT_CHECKIN_OPTIONS = ["Eu fiz", "Ainda não"];
+
+/**
+ * @param {import("whatsapp-web.js").Client} client
+ * @param {string} chatId
+ * @param {string} bodyText
+ * @param {string[]} mentionWaIds
+ */
+async function sendBodyWithOptionalMentions(client, chatId, bodyText, mentionWaIds) {
+  if (!bodyText) return null;
+  const ids = Array.isArray(mentionWaIds) ? mentionWaIds.filter(Boolean) : [];
+  if (ids.length) {
+    try {
+      const contacts = await Promise.all(
+        ids.map((jid) => client.getContactById(jid).catch(() => null)),
+      );
+      const valid = contacts.filter(Boolean);
+      if (valid.length) {
+        return client.sendMessage(chatId, bodyText, { mentions: valid });
+      }
+    } catch (e) {
+      logger.warn("[routineTick] mentions", e.message);
+    }
+  }
+  return client.sendMessage(chatId, bodyText);
+}
+
 /**
  * Processa fila de dispatches devolvidos pelo backend (enquetes de check-in / retrospectiva).
  * @param {import("whatsapp-web.js").Client} client
@@ -20,20 +47,22 @@ async function processRoutineTick(client) {
       const chatId = p.chatId || a.chatId;
       if (!chatId) continue;
 
+      const mentionIds = p.bodyMentionWaIds || p.metadata?.bodyMentionWaIds;
       if (p.bodyText) {
         try {
-          await client.sendMessage(chatId, p.bodyText);
+          await sendBodyWithOptionalMentions(
+            client,
+            chatId,
+            p.bodyText,
+            mentionIds,
+          );
         } catch (e) {
           logger.warn("[routineTick] bodyText", e.message);
         }
       }
 
       const title = p.title || "Rotina";
-      const options = p.options || [
-        "Eu fiz",
-        "Outra pessoa fez",
-        "Ninguém fez",
-      ];
+      const options = p.options || DEFAULT_CHECKIN_OPTIONS;
       const meta = p.metadata || {};
 
       const send = await polls.createPoll(client, chatId, title, options, {
