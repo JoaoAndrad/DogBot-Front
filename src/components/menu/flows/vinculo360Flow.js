@@ -10,6 +10,36 @@ const MAX_MEMBERS = 10;
 /** Opções da enquete: utilizadores + Próx./Ant. + Voltar (máx. ~12). */
 const USERS_PER_PAGE = 8;
 
+/** Lista completa por admin + membro Life360 — o estado persistido do menu não costuma guardar arrays grandes. */
+const VINCULO_USERS_CACHE_TTL_MS = 45 * 60 * 1000;
+const vinculoUsersListCache = new Map();
+
+function vinculoUsersSessionKey(adminWa, memberId) {
+  return `${String(adminWa || "")}::${String(memberId || "")}`;
+}
+
+function getVinculoUsersListCached(adminWa, memberId) {
+  const k = vinculoUsersSessionKey(adminWa, memberId);
+  const entry = vinculoUsersListCache.get(k);
+  if (!entry || !Array.isArray(entry.users)) return null;
+  if (Date.now() > entry.expiresAt) {
+    vinculoUsersListCache.delete(k);
+    return null;
+  }
+  return entry.users;
+}
+
+function setVinculoUsersListCached(adminWa, memberId, users) {
+  vinculoUsersListCache.set(vinculoUsersSessionKey(adminWa, memberId), {
+    users,
+    expiresAt: Date.now() + VINCULO_USERS_CACHE_TTL_MS,
+  });
+}
+
+function invalidateVinculoUsersListCache(adminWa, memberId) {
+  vinculoUsersListCache.delete(vinculoUsersSessionKey(adminWa, memberId));
+}
+
 function truncateLabel(s, max = 120) {
   const t = String(s || "?").replace(/\n/g, " ").trim();
   return t.length > max ? `${t.slice(0, max - 1)}…` : t;
@@ -201,14 +231,8 @@ const vinculo360Flow = createFlow("vinculo360", {
       }
 
       ctx.state.context = ctx.state.context || {};
-      const cacheKey = pending.memberId;
-      const sameMember =
-        ctx.state.context.vinculoUsersCacheKey === cacheKey;
-      let users = ctx.state.context.vinculoUsersList;
-      if (!users || !sameMember) {
-        const pageBeforeFetch = sameMember
-          ? Number(ctx.state.context.usersPage) || 0
-          : 0;
+      let users = getVinculoUsersListCached(adminWa, pending.memberId);
+      if (!users) {
         let res;
         try {
           res = await life360Client.getVinculoUsers(
@@ -226,10 +250,7 @@ const vinculo360Flow = createFlow("vinculo360", {
           };
         }
         users = (res && res.users) || [];
-        ctx.state.context.vinculoUsersList = users;
-        ctx.state.context.vinculoUsersCacheKey = cacheKey;
-        // Só repõe página 0 ao mudar de membro Life360; se só faltava a lista em memória, mantém a página.
-        ctx.state.context.usersPage = sameMember ? pageBeforeFetch : 0;
+        setVinculoUsersListCached(adminWa, pending.memberId, users);
       }
 
       if (!users.length) {
@@ -337,8 +358,6 @@ const vinculo360Flow = createFlow("vinculo360", {
         memberId: data.memberId,
         displayName: data.displayName,
       };
-      delete ctx.state.context.vinculoUsersList;
-      delete ctx.state.context.vinculoUsersCacheKey;
       ctx.state.context.usersPage = 0;
       ctx.state.history.push("/members");
       ctx.state.path = "/users";
@@ -374,6 +393,7 @@ const vinculo360Flow = createFlow("vinculo360", {
           `✅ Vínculo criado: membro Life360 *${pending.displayName}* → ` +
             `utilizador *${target.displayName}*.`,
         );
+        invalidateVinculoUsersListCache(adminWa, pending.memberId);
       } catch (e) {
         let msg = e.message || String(e);
         if (e.body && e.body.error) msg = String(e.body.error);
