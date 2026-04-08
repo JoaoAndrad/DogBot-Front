@@ -4,13 +4,12 @@
   "private": true,
   "scripts": {
     "start": "node src/index.js",
-    "dev": "nodemon --watch src --ignore .wwebjs_auth/** --ignore .wwebjs_cache/** --ignore data/** --exec node -r dotenv/config src/index.js",
+    "dev": "nodemon --watch src --ignore .wwebjs_auth/** --ignore .wwebjs_cache/** --ignore data/** --exec node src/index.js",
     "lint": "echo \"No linter configured\"",
     "test": "echo \"No tests configured\""
   },
   "dependencies": {
     "luxon": "^3.4.4",
-    "dotenv": "^16.0.0",
     "qrcode": "^1.5.1",
     "sharp": "^0.34.5",
     "node-html-to-image": "^3.2.0",

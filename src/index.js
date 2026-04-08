@@ -1,4 +1,4 @@
-require("dotenv").config();
+require("./utils/loadEnv").loadEnv();
 const logger = require("./utils/logger");
 const BotService = require("./bot");
 const commands = require("./commands");
