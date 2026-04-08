@@ -369,6 +369,14 @@ const life360Flow = createFlow("life360", {
         merged.circleId || (ctx.state.context && ctx.state.context.circleId);
       const memberId = merged.memberId;
 
+      const displayNameForWait =
+        merged.displayName && String(merged.displayName).trim()
+          ? String(merged.displayName).trim()
+          : "este membro";
+      await ctx.reply(
+        `Carregando dados da localização de *${displayNameForWait}*, um momento...`,
+      );
+
       // Voto via processador costuma trazer só memberId + location — sem circleId/avatar. Resolve pelo backend.
       const needsResolve =
         memberId &&
