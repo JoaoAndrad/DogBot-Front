@@ -4,7 +4,9 @@
 
 const { createFlow } = require("../flowBuilder");
 const life360Client = require("../../../services/life360Client");
-const { memberIdsFromGroupChat } = require("../../../utils/whatsappParticipantIds");
+const {
+  memberIdsFromGroupChat,
+} = require("../../../utils/whatsappParticipantIds");
 const {
   sendBufferAsSticker,
   downloadImageToBuffer,
@@ -13,7 +15,9 @@ const {
 const MAX_MEMBERS = 10;
 
 function truncateLabel(s, max = 120) {
-  const t = String(s || "?").replace(/\n/g, " ").trim();
+  const t = String(s || "?")
+    .replace(/\n/g, " ")
+    .trim();
   return t.length > max ? `${t.slice(0, max - 1)}…` : t;
 }
 
@@ -60,9 +64,7 @@ function speedMphToKmh(speed) {
 }
 
 function formatTimeAtPlaceLine(loc) {
-  const start =
-    toUnixSeconds(loc.since) ??
-    toUnixSeconds(loc.startTimestamp);
+  const start = toUnixSeconds(loc.since) ?? toUnixSeconds(loc.startTimestamp);
   if (start == null) return null;
   const now = Math.floor(Date.now() / 1000);
   let delta = Math.max(0, now - start);
@@ -91,10 +93,7 @@ function formatMovementLine(loc) {
   const driving = loc.isDriving === "1" || loc.isDriving === true;
   const transit = loc.inTransit === "1" || loc.inTransit === true;
   const kmh = speedMphToKmh(speed);
-  const moving =
-    driving ||
-    transit ||
-    (Number.isFinite(speed) && speed > 1.5);
+  const moving = driving || transit || (Number.isFinite(speed) && speed > 1.5);
   if (!moving && (!Number.isFinite(speed) || speed <= 1.5)) {
     return "🚶 Parado";
   }
@@ -114,15 +113,15 @@ function formatMovementLine(loc) {
 function formatLocationMessage(data) {
   const name = data.displayName || "Membro";
   const loc = data.location || {};
-  const lines = [`📍 *${name}*`];
+  const lines = [`👤 *${name}*`];
 
   const place =
     loc.name ||
     loc.shortAddress ||
     loc.address1 ||
     (loc.latitude != null &&
-    loc.longitude != null &&
-    `${loc.latitude}, ${loc.longitude}`) ||
+      loc.longitude != null &&
+      `${loc.latitude}, ${loc.longitude}`) ||
     null;
   if (place) lines.push(`📌 ${place}`);
 
@@ -150,25 +149,17 @@ function mergeMemberFromApi(data, apiMember) {
   for (const [k, v] of Object.entries(locApi)) {
     if (v !== undefined && v !== null && v !== "") mergedLoc[k] = v;
   }
+  const apiAvatar =
+    apiMember.avatar != null && String(apiMember.avatar).trim() !== ""
+      ? String(apiMember.avatar).trim()
+      : null;
   return {
     ...data,
     displayName: data.displayName || formatMemberName(apiMember),
-    avatar: data.avatar || apiMember.avatar,
+    // GET Member traz o URL de avatar completo; a lista por vezes omite ou vem incompleto.
+    avatar: apiAvatar || data.avatar,
     location: mergedLoc,
   };
-}
-
-function shouldFetchMemberDetail(data) {
-  const url = data.avatar && String(data.avatar).trim();
-  if (!url || !url.startsWith("http")) return true;
-  const loc = data.location || {};
-  const hasTime =
-    loc.since != null ||
-    loc.startTimestamp != null ||
-    loc.timestamp != null;
-  const hasBat = loc.battery != null && loc.battery !== "";
-  if (!hasTime || !hasBat) return true;
-  return false;
 }
 
 const life360Flow = createFlow("life360", {
@@ -234,7 +225,8 @@ const life360Flow = createFlow("life360", {
         } catch (e) {
           return {
             title:
-              "❌ Não foi possível carregar o grupo: " + (e.message || String(e)),
+              "❌ Não foi possível carregar o grupo: " +
+              (e.message || String(e)),
             skipPoll: true,
           };
         }
@@ -276,8 +268,7 @@ const life360Flow = createFlow("life360", {
 
       const options = slice.map((item) => {
         const m = item.member || {};
-        const displayName =
-          item.displayName || formatMemberName(m);
+        const displayName = item.displayName || formatMemberName(m);
         return {
           label: truncateLabel(`👤 ${displayName}`),
           action: "exec",
@@ -292,7 +283,11 @@ const life360Flow = createFlow("life360", {
         };
       });
 
-      options.push({ label: "🔙 Sair", action: "exec", handler: "leaveLife360" });
+      options.push({
+        label: "🔙 Sair",
+        action: "exec",
+        handler: "leaveLife360",
+      });
 
       return { title, options, skipPoll: false };
     },
@@ -318,8 +313,7 @@ const life360Flow = createFlow("life360", {
         members = await life360Client.getMembers(circleId);
       } catch (e) {
         return {
-          title:
-            "❌ Erro ao carregar membros: " + (e.message || String(e)),
+          title: "❌ Erro ao carregar membros: " + (e.message || String(e)),
           skipPoll: true,
         };
       }
@@ -371,11 +365,11 @@ const life360Flow = createFlow("life360", {
     pickMember: async (ctx, data) => {
       let merged = { ...data };
       const circleId =
-        merged.circleId ||
-        (ctx.state.context && ctx.state.context.circleId);
+        merged.circleId || (ctx.state.context && ctx.state.context.circleId);
       const memberId = merged.memberId;
 
-      if (circleId && memberId && shouldFetchMemberDetail(merged)) {
+      // GET Member em todo o clique: a lista omitte avatar com frequência; o detalhe traz `avatar` (URL) para figurinha.
+      if (circleId && memberId) {
         try {
           const res = await life360Client.getMember(circleId, memberId);
           const m = res && res.member;

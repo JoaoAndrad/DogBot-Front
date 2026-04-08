@@ -134,12 +134,23 @@ if (!fs.existsSync(TEMP_DIR)) {
  * @param {string} imageUrl - URL of the image to download
  * @returns {Promise<Buffer|null>} Raw image buffer or null
  */
-async function downloadImageToBuffer(imageUrl) {
+async function downloadImageToBuffer(imageUrl, opts = {}) {
   try {
     if (!imageUrl) return null;
-    const response = await fetch(imageUrl);
+    const response = await fetch(imageUrl, {
+      headers: {
+        Accept: "image/avif,image/webp,image/apng,image/*,*/*;q=0.8",
+        "User-Agent":
+          opts.userAgent ||
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        ...(opts.headers || {}),
+      },
+    });
     if (!response.ok) return null;
-    return await response.buffer();
+    if (typeof response.buffer === "function") {
+      return await response.buffer();
+    }
+    return Buffer.from(await response.arrayBuffer());
   } catch (e) {
     logger.warn("[StickerHelper] downloadImageToBuffer: " + e.message);
     return null;
