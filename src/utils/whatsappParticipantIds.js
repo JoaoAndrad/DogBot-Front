@@ -8,6 +8,11 @@ function serializedParticipantId(participant) {
   const id = participant.id;
   if (typeof id === "string") return id;
   if (id._serialized) return id._serialized;
+  // Wid sem _serialized populado (comum em alguns grupos / versões do wwebjs)
+  if (id.user) {
+    const server = id.server || "c.us";
+    return `${id.user}@${server}`;
+  }
   return null;
 }
 
