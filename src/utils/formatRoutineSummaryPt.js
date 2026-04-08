@@ -76,25 +76,25 @@ function formatRoutineSummaryFromApi(routine) {
 
   let people = "";
   if (creatorName) {
-    people = `• Criador: *${creatorName}*`;
+    people = `👤 *Criador:* *${creatorName}*`;
     if (otherNames.length) {
-      people += `\n• Também na rotina: ${otherNames.map((n) => `*${n}*`).join(", ")}`;
+      people += `\n👥 *Também na rotina:* ${otherNames.map((n) => `*${n}*`).join(", ")}`;
     } else {
-      people += `\n• Outros participantes: nenhum (só o criador).`;
+      people += `\n👥 *Outros participantes:* nenhum (só o criador).`;
     }
   } else if (assignees.length) {
-    people = `• Participantes: ${assignees.map((a) => userLabel(a.user)).map((n) => `*${n}*`).join(", ")}`;
+    people = `👥 *Participantes:* ${assignees.map((a) => userLabel(a.user)).map((n) => `*${n}*`).join(", ")}`;
   } else {
-    people = "• Participantes: —";
+    people = "👥 *Participantes:* —";
   }
 
   return (
     `✅ *Rotina criada*\n\n` +
-    `• Nome: *${title}*\n` +
-    `• Repetição: ${rep}\n` +
-    `• Início: ${start}\n` +
-    `• Horário: ${time}\n` +
-    `• Fuso: ${tz}\n` +
+    `📝 *Nome:* *${title}*\n` +
+    `🔁 *Repetição:* ${rep}\n` +
+    `📅 *Início:* ${start}\n` +
+    `⏰ *Horário:* ${time}\n` +
+    `🌐 *Fuso:* ${tz}\n` +
     `${people}`
   );
 }

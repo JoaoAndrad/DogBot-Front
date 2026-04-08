@@ -11,9 +11,9 @@ const {
   formatRoutineSummaryFromApi,
 } = require("../utils/formatRoutineSummaryPt");
 
-/** UUID v4 (aceita variantes 1–8 no terceiro grupo, como Prisma/cuid misturados não — só formato clássico). */
+/** UUID padrão (8-4-4-4-12) — evita falsos positivos com JIDs longos. */
 const USER_UUID_RE =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 function looksLikeUserUuid(s) {
   return typeof s === "string" && USER_UUID_RE.test(s.trim());
@@ -148,35 +148,37 @@ async function buildDraftSummaryText(backendUrl, invokerWaId, draft, isGroup) {
   const rep = repeatKindLabel(draft);
   const start = formatYmdToBr(draft.startDate);
   const time = formatTimeMinutes(draft.anchorTimeMinutes);
-  const creatorUuid = await resolveUuid(backendUrl, invokerWaId);
-  const creatorName = creatorUuid
-    ? await fetchUserLabel(backendUrl, creatorUuid)
-    : "?";
+  // Preferir JID do WhatsApp: GET by-identifier funciona como no fluxo de assignees; UUID em /users/:id pode falhar.
+  const creatorName = await fetchUserLabel(backendUrl, invokerWaId);
 
-  let peopleLine = "";
+  let peopleBlock = "";
   const ids = Array.isArray(draft.assigneeUserIds)
     ? draft.assigneeUserIds
     : [];
   if (!isGroup) {
-    peopleLine = `• Criador: *${creatorName}*\n• Participantes: só você (chat privado).`;
+    peopleBlock =
+      `👤 *Criador:* *${creatorName}*\n` +
+      `💬 *Participantes:* só você (chat privado).`;
   } else if (ids.length === 0) {
-    peopleLine = `• Criador: *${creatorName}*\n• Participantes: *só o criador* (Somente a mim).`;
+    peopleBlock =
+      `👤 *Criador:* *${creatorName}*\n` +
+      `👥 *Participantes:* *somente o criador* (opção “Somente a mim”).`;
   } else {
     const labels = await Promise.all(
       ids.map((id) => fetchUserLabel(backendUrl, id)),
     );
-    peopleLine =
-      `• Criador: *${creatorName}*\n` +
-      `• Também na rotina: ${labels.map((x) => `*${x}*`).join(", ")}`;
+    peopleBlock =
+      `👤 *Criador:* *${creatorName}*\n` +
+      `👥 *Também na rotina:* ${labels.map((x) => `*${x}*`).join(", ")}`;
   }
 
   return (
     `📋 *Confirmar criação da rotina*\n\n` +
-    `• Nome: *${title}*\n` +
-    `• Repetição: ${rep}\n` +
-    `• Início: ${start}\n` +
-    `• Horário: ${time}\n\n` +
-    `${peopleLine}`
+    `📝 *Nome:* *${title}*\n` +
+    `🔁 *Repetição:* ${rep}\n` +
+    `📅 *Início:* ${start}\n` +
+    `⏰ *Horário:* ${time}\n\n` +
+    `${peopleBlock}`
   );
 }
 
