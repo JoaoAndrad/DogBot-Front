@@ -30,12 +30,15 @@ async function processEvent(context) {
     context.chatName = chatName;
 
     if (config.rateLimitEnabled && fromId) {
-      const ok = rateLimitAllow(`msg:${fromId}`, {
+      const r = rateLimitAllow(`msg:${fromId}`, {
         maxEvents: config.rateLimitMsgMax,
         windowMs: config.rateLimitMsgWindowMs,
+        banMs: config.rateLimitBanMs,
       });
-      if (!ok) {
-        logger.debug(`[rateLimit] mensagem bloqueada: ${fromId}`);
+      if (!r.ok) {
+        logger.debug(
+          `[rateLimit] mensagem bloqueada (${r.reason}): ${fromId}`,
+        );
         return false;
       }
     }

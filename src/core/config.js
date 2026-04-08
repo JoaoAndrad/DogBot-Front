@@ -23,4 +23,6 @@ module.exports = {
   /** Máx. de votos em enquete por utilizador por janela — cliques rápidos em poll são sensíveis */
   rateLimitPollVoteMax: intEnv("RATE_LIMIT_POLL_VOTE_MAX", 6),
   rateLimitPollVoteWindowMs: intEnv("RATE_LIMIT_POLL_VOTE_WINDOW_MS", 60_000),
+  /** Ban (ms) ao exceder limite de mensagens ou de votos — default 10 min */
+  rateLimitBanMs: intEnv("RATE_LIMIT_BAN_MS", 10 * 60 * 1000),
 };

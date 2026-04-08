@@ -1,26 +1,39 @@
 /**
  * Limite de frequência em memória (janela deslizante por chave).
- * Usado para anti-spam em mensagens e votos em enquetes.
+ * Ao exceder a janela, pode aplicar ban temporário (opts.banMs).
  */
 
 /** @type {Map<string, number[]>} */
 const buckets = new Map();
+/** @type {Map<string, number>} — fim do ban (timestamp ms) */
+const bans = new Map();
 
 let sweepCounter = 0;
 const SWEEP_EVERY = 200;
 
 /**
  * @param {string} key
- * @param {{ maxEvents: number, windowMs: number }} opts
- * @returns {boolean} true se o evento é permitido (e foi contado)
+ * @param {{ maxEvents: number, windowMs: number, banMs?: number }} opts
+ * @returns {{ ok: true } | { ok: false, reason: 'banned' | 'limit_exceeded' }}
  */
 function allow(key, opts) {
   const maxEvents = Number(opts.maxEvents);
   const windowMs = Number(opts.windowMs);
-  if (!key || !Number.isFinite(maxEvents) || maxEvents <= 0) return true;
-  if (!Number.isFinite(windowMs) || windowMs <= 0) return true;
+  const banMs = Number(opts.banMs ?? 0);
+
+  if (!key || !Number.isFinite(maxEvents) || maxEvents <= 0) return { ok: true };
+  if (!Number.isFinite(windowMs) || windowMs <= 0) return { ok: true };
 
   const now = Date.now();
+
+  const banUntil = bans.get(key);
+  if (banUntil != null && banUntil > now) {
+    return { ok: false, reason: "banned" };
+  }
+  if (banUntil != null && banUntil <= now) {
+    bans.delete(key);
+  }
+
   const cutoff = now - windowMs;
   let stamps = buckets.get(key);
   if (!stamps) {
@@ -32,7 +45,11 @@ function allow(key, opts) {
   }
 
   if (stamps.length >= maxEvents) {
-    return false;
+    if (Number.isFinite(banMs) && banMs > 0) {
+      bans.set(key, now + banMs);
+      buckets.delete(key);
+    }
+    return { ok: false, reason: "limit_exceeded" };
   }
 
   stamps.push(now);
@@ -41,19 +58,22 @@ function allow(key, opts) {
     sweepCounter = 0;
     sweepStale(now);
   }
-  return true;
+  return { ok: true };
 }
 
 /**
- * Remove chaves sem timestamps recentes (usa o maior cutoff conservador).
+ * Remove buckets e bans antigos/inativos.
  */
 function sweepStale(now) {
-  const maxAge = 24 * 60 * 60 * 1000; // 24 h — remove chaves inativas
+  const maxAge = 24 * 60 * 60 * 1000; // 24 h
   const cutoff = now - maxAge;
   for (const [k, stamps] of buckets.entries()) {
     const kept = stamps.filter((t) => t >= cutoff);
     if (kept.length === 0) buckets.delete(k);
     else buckets.set(k, kept);
+  }
+  for (const [k, until] of bans.entries()) {
+    if (until <= now) bans.delete(k);
   }
 }
 

@@ -366,12 +366,15 @@ async function handleVoteUpdate(vote) {
     }
 
     if (config.rateLimitEnabled) {
-      const ok = rateLimitAllow(`poll:${voter}`, {
+      const r = rateLimitAllow(`poll:${voter}`, {
         maxEvents: config.rateLimitPollVoteMax,
         windowMs: config.rateLimitPollVoteWindowMs,
+        banMs: config.rateLimitBanMs,
       });
-      if (!ok) {
-        logger.debug(`[rateLimit] voto em enquete bloqueado: ${voter}`);
+      if (!r.ok) {
+        logger.debug(
+          `[rateLimit] voto em enquete bloqueado (${r.reason}): ${voter}`,
+        );
         return false;
       }
     }
