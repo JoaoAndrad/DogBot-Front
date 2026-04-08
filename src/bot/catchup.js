@@ -5,6 +5,26 @@ const chatCleaner = require("../utils/chatCleaner");
 const fs = require("fs");
 const path = require("path");
 
+/** Erro interno do WA Web quando o chat/store ainda não está pronto (loadEarlierMsgs / fetchMessages). */
+function isTransientWaChatError(err) {
+  const m = err && err.message ? String(err.message) : "";
+  return m.includes("waitForChatLoading");
+}
+
+function delay(ms) {
+  return new Promise((r) => setTimeout(r, ms));
+}
+
+async function fetchMessagesSafe(chat, opts) {
+  try {
+    return await chat.fetchMessages(opts);
+  } catch (e) {
+    if (!isTransientWaChatError(e)) throw e;
+    await delay(1500);
+    return await chat.fetchMessages(opts);
+  }
+}
+
 async function runCatchup(client, options = {}) {
   const limitPerChat = options.limitPerChat || 200;
   const chats = await client.getChats();
@@ -45,6 +65,7 @@ async function runCatchup(client, options = {}) {
       "Catchup: primeira execução detectada - marcando todas as mensagens antigas como processadas",
     );
     // Criar checkpoints com timestamp atual para todos os chats
+    let firstRunTransient = 0;
     for (const chat of chats) {
       try {
         const chatId =
@@ -53,21 +74,32 @@ async function runCatchup(client, options = {}) {
             : chat.id || chat.name || "unknown";
 
         // Buscar a última mensagem do chat
-        const messages = await chat.fetchMessages({ limit: 1 });
+        const messages = await fetchMessagesSafe(chat, { limit: 1 });
         if (messages.length > 0 && messages[0].timestamp) {
           storage.setLastTs(chatId, messages[0].timestamp);
         }
       } catch (err) {
-        logger.warn(
-          `Catchup: erro ao marcar chat ${chat.id?._serialized}: ${err?.message}`,
-        );
+        if (isTransientWaChatError(err)) {
+          firstRunTransient++;
+        } else {
+          logger.warn(
+            `Catchup: erro ao marcar chat ${chat.id?._serialized}: ${err?.message}`,
+          );
+        }
       }
+    }
+    if (firstRunTransient > 0) {
+      logger.info(
+        `Catchup: ${firstRunTransient} chat(s) omitidos na marcação inicial (WA Web a sincronizar)`,
+      );
     }
     logger.info("Catchup: todos os chats marcados como atualizados");
     return;
   }
 
   logger.info(`Catchup: iniciando para ${chats.length} chats`);
+
+  let transientChatSkips = 0;
 
   for (const chat of chats) {
     try {
@@ -89,7 +121,7 @@ async function runCatchup(client, options = {}) {
 
       const lastTs = storage.getLastTs(chatId) || 0;
       // Buscar últimas mensagens (limit)
-      const messages = await chat.fetchMessages({
+      const messages = await fetchMessagesSafe(chat, {
         limit: Math.min(limitPerChat, 200),
       });
       const newMsgs = messages
@@ -116,6 +148,10 @@ async function runCatchup(client, options = {}) {
         }
       }
     } catch (err) {
+      if (isTransientWaChatError(err)) {
+        transientChatSkips++;
+        continue;
+      }
       logger.warn(
         `Catchup: erro no chat ${chat.id && chat.id._serialized}: ${
           err && err.message
@@ -124,6 +160,11 @@ async function runCatchup(client, options = {}) {
     }
   }
 
+  if (transientChatSkips > 0) {
+    logger.info(
+      `Catchup: ${transientChatSkips} chat(s) ignorados (WA Web ainda a sincronizar; mensagens em falta chegam em tempo real)`,
+    );
+  }
   logger.info("Catchup: concluído");
 }
 

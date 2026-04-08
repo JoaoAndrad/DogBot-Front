@@ -70,6 +70,9 @@ async function start() {
     const config = require("../core/config");
     if (config.enableCatchup) {
       try {
+        if (config.catchupDelayMs > 0) {
+          await new Promise((r) => setTimeout(r, config.catchupDelayMs));
+        }
         const catchup = require("./catchup");
         // Rodar catchup ao iniciar para processar mensagens recebidas enquanto offline
         await catchup.runCatchup(client, { limitPerChat: 200 });
