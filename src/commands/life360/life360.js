@@ -1,4 +1,5 @@
 const flowManager = require("../../components/menu/flowManager");
+const { resolveGroupMemberIds } = require("../../utils/whatsappParticipantIds");
 
 module.exports = {
   name: "life360",
@@ -29,23 +30,18 @@ module.exports = {
       /* ignore */
     }
 
-    let memberIds;
+    let memberIds = [];
     try {
-      const chat = await message.getChat();
-      memberIds = (chat.participants || [])
-        .map((p) => p.id && p.id._serialized)
-        .filter(Boolean);
+      memberIds = await resolveGroupMemberIds(client, message, chatId);
     } catch (e) {
-      memberIds = null;
+      memberIds = [];
     }
 
     try {
       await flowManager.startFlow(client, chatId, userId, "life360", {
         initialContext: {
           groupChatId: chatId,
-          ...(memberIds && memberIds.length
-            ? { memberIds }
-            : {}),
+          ...(memberIds.length ? { memberIds } : {}),
         },
       });
     } catch (err) {

@@ -23,6 +23,16 @@ async function getMembers(circleId) {
   return res.members || res || [];
 }
 
+/** Detalhe de um membro (GET Member na API Life360). */
+async function getMember(circleId, memberId) {
+  if (!circleId || !memberId) throw new Error("circleId e memberId são obrigatórios");
+  return sendToBackend(
+    `/api/life360/circles/${encodeURIComponent(circleId)}/members/${encodeURIComponent(memberId)}`,
+    null,
+    "GET",
+  );
+}
+
 /**
  * Membros Life360 mapeados (User.life360_member_id) que participam no grupo.
  * @param {string} groupChatId - JID do grupo (@g.us)
@@ -64,6 +74,7 @@ module.exports = {
   getStatus,
   getCircles,
   getMembers,
+  getMember,
   getGroupLinkedPreview,
   getVinculoUsers,
   linkLife360ForUser,

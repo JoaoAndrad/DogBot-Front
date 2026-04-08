@@ -4,6 +4,11 @@
 
 const { createFlow } = require("../flowBuilder");
 const life360Client = require("../../../services/life360Client");
+const { memberIdsFromGroupChat } = require("../../../utils/whatsappParticipantIds");
+const {
+  sendBufferAsSticker,
+  downloadImageToBuffer,
+} = require("../../../utils/stickerHelper");
 
 const MAX_MEMBERS = 10;
 
@@ -17,30 +22,153 @@ function formatMemberName(m) {
   return parts.length ? parts.join(" ") : "Membro";
 }
 
+/** Campos de localização a partir do objeto membro Life360. */
+function locationPayloadFromMember(m) {
+  const loc = (m && m.location) || {};
+  return {
+    latitude: loc.latitude,
+    longitude: loc.longitude,
+    name: loc.name,
+    shortAddress: loc.shortAddress,
+    address1: loc.address1,
+    battery: loc.battery,
+    charge: loc.charge,
+    since: loc.since,
+    startTimestamp: loc.startTimestamp,
+    endTimestamp: loc.endTimestamp,
+    timestamp: loc.timestamp,
+    isDriving: loc.isDriving,
+    inTransit: loc.inTransit,
+    speed: loc.speed,
+    wifiState: loc.wifiState,
+  };
+}
+
+function toUnixSeconds(t) {
+  if (t == null || t === "") return null;
+  const n = Number(t);
+  if (!Number.isFinite(n)) return null;
+  if (n > 1e12) return Math.floor(n / 1000);
+  return Math.floor(n);
+}
+
+/** Life360 costuma enviar velocidade em mph (0–120). Converte para km/h para exibição. */
+function speedMphToKmh(speed) {
+  const n = Number(speed);
+  if (!Number.isFinite(n) || n <= 0) return null;
+  return Math.round(n * 1.60934);
+}
+
+function formatTimeAtPlaceLine(loc) {
+  const start =
+    toUnixSeconds(loc.since) ??
+    toUnixSeconds(loc.startTimestamp);
+  if (start == null) return null;
+  const now = Math.floor(Date.now() / 1000);
+  let delta = Math.max(0, now - start);
+  const mins = Math.floor(delta / 60);
+  if (mins < 1) return "⏱️ Neste local há menos de 1 min";
+  if (mins < 60) return `⏱️ Neste local há ~${mins} min`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 48) return `⏱️ Neste local há ~${hours} h`;
+  const days = Math.floor(hours / 24);
+  return `⏱️ Neste local há ~${days} dia(s)`;
+}
+
+function formatBatteryLine(loc) {
+  const bat = loc.battery;
+  if (bat == null || bat === "") return null;
+  const pct = String(bat).replace(/%/g, "").trim();
+  const charging =
+    loc.charge === "1" || loc.charge === 1 || loc.charge === true;
+  let line = `🔋 ${pct}%`;
+  if (charging) line += " · Carregando";
+  return line;
+}
+
+function formatMovementLine(loc) {
+  const speed = Number(loc.speed);
+  const driving = loc.isDriving === "1" || loc.isDriving === true;
+  const transit = loc.inTransit === "1" || loc.inTransit === true;
+  const kmh = speedMphToKmh(speed);
+  const moving =
+    driving ||
+    transit ||
+    (Number.isFinite(speed) && speed > 1.5);
+  if (!moving && (!Number.isFinite(speed) || speed <= 1.5)) {
+    return "🚶 Parado";
+  }
+  if (kmh != null && kmh > 0) {
+    if (driving || transit) {
+      return `🚗 Em deslocação · ~${kmh} km/h`;
+    }
+    return `🏃 Em movimento · ~${kmh} km/h`;
+  }
+  if (driving || transit) return "🚗 Em deslocação";
+  return "🚶 Parado";
+}
+
+/**
+ * @param {object} data - displayName, location, avatar opcional
+ */
 function formatLocationMessage(data) {
   const name = data.displayName || "Membro";
   const loc = data.location || {};
   const lines = [`📍 *${name}*`];
+
   const place =
-    loc.shortAddress ||
     loc.name ||
+    loc.shortAddress ||
     loc.address1 ||
-    (loc.latitude != null && loc.longitude != null
-      ? `${loc.latitude}, ${loc.longitude}`
-      : null);
+    (loc.latitude != null &&
+    loc.longitude != null &&
+    `${loc.latitude}, ${loc.longitude}`) ||
+    null;
   if (place) lines.push(`📌 ${place}`);
+
+  const timeLine = formatTimeAtPlaceLine(loc);
+  if (timeLine) lines.push(timeLine);
+
+  const batLine = formatBatteryLine(loc);
+  if (batLine) lines.push(batLine);
+
+  lines.push(formatMovementLine(loc));
+
   if (loc.latitude != null && loc.longitude != null) {
     lines.push(
       `🗺️ https://maps.google.com/?q=${encodeURIComponent(`${loc.latitude},${loc.longitude}`)}`,
     );
   }
-  if (loc.battery != null && loc.battery !== "") {
-    lines.push(`🔋 Bateria: ${loc.battery}%`);
-  }
-  if (loc.isDriving === "1" || loc.isDriving === true) {
-    lines.push("🚗 Em deslocação");
-  }
+
   return lines.join("\n");
+}
+
+function mergeMemberFromApi(data, apiMember) {
+  if (!apiMember || !apiMember.id) return data;
+  const locApi = locationPayloadFromMember(apiMember);
+  const mergedLoc = { ...(data.location || {}) };
+  for (const [k, v] of Object.entries(locApi)) {
+    if (v !== undefined && v !== null && v !== "") mergedLoc[k] = v;
+  }
+  return {
+    ...data,
+    displayName: data.displayName || formatMemberName(apiMember),
+    avatar: data.avatar || apiMember.avatar,
+    location: mergedLoc,
+  };
+}
+
+function shouldFetchMemberDetail(data) {
+  const url = data.avatar && String(data.avatar).trim();
+  if (!url || !url.startsWith("http")) return true;
+  const loc = data.location || {};
+  const hasTime =
+    loc.since != null ||
+    loc.startTimestamp != null ||
+    loc.timestamp != null;
+  const hasBat = loc.battery != null && loc.battery !== "";
+  if (!hasTime || !hasBat) return true;
+  return false;
 }
 
 const life360Flow = createFlow("life360", {
@@ -110,9 +238,7 @@ const life360Flow = createFlow("life360", {
             skipPoll: true,
           };
         }
-        memberIds = (chat.participants || [])
-          .map((p) => p.id && p.id._serialized)
-          .filter(Boolean);
+        memberIds = memberIdsFromGroupChat(chat);
       }
 
       let preview;
@@ -133,6 +259,7 @@ const life360Flow = createFlow("life360", {
       }
 
       const items = preview.items || [];
+      const circleId = preview.circleId || null;
       if (items.length === 0) {
         return {
           title:
@@ -149,7 +276,6 @@ const life360Flow = createFlow("life360", {
 
       const options = slice.map((item) => {
         const m = item.member || {};
-        const loc = m.location || {};
         const displayName =
           item.displayName || formatMemberName(m);
         return {
@@ -159,16 +285,9 @@ const life360Flow = createFlow("life360", {
           data: {
             displayName,
             memberId: m.id || item.life360_member_id,
-            location: {
-              latitude: loc.latitude,
-              longitude: loc.longitude,
-              name: loc.name,
-              shortAddress: loc.shortAddress,
-              address1: loc.address1,
-              battery: loc.battery,
-              isDriving: loc.isDriving,
-              inTransit: loc.inTransit,
-            },
+            circleId,
+            avatar: m.avatar,
+            location: locationPayloadFromMember(m),
           },
         };
       });
@@ -220,7 +339,6 @@ const life360Flow = createFlow("life360", {
 
       const options = slice.map((m) => {
         const displayName = formatMemberName(m);
-        const loc = m.location || {};
         return {
           label: truncateLabel(`👤 ${displayName}`),
           action: "exec",
@@ -228,16 +346,9 @@ const life360Flow = createFlow("life360", {
           data: {
             displayName,
             memberId: m.id,
-            location: {
-              latitude: loc.latitude,
-              longitude: loc.longitude,
-              name: loc.name,
-              shortAddress: loc.shortAddress,
-              address1: loc.address1,
-              battery: loc.battery,
-              isDriving: loc.isDriving,
-              inTransit: loc.inTransit,
-            },
+            circleId,
+            avatar: m.avatar,
+            location: locationPayloadFromMember(m),
           },
         };
       });
@@ -258,8 +369,40 @@ const life360Flow = createFlow("life360", {
     },
 
     pickMember: async (ctx, data) => {
-      const text = formatLocationMessage(data);
+      let merged = { ...data };
+      const circleId =
+        merged.circleId ||
+        (ctx.state.context && ctx.state.context.circleId);
+      const memberId = merged.memberId;
+
+      if (circleId && memberId && shouldFetchMemberDetail(merged)) {
+        try {
+          const res = await life360Client.getMember(circleId, memberId);
+          const m = res && res.member;
+          if (m) merged = mergeMemberFromApi(merged, m);
+        } catch (e) {
+          /* mantém dados da enquete */
+        }
+      }
+
+      const text = formatLocationMessage(merged);
       await ctx.reply(text);
+
+      const avatarUrl = merged.avatar && String(merged.avatar).trim();
+      if (avatarUrl && /^https?:\/\//i.test(avatarUrl)) {
+        try {
+          const buf = await downloadImageToBuffer(avatarUrl);
+          if (buf && buf.length) {
+            await sendBufferAsSticker(ctx.client, ctx.chatId, buf, {
+              fullOnly: true,
+              filename: "life360-avatar.webp",
+            });
+          }
+        } catch (e) {
+          /* figurinha opcional */
+        }
+      }
+
       return { end: true };
     },
 
