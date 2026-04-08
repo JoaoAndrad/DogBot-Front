@@ -11,6 +11,12 @@ const {
   sendTrackSticker,
   sendCompositeSticker,
 } = require("../../../utils/stickerHelper");
+const {
+  musicCurrentMonthRangeToNowUtc,
+  musicMonthRangeUtc,
+  musicLast12MonthsChoices,
+  formatPlaybackInstant,
+} = require("../../../utils/musicTimezone");
 
 const BACKEND_URL = process.env.BACKEND_URL || "http://localhost:8000";
 
@@ -293,21 +299,10 @@ const spotifyFlow = createFlow("spotify", {
     title: "📅 Escolha um mês",
     dynamic: true,
     handler: async (ctx) => {
-      // Present last 12 months as choices
       const opts = [];
-      const now = new Date();
-      for (let i = 0; i < 12; i++) {
-        const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-        const label = d.toLocaleString("pt-BR", {
-          month: "long",
-          year: "numeric",
-        });
-        const ym = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(
-          2,
-          "0",
-        )}`;
+      for (const { label, ym } of musicLast12MonthsChoices()) {
         opts.push({
-          label: label,
+          label,
           action: "exec",
           handler: "showMonth",
           data: { month: ym },
@@ -371,7 +366,7 @@ const spotifyFlow = createFlow("spotify", {
           reply += `\n${bar} ${percent}%\n${msToTime(positionMs)} / ${msToTime(
             durationMs,
           )}\n`;
-          reply += `Iniciado: ${new Date(json.startedAt).toLocaleString()}`;
+          reply += `Iniciado: ${formatPlaybackInstant(json.startedAt)}`;
 
           await ctx.reply(reply);
 
@@ -619,7 +614,7 @@ const spotifyFlow = createFlow("spotify", {
               Array.isArray(p.track.artists)
                 ? p.track.artists.join(", ")
                 : p.track.artists
-            } \n  tocado: ${new Date(p.startedAt).toLocaleString()}\n`;
+            } \n  tocado: ${formatPlaybackInstant(p.startedAt)}\n`;
           }
 
           await ctx.reply(reply);
@@ -694,12 +689,14 @@ const spotifyFlow = createFlow("spotify", {
 
         let displayLabel = null;
         if (period === "month") {
-          const now = new Date();
-          const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+          const { from: monthStart, to: monthTo } =
+            musicCurrentMonthRangeToNowUtc();
           url += `&from=${encodeURIComponent(monthStart.toISOString())}`;
-          url += `&to=${encodeURIComponent(new Date().toISOString())}`;
-          // Gera o nome do mês em português (minúsculo)
-          displayLabel = now.toLocaleString("pt-BR", { month: "long" });
+          url += `&to=${encodeURIComponent(monthTo.toISOString())}`;
+          displayLabel = new Date(monthStart).toLocaleString("pt-BR", {
+            month: "long",
+            timeZone: "America/Sao_Paulo",
+          });
         } else {
           if (days && Number(days) > 0) url += `&days=${Number(days)}`;
           displayLabel =
@@ -980,9 +977,7 @@ const spotifyFlow = createFlow("spotify", {
                 caption: "",
               });
             } else {
-              await ctx.reply(
-                "_Nenhuma avaliação registrada neste período._",
-              );
+              await ctx.reply("_Nenhuma avaliação registrada neste período._");
             }
           } catch (ratingErr) {
             console.warn(
@@ -1017,24 +1012,21 @@ const spotifyFlow = createFlow("spotify", {
           String(ctx.chatId).endsWith("@g.us")
         );
 
-        // Calcular início e fim do mês
-        const [year, monthNum] = month.split("-");
-        const monthStart = new Date(parseInt(year), parseInt(monthNum) - 1, 1);
-        const monthEnd = new Date(parseInt(year), parseInt(monthNum), 1);
+        const { from: monthStart, to: monthEnd } = musicMonthRangeUtc(month);
 
         let url = `${BACKEND_URL}/api/spotify/stats?userId=${encodeURIComponent(
           userParam,
         )}`;
         url += `&from=${encodeURIComponent(monthStart.toISOString())}`;
         url += `&to=${encodeURIComponent(monthEnd.toISOString())}`;
+        url += `&endExclusive=1`;
 
         if (isGroup) url += `&scope=group`;
 
-        // Formatar label do período
-        const date = new Date(monthStart);
-        const displayLabel = date.toLocaleString("pt-BR", {
+        const displayLabel = new Date(monthStart).toLocaleString("pt-BR", {
           month: "long",
           year: "numeric",
+          timeZone: "America/Sao_Paulo",
         });
         url += `&period=${encodeURIComponent(displayLabel)}`;
 
@@ -1107,9 +1099,7 @@ const spotifyFlow = createFlow("spotify", {
                 caption: "",
               });
             } else {
-              await ctx.reply(
-                "_Nenhuma avaliação registrada neste período._",
-              );
+              await ctx.reply("_Nenhuma avaliação registrada neste período._");
             }
           } catch (ratingErr) {
             console.warn(

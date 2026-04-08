@@ -50,6 +50,14 @@ async function start() {
   client.on("ready", async () => {
     logger.info("WhatsApp client pronto");
 
+    try {
+      const { startRoutineTickLoop } = require("../services/routineTickService");
+      startRoutineTickLoop(client, 60000);
+      logger.info("[routineTick] loop iniciado (60s)");
+    } catch (err) {
+      logger.warn("[routineTick] não iniciado:", err && err.message);
+    }
+
     // Initialize workout ranking service
     try {
       const groupRankingService = require("../services/groupRankingService");

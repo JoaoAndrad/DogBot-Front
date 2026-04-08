@@ -323,6 +323,24 @@ async function handle(context) {
         message: msg,
       });
     }
+
+    if (state.flowType === "rotina") {
+      const { handleRotinaFlow } = require("./rotinaFlowHandler");
+      let contactId = author;
+      try {
+        const c = await msg.getContact();
+        if (c && c.id && c.id._serialized) contactId = c.id._serialized;
+      } catch (e) {
+        /* ignore */
+      }
+      return await handleRotinaFlow(flowUserId, body, state, reply, {
+        author: contactId,
+        isGroup,
+        from,
+        chatId: from,
+        client: context.client,
+      });
+    }
   }
 
   // Film card: texto com data após "Sim" na enquete (conversationState + /api/menu/state)

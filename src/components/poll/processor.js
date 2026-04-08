@@ -100,29 +100,48 @@ async function processVoteViaBackend(pollId, vote, client) {
       (vote.voter && vote.voter._serialized) ||
       "unknown";
 
-    // Extract selected index
     const selectedOptions = vote.selectedOptions || vote.selected || [];
-    let selectedIndex = null;
+    const selectedIndexes = [];
 
     if (Array.isArray(selectedOptions) && selectedOptions.length > 0) {
-      const first = selectedOptions[0];
-      if (typeof first === "object") {
-        selectedIndex =
-          first.localId != null ? first.localId : first.local_id || null;
-      } else {
-        selectedIndex = Number(first);
+      for (const opt of selectedOptions) {
+        if (typeof opt === "object" && opt != null) {
+          const lid =
+            opt.localId != null ? opt.localId : opt.local_id != null ? opt.local_id : null;
+          if (lid != null) selectedIndexes.push(Number(lid));
+        } else if (opt != null && opt !== "") {
+          selectedIndexes.push(Number(opt));
+        }
       }
     }
 
-    if (selectedIndex === null || selectedIndex === undefined) {
+    let selectedIndex =
+      selectedIndexes.length > 0 ? selectedIndexes[0] : null;
+    if (
+      (selectedIndex === null || selectedIndex === undefined) &&
+      vote.selectedIndex != null
+    ) {
+      selectedIndex = Number(vote.selectedIndex);
+      selectedIndexes.push(selectedIndex);
+    }
+
+    if (
+      selectedIndex === null ||
+      selectedIndex === undefined ||
+      Number.isNaN(selectedIndex)
+    ) {
       logger.warn(`[processor] No selected index found in vote for ${pollId}`);
       return;
     }
 
-    // Call backend to process vote
+    const body = { voterId, selectedIndex, selectedIndexes };
+    if (!selectedIndexes.length) {
+      body.selectedIndexes = [selectedIndex];
+    }
+
     const result = await backendClient.sendToBackend(
       `/api/polls/${pollId}/process-vote`,
-      { voterId, selectedIndex },
+      body,
       "POST",
     );
 
@@ -157,11 +176,68 @@ async function executeAction(result, client) {
     dataKeys: data ? Object.keys(data) : [],
   });
 
+  if (actionType === "noop" || action === "noop") {
+    return;
+  }
+
   try {
     // Get chat
     const chat = await client.getChatById(poll.chatId);
 
     switch (actionType) {
+      case "rotina_assign":
+        if (action === "rotina_assign_invalid") {
+          await client.sendMessage(
+            poll.chatId,
+            "Marque quem entra na rotina e também *Continuar*.",
+          );
+          break;
+        }
+        if (action === "rotina_assign_ok" && data && data.flowId === "rotina") {
+          const conversationState = require("../../services/conversationState");
+          const {
+            finalizeCreateFromContext,
+          } = require("../../handlers/rotinaFlowHandler");
+          const stateUserId = data.userId;
+          let st = conversationState.getState(stateUserId);
+          if (!st && data.chatId) st = conversationState.getState(data.chatId);
+          if (
+            !st ||
+            st.flowType !== "rotina" ||
+            !st.data ||
+            !st.data.draft
+          ) {
+            await client.sendMessage(
+              poll.chatId,
+              "❌ Sessão expirada. Use /rotina de novo.",
+            );
+            break;
+          }
+          try {
+            await finalizeCreateFromContext(
+              stateUserId,
+              poll.chatId,
+              st.data.draft,
+              data.assigneeUserIds,
+            );
+            conversationState.clearState(stateUserId);
+            if (data.chatId) conversationState.clearState(data.chatId);
+            await client.sendMessage(poll.chatId, "✅ Rotina criada.");
+          } catch (e) {
+            logger.error("[processor] rotina_assign finalize", e);
+            await client.sendMessage(
+              poll.chatId,
+              `❌ Erro ao criar: ${e.message || e}`,
+            );
+          }
+        }
+        break;
+
+      case "routine_checkin":
+      case "routine_checkin_retrospective":
+        logger.debug(`[processor] routine check-in recorded: ${action}`);
+        break;
+
       case "menu_spotify":
       case "menu":
         // State is keyed by the flow owner (who started the flow). Prefer data.userId from
