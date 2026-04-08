@@ -1,5 +1,5 @@
 /**
- * Flow /vinculo360 — círculo → membro → confirmar vínculo com User (privado).
+ * Flow /vinculo360 — [Admin] círculo → membro Life360 → utilizador do bot → confirmar.
  */
 
 const { createFlow } = require("../flowBuilder");
@@ -7,6 +7,7 @@ const life360Client = require("../../../services/life360Client");
 
 const MAX_CIRCLES = 11;
 const MAX_MEMBERS = 10;
+const MAX_TARGET_USERS = 10;
 
 function truncateLabel(s, max = 120) {
   const t = String(s || "?").replace(/\n/g, " ").trim();
@@ -20,7 +21,7 @@ function formatMemberName(m) {
 
 const vinculo360Flow = createFlow("vinculo360", {
   root: {
-    title: "Vínculo Life360",
+    title: "Vínculo Life360 (admin)",
     dynamic: true,
     handler: async (ctx) => {
       let status;
@@ -76,9 +77,9 @@ const vinculo360Flow = createFlow("vinculo360", {
       const slice = circles.slice(0, MAX_CIRCLES);
       const title =
         (truncated
-          ? `Escolha o círculo (primeiros ${MAX_CIRCLES}):`
-          : "Escolha o círculo:") +
-        "\n\nDepois escolha *o membro que é você* para vincular à sua conta do bot.";
+          ? `1️⃣ Círculo (primeiros ${MAX_CIRCLES}):`
+          : "1️⃣ Escolha o círculo:") +
+        "\n\nDepois: membro Life360 → utilizador do bot a atribuir.";
 
       const options = slice.map((c) => ({
         label: truncateLabel(`⭕ ${c.name || c.id || "?"}`),
@@ -131,7 +132,7 @@ const vinculo360Flow = createFlow("vinculo360", {
       const truncated = members.length > MAX_MEMBERS;
       const slice = members.slice(0, MAX_MEMBERS);
       const title =
-        `Quem é você neste círculo? — ${truncateLabel(circleName, 50)}` +
+        `2️⃣ Membro Life360 — ${truncateLabel(circleName, 45)}` +
         (truncated ? ` (primeiros ${MAX_MEMBERS})` : "");
 
       const options = slice.map((m) => {
@@ -153,10 +154,12 @@ const vinculo360Flow = createFlow("vinculo360", {
     },
   },
 
-  "/confirm": {
-    title: "Confirmar",
+  "/users": {
+    title: "Utilizadores",
     dynamic: true,
     handler: async (ctx) => {
+      const adminWa =
+        (ctx.state.context && ctx.state.context.adminWaIdentifier) || ctx.userId;
       const pending = ctx.state.context && ctx.state.context.pendingMember;
       if (!pending || !pending.memberId) {
         return {
@@ -164,11 +167,73 @@ const vinculo360Flow = createFlow("vinculo360", {
           skipPoll: true,
         };
       }
+
+      let res;
+      try {
+        res = await life360Client.getVinculoUsers(adminWa);
+      } catch (e) {
+        const msg =
+          e.status === 403
+            ? "Apenas administradores podem usar este fluxo."
+            : e.message || String(e);
+        return {
+          title: "❌ " + msg,
+          skipPoll: true,
+        };
+      }
+
+      const users = (res && res.users) || [];
+      if (users.length === 0) {
+        return {
+          title: "Nenhum utilizador cadastrado na base de dados.",
+          skipPoll: true,
+        };
+      }
+
+      const truncated = users.length > MAX_TARGET_USERS;
+      const slice = users.slice(0, MAX_TARGET_USERS);
       const title =
-        `Confirmar vínculo?\n\n` +
-        `Membro: *${pending.displayName}*\n` +
+        `3️⃣ Utilizador do bot a receber o vínculo` +
+        (truncated ? ` (primeiros ${MAX_TARGET_USERS} alfabeticamente)` : "");
+
+      const options = slice.map((u) => {
+        const label = `${u.displayName} · ${u.sender_number}`;
+        return {
+          label: truncateLabel(`🧑 ${label}`),
+          action: "exec",
+          handler: "pickTargetUser",
+          data: {
+            targetUserId: u.id,
+            displayName: u.displayName,
+            sender_number: u.sender_number,
+          },
+        };
+      });
+
+      options.push({ label: "🔙 Voltar aos membros", action: "back" });
+
+      return { title, options, skipPoll: false };
+    },
+  },
+
+  "/confirm": {
+    title: "Confirmar",
+    dynamic: true,
+    handler: async (ctx) => {
+      const pending = ctx.state.context && ctx.state.context.pendingMember;
+      const target = ctx.state.context && ctx.state.context.pendingTarget;
+      if (!pending || !pending.memberId || !target || !target.targetUserId) {
+        return {
+          title: "❌ Sessão inválida. Use /vinculo360 de novo.",
+          skipPoll: true,
+        };
+      }
+      const title =
+        `4️⃣ Confirmar vínculo?\n\n` +
+        `*Membro Life360:* ${pending.displayName}\n` +
         `ID: \`${pending.memberId}\`\n\n` +
-        `Isto associa este membro Life360 à *sua* conta do bot.`;
+        `*Utilizador do bot:* ${target.displayName}\n` +
+        `${target.sender_number}`;
       return {
         title,
         options: [
@@ -197,22 +262,38 @@ const vinculo360Flow = createFlow("vinculo360", {
         displayName: data.displayName,
       };
       ctx.state.history.push("/members");
+      ctx.state.path = "/users";
+    },
+
+    pickTargetUser: async (ctx, data) => {
+      ctx.state.context = ctx.state.context || {};
+      ctx.state.context.pendingTarget = {
+        targetUserId: data.targetUserId,
+        displayName: data.displayName,
+        sender_number: data.sender_number,
+      };
+      ctx.state.history.push("/users");
       ctx.state.path = "/confirm";
     },
 
     confirmLink: async (ctx) => {
-      const wa =
-        (ctx.state.context && ctx.state.context.waIdentifier) || ctx.userId;
+      const adminWa =
+        (ctx.state.context && ctx.state.context.adminWaIdentifier) || ctx.userId;
       const pending = ctx.state.context && ctx.state.context.pendingMember;
-      if (!wa || !pending || !pending.memberId) {
+      const target = ctx.state.context && ctx.state.context.pendingTarget;
+      if (!adminWa || !pending || !pending.memberId || !target || !target.targetUserId) {
         await ctx.reply("❌ Dados em falta. Use /vinculo360 de novo.");
         return { end: true };
       }
       try {
-        await life360Client.linkLife360Member(wa, pending.memberId);
+        await life360Client.linkLife360ForUser(
+          adminWa,
+          target.targetUserId,
+          pending.memberId,
+        );
         await ctx.reply(
-          `✅ Conta vinculada ao membro Life360 *${pending.displayName}*.\n\n` +
-            "Pode usar /life360 no grupo para ver a sua localização (se o círculo estiver configurado no servidor).",
+          `✅ Vínculo criado: membro Life360 *${pending.displayName}* → ` +
+            `utilizador *${target.displayName}*.`,
         );
       } catch (e) {
         let msg = e.message || String(e);
@@ -223,7 +304,7 @@ const vinculo360Flow = createFlow("vinculo360", {
     },
 
     cancelVinculo: async (ctx) => {
-      await ctx.reply("Vínculo cancelado.");
+      await ctx.reply("Operação cancelada.");
       return { end: true };
     },
 

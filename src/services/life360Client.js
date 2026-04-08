@@ -34,15 +34,28 @@ async function getGroupLinkedPreview(groupChatId, memberIds) {
 }
 
 /**
- * Associa o membro Life360 ao User do WhatsApp (identifier = JID @c.us).
+ * Lista utilizadores para o vínculo (requer actorIdentifier = admin no backend).
  */
-async function linkLife360Member(identifier, life360MemberId) {
-  if (!identifier || !life360MemberId) {
-    throw new Error("identifier e life360MemberId são obrigatórios");
+async function getVinculoUsers(actorIdentifier) {
+  if (!actorIdentifier) throw new Error("actorIdentifier é obrigatório");
+  const q = encodeURIComponent(actorIdentifier);
+  return sendToBackend(
+    `/api/life360/vinculo-users?actorIdentifier=${q}`,
+    null,
+    "GET",
+  );
+}
+
+/**
+ * Admin atribui membro Life360 a um User (UUID).
+ */
+async function linkLife360ForUser(actorIdentifier, targetUserId, life360MemberId) {
+  if (!actorIdentifier || !targetUserId || !life360MemberId) {
+    throw new Error("actorIdentifier, targetUserId e life360MemberId são obrigatórios");
   }
   return sendToBackend(
-    "/api/life360/link-self",
-    { identifier, life360MemberId },
+    "/api/life360/link-user",
+    { actorIdentifier, targetUserId, life360MemberId },
     "POST",
   );
 }
@@ -52,5 +65,6 @@ module.exports = {
   getCircles,
   getMembers,
   getGroupLinkedPreview,
-  linkLife360Member,
+  getVinculoUsers,
+  linkLife360ForUser,
 };

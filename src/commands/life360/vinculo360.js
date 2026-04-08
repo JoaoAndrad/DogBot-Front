@@ -1,10 +1,11 @@
 const flowManager = require("../../components/menu/flowManager");
+const life360Client = require("../../services/life360Client");
 
 module.exports = {
   name: "vinculo360",
   aliases: ["link360", "mapear360"],
   description:
-    "Vincular a sua conta do bot a um membro Life360 (só no privado com o bot)",
+    "[Admin] Vincular membro Life360 a um utilizador do bot (só no privado)",
 
   async execute(context) {
     const { client, message } = context;
@@ -15,7 +16,7 @@ module.exports = {
     if (isGroup) {
       await client.sendMessage(
         chatId,
-        "⚠️ O comando /vinculo360 só pode ser usado no *privado* com o bot, para associar a *sua* conta Life360 de forma segura.",
+        "⚠️ O comando /vinculo360 só pode ser usado no *privado* com o bot.",
       );
       return;
     }
@@ -31,8 +32,25 @@ module.exports = {
     }
 
     try {
+      await life360Client.getVinculoUsers(userId);
+    } catch (e) {
+      if (e.status === 403) {
+        await client.sendMessage(
+          chatId,
+          "⚠️ Apenas *administradores* do bot podem usar /vinculo360.",
+        );
+        return;
+      }
+      await client.sendMessage(
+        chatId,
+        "❌ " + (e.message || String(e)),
+      );
+      return;
+    }
+
+    try {
       await flowManager.startFlow(client, chatId, userId, "vinculo360", {
-        initialContext: { waIdentifier: userId },
+        initialContext: { adminWaIdentifier: userId },
       });
     } catch (err) {
       await client.sendMessage(
