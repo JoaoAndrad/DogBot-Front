@@ -3,6 +3,10 @@ const commands = require("../commands");
 const backendClient = require("../services/backendClient");
 const spotifyService = require("../services/spotifyService");
 const conversationState = require("../services/conversationState");
+const {
+  isGlobalCancelMessage,
+  cancelPendingForUser,
+} = require("../services/cancelPendingUserState");
 const botMetricsReporter = require("../services/botMetricsReporter");
 const { handleCadastroFlow } = require("./cadastroFlowHandler");
 
@@ -298,6 +302,27 @@ async function handle(context) {
 
   // Use database userId for flow checking if available, fallback to actualNumber
   const flowUserId = dbUserId || actualNumber;
+
+  // Cancelar global (antes de encaminhar texto a fluxos pendentes ou comandos)
+  if (body && isGlobalCancelMessage(body)) {
+    try {
+      const { cleared } = await cancelPendingForUser({
+        flowUserId,
+        actualNumber,
+        author,
+        dbUserId,
+      });
+      await reply(
+        cleared
+          ? "Operação cancelada."
+          : "Não havia fluxos pendentes para cancelar.",
+      );
+    } catch (e) {
+      logger.warn("[Handler] cancel global:", e && e.message);
+      await reply("❌ Não foi possível cancelar. Tente novamente.");
+    }
+    return;
+  }
 
   //logger.debug(`[Handler] Verificando fluxo ativo para: ${flowUserId}`);
 
