@@ -139,8 +139,7 @@ async function start() {
 
     client.on("vote_update", async (vote) => {
       try {
-        // First, record the vote in backend (handled by poll component)
-        await polls.handleVoteUpdate(vote);
+        const voteAccepted = await polls.handleVoteUpdate(vote);
 
         // Extract poll ID from vote event (same logic as handleVoteUpdate)
         let pollId = null;
@@ -165,7 +164,7 @@ async function start() {
         }
 
         // NEW: Process vote through backend instead of local processor
-        if (pollId) {
+        if (voteAccepted && pollId) {
           await processor.processVoteViaBackend(pollId, vote, client);
         }
       } catch (err) {

@@ -1,4 +1,6 @@
 const logger = require("../utils/logger");
+const config = require("../core/config");
+const { allow: rateLimitAllow } = require("../utils/userRateLimiter");
 const middleware = require("./middleware");
 const dedupe = require("./dedupe");
 const botMetricsReporter = require("../services/botMetricsReporter");
@@ -26,6 +28,17 @@ async function processEvent(context) {
       }
     } catch (_) {}
     context.chatName = chatName;
+
+    if (config.rateLimitEnabled && fromId) {
+      const ok = rateLimitAllow(`msg:${fromId}`, {
+        maxEvents: config.rateLimitMsgMax,
+        windowMs: config.rateLimitMsgWindowMs,
+      });
+      if (!ok) {
+        logger.debug(`[rateLimit] mensagem bloqueada: ${fromId}`);
+        return false;
+      }
+    }
 
     botMetricsReporter
       .reportEvent("message_received", { chatId, fromId, chatName, isGroup })

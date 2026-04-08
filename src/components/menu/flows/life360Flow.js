@@ -92,13 +92,18 @@ function formatBatteryLine(loc) {
 }
 
 function formatMovementLine(loc) {
+  /** Sem lugar/endereço/coordenadas na API — localização não partilhada (modo fantasma). */
+  const sharingLocation = formatLife360PlaceLine(loc) != null;
+  const stationary = () =>
+    sharingLocation ? "🚶 Parado" : "👻 Desaparecido";
+
   const speed = Number(loc.speed);
   const driving = loc.isDriving === "1" || loc.isDriving === true;
   const transit = loc.inTransit === "1" || loc.inTransit === true;
   const kmh = speedMphToKmh(speed);
   const moving = driving || transit || (Number.isFinite(speed) && speed > 1.5);
   if (!moving && (!Number.isFinite(speed) || speed <= 1.5)) {
-    return "🚶 Parado";
+    return stationary();
   }
   if (kmh != null && kmh > 0) {
     if (driving || transit) {
@@ -107,7 +112,7 @@ function formatMovementLine(loc) {
     return `🏃 Em movimento · ~${kmh} km/h`;
   }
   if (driving || transit) return "🚗 Em deslocação";
-  return "🚶 Parado";
+  return stationary();
 }
 
 /**

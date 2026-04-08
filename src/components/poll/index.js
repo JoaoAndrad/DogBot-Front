@@ -1,4 +1,6 @@
 const logger = require("../../utils/logger");
+const config = require("../../core/config");
+const { allow: rateLimitAllow } = require("../../utils/userRateLimiter");
 const storage = require("./storage");
 const builder = require("./builder");
 const { createSender } = require("./sender");
@@ -202,6 +204,9 @@ async function createPoll(clientOrSender, chatId, title, options, opts = {}) {
   return { sent, msgId };
 }
 
+/**
+ * @returns {Promise<boolean>} true se o voto foi aceite e processado; false se ignorado (ex.: rate limit, enquete desconhecida)
+ */
 async function handleVoteUpdate(vote) {
   try {
     //logger.debug("vote_update recebido", vote);
@@ -230,7 +235,7 @@ async function handleVoteUpdate(vote) {
 
     if (!messageId) {
       logger.debug("vote_update sem messageId — ignorando");
-      return;
+      return false;
     }
 
     // Try direct lookup first
@@ -322,7 +327,7 @@ async function handleVoteUpdate(vote) {
 
     if (!poll) {
       logger.debug("vote_update para enquete desconhecida", messageId);
-      return;
+      return false;
     }
 
     // Extract raw voter ID from vote event
@@ -359,6 +364,18 @@ async function handleVoteUpdate(vote) {
         // Keep original voter if resolution fails
       }
     }
+
+    if (config.rateLimitEnabled) {
+      const ok = rateLimitAllow(`poll:${voter}`, {
+        maxEvents: config.rateLimitPollVoteMax,
+        windowMs: config.rateLimitPollVoteWindowMs,
+      });
+      if (!ok) {
+        logger.debug(`[rateLimit] voto em enquete bloqueado: ${voter}`);
+        return false;
+      }
+    }
+
     const selectedOptions =
       vote.selectedOptions || vote.selected || vote.selectedOptionIndexes || [];
 
@@ -472,8 +489,11 @@ async function handleVoteUpdate(vote) {
         );
       }
     }
+
+    return true;
   } catch (err) {
     logger.error("Erro ao handleVoteUpdate", err);
+    return false;
   }
 }
 
