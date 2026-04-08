@@ -122,6 +122,7 @@ class FlowManager {
       state,
       option,
       path,
+      selectedIndex,
     );
   }
 
@@ -137,6 +138,7 @@ class FlowManager {
     state,
     option,
     currentPath,
+    selectedIndex,
   ) {
     const flow = this.flows.get(flowId);
 
@@ -174,10 +176,17 @@ class FlowManager {
         flowId,
         state,
         data: option.data || {},
+        option,
       };
 
+      const handlerMeta = { option, selectedIndex };
+
       try {
-        const result = await handler(ctx, option.data);
+        const result = await handler(
+          ctx,
+          option.data || {},
+          handlerMeta,
+        );
 
         if (result && result.end) {
           // End flow

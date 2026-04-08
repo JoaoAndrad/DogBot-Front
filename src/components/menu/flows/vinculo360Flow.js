@@ -25,6 +25,23 @@ function formatUserPollLabel(u) {
   return truncateLabel(`🧑 ${s}`);
 }
 
+/** Índice de página vindo da metadata da opção (processador pode omitir `data` no 2.º arg). */
+function extractTargetUsersPage(data, meta, ctx) {
+  const asNum = (v) => {
+    const n = Number(v);
+    return Number.isFinite(n) && n >= 0 ? n : undefined;
+  };
+  const fromObj = (o) => {
+    if (!o || typeof o !== "object") return undefined;
+    return asNum(o.page);
+  };
+  let p = fromObj(data);
+  if (p === undefined) p = fromObj(meta && meta.option && meta.option.data);
+  if (p === undefined) p = fromObj(ctx && ctx.option && ctx.option.data);
+  if (p === undefined) p = fromObj(ctx && ctx.data);
+  return p;
+}
+
 function formatMemberName(m) {
   const parts = [m.firstName, m.lastName].filter(Boolean);
   return parts.length ? parts.join(" ") : "Membro";
@@ -320,20 +337,28 @@ const vinculo360Flow = createFlow("vinculo360", {
     },
 
     /**
-     * Página vem em data.page (metadata da enquete) para sobreviver a estado
-     * rehidratado sem usersPage / lista em memória.
+     * Página: `data.page` ou `meta.option.data.page` (processador backend pode
+     * não repassar `option.data` no 2.º argumento). Sem lista em memória, não
+     * fazer clamp aqui — o nó /users recalcula após o GET.
      */
-    goToUsersPage: async (ctx, data) => {
+    goToUsersPage: async (ctx, data, meta) => {
       ctx.state.context = ctx.state.context || {};
       const list = ctx.state.context.vinculoUsersList || [];
-      const maxPage = Math.max(0, Math.ceil(list.length / USERS_PER_PAGE) - 1);
-      let p = Number(data && data.page);
-      if (!Number.isFinite(p) || p < 0) {
-        p = Math.min(maxPage, (ctx.state.context.usersPage || 0) + 1);
-      } else {
-        p = Math.max(0, Math.min(p, maxPage));
+      const hasList = Array.isArray(list) && list.length > 0;
+      const maxPage = hasList
+        ? Math.max(0, Math.ceil(list.length / USERS_PER_PAGE) - 1)
+        : null;
+
+      let p = extractTargetUsersPage(data, meta, ctx);
+      if (p === undefined) {
+        p = (ctx.state.context.usersPage || 0) + 1;
       }
-      ctx.state.context.usersPage = p;
+
+      if (maxPage !== null) {
+        ctx.state.context.usersPage = Math.max(0, Math.min(p, maxPage));
+      } else {
+        ctx.state.context.usersPage = Math.max(0, p);
+      }
       return { rerenderCurrent: true };
     },
 

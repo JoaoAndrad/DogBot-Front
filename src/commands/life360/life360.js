@@ -2,7 +2,7 @@ const flowManager = require("../../components/menu/flowManager");
 
 module.exports = {
   name: "life360",
-  aliases: ["life", "l360"],
+  aliases: ["life", "l360", "loc", "localizacao"],
   description: "Life360: localização dos membros mapeados (só em grupo)",
 
   async execute(context) {
