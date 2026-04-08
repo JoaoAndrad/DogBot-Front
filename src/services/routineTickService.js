@@ -35,7 +35,26 @@ async function sendBodyWithOptionalMentions(client, chatId, bodyText, mentionWaI
 }
 
 /**
- * Evita dois check-ins / retroativos idênticos no mesmo tick (ex.: duplicata na BD).
+ * Chave de dedupe: por ocorrência há vários `checkin_poll` (slots do dia); cada um tem
+ * `metadata.checkinSlotMinute` no payload. Sem o minuto, só a primeira enquete era enviada.
+ */
+function routineDispatchDedupeKey(a) {
+  if (!a.routineId || !a.occurrenceId) return null;
+  if (a.kind === "checkin_poll") {
+    const slot = a.payload?.metadata?.checkinSlotMinute;
+    if (slot != null && Number.isFinite(Number(slot))) {
+      return `${a.routineId}|${a.occurrenceId}|checkin_poll|${Number(slot)}`;
+    }
+    return `${a.routineId}|${a.occurrenceId}|checkin_poll|id:${a.dispatchId || "?"}`;
+  }
+  if (a.kind === "retrospective") {
+    return `${a.routineId}|${a.occurrenceId}|retrospective`;
+  }
+  return null;
+}
+
+/**
+ * Evita dois dispatches realmente duplicados no mesmo tick (ex.: mesma linha na BD duas vezes).
  */
 function dedupeRoutineDispatchActions(actions) {
   const primary = [];
@@ -44,12 +63,7 @@ function dedupeRoutineDispatchActions(actions) {
   const seenOccurrenceKind = new Set();
 
   for (const a of actions) {
-    const key =
-      a.routineId &&
-      a.occurrenceId &&
-      (a.kind === "checkin_poll" || a.kind === "retrospective")
-        ? `${a.routineId}|${a.occurrenceId}|${a.kind}`
-        : null;
+    const key = routineDispatchDedupeKey(a);
     if (!key) {
       primary.push({ action: a, key: null });
       continue;

@@ -11,12 +11,22 @@ const {
   formatRoutineSummaryFromApi,
 } = require("../utils/formatRoutineSummaryPt");
 
+/** UUID v4 (aceita variantes 1–8 no terceiro grupo, como Prisma/cuid misturados não — só formato clássico). */
+const USER_UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+function looksLikeUserUuid(s) {
+  return typeof s === "string" && USER_UUID_RE.test(s.trim());
+}
+
 async function resolveUuid(backendUrl, identifier) {
   try {
     const fetch = require("node-fetch");
-    const res = await fetch(
-      `${backendUrl}/api/users/by-identifier/${encodeURIComponent(identifier)}`,
-    );
+    const id = String(identifier || "").trim();
+    const url = looksLikeUserUuid(id)
+      ? `${backendUrl}/api/users/${encodeURIComponent(id)}`
+      : `${backendUrl}/api/users/by-identifier/${encodeURIComponent(identifier)}`;
+    const res = await fetch(url);
     if (!res.ok) return null;
     const j = await res.json();
     return j && j.user && j.user.id ? j.user.id : null;
@@ -114,14 +124,16 @@ async function sendAssignPoll(client, chatId, userId, draft) {
   });
 }
 
-async function fetchUserLabel(backendUrl, userIdUuid) {
-  if (!userIdUuid) return "?";
+async function fetchUserLabel(backendUrl, userIdOrWaId) {
+  if (!userIdOrWaId) return "?";
+  const raw = String(userIdOrWaId).trim();
   try {
     const fetch = require("node-fetch");
-    const res = await fetch(
-      `${backendUrl}/api/users/by-identifier/${encodeURIComponent(userIdUuid)}`,
-    );
-    if (!res.ok) return String(userIdUuid).slice(0, 8) + "…";
+    const url = looksLikeUserUuid(raw)
+      ? `${backendUrl}/api/users/${encodeURIComponent(raw)}`
+      : `${backendUrl}/api/users/by-identifier/${encodeURIComponent(raw)}`;
+    const res = await fetch(url);
+    if (!res.ok) return String(raw).slice(0, 8) + "…";
     const j = await res.json();
     const u = j && j.user;
     if (!u) return "?";
