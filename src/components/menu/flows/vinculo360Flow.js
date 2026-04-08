@@ -25,26 +25,30 @@ function formatUserPollLabel(u) {
   return truncateLabel(`🧑 ${s}`);
 }
 
-/** Índice de página vindo da metadata da opção (processador pode omitir `data` no 2.º arg). */
-function extractTargetUsersPage(data, meta, ctx) {
-  const asNum = (v) => {
-    const n = Number(v);
-    return Number.isFinite(n) && n >= 0 ? n : undefined;
-  };
-  const fromObj = (o) => {
-    if (!o || typeof o !== "object") return undefined;
-    return asNum(o.page);
-  };
-  let p = fromObj(data);
-  if (p === undefined) p = fromObj(meta && meta.option && meta.option.data);
-  if (p === undefined) p = fromObj(ctx && ctx.option && ctx.option.data);
-  if (p === undefined) p = fromObj(ctx && ctx.data);
-  return p;
-}
+/**
+ * Número máximo de páginas suportadas na enquete sem depender de `option.data`
+ * (o processador de votos repete o handler sem repassar data aninhada).
+ * 50 págin × 8 linhas = 400 utilizadores por membro Life360.
+ */
+const MAX_USERS_LIST_PAGES = 50;
 
 function formatMemberName(m) {
   const parts = [m.firstName, m.lastName].filter(Boolean);
   return parts.length ? parts.join(" ") : "Membro";
+}
+
+/** Handlers `setUsersPage0` … `setUsersPage49` — página codificada no nome (compatível com o processador). */
+function buildSetUsersPageHandlers() {
+  const out = {};
+  for (let i = 0; i < MAX_USERS_LIST_PAGES; i++) {
+    const pageIndex = i;
+    out[`setUsersPage${i}`] = async (ctx) => {
+      ctx.state.context = ctx.state.context || {};
+      ctx.state.context.usersPage = pageIndex;
+      return { rerenderCurrent: true };
+    };
+  }
+  return out;
 }
 
 const vinculo360Flow = createFlow("vinculo360", {
@@ -262,19 +266,21 @@ const vinculo360Flow = createFlow("vinculo360", {
       }));
 
       if (page < totalPages - 1) {
-        options.push({
-          label: "➡️ Próxima página",
-          action: "exec",
-          handler: "goToUsersPage",
-          data: { page: page + 1 },
-        });
+        const next = page + 1;
+        if (next < MAX_USERS_LIST_PAGES) {
+          options.push({
+            label: "➡️ Próxima página",
+            action: "exec",
+            handler: `setUsersPage${next}`,
+          });
+        }
       }
       if (page > 0) {
+        const prev = page - 1;
         options.push({
           label: "⬅️ Página anterior",
           action: "exec",
-          handler: "goToUsersPage",
-          data: { page: page - 1 },
+          handler: `setUsersPage${prev}`,
         });
       }
 
@@ -315,6 +321,8 @@ const vinculo360Flow = createFlow("vinculo360", {
   },
 
   handlers: {
+    ...buildSetUsersPageHandlers(),
+
     pickCircle: async (ctx, data) => {
       ctx.state.context = ctx.state.context || {};
       ctx.state.context.circleId = data.circleId;
@@ -334,32 +342,6 @@ const vinculo360Flow = createFlow("vinculo360", {
       ctx.state.context.usersPage = 0;
       ctx.state.history.push("/members");
       ctx.state.path = "/users";
-    },
-
-    /**
-     * Página: `data.page` ou `meta.option.data.page` (processador backend pode
-     * não repassar `option.data` no 2.º argumento). Sem lista em memória, não
-     * fazer clamp aqui — o nó /users recalcula após o GET.
-     */
-    goToUsersPage: async (ctx, data, meta) => {
-      ctx.state.context = ctx.state.context || {};
-      const list = ctx.state.context.vinculoUsersList || [];
-      const hasList = Array.isArray(list) && list.length > 0;
-      const maxPage = hasList
-        ? Math.max(0, Math.ceil(list.length / USERS_PER_PAGE) - 1)
-        : null;
-
-      let p = extractTargetUsersPage(data, meta, ctx);
-      if (p === undefined) {
-        p = (ctx.state.context.usersPage || 0) + 1;
-      }
-
-      if (maxPage !== null) {
-        ctx.state.context.usersPage = Math.max(0, Math.min(p, maxPage));
-      } else {
-        ctx.state.context.usersPage = Math.max(0, p);
-      }
-      return { rerenderCurrent: true };
     },
 
     pickTargetUser: async (ctx, data) => {
