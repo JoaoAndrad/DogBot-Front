@@ -81,6 +81,30 @@ function getActionType(poll) {
 }
 
 /**
+ * O WhatsApp envia o votante como @lid; o backend compara com metadata.userId em @c.us
+ * (pollService menu+rotina). Sem isto, sameWaUser falha e o backend devolve noop.
+ */
+async function resolveVoterIdForBackend(client, voterId) {
+  if (!voterId || voterId === "unknown" || typeof voterId !== "string") {
+    return voterId;
+  }
+  if (!voterId.includes("@lid")) return voterId;
+  try {
+    const contact = await client.getContactById(voterId);
+    const sid = contact && contact.id && contact.id._serialized;
+    if (sid && (sid.endsWith("@c.us") || sid.endsWith("@g.us"))) {
+      logger.debug(
+        `[processor] LID → JID (process-vote): ${voterId} → ${sid}`,
+      );
+      return sid;
+    }
+  } catch (e) {
+    logger.warn(`[processor] resolveVoterIdForBackend: ${e.message}`);
+  }
+  return voterId;
+}
+
+/**
  * Process a poll vote via backend (NEW approach)
  * Backend interprets metadata and returns action to execute
  * @param {string} pollId - Poll message ID
@@ -99,6 +123,12 @@ async function processVoteViaBackend(pollId, vote, client) {
       (vote.author && vote.author.id) ||
       (vote.voter && vote.voter._serialized) ||
       "unknown";
+
+    if (typeof voterId === "object" && voterId != null && voterId._serialized) {
+      voterId = voterId._serialized;
+    }
+
+    voterId = await resolveVoterIdForBackend(client, voterId);
 
     const selectedOptions = vote.selectedOptions || vote.selected || [];
     const selectedIndexes = [];
