@@ -236,6 +236,11 @@ async function verifyAndCleanGroupChat(client, chat, chatId) {
 
     return true; // Bot is still in group
   } catch (error) {
+    const errMsg = error && error.message ? String(error.message) : "";
+    // WA Web ainda a hidratar / bug loadEarlierMsgs+waitForChatLoading — não arquivar
+    if (errMsg.includes("waitForChatLoading")) {
+      return true;
+    }
     // getChatById failed - bot is not in group anymore
     const groupName = chat.name || chatId.split("@")[0];
     logger.info(

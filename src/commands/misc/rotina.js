@@ -1,6 +1,4 @@
 const flowManager = require("../../components/menu/flowManager");
-const rotinaFlow = require("../../components/menu/flows/rotinaFlow");
-flowManager.registerFlow(rotinaFlow);
 
 module.exports = {
   name: "rotina",
