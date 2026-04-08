@@ -6,6 +6,29 @@
 const backendClient = require("../../services/backendClient");
 const logger = require("../../utils/logger");
 
+/** Título da rotina a partir do título da enquete de check-in / retrospectiva. */
+function routineNameFromPollTitle(title) {
+  const s = String(title || "").trim();
+  const retro = s.match(/Retrospectiva:\s*(.+)$/i);
+  if (retro) return retro[1].trim();
+  const parts = s.split(/\s—\s/);
+  if (parts.length >= 2) return parts[parts.length - 1].trim();
+  return s;
+}
+
+async function waDisplayName(client, waId) {
+  if (!waId || waId === "unknown") return "?";
+  try {
+    const c = await client.getContactById(waId);
+    if (c && (c.pushname || c.name))
+      return String(c.pushname || c.name).trim().slice(0, 80);
+  } catch (e) {
+    /* ignore */
+  }
+  const num = String(waId).split("@")[0] || "";
+  return num || "?";
+}
+
 // Registry of action type handlers
 const actionHandlers = new Map();
 
@@ -217,10 +240,7 @@ async function executeAction(result, client) {
     switch (actionType) {
       case "rotina_assign":
         if (action === "rotina_assign_invalid") {
-          await client.sendMessage(
-            poll.chatId,
-            "Marque quem entra na rotina e também *Continuar*.",
-          );
+          // Enquete já explica; não spammar o grupo a cada voto parcial/inválido.
           break;
         }
         if (action === "rotina_assign_ok" && data && data.flowId === "rotina") {
@@ -286,9 +306,14 @@ async function executeAction(result, client) {
         if (!chatId) break;
 
         if (rr && rr.ok && rr.outcome === "self_done") {
+          const routineTitle =
+            routineNameFromPollTitle(poll && poll.title) || "—";
+          const who = await waDisplayName(client, result.voterId);
           await client.sendMessage(
             chatId,
-            "✅ Registado: a rotina foi marcada como concluída para este dia.",
+            `✅ *Rotina concluída hoje*\n\n` +
+              `📝 *Rotina:* ${routineTitle}\n` +
+              `👤 *Registou:* ${who}`,
           );
         } else if (rr && rr.ok && rr.outcome === "not_yet") {
           const voterJid = result.voterId;
