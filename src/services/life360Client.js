@@ -23,8 +23,19 @@ async function getMembers(circleId) {
   return res.members || res || [];
 }
 
+/**
+ * Membros Life360 mapeados (User.life360_member_id) que participam no grupo.
+ * @param {string} groupChatId - JID do grupo (@g.us)
+ * @param {string[]} memberIds - JIDs dos participantes (ex.: chat.participants)
+ */
+async function getGroupLinkedPreview(groupChatId, memberIds) {
+  const path = `/api/groups/${encodeURIComponent(groupChatId)}/life360-linked-preview`;
+  return sendToBackend(path, { memberIds }, "POST");
+}
+
 module.exports = {
   getStatus,
   getCircles,
   getMembers,
+  getGroupLinkedPreview,
 };

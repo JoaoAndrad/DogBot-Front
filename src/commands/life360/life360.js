@@ -3,11 +3,22 @@ const flowManager = require("../../components/menu/flowManager");
 module.exports = {
   name: "life360",
   aliases: ["life", "l360"],
-  description: "Life360: círculos e localização dos membros",
+  description: "Life360: localização dos membros mapeados (só em grupo)",
 
   async execute(context) {
     const { client, message } = context;
     const chatId = message.from;
+    const isGroup =
+      !!(message && message.isGroup) ||
+      (chatId && chatId.endsWith("@g.us"));
+    if (!isGroup) {
+      await client.sendMessage(
+        chatId,
+        "⚠️ O comando /life360 só funciona em *grupos* WhatsApp. A localização Life360 é partilhada apenas no contexto do grupo.",
+      );
+      return;
+    }
+
     let userId = message.author || message.from;
     try {
       const contact = await message.getContact();
@@ -19,7 +30,9 @@ module.exports = {
     }
 
     try {
-      await flowManager.startFlow(client, chatId, userId, "life360");
+      await flowManager.startFlow(client, chatId, userId, "life360", {
+        initialContext: { groupChatId: chatId },
+      });
     } catch (err) {
       await client.sendMessage(
         chatId,

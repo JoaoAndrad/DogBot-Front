@@ -1,11 +1,10 @@
 /**
- * Flow /life360 — círculos → membros → detalhe de localização (via backend Life360).
+ * Flow /life360 — só em grupo: enquete com membros mapeados (User.life360_member_id).
  */
 
 const { createFlow } = require("../flowBuilder");
 const life360Client = require("../../../services/life360Client");
 
-const MAX_CIRCLES = 11;
 const MAX_MEMBERS = 10;
 
 function truncateLabel(s, max = 120) {
@@ -49,7 +48,18 @@ const life360Flow = createFlow("life360", {
     title: "Life360",
     dynamic: true,
     handler: async (ctx) => {
-      const isGroup = String(ctx.chatId || "").endsWith("@g.us");
+      const groupChatId =
+        (ctx.state.context && ctx.state.context.groupChatId) ||
+        (String(ctx.chatId || "").endsWith("@g.us") ? ctx.chatId : null);
+
+      if (!groupChatId) {
+        return {
+          title:
+            "⚠️ O comando /life360 só funciona em *grupos* WhatsApp. Use o comando num grupo.",
+          skipPoll: true,
+        };
+      }
+
       let status;
       try {
         status = await life360Client.getStatus();
@@ -82,44 +92,78 @@ const life360Flow = createFlow("life360", {
         };
       }
 
-      let circles;
+      let chat;
       try {
-        circles = await life360Client.getCircles();
+        chat = await ctx.client.getChatById(groupChatId);
       } catch (e) {
         return {
           title:
-            "❌ Erro ao listar círculos: " + (e.message || String(e)),
+            "❌ Não foi possível carregar o grupo: " + (e.message || String(e)),
           skipPoll: true,
         };
       }
 
-      if (!Array.isArray(circles) || circles.length === 0) {
+      const memberIds = (chat.participants || []).map(
+        (p) => p.id && p.id._serialized,
+      ).filter(Boolean);
+
+      let preview;
+      try {
+        preview = await life360Client.getGroupLinkedPreview(
+          groupChatId,
+          memberIds,
+        );
+      } catch (e) {
+        const msg =
+          e.status === 400 && e.body && e.body.error
+            ? String(e.body.error)
+            : e.message || String(e);
         return {
-          title: "Nenhum círculo encontrado na conta Life360.",
+          title: "❌ " + msg,
           skipPoll: true,
         };
       }
 
-      const truncated = circles.length > MAX_CIRCLES;
-      const slice = circles.slice(0, MAX_CIRCLES);
-      const titlePrefix = isGroup
-        ? "📍 *Life360* (dados sensíveis — prefira usar no privado)\n\n"
-        : "";
-      const title =
-        titlePrefix +
-        (truncated
-          ? `Escolha um círculo (mostrando os primeiros ${MAX_CIRCLES}):`
-          : "Escolha um círculo:");
+      const items = preview.items || [];
+      if (items.length === 0) {
+        return {
+          title:
+            "Nenhum participante deste grupo tem *mapeamento Life360* (campo `life360_member_id` na base de dados) ou o membro não aparece no círculo configurado no servidor. Peça ao administrador para mapear utilizadores com o script do servidor.",
+          skipPoll: true,
+        };
+      }
 
-      const options = slice.map((c) => ({
-        label: truncateLabel(`⭕ ${c.name || c.id || "?"}`),
-        action: "exec",
-        handler: "pickCircle",
-        data: {
-          circleId: c.id,
-          name: c.name || String(c.id),
-        },
-      }));
+      const truncated = items.length > MAX_MEMBERS;
+      const slice = items.slice(0, MAX_MEMBERS);
+      const title = truncated
+        ? `📍 Localização — membros mapeados (primeiros ${MAX_MEMBERS}):`
+        : "📍 Localização — membros mapeados:";
+
+      const options = slice.map((item) => {
+        const m = item.member || {};
+        const loc = m.location || {};
+        const displayName =
+          item.displayName || formatMemberName(m);
+        return {
+          label: truncateLabel(`👤 ${displayName}`),
+          action: "exec",
+          handler: "pickMember",
+          data: {
+            displayName,
+            memberId: m.id || item.life360_member_id,
+            location: {
+              latitude: loc.latitude,
+              longitude: loc.longitude,
+              name: loc.name,
+              shortAddress: loc.shortAddress,
+              address1: loc.address1,
+              battery: loc.battery,
+              isDriving: loc.isDriving,
+              inTransit: loc.inTransit,
+            },
+          },
+        };
+      });
 
       options.push({ label: "🔙 Sair", action: "exec", handler: "leaveLife360" });
 
