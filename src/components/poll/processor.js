@@ -292,16 +292,13 @@ async function executeAction(result, client) {
           );
         } else if (rr && rr.ok && rr.outcome === "not_yet") {
           const voterJid = result.voterId;
+          const num = String(voterJid || "").split("@")[0] || "";
           try {
-            const c = voterJid
-              ? await client.getContactById(voterJid).catch(() => null)
-              : null;
-            if (c) {
-              const num = String(voterJid).split("@")[0] || "";
+            if (voterJid) {
               await client.sendMessage(
                 chatId,
                 `Certo @${num} novos lembretes serão enviados ao longo do dia até que a rotina seja realizada.`,
-                { mentions: [c] },
+                { mentions: [String(voterJid)] },
               );
             } else {
               await client.sendMessage(

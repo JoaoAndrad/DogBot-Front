@@ -14,6 +14,12 @@ async function sendBodyWithOptionalMentions(client, chatId, bodyText, mentionWaI
   const ids = Array.isArray(mentionWaIds) ? mentionWaIds.filter(Boolean) : [];
   if (ids.length) {
     try {
+      // Prefer JIDs (evita aviso de depreciação de array de Contact em versões recentes)
+      return client.sendMessage(chatId, bodyText, { mentions: ids });
+    } catch (e) {
+      logger.warn("[routineTick] mentions (JID)", e.message);
+    }
+    try {
       const contacts = await Promise.all(
         ids.map((jid) => client.getContactById(jid).catch(() => null)),
       );
@@ -21,11 +27,45 @@ async function sendBodyWithOptionalMentions(client, chatId, bodyText, mentionWaI
       if (valid.length) {
         return client.sendMessage(chatId, bodyText, { mentions: valid });
       }
-    } catch (e) {
-      logger.warn("[routineTick] mentions", e.message);
+    } catch (e2) {
+      logger.warn("[routineTick] mentions (Contact)", e2.message);
     }
   }
   return client.sendMessage(chatId, bodyText);
+}
+
+/**
+ * Evita dois check-ins / retroativos idênticos no mesmo tick (ex.: duplicata na BD).
+ */
+function dedupeRoutineDispatchActions(actions) {
+  const primary = [];
+  /** @type {Map<string, string[]>} */
+  const extraDispatchIdsByKey = new Map();
+  const seenOccurrenceKind = new Set();
+
+  for (const a of actions) {
+    const key =
+      a.routineId &&
+      a.occurrenceId &&
+      (a.kind === "checkin_poll" || a.kind === "retrospective")
+        ? `${a.routineId}|${a.occurrenceId}|${a.kind}`
+        : null;
+    if (!key) {
+      primary.push({ action: a, key: null });
+      continue;
+    }
+    if (!seenOccurrenceKind.has(key)) {
+      seenOccurrenceKind.add(key);
+      primary.push({ action: a, key });
+    } else {
+      if (!extraDispatchIdsByKey.has(key)) extraDispatchIdsByKey.set(key, []);
+      if (a.dispatchId) extraDispatchIdsByKey.get(key).push(a.dispatchId);
+      logger.warn(
+        `[routineTick] dispatch duplicado ignorado no envio (ack será unificado): ${key}`,
+      );
+    }
+  }
+  return { primary, extraDispatchIdsByKey };
 }
 
 /**
@@ -41,8 +81,12 @@ async function processRoutineTick(client) {
     const polls = require("../components/poll");
     const dispatchIds = [];
     const waMessageIds = {};
+    /** @type {Map<string, string>} */
+    const keyToMsgId = new Map();
 
-    for (const a of actions) {
+    const { primary, extraDispatchIdsByKey } = dedupeRoutineDispatchActions(actions);
+
+    for (const { action: a, key: dispatchKey } of primary) {
       const p = a.payload || {};
       const chatId = p.chatId || a.chatId;
       if (!chatId) continue;
@@ -78,8 +122,19 @@ async function processRoutineTick(client) {
         }
         dispatchIds.push(a.dispatchId);
         waMessageIds[a.dispatchId] = send.msgId;
+        if (dispatchKey) keyToMsgId.set(dispatchKey, send.msgId);
       } else if (a.dispatchId) {
         dispatchIds.push(a.dispatchId);
+        if (send && send.msgId) waMessageIds[a.dispatchId] = send.msgId;
+      }
+    }
+
+    for (const [dupKey, ids] of extraDispatchIdsByKey) {
+      const msgId = keyToMsgId.get(dupKey);
+      if (!msgId) continue;
+      for (const dispatchId of ids) {
+        dispatchIds.push(dispatchId);
+        waMessageIds[dispatchId] = msgId;
       }
     }
 
