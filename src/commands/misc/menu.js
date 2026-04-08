@@ -12,6 +12,7 @@ const movieFlow = require("../../components/menu/flows/movieFlow");
 const bookFlow = require("../../components/menu/flows/bookFlow");
 const rotinaFlow = require("../../components/menu/flows/rotinaFlow");
 const life360Flow = require("../../components/menu/flows/life360Flow");
+const vinculo360Flow = require("../../components/menu/flows/vinculo360Flow");
 
 // Register flows on load
 flowManager.registerFlow(testFlow);
@@ -27,6 +28,7 @@ flowManager.registerFlow(bookCardFlow);
 flowManager.registerFlow(bookSearchFlow);
 flowManager.registerFlow(rotinaFlow);
 flowManager.registerFlow(life360Flow);
+flowManager.registerFlow(vinculo360Flow);
 
 module.exports = {
   name: "menu",

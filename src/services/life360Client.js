@@ -33,9 +33,24 @@ async function getGroupLinkedPreview(groupChatId, memberIds) {
   return sendToBackend(path, { memberIds }, "POST");
 }
 
+/**
+ * Associa o membro Life360 ao User do WhatsApp (identifier = JID @c.us).
+ */
+async function linkLife360Member(identifier, life360MemberId) {
+  if (!identifier || !life360MemberId) {
+    throw new Error("identifier e life360MemberId são obrigatórios");
+  }
+  return sendToBackend(
+    "/api/life360/link-self",
+    { identifier, life360MemberId },
+    "POST",
+  );
+}
+
 module.exports = {
   getStatus,
   getCircles,
   getMembers,
   getGroupLinkedPreview,
+  linkLife360Member,
 };

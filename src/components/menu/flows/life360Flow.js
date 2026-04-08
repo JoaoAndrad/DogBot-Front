@@ -128,7 +128,7 @@ const life360Flow = createFlow("life360", {
       if (items.length === 0) {
         return {
           title:
-            "Nenhum participante deste grupo tem *mapeamento Life360* (campo `life360_member_id` na base de dados) ou o membro não aparece no círculo configurado no servidor. Peça ao administrador para mapear utilizadores com o script do servidor.",
+            "Nenhum participante deste grupo tem *vínculo com o Life360* ou o membro não aparece no círculo configurado.",
           skipPoll: true,
         };
       }
