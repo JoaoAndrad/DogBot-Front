@@ -12,6 +12,7 @@ const {
   downloadImageToBuffer,
 } = require("../../../utils/stickerHelper");
 const logger = require("../../../utils/logger");
+const { formatLife360PlaceLine } = require("../../../utils/life360PlaceFormat");
 
 const MAX_MEMBERS = 10;
 
@@ -36,6 +37,7 @@ function locationPayloadFromMember(m) {
     name: loc.name,
     shortAddress: loc.shortAddress,
     address1: loc.address1,
+    address2: loc.address2,
     battery: loc.battery,
     charge: loc.charge,
     since: loc.since,
@@ -116,14 +118,7 @@ function formatLocationMessage(data) {
   const loc = data.location || {};
   const lines = [`👤 *${name}*`];
 
-  const place =
-    loc.name ||
-    loc.shortAddress ||
-    loc.address1 ||
-    (loc.latitude != null &&
-      loc.longitude != null &&
-      `${loc.latitude}, ${loc.longitude}`) ||
-    null;
+  const place = formatLife360PlaceLine(loc);
   if (place) lines.push(`📌 ${place}`);
 
   const timeLine = formatTimeAtPlaceLine(loc);

@@ -1,5 +1,6 @@
 const backendClient = require("../../services/backendClient");
 const logger = require("../../utils/logger");
+const { formatLife360PlaceLine } = require("../../utils/life360PlaceFormat");
 const {
   sendTrackSticker,
   sendCompositeSticker,
@@ -45,6 +46,25 @@ module.exports = {
         return reply("Nenhum usuário do grupo está ouvindo músicas no momento");
       }
 
+      const locByUserId = new Map();
+      try {
+        const locRes = await backendClient.sendToBackend(
+          `/api/groups/${encodeURIComponent(chatId)}/life360-locations`,
+          { memberIds },
+          "POST",
+        );
+        for (const entry of locRes?.locations || []) {
+          if (entry?.userId != null) locByUserId.set(entry.userId, entry);
+        }
+      } catch (locErr) {
+        logger.info("[Todos] life360-locations: " + (locErr.message || locErr));
+      }
+
+      function placeForUser(userId) {
+        const entry = locByUserId.get(userId);
+        return formatLife360PlaceLine(entry?.location);
+      }
+
       // Prepare groups: jam groups (same trackId + contextId) and individuals
       const byTrack = new Map();
       const notPlaying = [];
@@ -59,7 +79,7 @@ module.exports = {
 
         const key = `${t.trackId}::${t.contextId || "noctx"}`;
         if (!byTrack.has(key)) byTrack.set(key, []);
-        byTrack.get(key).push({ who, track: t });
+        byTrack.get(key).push({ who, track: t, userId: l.userId });
       }
 
       const lines = [];
@@ -74,7 +94,7 @@ module.exports = {
       }
 
       // Build message per track group
-      for (const [key, group] of byTrack.entries()) {
+      for (const [, group] of byTrack.entries()) {
         if (group.length === 1) {
           const item = group[0];
           const t = item.track;
@@ -85,67 +105,30 @@ module.exports = {
               Array.isArray(t.artists) ? t.artists.join(", ") : t.artists || ""
             }`,
           );
-          lines.push(`   ${percent !== null ? `⏱️ ${percent}%` : ""}`);
+          if (percent !== null) lines.push(`   ⏱️ ${percent}%`);
+          const pl = placeForUser(item.userId);
+          if (pl) lines.push(`   📍 ${pl}`);
           lines.push("");
         } else {
-          // multiple listeners: if their percent close, mark as JAM coletiva
-          const percents = group.map((g) => ({
-            who: g.who,
-            pct: pct(g.track),
-          }));
-          const validPercs = percents
-            .filter((p) => p.pct !== null)
-            .map((p) => p.pct);
-          let approx = "";
-          if (validPercs.length > 0) {
-            // compute average and show ~avg%
-            const avg = Math.round(
-              validPercs.reduce((a, b) => a + b, 0) / validPercs.length,
-            );
-            approx = `\n   ⏱️ ~${avg}%`;
-          }
-
-          const names = group.map((g) => g.who).join(", ");
           const t = group[0].track;
-          lines.push(`🎵 JAM Coletiva (${names}):`);
-          lines.push(
-            `   ${t.trackName} - ${
-              Array.isArray(t.artists) ? t.artists.join(", ") : t.artists || ""
-            }${approx}`,
-          );
+          const artists = Array.isArray(t.artists)
+            ? t.artists.join(", ")
+            : t.artists || "";
+          lines.push(`🎵 JAM — ${t.trackName} - ${artists}`);
+          for (const g of group) {
+            const p = pct(g.track);
+            let head = `🎶 ${g.who}`;
+            if (p !== null) head += ` · ⏱️ ${p}%`;
+            lines.push(head);
+            const pl = placeForUser(g.userId);
+            if (pl) lines.push(`   📍 ${pl}`);
+          }
           lines.push("");
         }
       }
 
       if (notPlaying.length > 0) {
         lines.push(`⏸️ Sem música: ${notPlaying.join(", ")}`);
-      }
-
-      try {
-        const locRes = await backendClient.sendToBackend(
-          `/api/groups/${encodeURIComponent(chatId)}/life360-locations`,
-          { memberIds },
-          "POST",
-        );
-        if (locRes?.locations?.length) {
-          lines.push("");
-          lines.push("📍 Onde estão (Life360):");
-          for (const loc of locRes.locations) {
-            const label = loc.displayName || loc.name || "Membro";
-            const l = loc.location;
-            const place =
-              l?.shortAddress ||
-              l?.name ||
-              (l?.latitude != null && l?.longitude != null
-                ? `${l.latitude}, ${l.longitude}`
-                : null);
-            lines.push(
-              `• ${label}: ${place || "localização indisponível"}`,
-            );
-          }
-        }
-      } catch (locErr) {
-        logger.info("[Todos] life360-locations: " + (locErr.message || locErr));
       }
 
       const finalMsg = lines.join("\n");
