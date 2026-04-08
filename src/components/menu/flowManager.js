@@ -71,8 +71,9 @@ class FlowManager {
    * @param {string} userId - User ID (voter)
    * @param {object} pollMeta - { flowId, path } from poll metadata
    * @param {number} selectedIndex - Index of selected option
+   * @param {object} [resolvedOption] - Opção completa vinda da metadata da enquete (obrigatória para nós `dynamic` com options vazias no flow)
    */
-  async handleVote(client, chatId, userId, pollMeta, selectedIndex) {
+  async handleVote(client, chatId, userId, pollMeta, selectedIndex, resolvedOption) {
     const { flowId, path } = pollMeta;
 
     console.log(
@@ -103,10 +104,12 @@ class FlowManager {
       return;
     }
 
-    const option = node.options[selectedIndex];
+    const option =
+      resolvedOption ||
+      (Array.isArray(node.options) ? node.options[selectedIndex] : undefined);
     if (!option) {
       console.log(
-        `[FlowManager] Invalid option index ${selectedIndex} for ${path}`,
+        `[FlowManager] Opção inválida ${selectedIndex} para ${path} (nós dinâmicos: passe resolvedOption = metadata.options[index])`,
       );
       return;
     }

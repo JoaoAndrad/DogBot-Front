@@ -92,20 +92,28 @@ const life360Flow = createFlow("life360", {
         };
       }
 
-      let chat;
-      try {
-        chat = await ctx.client.getChatById(groupChatId);
-      } catch (e) {
-        return {
-          title:
-            "❌ Não foi possível carregar o grupo: " + (e.message || String(e)),
-          skipPoll: true,
-        };
-      }
+      let memberIds =
+        ctx.state.context &&
+        Array.isArray(ctx.state.context.memberIds) &&
+        ctx.state.context.memberIds.length
+          ? ctx.state.context.memberIds
+          : null;
 
-      const memberIds = (chat.participants || []).map(
-        (p) => p.id && p.id._serialized,
-      ).filter(Boolean);
+      if (!memberIds) {
+        let chat;
+        try {
+          chat = await ctx.client.getChatById(groupChatId);
+        } catch (e) {
+          return {
+            title:
+              "❌ Não foi possível carregar o grupo: " + (e.message || String(e)),
+            skipPoll: true,
+          };
+        }
+        memberIds = (chat.participants || [])
+          .map((p) => p.id && p.id._serialized)
+          .filter(Boolean);
+      }
 
       let preview;
       try {

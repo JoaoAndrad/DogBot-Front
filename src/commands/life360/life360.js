@@ -29,9 +29,24 @@ module.exports = {
       /* ignore */
     }
 
+    let memberIds;
+    try {
+      const chat = await message.getChat();
+      memberIds = (chat.participants || [])
+        .map((p) => p.id && p.id._serialized)
+        .filter(Boolean);
+    } catch (e) {
+      memberIds = null;
+    }
+
     try {
       await flowManager.startFlow(client, chatId, userId, "life360", {
-        initialContext: { groupChatId: chatId },
+        initialContext: {
+          groupChatId: chatId,
+          ...(memberIds && memberIds.length
+            ? { memberIds }
+            : {}),
+        },
       });
     } catch (err) {
       await client.sendMessage(

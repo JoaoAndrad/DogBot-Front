@@ -181,8 +181,13 @@ const vinculo360Flow = createFlow("vinculo360", {
 
       ctx.state.context = ctx.state.context || {};
       const cacheKey = pending.memberId;
+      const sameMember =
+        ctx.state.context.vinculoUsersCacheKey === cacheKey;
       let users = ctx.state.context.vinculoUsersList;
-      if (!users || ctx.state.context.vinculoUsersCacheKey !== cacheKey) {
+      if (!users || !sameMember) {
+        const pageBeforeFetch = sameMember
+          ? Number(ctx.state.context.usersPage) || 0
+          : 0;
         let res;
         try {
           res = await life360Client.getVinculoUsers(
@@ -202,7 +207,8 @@ const vinculo360Flow = createFlow("vinculo360", {
         users = (res && res.users) || [];
         ctx.state.context.vinculoUsersList = users;
         ctx.state.context.vinculoUsersCacheKey = cacheKey;
-        ctx.state.context.usersPage = 0;
+        // Só repõe página 0 ao mudar de membro Life360; se só faltava a lista em memória, mantém a página.
+        ctx.state.context.usersPage = sameMember ? pageBeforeFetch : 0;
       }
 
       if (!users.length) {
@@ -242,14 +248,16 @@ const vinculo360Flow = createFlow("vinculo360", {
         options.push({
           label: "➡️ Próxima página",
           action: "exec",
-          handler: "nextUsersPage",
+          handler: "goToUsersPage",
+          data: { page: page + 1 },
         });
       }
       if (page > 0) {
         options.push({
           label: "⬅️ Página anterior",
           action: "exec",
-          handler: "prevUsersPage",
+          handler: "goToUsersPage",
+          data: { page: page - 1 },
         });
       }
 
@@ -311,23 +319,21 @@ const vinculo360Flow = createFlow("vinculo360", {
       ctx.state.path = "/users";
     },
 
-    nextUsersPage: async (ctx) => {
+    /**
+     * Página vem em data.page (metadata da enquete) para sobreviver a estado
+     * rehidratado sem usersPage / lista em memória.
+     */
+    goToUsersPage: async (ctx, data) => {
       ctx.state.context = ctx.state.context || {};
       const list = ctx.state.context.vinculoUsersList || [];
       const maxPage = Math.max(0, Math.ceil(list.length / USERS_PER_PAGE) - 1);
-      ctx.state.context.usersPage = Math.min(
-        maxPage,
-        (ctx.state.context.usersPage || 0) + 1,
-      );
-      return { rerenderCurrent: true };
-    },
-
-    prevUsersPage: async (ctx) => {
-      ctx.state.context = ctx.state.context || {};
-      ctx.state.context.usersPage = Math.max(
-        0,
-        (ctx.state.context.usersPage || 0) - 1,
-      );
+      let p = Number(data && data.page);
+      if (!Number.isFinite(p) || p < 0) {
+        p = Math.min(maxPage, (ctx.state.context.usersPage || 0) + 1);
+      } else {
+        p = Math.max(0, Math.min(p, maxPage));
+      }
+      ctx.state.context.usersPage = p;
       return { rerenderCurrent: true };
     },
 
