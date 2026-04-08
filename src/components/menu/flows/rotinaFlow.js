@@ -95,7 +95,7 @@ const rotinaFlow = createFlow("rotina", {
       const opts = [
         { label: "➕ Criar rotina", action: "goto", target: "/create/repeat" },
         {
-          label: "📃 Listar / gerir",
+          label: "📃 Exibir rotinas",
           action: "exec",
           handler: "listRoutines",
         },
@@ -268,7 +268,7 @@ const rotinaFlow = createFlow("rotina", {
           label: labels[0],
           action: "exec",
           handler: "routineExecuteDelete",
-          data: { routineId: data.routineId },
+          data: { routineId: data.routineId, title: data.title },
         },
         {
           index: 1,
@@ -305,7 +305,10 @@ const rotinaFlow = createFlow("rotina", {
       }
       try {
         await routineClient.deleteRoutine(data.routineId, uuid);
-        await ctx.reply("🗑️ Rotina eliminada.");
+        const name = truncateLabel(data.title || "—", 80);
+        await ctx.reply(
+          `🗑️ Rotina (*${name}*) excluída com sucesso.`,
+        );
       } catch (e) {
         await ctx.reply(`❌ ${e.message || e}`);
       }
