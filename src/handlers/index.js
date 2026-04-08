@@ -5,6 +5,21 @@ const spotifyService = require("../services/spotifyService");
 const conversationState = require("../services/conversationState");
 const botMetricsReporter = require("../services/botMetricsReporter");
 const { handleCadastroFlow } = require("./cadastroFlowHandler");
+
+/** Estado pode estar em UUID, @c.us ou id do chat (startFlowWithAliases). */
+function findActiveConversationState(flowUserId, actualNumber, author, from) {
+  const candidates = [flowUserId, actualNumber, author, from].filter(Boolean);
+  const seen = new Set();
+  for (const k of candidates) {
+    const key = String(k);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    if (conversationState.hasActiveFlow(key)) {
+      return { stateKey: key, state: conversationState.getState(key) };
+    }
+  }
+  return null;
+}
 const { handleMetaFlow } = require("./metaFlowHandler");
 const { handleListFlow } = require("./listFlowHandler");
 const { handleAddFilmFlow } = require("./addFilmFlowHandler");
@@ -247,7 +262,17 @@ async function handle(context) {
       actualNumber = from;
     }
   } else {
-    actualNumber = author ? author.replace(/@lid$/i, "") : null;
+    actualNumber = author || null;
+    if (author && String(author).includes("@lid") && context.client) {
+      try {
+        const c = await context.client.getContactById(author);
+        if (c && c.id && c.id._serialized) {
+          actualNumber = c.id._serialized;
+        }
+      } catch (err) {
+        logger.debug("[Handler] grupo getContactById(author):", err.message);
+      }
+    }
   }
 
   // Do early lookup to get actual database userId for flow management (com cache para evitar muitos requests)
@@ -276,14 +301,20 @@ async function handle(context) {
 
   //logger.debug(`[Handler] Verificando fluxo ativo para: ${flowUserId}`);
 
-  if (flowUserId && conversationState.hasActiveFlow(flowUserId)) {
-    const state = conversationState.getState(flowUserId);
+  const conv = findActiveConversationState(
+    flowUserId,
+    actualNumber,
+    author,
+    from,
+  );
+  if (conv) {
+    const { stateKey, state } = conv;
     logger.debug(
-      `[Handler] Fluxo ativo detectado para ${flowUserId}: ${state.flowType}`,
+      `[Handler] Fluxo ativo detectado para ${stateKey}: ${state.flowType}`,
     );
 
     if (state.flowType === "cadastro") {
-      return await handleCadastroFlow(flowUserId, body, state, reply, {
+      return await handleCadastroFlow(stateKey, body, state, reply, {
         author,
         isGroup,
         from,
@@ -293,7 +324,7 @@ async function handle(context) {
     }
 
     if (state.flowType === "meta") {
-      return await handleMetaFlow(flowUserId, body, state, reply, {
+      return await handleMetaFlow(stateKey, body, state, reply, {
         author,
         isGroup,
         from,
@@ -303,7 +334,7 @@ async function handle(context) {
     }
 
     if (state.flowType === "list-creation") {
-      return await handleListFlow(flowUserId, body, state, reply, {
+      return await handleListFlow(stateKey, body, state, reply, {
         author,
         isGroup,
         from,
@@ -314,7 +345,7 @@ async function handle(context) {
     }
 
     if (state.flowType === "add-film") {
-      return await handleAddFilmFlow(flowUserId, body, state, reply, {
+      return await handleAddFilmFlow(stateKey, body, state, reply, {
         author,
         isGroup,
         from,
@@ -333,7 +364,7 @@ async function handle(context) {
       } catch (e) {
         /* ignore */
       }
-      return await handleRotinaFlow(flowUserId, body, state, reply, {
+      return await handleRotinaFlow(stateKey, body, state, reply, {
         author: contactId,
         isGroup,
         from,

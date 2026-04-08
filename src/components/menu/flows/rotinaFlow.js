@@ -3,7 +3,6 @@
  */
 
 const { createFlow } = require("../flowBuilder");
-const storage = require("../storage");
 const conversationState = require("../../../services/conversationState");
 const routineClient = require("../../../services/routineClient");
 
@@ -98,7 +97,10 @@ const rotinaFlow = createFlow("rotina", {
         weeklyDays: data.weeklyDays,
         monthlyDay: data.monthlyDay,
       };
-      conversationState.startFlowWithAliases([ctx.userId, ctx.chatId], "rotina", {
+      const aliasKeys = [ctx.userId, ctx.chatId];
+      const uuid = await resolveEditorUuid(ctx.userId);
+      if (uuid) aliasKeys.push(uuid);
+      conversationState.startFlowWithAliases(aliasKeys, "rotina", {
         step: "await_name",
         draft,
         invokerUserId: ctx.userId,
@@ -108,7 +110,6 @@ const rotinaFlow = createFlow("rotina", {
       await ctx.reply(
         "📝 *Nome da rotina*\nEnvie o nome (só quem usou /rotina pode responder).",
       );
-      await storage.deleteState(ctx.userId, "rotina");
       return { end: true };
     },
 

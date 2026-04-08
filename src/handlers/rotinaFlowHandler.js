@@ -84,6 +84,22 @@ function samePhone(a, b) {
   return d(a).length > 6 && d(b).length > 6 && d(a) === d(b);
 }
 
+async function authorMatchesInvoker(client, author, invoker) {
+  if (!author || !invoker) return true;
+  if (author === invoker) return true;
+  if (samePhone(author, invoker)) return true;
+  if (String(author).includes("@lid") && client) {
+    try {
+      const c = await client.getContactById(author);
+      const sid = c && c.id && c.id._serialized;
+      if (sid && (sid === invoker || samePhone(sid, invoker))) return true;
+    } catch (e) {
+      /* ignore */
+    }
+  }
+  return false;
+}
+
 async function handleRotinaFlow(userId, body, state, reply, context) {
   const data = state.data || {};
   const step = data.step || state.step;
@@ -95,7 +111,7 @@ async function handleRotinaFlow(userId, body, state, reply, context) {
   if (
     invoker &&
     context.author &&
-    !samePhone(context.author, invoker)
+    !(await authorMatchesInvoker(client, context.author, invoker))
   ) {
     return false;
   }
