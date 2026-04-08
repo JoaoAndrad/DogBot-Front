@@ -11,6 +11,7 @@ const {
   sendBufferAsSticker,
   downloadImageToBuffer,
 } = require("../../../utils/stickerHelper");
+const logger = require("../../../utils/logger");
 
 const MAX_MEMBERS = 10;
 
@@ -251,11 +252,10 @@ const life360Flow = createFlow("life360", {
       }
 
       const items = preview.items || [];
-      const circleId = preview.circleId || null;
       if (items.length === 0) {
         return {
           title:
-            "Nenhum participante deste grupo tem *vínculo com o Life360* ou o membro não aparece no círculo configurado.",
+            "Nenhum participante deste grupo tem *vínculo com o Life360* ou o membro não foi encontrado em *nenhum* círculo da conta.",
           skipPoll: true,
         };
       }
@@ -269,6 +269,7 @@ const life360Flow = createFlow("life360", {
       const options = slice.map((item) => {
         const m = item.member || {};
         const displayName = item.displayName || formatMemberName(m);
+        const itemCircleId = item.circleId || null;
         return {
           label: truncateLabel(`👤 ${displayName}`),
           action: "exec",
@@ -276,7 +277,7 @@ const life360Flow = createFlow("life360", {
           data: {
             displayName,
             memberId: m.id || item.life360_member_id,
-            circleId,
+            circleId: itemCircleId,
             avatar: m.avatar,
             location: locationPayloadFromMember(m),
           },
@@ -364,18 +365,37 @@ const life360Flow = createFlow("life360", {
 
     pickMember: async (ctx, data) => {
       let merged = { ...data };
-      const circleId =
+      let circleId =
         merged.circleId || (ctx.state.context && ctx.state.context.circleId);
       const memberId = merged.memberId;
 
-      // GET Member em todo o clique: a lista omitte avatar com frequência; o detalhe traz `avatar` (URL) para figurinha.
+      // Voto via processador costuma trazer só memberId + location — sem circleId/avatar. Resolve pelo backend.
+      const needsResolve =
+        memberId &&
+        (!circleId ||
+          !merged.avatar ||
+          !String(merged.avatar).trim().startsWith("http"));
+      if (needsResolve) {
+        try {
+          const resolved = await life360Client.resolveLife360Member(memberId);
+          if (resolved && resolved.member) {
+            merged = mergeMemberFromApi(merged, resolved.member);
+            circleId = resolved.circleId || circleId;
+          }
+        } catch (e) {
+          logger.warn(
+            "[life360Flow] resolveLife360Member: " + (e.message || String(e)),
+          );
+        }
+      }
+
       if (circleId && memberId) {
         try {
           const res = await life360Client.getMember(circleId, memberId);
           const m = res && res.member;
           if (m) merged = mergeMemberFromApi(merged, m);
         } catch (e) {
-          /* mantém dados da enquete */
+          /* mantém merge anterior */
         }
       }
 
@@ -387,14 +407,27 @@ const life360Flow = createFlow("life360", {
         try {
           const buf = await downloadImageToBuffer(avatarUrl);
           if (buf && buf.length) {
-            await sendBufferAsSticker(ctx.client, ctx.chatId, buf, {
+            const ok = await sendBufferAsSticker(ctx.client, ctx.chatId, buf, {
               fullOnly: true,
               filename: "life360-avatar.webp",
             });
+            logger.info(
+              `[life360Flow] figurinha avatar memberId=${memberId} ok=${ok}`,
+            );
+          } else {
+            logger.warn(
+              `[life360Flow] downloadImageToBuffer vazio memberId=${memberId}`,
+            );
           }
         } catch (e) {
-          /* figurinha opcional */
+          logger.warn(
+            "[life360Flow] figurinha: " + (e.message || String(e)),
+          );
         }
+      } else {
+        logger.info(
+          `[life360Flow] sem URL de avatar após merge memberId=${memberId}`,
+        );
       }
 
       return { end: true };

@@ -34,6 +34,18 @@ async function getMember(circleId, memberId) {
 }
 
 /**
+ * Descobre o círculo do membro e devolve membro completo (quando o fluxo só tem memberId, ex. voto via processador).
+ */
+async function resolveLife360Member(memberId) {
+  if (!memberId) throw new Error("memberId é obrigatório");
+  return sendToBackend(
+    `/api/life360/resolve-member/${encodeURIComponent(memberId)}`,
+    null,
+    "GET",
+  );
+}
+
+/**
  * Membros Life360 mapeados (User.life360_member_id) que participam no grupo.
  * @param {string} groupChatId - JID do grupo (@g.us)
  * @param {string[]} memberIds - JIDs dos participantes (ex.: chat.participants)
@@ -75,6 +87,7 @@ module.exports = {
   getCircles,
   getMembers,
   getMember,
+  resolveLife360Member,
   getGroupLinkedPreview,
   getVinculoUsers,
   linkLife360ForUser,
