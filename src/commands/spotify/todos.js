@@ -121,6 +121,33 @@ module.exports = {
         lines.push(`⏸️ Sem música: ${notPlaying.join(", ")}`);
       }
 
+      try {
+        const locRes = await backendClient.sendToBackend(
+          `/api/groups/${encodeURIComponent(chatId)}/life360-locations`,
+          { memberIds },
+          "POST",
+        );
+        if (locRes?.locations?.length) {
+          lines.push("");
+          lines.push("📍 Onde estão (Life360):");
+          for (const loc of locRes.locations) {
+            const label = loc.displayName || loc.name || "Membro";
+            const l = loc.location;
+            const place =
+              l?.shortAddress ||
+              l?.name ||
+              (l?.latitude != null && l?.longitude != null
+                ? `${l.latitude}, ${l.longitude}`
+                : null);
+            lines.push(
+              `• ${label}: ${place || "localização indisponível"}`,
+            );
+          }
+        }
+      } catch (locErr) {
+        logger.info("[Todos] life360-locations: " + (locErr.message || locErr));
+      }
+
       const finalMsg = lines.join("\n");
 
       // Send the text summary first.

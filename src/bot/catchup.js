@@ -162,7 +162,7 @@ async function runCatchup(client, options = {}) {
 
   if (transientChatSkips > 0) {
     logger.info(
-      `Catchup: ${transientChatSkips} chat(s) ignorados (WA Web ainda a sincronizar; mensagens em falta chegam em tempo real)`,
+      `Catchup: ${transientChatSkips} chat(s) ignorados (WA Web ainda está sincronizando, mensagens em falta chegam em tempo real)`,
     );
   }
   logger.info("Catchup: concluído");
