@@ -32,7 +32,7 @@ module.exports = {
     }
 
     try {
-      await life360Client.getVinculoUsers(userId);
+      await life360Client.getVinculoUsers(userId, "");
     } catch (e) {
       if (e.status === 403) {
         await client.sendMessage(

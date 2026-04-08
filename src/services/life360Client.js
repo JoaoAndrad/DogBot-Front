@@ -35,15 +35,15 @@ async function getGroupLinkedPreview(groupChatId, memberIds) {
 
 /**
  * Lista utilizadores para o vínculo (requer actorIdentifier = admin no backend).
+ * @param {string} [memberHint] — nome do membro Life360 para ordenar por match (push_name/display_name).
  */
-async function getVinculoUsers(actorIdentifier) {
+async function getVinculoUsers(actorIdentifier, memberHint) {
   if (!actorIdentifier) throw new Error("actorIdentifier é obrigatório");
-  const q = encodeURIComponent(actorIdentifier);
-  return sendToBackend(
-    `/api/life360/vinculo-users?actorIdentifier=${q}`,
-    null,
-    "GET",
-  );
+  let path = `/api/life360/vinculo-users?actorIdentifier=${encodeURIComponent(actorIdentifier)}`;
+  if (memberHint && String(memberHint).trim()) {
+    path += `&memberHint=${encodeURIComponent(String(memberHint).trim())}`;
+  }
+  return sendToBackend(path, null, "GET");
 }
 
 /**

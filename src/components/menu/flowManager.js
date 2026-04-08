@@ -190,6 +190,16 @@ class FlowManager {
           if (result && result.noRender) {
             return;
           }
+          if (result && result.rerenderCurrent) {
+            await this._renderNode(
+              client,
+              chatId,
+              userId,
+              flowId,
+              state.path,
+            );
+            return;
+          }
           const compareFrom =
             currentPath != null ? currentPath : pathBeforeHandler;
           if (

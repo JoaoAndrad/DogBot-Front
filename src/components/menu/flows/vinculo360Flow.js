@@ -7,11 +7,22 @@ const life360Client = require("../../../services/life360Client");
 
 const MAX_CIRCLES = 11;
 const MAX_MEMBERS = 10;
-const MAX_TARGET_USERS = 10;
+/** Opções da enquete: utilizadores + Próx./Ant. + Voltar (máx. ~12). */
+const USERS_PER_PAGE = 8;
 
 function truncateLabel(s, max = 120) {
   const t = String(s || "?").replace(/\n/g, " ").trim();
   return t.length > max ? `${t.slice(0, max - 1)}…` : t;
+}
+
+function formatUserPollLabel(u) {
+  const dn = u.displayName || "—";
+  const pn = u.pushName && u.pushName !== dn ? u.pushName : null;
+  const num = String(u.sender_number || "").replace(/\s+/g, "");
+  let s = dn;
+  if (pn) s += ` (${pn})`;
+  s += ` · ${num}`;
+  return truncateLabel(`🧑 ${s}`);
 }
 
 function formatMemberName(m) {
@@ -168,47 +179,79 @@ const vinculo360Flow = createFlow("vinculo360", {
         };
       }
 
-      let res;
-      try {
-        res = await life360Client.getVinculoUsers(adminWa);
-      } catch (e) {
-        const msg =
-          e.status === 403
-            ? "Apenas administradores podem usar este fluxo."
-            : e.message || String(e);
-        return {
-          title: "❌ " + msg,
-          skipPoll: true,
-        };
+      ctx.state.context = ctx.state.context || {};
+      const cacheKey = pending.memberId;
+      let users = ctx.state.context.vinculoUsersList;
+      if (!users || ctx.state.context.vinculoUsersCacheKey !== cacheKey) {
+        let res;
+        try {
+          res = await life360Client.getVinculoUsers(
+            adminWa,
+            pending.displayName || "",
+          );
+        } catch (e) {
+          const msg =
+            e.status === 403
+              ? "Apenas administradores podem usar este fluxo."
+              : e.message || String(e);
+          return {
+            title: "❌ " + msg,
+            skipPoll: true,
+          };
+        }
+        users = (res && res.users) || [];
+        ctx.state.context.vinculoUsersList = users;
+        ctx.state.context.vinculoUsersCacheKey = cacheKey;
+        ctx.state.context.usersPage = 0;
       }
 
-      const users = (res && res.users) || [];
-      if (users.length === 0) {
+      if (!users.length) {
         return {
           title: "Nenhum utilizador cadastrado na base de dados.",
           skipPoll: true,
         };
       }
 
-      const truncated = users.length > MAX_TARGET_USERS;
-      const slice = users.slice(0, MAX_TARGET_USERS);
-      const title =
-        `3️⃣ Utilizador do bot a receber o vínculo` +
-        (truncated ? ` (primeiros ${MAX_TARGET_USERS} alfabeticamente)` : "");
+      const maxPage = Math.max(0, Math.ceil(users.length / USERS_PER_PAGE) - 1);
+      const page = Math.max(
+        0,
+        Math.min(ctx.state.context.usersPage || 0, maxPage),
+      );
+      ctx.state.context.usersPage = page;
 
-      const options = slice.map((u) => {
-        const label = `${u.displayName} · ${u.sender_number}`;
-        return {
-          label: truncateLabel(`🧑 ${label}`),
+      const totalPages = Math.max(1, Math.ceil(users.length / USERS_PER_PAGE));
+      const start = page * USERS_PER_PAGE;
+      const slice = users.slice(start, start + USERS_PER_PAGE);
+
+      const title =
+        `3️⃣ Utilizador a receber o vínculo — página ${page + 1}/${totalPages}\n` +
+        `Total: ${users.length} · Ordem: match com *${truncateLabel(pending.displayName || "membro", 40)}* (push_name priorizado em empates)`;
+
+      const options = slice.map((u) => ({
+        label: formatUserPollLabel(u),
+        action: "exec",
+        handler: "pickTargetUser",
+        data: {
+          targetUserId: u.id,
+          displayName: u.displayName,
+          sender_number: u.sender_number,
+        },
+      }));
+
+      if (page < totalPages - 1) {
+        options.push({
+          label: "➡️ Próxima página",
           action: "exec",
-          handler: "pickTargetUser",
-          data: {
-            targetUserId: u.id,
-            displayName: u.displayName,
-            sender_number: u.sender_number,
-          },
-        };
-      });
+          handler: "nextUsersPage",
+        });
+      }
+      if (page > 0) {
+        options.push({
+          label: "⬅️ Página anterior",
+          action: "exec",
+          handler: "prevUsersPage",
+        });
+      }
 
       options.push({ label: "🔙 Voltar aos membros", action: "back" });
 
@@ -261,8 +304,31 @@ const vinculo360Flow = createFlow("vinculo360", {
         memberId: data.memberId,
         displayName: data.displayName,
       };
+      delete ctx.state.context.vinculoUsersList;
+      delete ctx.state.context.vinculoUsersCacheKey;
+      ctx.state.context.usersPage = 0;
       ctx.state.history.push("/members");
       ctx.state.path = "/users";
+    },
+
+    nextUsersPage: async (ctx) => {
+      ctx.state.context = ctx.state.context || {};
+      const list = ctx.state.context.vinculoUsersList || [];
+      const maxPage = Math.max(0, Math.ceil(list.length / USERS_PER_PAGE) - 1);
+      ctx.state.context.usersPage = Math.min(
+        maxPage,
+        (ctx.state.context.usersPage || 0) + 1,
+      );
+      return { rerenderCurrent: true };
+    },
+
+    prevUsersPage: async (ctx) => {
+      ctx.state.context = ctx.state.context || {};
+      ctx.state.context.usersPage = Math.max(
+        0,
+        (ctx.state.context.usersPage || 0) - 1,
+      );
+      return { rerenderCurrent: true };
     },
 
     pickTargetUser: async (ctx, data) => {
