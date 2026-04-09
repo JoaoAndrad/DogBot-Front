@@ -299,6 +299,26 @@ async function executeAction(result, client) {
         }
         break;
 
+      case "routine_checkin_group": {
+        const gr = result.routineGroupResult;
+        const chatId = poll.chatId;
+        if (!chatId || !gr || !Array.isArray(gr.results)) break;
+
+        for (const row of gr.results) {
+          if (row.ok && row.outcome === "self_done") {
+            const routineTitle = row.routineTitle || "—";
+            const who = await waDisplayName(client, result.voterId);
+            await client.sendMessage(
+              chatId,
+              `✅ *Rotina concluída hoje*\n\n` +
+                `📝 *Rotina:* ${routineTitle}\n` +
+                `👤 *Registou:* ${who}`,
+            );
+          }
+        }
+        break;
+      }
+
       case "routine_checkin":
       case "routine_checkin_retrospective": {
         const rr = result.routineResult;

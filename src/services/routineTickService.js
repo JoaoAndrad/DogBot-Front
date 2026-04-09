@@ -47,6 +47,9 @@ function routineDispatchDedupeKey(a) {
     }
     return `${a.routineId}|${a.occurrenceId}|checkin_poll|id:${a.dispatchId || "?"}`;
   }
+  if (a.kind === "checkin_poll_group") {
+    return `${a.dispatchId || "?"}|checkin_poll_group`;
+  }
   if (a.kind === "retrospective") {
     return `${a.routineId}|${a.occurrenceId}|retrospective`;
   }
@@ -105,8 +108,25 @@ async function processRoutineTick(client) {
       const chatId = p.chatId || a.chatId;
       if (!chatId) continue;
 
+      const isGroup = a.kind === "checkin_poll_group";
+
+      const preamble = p.preambleText || null;
+      const preambleMentions =
+        p.preambleMentionWaIds || p.metadata?.preambleMentionWaIds;
+
       const mentionIds = p.bodyMentionWaIds || p.metadata?.bodyMentionWaIds;
-      if (p.bodyText) {
+      if (preamble) {
+        try {
+          await sendBodyWithOptionalMentions(
+            client,
+            chatId,
+            preamble,
+            preambleMentions,
+          );
+        } catch (e) {
+          logger.warn("[routineTick] preambleText", e.message);
+        }
+      } else if (p.bodyText) {
         try {
           await sendBodyWithOptionalMentions(
             client,
@@ -125,14 +145,23 @@ async function processRoutineTick(client) {
 
       const send = await polls.createPoll(client, chatId, title, options, {
         metadata: meta,
-        options: { allowMultipleAnswers: false },
+        options: { allowMultipleAnswers: !!isGroup },
       });
 
-      if (send && send.msgId && a.occurrenceId) {
-        try {
-          await routineClient.setActiveCheckinPoll(a.occurrenceId, send.msgId);
-        } catch (e) {
-          logger.warn("[routineTick] setActiveCheckinPoll", e.message);
+      const occIds =
+        isGroup && Array.isArray(meta.occurrenceIds)
+          ? meta.occurrenceIds
+          : a.occurrenceId
+            ? [a.occurrenceId]
+            : [];
+
+      if (send && send.msgId && occIds.length) {
+        for (const oid of occIds) {
+          try {
+            await routineClient.setActiveCheckinPoll(oid, send.msgId);
+          } catch (e) {
+            logger.warn("[routineTick] setActiveCheckinPoll", e.message);
+          }
         }
         dispatchIds.push(a.dispatchId);
         waMessageIds[a.dispatchId] = send.msgId;
