@@ -28,6 +28,14 @@ async function postponeRoutine(id, editorUserId, localDate) {
   }, "POST");
 }
 
+async function completeRoutineToday(id, editorUserId) {
+  return backendClient.sendToBackend(
+    `/api/routines/${id}/complete-today`,
+    { editorUserId },
+    "POST",
+  );
+}
+
 async function setActiveCheckinPoll(occurrenceId, pollId) {
   return backendClient.sendToBackend("/api/routines/active-poll", {
     occurrenceId,
@@ -56,6 +64,7 @@ module.exports = {
   createRoutine,
   patchRoutine,
   deleteRoutine,
+  completeRoutineToday,
   postponeRoutine,
   setActiveCheckinPoll,
   routineTick,

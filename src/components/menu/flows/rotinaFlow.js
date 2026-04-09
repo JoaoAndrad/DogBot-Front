@@ -7,6 +7,7 @@ const conversationState = require("../../../services/conversationState");
 const routineClient = require("../../../services/routineClient");
 const polls = require("../../poll");
 const flowManager = require("../flowManager");
+const { routineApiToDraft, sendEditFieldPoll } = require("../../../handlers/rotinaFlowHandler");
 
 const WA_POLL_MAX_OPTIONS = 12;
 
@@ -316,6 +317,8 @@ const rotinaFlow = createFlow("rotina", {
       const t = truncateLabel(title || "Rotina", 80);
       const labels = [
         "⏸/▶️ Pausar ou reativar",
+        "✅ Realizada hoje",
+        "✏️ Editar…",
         "🗑️ Excluir…",
         "🔙 Voltar à lista",
       ];
@@ -331,12 +334,26 @@ const rotinaFlow = createFlow("rotina", {
           index: 1,
           label: labels[1],
           action: "exec",
-          handler: "routinePromptDelete",
-          data: { routineId, title },
+          handler: "routineMarkDoneToday",
+          data: { routineId },
         },
         {
           index: 2,
           label: labels[2],
+          action: "exec",
+          handler: "routineStartEdit",
+          data: { routineId, title },
+        },
+        {
+          index: 3,
+          label: labels[3],
+          action: "exec",
+          handler: "routinePromptDelete",
+          data: { routineId, title },
+        },
+        {
+          index: 4,
+          label: labels[4],
           action: "exec",
           handler: "routineBackToList",
           data: {},
@@ -357,6 +374,97 @@ const rotinaFlow = createFlow("rotina", {
           },
           options: { allowMultipleAnswers: false },
         },
+      );
+      return { noRender: true };
+    },
+
+    routineMarkDoneToday: async (ctx, data) => {
+      const uuid = await resolveEditorUuid(ctx.userId);
+      if (!uuid) {
+        await ctx.reply("❌ Utilizador não identificado.");
+        return { noRender: true };
+      }
+      try {
+        const out = await routineClient.completeRoutineToday(
+          data.routineId,
+          uuid,
+        );
+        if (out.kind === "already_completed") {
+          let msg =
+            "ℹ️ Já estava registado como concluído para este período.";
+          if (out.nextDueYmd) {
+            msg += `\n⏭️ Próximo dia previsto: ${out.nextDueYmd}`;
+          }
+          await ctx.reply(msg);
+          return { noRender: true };
+        }
+        const bits = [];
+        if (out.kind === "anticipation") {
+          bits.push(
+            "Conta como conclusão antecipada do próximo dia previsto (sem novo lembrete nesse dia).",
+          );
+        } else if (out.kind === "late") {
+          bits.push("Registou conclusão em atraso face ao dia previsto.");
+        } else if (out.kind === "same_day") {
+          bits.push("Registou como feito no dia previsto.");
+        }
+        let msg = `✅ *Rotina*\n\n${bits.join(" ")}\n`;
+        if (out.satisfiedDueYmd) {
+          msg += `\n📅 Ocorrência satisfeita: ${out.satisfiedDueYmd}`;
+        }
+        if (out.reportedYmd && out.reportedYmd !== out.satisfiedDueYmd) {
+          msg += `\n📝 Data do registo: ${out.reportedYmd}`;
+        }
+        if (out.nextDueYmd) {
+          msg += `\n⏭️ Próximo dia previsto: ${out.nextDueYmd}`;
+        }
+        await ctx.reply(msg);
+      } catch (e) {
+        const err = String((e && e.message) || e);
+        if (err.includes("no_upcoming_due")) {
+          await ctx.reply(
+            "❌ Não há próximo dia previsto para esta rotina no calendário.",
+          );
+        } else {
+          await ctx.reply(`❌ ${err}`);
+        }
+      }
+      return { noRender: true };
+    },
+
+    routineStartEdit: async (ctx, data) => {
+      const uuid = await resolveEditorUuid(ctx.userId);
+      if (!uuid) {
+        await ctx.reply("❌ Utilizador não identificado.");
+        return { noRender: true };
+      }
+      const { routines } = await routineClient.getRoutines(ctx.chatId, uuid);
+      const r = routines.find((x) => x.id === data.routineId);
+      if (!r) {
+        await ctx.reply("❌ Rotina não encontrada.");
+        return { noRender: true };
+      }
+      const draft = routineApiToDraft(r);
+      const aliasKeys = [ctx.userId, ctx.chatId];
+      aliasKeys.push(uuid);
+      const isGroup = String(ctx.chatId).endsWith("@g.us");
+      conversationState.startFlowWithAliases(aliasKeys, "rotina_edit", {
+        step: "await_final_confirm",
+        routineId: r.id,
+        draft,
+        invokerUserId: ctx.userId,
+        chatId: ctx.chatId,
+        isGroup,
+      });
+      await sendEditFieldPoll(
+        ctx.client,
+        ctx.chatId,
+        ctx.userId,
+        isGroup,
+        true,
+      );
+      await ctx.reply(
+        "👆 Escolha o que deseja alterar na enquete acima.",
       );
       return { noRender: true };
     },

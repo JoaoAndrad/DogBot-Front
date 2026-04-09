@@ -243,7 +243,11 @@ async function executeAction(result, client) {
           // Enquete já explica; não spammar o grupo a cada voto parcial/inválido.
           break;
         }
-        if (action === "rotina_assign_ok" && data && data.flowId === "rotina") {
+        if (
+          action === "rotina_assign_ok" &&
+          data &&
+          (data.flowId === "rotina" || data.flowId === "rotina_edit")
+        ) {
           const conversationState = require("../../services/conversationState");
           const {
             sendPrimaryConfirmPoll,
@@ -253,7 +257,7 @@ async function executeAction(result, client) {
           if (!st && data.chatId) st = conversationState.getState(data.chatId);
           if (
             !st ||
-            st.flowType !== "rotina" ||
+            (st.flowType !== "rotina" && st.flowType !== "rotina_edit") ||
             !st.data ||
             !st.data.draft
           ) {
@@ -268,6 +272,7 @@ async function executeAction(result, client) {
               ...st.data.draft,
               assigneeUserIds: data.assigneeUserIds || [],
             };
+            const isEdit = st.flowType === "rotina_edit";
             conversationState.updateData(stateUserId, {
               draft: nextDraft,
               step: "await_final_confirm",
@@ -279,6 +284,7 @@ async function executeAction(result, client) {
               stateUserId,
               nextDraft,
               true,
+              isEdit,
             );
           } catch (e) {
             logger.error("[processor] rotina_assign confirm", e);
@@ -291,6 +297,7 @@ async function executeAction(result, client) {
         break;
 
       case "rotina_wizard":
+      case "rotina_edit_wizard":
         {
           const {
             executeRotinaWizardAction,

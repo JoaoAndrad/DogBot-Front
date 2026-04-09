@@ -380,7 +380,7 @@ async function handle(context) {
       });
     }
 
-    if (state.flowType === "rotina") {
+    if (state.flowType === "rotina" || state.flowType === "rotina_edit") {
       const { handleRotinaFlow } = require("./rotinaFlowHandler");
       let contactId = author;
       try {

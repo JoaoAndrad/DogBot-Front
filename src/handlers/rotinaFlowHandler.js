@@ -64,7 +64,7 @@ function samePhone(a, b) {
   return d(a).length > 6 && d(b).length > 6 && d(a) === d(b);
 }
 
-async function sendAssignPoll(client, chatId, userId, draft) {
+async function sendAssignPoll(client, chatId, userId, draft, flowId = "rotina") {
   const backendUrl = process.env.BACKEND_URL || "http://localhost:8000";
   const creatorUuid = await resolveUuid(backendUrl, userId);
   if (!creatorUuid) {
@@ -111,7 +111,7 @@ async function sendAssignPoll(client, chatId, userId, draft) {
   await polls.createPoll(client, chatId, title, options, {
     metadata: {
       actionType: "rotina_assign",
-      flowId: "rotina",
+      flowId,
       userId,
       chatId,
       path: "/create/assignees",
@@ -143,7 +143,13 @@ async function fetchUserLabel(backendUrl, userIdOrWaId) {
   }
 }
 
-async function buildDraftSummaryText(backendUrl, invokerWaId, draft, isGroup) {
+async function buildDraftSummaryText(
+  backendUrl,
+  invokerWaId,
+  draft,
+  isGroup,
+  isEdit = false,
+) {
   const title = draft.title || "—";
   const rep = repeatKindLabel(draft);
   const start = formatYmdToBr(draft.startDate);
@@ -172,8 +178,11 @@ async function buildDraftSummaryText(backendUrl, invokerWaId, draft, isGroup) {
       `👥 *Também na rotina:* ${labels.map((x) => `*${x}*`).join(", ")}`;
   }
 
+  const head = isEdit
+    ? "📋 *Confirmar alterações à rotina*\n\n"
+    : "📋 *Confirmar criação da rotina*\n\n";
   return (
-    `📋 *Confirmar criação da rotina*\n\n` +
+    head +
     `📝 *Nome:* *${title}*\n` +
     `🔁 *Repetição:* ${rep}\n` +
     `📅 *Início:* ${start}\n` +
@@ -182,25 +191,62 @@ async function buildDraftSummaryText(backendUrl, invokerWaId, draft, isGroup) {
   );
 }
 
-async function sendPrimaryConfirmPoll(client, chatId, userId, draft, isGroup) {
+function routineApiToDraft(r) {
+  if (!r) return {};
+  const sd = r.startDate;
+  const startStr =
+    typeof sd === "string"
+      ? sd.slice(0, 10)
+      : sd instanceof Date
+        ? sd.toISOString().slice(0, 10)
+        : String(sd).slice(0, 10);
+  const assigneeUserIds = (Array.isArray(r.assignees) ? r.assignees : [])
+    .map((a) => a.userId || (a.user && a.user.id))
+    .filter((uid) => uid && uid !== r.createdByUserId);
+  return {
+    title: r.title,
+    repeatKind: r.repeatKind,
+    repeatEveryN: r.repeatEveryN,
+    weeklyDays: Array.isArray(r.weeklyDays) ? r.weeklyDays : [],
+    monthlyDay: r.monthlyDay,
+    startDate: startStr,
+    anchorTimeMinutes: r.anchorTimeMinutes,
+    timezone: r.timezone || "America/Sao_Paulo",
+    usefulWindowStartMinutes: r.usefulWindowStartMinutes ?? 480,
+    usefulWindowEndMinutes: r.usefulWindowEndMinutes ?? 1260,
+    assigneeUserIds,
+  };
+}
+
+async function sendPrimaryConfirmPoll(
+  client,
+  chatId,
+  userId,
+  draft,
+  isGroup,
+  isEdit = false,
+) {
   const backendUrl = process.env.BACKEND_URL || "http://localhost:8000";
   const summary = await buildDraftSummaryText(
     backendUrl,
     userId,
     draft,
     isGroup,
+    isEdit,
   );
   await client.sendMessage(chatId, summary);
   await polls.createPoll(
     client,
     chatId,
-    "Confirmar ou editar?",
-    ["✅ Confirmar criação", "✏️ Editar informação"],
+    isEdit ? "Guardar ou editar mais?" : "Confirmar ou editar?",
+    isEdit
+      ? ["✅ Guardar alterações", "✏️ Editar informação"]
+      : ["✅ Confirmar criação", "✏️ Editar informação"],
     {
       metadata: {
-        actionType: "rotina_wizard",
+        actionType: isEdit ? "rotina_edit_wizard" : "rotina_wizard",
         wizardStep: "primary",
-        flowId: "rotina",
+        flowId: isEdit ? "rotina_edit" : "rotina",
         userId,
         chatId,
       },
@@ -209,7 +255,7 @@ async function sendPrimaryConfirmPoll(client, chatId, userId, draft, isGroup) {
   );
 }
 
-async function sendEditFieldPoll(client, chatId, userId, isGroup) {
+async function sendEditFieldPoll(client, chatId, userId, isGroup, isEdit = false) {
   const labels = [
     "📝 Nome",
     "📅 Data de início",
@@ -223,10 +269,10 @@ async function sendEditFieldPoll(client, chatId, userId, isGroup) {
   }
   await polls.createPoll(client, chatId, "O que deseja editar?", labels, {
     metadata: {
-      actionType: "rotina_wizard",
+      actionType: isEdit ? "rotina_edit_wizard" : "rotina_wizard",
       wizardStep: "edit_pick",
       editFields: fields,
-      flowId: "rotina",
+      flowId: isEdit ? "rotina_edit" : "rotina",
       userId,
       chatId,
     },
@@ -254,7 +300,7 @@ const REPEAT_EDIT_CHOICES = [
   { repeatKind: "monthly", monthlyDay: null },
 ];
 
-async function sendRepeatEditPoll(client, chatId, userId) {
+async function sendRepeatEditPoll(client, chatId, userId, isEdit = false) {
   await polls.createPoll(
     client,
     chatId,
@@ -262,10 +308,10 @@ async function sendRepeatEditPoll(client, chatId, userId) {
     REPEAT_EDIT_LABELS,
     {
       metadata: {
-        actionType: "rotina_wizard",
+        actionType: isEdit ? "rotina_edit_wizard" : "rotina_wizard",
         wizardStep: "repeat_pick",
         repeatChoices: REPEAT_EDIT_CHOICES,
-        flowId: "rotina",
+        flowId: isEdit ? "rotina_edit" : "rotina",
         userId,
         chatId,
       },
@@ -275,7 +321,7 @@ async function sendRepeatEditPoll(client, chatId, userId) {
 }
 
 /** Enquete de dia da semana após escolher Semanal / Quinzenal na edição. */
-async function sendRepeatWeekdayEditPoll(client, chatId, userId) {
+async function sendRepeatWeekdayEditPoll(client, chatId, userId, isEdit = false) {
   const labels = [
     "Domingo",
     "Segunda",
@@ -288,10 +334,10 @@ async function sendRepeatWeekdayEditPoll(client, chatId, userId) {
   const weekdayLuxonByIndex = [7, 1, 2, 3, 4, 5, 6];
   await polls.createPoll(client, chatId, "🔁 Qual dia da semana?", labels, {
     metadata: {
-      actionType: "rotina_wizard",
+      actionType: isEdit ? "rotina_edit_wizard" : "rotina_wizard",
       wizardStep: "repeat_weekday_pick",
       weekdayLuxonByIndex,
-      flowId: "rotina",
+      flowId: isEdit ? "rotina_edit" : "rotina",
       userId,
       chatId,
     },
@@ -314,7 +360,18 @@ async function executeRotinaWizardAction(result, client) {
 
   let st = conversationState.getState(stateUserId);
   if (!st && data.chatId) st = conversationState.getState(data.chatId);
-  if (!st || st.flowType !== "rotina" || !st.data || !st.data.draft) {
+  const isEditFlow =
+    st &&
+    st.flowType === "rotina_edit" &&
+    st.data &&
+    st.data.routineId;
+  if (
+    !st ||
+    !st.data ||
+    !st.data.draft ||
+    (st.flowType !== "rotina" && st.flowType !== "rotina_edit") ||
+    (st.flowType === "rotina_edit" && !st.data.routineId)
+  ) {
     await client.sendMessage(chatId, "❌ Sessão expirada. Use /rotina de novo.");
     return;
   }
@@ -322,42 +379,71 @@ async function executeRotinaWizardAction(result, client) {
   const invoker = st.data.invokerUserId || stateUserId;
   const isGroup = !!st.data.isGroup;
   const draft = st.data.draft;
+  const isEdit = !!isEditFlow;
 
   if (action === "rotina_wizard_confirm") {
     try {
-      const creatorUuid = await resolveUuid(
+      const editorUuid = await resolveUuid(
         process.env.BACKEND_URL || "http://localhost:8000",
         invoker,
       );
-      if (!creatorUuid) throw new Error("creator_not_found");
-      const created = await routineClient.createRoutine({
-        chatId,
-        title: draft.title,
-        repeatKind: draft.repeatKind,
-        repeatEveryN: draft.repeatEveryN,
-        weeklyDays: draft.weeklyDays || [],
-        monthlyDay: draft.monthlyDay,
-        startDate: draft.startDate,
-        anchorTimeMinutes: draft.anchorTimeMinutes,
-        createdByUserId: creatorUuid,
-        assigneeUserIds: isGroup ? draft.assigneeUserIds || [] : [],
-      });
-      conversationState.clearState(stateUserId);
-      if (data.chatId) conversationState.clearState(data.chatId);
-      const msg = formatRoutineSummaryFromApi(created);
-      await client.sendMessage(chatId, msg);
+      if (!editorUuid) throw new Error("creator_not_found");
+      if (isEdit) {
+        const patchBody = {
+          editorUserId: editorUuid,
+          title: draft.title,
+          repeatKind: draft.repeatKind,
+          repeatEveryN: draft.repeatEveryN,
+          weeklyDays: draft.weeklyDays || [],
+          monthlyDay: draft.monthlyDay,
+          startDate: draft.startDate,
+          anchorTimeMinutes: draft.anchorTimeMinutes,
+          timezone: draft.timezone,
+          usefulWindowStartMinutes: draft.usefulWindowStartMinutes,
+          usefulWindowEndMinutes: draft.usefulWindowEndMinutes,
+        };
+        if (isGroup) patchBody.assigneeUserIds = draft.assigneeUserIds || [];
+        const updated = await routineClient.patchRoutine(
+          st.data.routineId,
+          patchBody,
+        );
+        conversationState.clearState(stateUserId);
+        if (data.chatId) conversationState.clearState(data.chatId);
+        const msg = formatRoutineSummaryFromApi(updated).replace(
+          "✅ *Rotina criada*",
+          "✅ *Rotina atualizada*",
+        );
+        await client.sendMessage(chatId, msg);
+      } else {
+        const created = await routineClient.createRoutine({
+          chatId,
+          title: draft.title,
+          repeatKind: draft.repeatKind,
+          repeatEveryN: draft.repeatEveryN,
+          weeklyDays: draft.weeklyDays || [],
+          monthlyDay: draft.monthlyDay,
+          startDate: draft.startDate,
+          anchorTimeMinutes: draft.anchorTimeMinutes,
+          createdByUserId: editorUuid,
+          assigneeUserIds: isGroup ? draft.assigneeUserIds || [] : [],
+        });
+        conversationState.clearState(stateUserId);
+        if (data.chatId) conversationState.clearState(data.chatId);
+        const msg = formatRoutineSummaryFromApi(created);
+        await client.sendMessage(chatId, msg);
+      }
     } catch (e) {
       logger.error("[rotina] wizard confirm", e);
       await client.sendMessage(
         chatId,
-        `❌ Erro ao criar: ${e.message || e}`,
+        `❌ Erro: ${e.message || e}`,
       );
     }
     return;
   }
 
   if (action === "rotina_wizard_edit_menu") {
-    await sendEditFieldPoll(client, chatId, stateUserId, isGroup);
+    await sendEditFieldPoll(client, chatId, stateUserId, isGroup, isEdit);
     return;
   }
 
@@ -401,7 +487,7 @@ async function executeRotinaWizardAction(result, client) {
       conversationState.updateData(stateUserId, {
         step: "await_repeat_edit_poll",
       });
-      await sendRepeatEditPoll(client, chatId, stateUserId);
+      await sendRepeatEditPoll(client, chatId, stateUserId, isEdit);
       return;
     }
     if (field === "assignees" && isGroup) {
@@ -409,7 +495,13 @@ async function executeRotinaWizardAction(result, client) {
         step: "await_assign_poll",
         editReturnTo: "await_final_confirm",
       });
-      await sendAssignPoll(client, chatId, invoker, draft);
+      await sendAssignPoll(
+        client,
+        chatId,
+        invoker,
+        draft,
+        isEdit ? "rotina_edit" : "rotina",
+      );
       await client.sendMessage(
         chatId,
         "👆 Marque quem participa e *Continuar*.",
@@ -428,7 +520,7 @@ async function executeRotinaWizardAction(result, client) {
         pendingRepeatChoice: ch,
         step: "await_repeat_weekday_edit_poll",
       });
-      await sendRepeatWeekdayEditPoll(client, chatId, stateUserId);
+      await sendRepeatWeekdayEditPoll(client, chatId, stateUserId, isEdit);
       return;
     }
     if (rk === "monthly") {
@@ -449,7 +541,14 @@ async function executeRotinaWizardAction(result, client) {
       draft: nextDraft,
       step: "await_final_confirm",
     });
-    await sendPrimaryConfirmPoll(client, chatId, stateUserId, nextDraft, isGroup);
+    await sendPrimaryConfirmPoll(
+      client,
+      chatId,
+      stateUserId,
+      nextDraft,
+      isGroup,
+      isEdit,
+    );
     return;
   }
 
@@ -470,7 +569,14 @@ async function executeRotinaWizardAction(result, client) {
       step: "await_final_confirm",
       pendingRepeatChoice: undefined,
     });
-    await sendPrimaryConfirmPoll(client, chatId, stateUserId, nextDraft, isGroup);
+    await sendPrimaryConfirmPoll(
+      client,
+      chatId,
+      stateUserId,
+      nextDraft,
+      isGroup,
+      isEdit,
+    );
   }
 }
 
@@ -498,6 +604,7 @@ async function handleRotinaFlow(userId, body, state, reply, context) {
   const client = context?.client;
   const invoker = data.invokerUserId || userId;
   const isGroup = data.isGroup;
+  const isEdit = state.flowType === "rotina_edit";
 
   if (
     invoker &&
@@ -524,7 +631,14 @@ async function handleRotinaFlow(userId, body, state, reply, context) {
         step: "await_final_confirm",
         editReturnTo: undefined,
       });
-      await sendPrimaryConfirmPoll(client, chatId, invoker, data.draft, isGroup);
+      await sendPrimaryConfirmPoll(
+        client,
+        chatId,
+        invoker,
+        data.draft,
+        isGroup,
+        isEdit,
+      );
       return true;
     }
     conversationState.updateData(userId, {
@@ -552,7 +666,14 @@ async function handleRotinaFlow(userId, body, state, reply, context) {
         step: "await_final_confirm",
         editReturnTo: undefined,
       });
-      await sendPrimaryConfirmPoll(client, chatId, invoker, data.draft, isGroup);
+      await sendPrimaryConfirmPoll(
+        client,
+        chatId,
+        invoker,
+        data.draft,
+        isGroup,
+        isEdit,
+      );
       return true;
     }
     conversationState.updateData(userId, {
@@ -580,7 +701,14 @@ async function handleRotinaFlow(userId, body, state, reply, context) {
         step: "await_final_confirm",
         editReturnTo: undefined,
       });
-      await sendPrimaryConfirmPoll(client, chatId, invoker, data.draft, isGroup);
+      await sendPrimaryConfirmPoll(
+        client,
+        chatId,
+        invoker,
+        data.draft,
+        isGroup,
+        isEdit,
+      );
       return true;
     }
     conversationState.updateData(userId, {
@@ -607,7 +735,14 @@ async function handleRotinaFlow(userId, body, state, reply, context) {
         step: "await_final_confirm",
         editReturnTo: undefined,
       });
-      await sendPrimaryConfirmPoll(client, chatId, invoker, data.draft, isGroup);
+      await sendPrimaryConfirmPoll(
+        client,
+        chatId,
+        invoker,
+        data.draft,
+        isGroup,
+        isEdit,
+      );
       return true;
     }
 
@@ -629,7 +764,14 @@ async function handleRotinaFlow(userId, body, state, reply, context) {
       draft: data.draft,
       step: "await_final_confirm",
     });
-    await sendPrimaryConfirmPoll(client, chatId, invoker, data.draft, false);
+    await sendPrimaryConfirmPoll(
+      client,
+      chatId,
+      invoker,
+      data.draft,
+      false,
+      isEdit,
+    );
     return true;
   }
 
@@ -681,7 +823,9 @@ module.exports = {
   sendAssignPoll,
   sendPrimaryConfirmPoll,
   sendRepeatWeekdayEditPoll,
+  sendEditFieldPoll,
   executeRotinaWizardAction,
   finalizeCreateFromContext,
   resolveUuid,
+  routineApiToDraft,
 };
