@@ -1,5 +1,6 @@
 const logger = require("../utils/logger");
 const config = require("../core/config");
+const { isCommandMessage } = require("../utils/isCommandMessage");
 const { allow: rateLimitAllow } = require("../utils/userRateLimiter");
 const middleware = require("./middleware");
 const dedupe = require("./dedupe");
@@ -29,15 +30,21 @@ async function processEvent(context) {
     } catch (_) {}
     context.chatName = chatName;
 
-    if (config.rateLimitEnabled && fromId) {
-      const r = rateLimitAllow(`msg:${fromId}`, {
-        maxEvents: config.rateLimitMsgMax,
-        windowMs: config.rateLimitMsgWindowMs,
+    const info = context.info || {};
+    if (
+      config.rateLimitEnabled &&
+      fromId &&
+      isCommandMessage(info, msg, context.isGroup)
+    ) {
+      const r = rateLimitAllow(`cmd:${fromId}`, {
+        maxEvents: config.rateLimitCmdMax,
+        windowMs: config.rateLimitCmdWindowMs,
         banMs: config.rateLimitBanMs,
+        banKey: `rl:${fromId}`,
       });
       if (!r.ok) {
         logger.debug(
-          `[rateLimit] mensagem bloqueada (${r.reason}): ${fromId}`,
+          `[rateLimit] comando bloqueado (${r.reason}): ${fromId}`,
         );
         return false;
       }

@@ -17,6 +17,87 @@ let whatsappClient = null;
 // Store handlers for different vote types
 const voteHandlers = {};
 
+/**
+ * Opções passadas ao whatsapp-web.js Poll(..., optionsObj), persistidas em options_obj.
+ */
+function getPollOptionsObj(p) {
+  if (!p) return {};
+  let o = p.options_obj ?? p.optionsObj;
+  if (o == null) return {};
+  if (typeof o === "string") {
+    try {
+      o = JSON.parse(o);
+    } catch {
+      return {};
+    }
+  }
+  return typeof o === "object" && o !== null && !Array.isArray(o) ? o : {};
+}
+
+/** Enquete com várias escolhas — o WA dispara vários vote_update; não aplicar o mesmo rate limit de voto único. */
+function pollAllowsMultipleAnswers(p) {
+  return getPollOptionsObj(p).allowMultipleAnswers === true;
+}
+
+/** Texto legível em pt para duração do ban (config.rateLimitBanMs). */
+function formatBanDurationPt(ms) {
+  const n = Number(ms);
+  if (!Number.isFinite(n) || n <= 0) return "alguns instantes";
+  const sec = Math.ceil(n / 1000);
+  if (sec < 60) return `${sec} segundo${sec === 1 ? "" : "s"}`;
+  const min = Math.ceil(sec / 60);
+  if (min < 60) return `${min} minuto${min === 1 ? "" : "s"}`;
+  const h = Math.floor(min / 60);
+  const remMin = min % 60;
+  if (remMin === 0) return `${h} hora${h === 1 ? "" : "s"}`;
+  return `${h} hora${h === 1 ? "" : "s"} e ${remMin} minuto${remMin === 1 ? "" : "s"}`;
+}
+
+/**
+ * Aviso no chat quando entra ban unificado (enquetes + comandos), só na transição limit_exceeded no fluxo de voto.
+ * Grupo: menção; DM: texto sem @.
+ */
+async function sendPollAbuseBanNotice(chatId, voterJid, banMs) {
+  if (!whatsappClient || !chatId || !voterJid || voterJid === "unknown") {
+    return;
+  }
+  const dur = formatBanDurationPt(banMs);
+  const isGroup = String(chatId).endsWith("@g.us");
+
+  if (isGroup) {
+    const num = String(voterJid).split("@")[0];
+    const body = `⚠️ @${num}, você foi suspenso do uso de enquetes e comandos por ${dur} devido a uso excessivo. Peço que utilize minhas funções com calma para evitar novos bloqueios.`;
+    try {
+      await whatsappClient.sendMessage(chatId, body, {
+        mentions: [voterJid],
+      });
+    } catch (e) {
+      logger.warn("[PollComponent] aviso ban enquetes (mentions JID)", e.message);
+      try {
+        const contacts = await Promise.all([
+          whatsappClient.getContactById(voterJid).catch(() => null),
+        ]);
+        const valid = contacts.filter(Boolean);
+        if (valid.length) {
+          await whatsappClient.sendMessage(chatId, body, { mentions: valid });
+        } else {
+          await whatsappClient.sendMessage(chatId, body);
+        }
+      } catch (e2) {
+        logger.warn("[PollComponent] aviso ban enquetes fallback", e2.message);
+      }
+    }
+    return;
+  }
+
+  const bodyDm = `⚠️ Você foi suspenso do uso de enquetes e comandos por ${dur} devido a uso excessivo. Peço que utilize minhas funções com calma para evitar novos bloqueios.`;
+  try {
+    await whatsappClient.sendMessage(chatId, bodyDm);
+  } catch (e) {
+    logger.warn("[PollComponent] aviso ban enquetes DM", e.message);
+  }
+}
+
 function setWhatsAppClient(client) {
   whatsappClient = client;
   logger.info("[PollComponent] Cliente WhatsApp configurado");
@@ -365,16 +446,31 @@ async function handleVoteUpdate(vote) {
       }
     }
 
-    if (config.rateLimitEnabled) {
+    if (config.rateLimitEnabled && !pollAllowsMultipleAnswers(poll)) {
       const r = rateLimitAllow(`poll:${voter}`, {
         maxEvents: config.rateLimitPollVoteMax,
         windowMs: config.rateLimitPollVoteWindowMs,
         banMs: config.rateLimitBanMs,
+        banKey: `rl:${voter}`,
       });
       if (!r.ok) {
         logger.debug(
           `[rateLimit] voto em enquete bloqueado (${r.reason}): ${voter}`,
         );
+        if (r.reason === "limit_exceeded") {
+          const noticeChatId =
+            poll.chat_id ||
+            poll.chatId ||
+            (vote.parentMsgKey && vote.parentMsgKey.remote) ||
+            null;
+          if (noticeChatId) {
+            await sendPollAbuseBanNotice(
+              noticeChatId,
+              voter,
+              config.rateLimitBanMs,
+            );
+          }
+        }
         return false;
       }
     }

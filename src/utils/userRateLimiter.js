@@ -12,26 +12,31 @@ let sweepCounter = 0;
 const SWEEP_EVERY = 200;
 
 /**
- * @param {string} key
- * @param {{ maxEvents: number, windowMs: number, banMs?: number }} opts
+ * @param {string} key — chave do bucket (contagem por tipo, ex.: cmd: / poll:)
+ * @param {{ maxEvents: number, windowMs: number, banMs?: number, banKey?: string }} opts
+ *        banKey — se definido, o ban temporário aplica-se a esta chave (ex.: rl:jid partilhado entre comandos e enquetes)
  * @returns {{ ok: true } | { ok: false, reason: 'banned' | 'limit_exceeded' }}
  */
 function allow(key, opts) {
   const maxEvents = Number(opts.maxEvents);
   const windowMs = Number(opts.windowMs);
   const banMs = Number(opts.banMs ?? 0);
+  const banKey =
+    opts.banKey != null && String(opts.banKey).length > 0
+      ? String(opts.banKey)
+      : key;
 
   if (!key || !Number.isFinite(maxEvents) || maxEvents <= 0) return { ok: true };
   if (!Number.isFinite(windowMs) || windowMs <= 0) return { ok: true };
 
   const now = Date.now();
 
-  const banUntil = bans.get(key);
+  const banUntil = bans.get(banKey);
   if (banUntil != null && banUntil > now) {
     return { ok: false, reason: "banned" };
   }
   if (banUntil != null && banUntil <= now) {
-    bans.delete(key);
+    bans.delete(banKey);
   }
 
   const cutoff = now - windowMs;
@@ -46,7 +51,7 @@ function allow(key, opts) {
 
   if (stamps.length >= maxEvents) {
     if (Number.isFinite(banMs) && banMs > 0) {
-      bans.set(key, now + banMs);
+      bans.set(banKey, now + banMs);
       buckets.delete(key);
     }
     return { ok: false, reason: "limit_exceeded" };

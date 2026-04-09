@@ -17,12 +17,12 @@ module.exports = {
 
   /** Rate limiting (frontend): desligar com RATE_LIMIT_ENABLED=false */
   rateLimitEnabled: process.env.RATE_LIMIT_ENABLED !== "false",
-  /** Máx. de mensagens por utilizador por janela (pipeline) — defaults baixos para não parecer automatização */
-  rateLimitMsgMax: intEnv("RATE_LIMIT_MSG_MAX", 12),
-  rateLimitMsgWindowMs: intEnv("RATE_LIMIT_MSG_WINDOW_MS", 60_000),
-  /** Máx. de votos em enquete por utilizador por janela — cliques rápidos em poll são sensíveis */
-  rateLimitPollVoteMax: intEnv("RATE_LIMIT_POLL_VOTE_MAX", 6),
-  rateLimitPollVoteWindowMs: intEnv("RATE_LIMIT_POLL_VOTE_WINDOW_MS", 60_000),
-  /** Ban (ms) ao exceder limite de mensagens ou de votos — default 10 min */
-  rateLimitBanMs: intEnv("RATE_LIMIT_BAN_MS", 10 * 60 * 1000),
+  /** Máx. de comandos por utilizador por janela (só / ou ! ou confissao em DM) — evita rajadas */
+  rateLimitCmdMax: intEnv("RATE_LIMIT_CMD_MAX", 3),
+  rateLimitCmdWindowMs: intEnv("RATE_LIMIT_CMD_WINDOW_MS", 5_000),
+  /** Máx. de interações com enquetes de voto único por utilizador por janela — default 5 em 10s (enquetes com allowMultipleAnswers não usam este limite) */
+  rateLimitPollVoteMax: intEnv("RATE_LIMIT_POLL_VOTE_MAX", 3),
+  rateLimitPollVoteWindowMs: intEnv("RATE_LIMIT_POLL_VOTE_WINDOW_MS", 5_000),
+  /** Ban (ms) ao exceder limite de comandos ou de votos em enquetes */
+  rateLimitBanMs: intEnv("RATE_LIMIT_BAN_MS", 5 * 60 * 1000),
 };
