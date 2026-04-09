@@ -7,7 +7,7 @@ const life360Client = require("../../../services/life360Client");
 
 const MAX_CIRCLES = 11;
 const MAX_MEMBERS = 10;
-/** Opções da enquete: utilizadores + Próx./Ant. + Voltar (máx. ~12). */
+/** Opções da enquete: Usuários + Próx./Ant. + Voltar (máx. ~12). */
 const USERS_PER_PAGE = 8;
 
 /** Lista completa por admin + membro Life360 — o estado persistido do menu não costuma guardar arrays grandes. */
@@ -41,7 +41,9 @@ function invalidateVinculoUsersListCache(adminWa, memberId) {
 }
 
 function truncateLabel(s, max = 120) {
-  const t = String(s || "?").replace(/\n/g, " ").trim();
+  const t = String(s || "?")
+    .replace(/\n/g, " ")
+    .trim();
   return t.length > max ? `${t.slice(0, max - 1)}…` : t;
 }
 
@@ -58,7 +60,7 @@ function formatUserPollLabel(u) {
 /**
  * Número máximo de páginas suportadas na enquete sem depender de `option.data`
  * (o processador de votos repete o handler sem repassar data aninhada).
- * 50 págin × 8 linhas = 400 utilizadores por membro Life360.
+ * 50 págin × 8 linhas = 400 usuários por membro Life360.
  */
 const MAX_USERS_LIST_PAGES = 50;
 
@@ -153,7 +155,11 @@ const vinculo360Flow = createFlow("vinculo360", {
         },
       }));
 
-      options.push({ label: "🔙 Sair", action: "exec", handler: "leaveVinculo" });
+      options.push({
+        label: "🔙 Sair",
+        action: "exec",
+        handler: "leaveVinculo",
+      });
 
       return { title, options, skipPoll: false };
     },
@@ -217,11 +223,12 @@ const vinculo360Flow = createFlow("vinculo360", {
   },
 
   "/users": {
-    title: "Utilizadores",
+    title: "Usuários",
     dynamic: true,
     handler: async (ctx) => {
       const adminWa =
-        (ctx.state.context && ctx.state.context.adminWaIdentifier) || ctx.userId;
+        (ctx.state.context && ctx.state.context.adminWaIdentifier) ||
+        ctx.userId;
       const pending = ctx.state.context && ctx.state.context.pendingMember;
       if (!pending || !pending.memberId) {
         return {
@@ -332,7 +339,11 @@ const vinculo360Flow = createFlow("vinculo360", {
       return {
         title,
         options: [
-          { label: "✅ Confirmar vínculo", action: "exec", handler: "confirmLink" },
+          {
+            label: "✅ Confirmar vínculo",
+            action: "exec",
+            handler: "confirmLink",
+          },
           { label: "🔙 Voltar", action: "back" },
           { label: "❌ Cancelar", action: "exec", handler: "cancelVinculo" },
         ],
@@ -376,10 +387,17 @@ const vinculo360Flow = createFlow("vinculo360", {
 
     confirmLink: async (ctx) => {
       const adminWa =
-        (ctx.state.context && ctx.state.context.adminWaIdentifier) || ctx.userId;
+        (ctx.state.context && ctx.state.context.adminWaIdentifier) ||
+        ctx.userId;
       const pending = ctx.state.context && ctx.state.context.pendingMember;
       const target = ctx.state.context && ctx.state.context.pendingTarget;
-      if (!adminWa || !pending || !pending.memberId || !target || !target.targetUserId) {
+      if (
+        !adminWa ||
+        !pending ||
+        !pending.memberId ||
+        !target ||
+        !target.targetUserId
+      ) {
         await ctx.reply("❌ Dados em falta. Use /vinculo360 de novo.");
         return { end: true };
       }

@@ -25,7 +25,8 @@ async function getMembers(circleId) {
 
 /** Detalhe de um membro (GET Member na API Life360). */
 async function getMember(circleId, memberId) {
-  if (!circleId || !memberId) throw new Error("circleId e memberId são obrigatórios");
+  if (!circleId || !memberId)
+    throw new Error("circleId e memberId são obrigatórios");
   return sendToBackend(
     `/api/life360/circles/${encodeURIComponent(circleId)}/members/${encodeURIComponent(memberId)}`,
     null,
@@ -56,7 +57,7 @@ async function getGroupLinkedPreview(groupChatId, memberIds) {
 }
 
 /**
- * Lista utilizadores para o vínculo (requer actorIdentifier = admin no backend).
+ * Lista Usuários para o vínculo (requer actorIdentifier = admin no backend).
  * @param {string} [memberHint] — nome do membro Life360 para ordenar por match (push_name/display_name).
  */
 async function getVinculoUsers(actorIdentifier, memberHint) {
@@ -71,9 +72,15 @@ async function getVinculoUsers(actorIdentifier, memberHint) {
 /**
  * Admin atribui membro Life360 a um User (UUID).
  */
-async function linkLife360ForUser(actorIdentifier, targetUserId, life360MemberId) {
+async function linkLife360ForUser(
+  actorIdentifier,
+  targetUserId,
+  life360MemberId,
+) {
   if (!actorIdentifier || !targetUserId || !life360MemberId) {
-    throw new Error("actorIdentifier, targetUserId e life360MemberId são obrigatórios");
+    throw new Error(
+      "actorIdentifier, targetUserId e life360MemberId são obrigatórios",
+    );
   }
   return sendToBackend(
     "/api/life360/link-user",
