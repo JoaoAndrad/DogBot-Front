@@ -347,7 +347,20 @@ module.exports = {
           return;
         }
 
-        // Guard: a vote for this track is already active (e.g. two users voting concurrently)
+        // Agregação de votos anteriores já atingiu o limiar — adicionar sem nova enquete
+        if (voteRes.immediateAdd) {
+          await addPassedTrackToPlaylist({
+            vote: voteRes.vote,
+            stats: voteRes.stats,
+            group,
+            client,
+            chatId,
+            initiatorAccountId: initiatorLookup.spotifyAccount?.id,
+          });
+          return;
+        }
+
+        // Guard: votação ativa recente (< janela no backend) para a mesma faixa
         if (voteRes.alreadyExists) {
           await client.sendMessage(
             chatId,
@@ -501,6 +514,83 @@ module.exports = {
 };
 
 /**
+ * Adiciona faixa à playlist após votação passed (enquete ou immediateAdd no backend).
+ */
+async function addPassedTrackToPlaylist({
+  vote,
+  stats,
+  group,
+  client,
+  chatId,
+  initiatorAccountId,
+}) {
+  const playlistSpotifyId = group.playlist?.spotifyId;
+
+  if (!playlistSpotifyId) {
+    await client.sendMessage(
+      chatId,
+      "⚠️ Votação aprovada, mas playlist não tem ID do Spotify configurado.",
+    );
+    return;
+  }
+
+  const accountId = initiatorAccountId || group.playlist?.accountId;
+
+  if (!accountId) {
+    await client.sendMessage(
+      chatId,
+      "⚠️ Votação aprovada, mas não há conta Spotify configurada para gerenciar a playlist.",
+    );
+    return;
+  }
+
+  const addRes = await backendClient.sendToBackend(
+    `/api/spotify/playlists/${playlistSpotifyId}/tracks`,
+    {
+      trackUri: vote.trackId,
+      accountId,
+    },
+  );
+
+  if (addRes.success) {
+    await client.sendMessage(
+      chatId,
+      `✅ Música adicionada à playlist! (${stats.votesFor}/${stats.totalEligible} votos)\n\n🎵 ${vote.trackName}\n${vote.trackArtists}`,
+    );
+
+    try {
+      const playlistRes = await backendClient.sendToBackend(
+        `/api/groups/playlists/${encodeURIComponent(playlistSpotifyId)}`,
+        null,
+        "GET",
+      );
+
+      if (
+        playlistRes &&
+        playlistRes.images &&
+        playlistRes.images.length > 0
+      ) {
+        const playlistSticker = {
+          trackId: playlistSpotifyId,
+          trackName: playlistRes.name || "Playlist",
+          image: playlistRes.images[0].url,
+        };
+        await sendTrackSticker(client, chatId, playlistSticker);
+      }
+    } catch (err) {
+      logger.warn(
+        `[Voto] Erro ao enviar figurinha da playlist: ${err.message}`,
+      );
+    }
+  } else {
+    await client.sendMessage(
+      chatId,
+      `⚠️ Votação aprovada, mas erro ao adicionar à playlist: ${addRes.error}`,
+    );
+  }
+}
+
+/**
  * Handle vote on add-to-playlist poll
  */
 async function handleAddVote(
@@ -638,74 +728,14 @@ async function handleAddVote(
 
     // Check if resolved
     if (updatedVote.status === "passed" && !castRes.alreadyResolved) {
-      // Only add to playlist if this is the first resolution (not a duplicate event)
-      // Add to playlist via backend API
-      const playlistSpotifyId = group.playlist?.spotifyId;
-
-      if (!playlistSpotifyId) {
-        await client.sendMessage(
-          chatId,
-          "⚠️ Votação aprovada, mas playlist não tem ID do Spotify configurado.",
-        );
-        return;
-      }
-
-      // Use initiator's Spotify account to add the track (they proposed the song)
-      const accountId = initiatorAccountId || group.playlist?.accountId;
-
-      if (!accountId) {
-        await client.sendMessage(
-          chatId,
-          "⚠️ Votação aprovada, mas não há conta Spotify configurada para gerenciar a playlist.",
-        );
-        return;
-      }
-
-      const addRes = await backendClient.sendToBackend(
-        `/api/spotify/playlists/${playlistSpotifyId}/tracks`,
-        {
-          trackUri: updatedVote.trackId,
-          accountId,
-        },
-      );
-
-      if (addRes.success) {
-        await client.sendMessage(
-          chatId,
-          `✅ Música adicionada à playlist! (${stats.votesFor}/${stats.totalEligible} votos)\n\n🎵 ${updatedVote.trackName}\n${updatedVote.trackArtists}`,
-        );
-
-        // Send playlist artwork as sticker
-        try {
-          const playlistRes = await backendClient.sendToBackend(
-            `/api/groups/playlists/${encodeURIComponent(playlistSpotifyId)}`,
-            null,
-            "GET",
-          );
-
-          if (
-            playlistRes &&
-            playlistRes.images &&
-            playlistRes.images.length > 0
-          ) {
-            const playlistSticker = {
-              trackId: playlistSpotifyId,
-              trackName: playlistRes.name || "Playlist",
-              image: playlistRes.images[0].url,
-            };
-            await sendTrackSticker(client, chatId, playlistSticker);
-          }
-        } catch (err) {
-          logger.warn(
-            `[Voto] Erro ao enviar figurinha da playlist: ${err.message}`,
-          );
-        }
-      } else {
-        await client.sendMessage(
-          chatId,
-          `⚠️ Votação aprovada, mas erro ao adicionar à playlist: ${addRes.error}`,
-        );
-      }
+      await addPassedTrackToPlaylist({
+        vote: updatedVote,
+        stats,
+        group,
+        client,
+        chatId,
+        initiatorAccountId,
+      });
     } else if (updatedVote.status === "failed") {
       await client.sendMessage(
         chatId,
