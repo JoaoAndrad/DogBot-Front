@@ -39,6 +39,33 @@ function pollAllowsMultipleAnswers(p) {
   return getPollOptionsObj(p).allowMultipleAnswers === true;
 }
 
+function parsePollMetadataObject(poll) {
+  if (!poll || poll.metadata == null) return {};
+  let m = poll.metadata;
+  if (typeof m === "string") {
+    try {
+      m = JSON.parse(m);
+    } catch {
+      return {};
+    }
+  }
+  return typeof m === "object" && m !== null && !Array.isArray(m) ? m : {};
+}
+
+/**
+ * Ban / rate limit de votos aplica-se só a enquetes criadas pelo bot (persistidas via createPoll).
+ * Enquetes só no WhatsApp (não no nosso registo) já não passam por aqui com poll conhecido;
+ * registos sem marca usam heurística de legado (fluxos do bot antes de __dogbotPoll).
+ */
+function isPollCreatedByBot(poll) {
+  if (!poll) return false;
+  const meta = parsePollMetadataObject(poll);
+  if (meta.__dogbotPoll === true) return true;
+  if (meta.actionType || meta.flowId) return true;
+  if (poll.vote_type || poll.vote_id) return true;
+  return false;
+}
+
 /** Texto legível em pt para duração do ban (config.rateLimitBanMs). */
 function formatBanDurationPt(ms) {
   const n = Number(ms);
@@ -190,6 +217,7 @@ async function saveFallbackPoll(chatId, title, options, opts = {}) {
     options: normOptions.slice(),
     pollOptions: normOptions.map((o, i) => ({ name: o, localId: i })),
     optionsObj: opts.options || {},
+    metadata: { __dogbotPoll: true },
     createdAt: Date.now(),
   };
   await storage.savePoll(msgId, record);
@@ -242,6 +270,11 @@ async function createPoll(clientOrSender, chatId, title, options, opts = {}) {
   const { msgId, sent, type, pollOptions } = sendResult;
 
   // persist
+  const metaMerged = {
+    ...(opts.metadata && typeof opts.metadata === "object" ? opts.metadata : {}),
+    __dogbotPoll: true,
+  };
+
   const record = {
     type: type || "native",
     chatId: payload.chatId,
@@ -253,7 +286,7 @@ async function createPoll(clientOrSender, chatId, title, options, opts = {}) {
     voteType: opts.voteType || null,
     voteId: opts.voteId || null,
     groupId: opts.groupId || null,
-    metadata: opts.metadata || null,
+    metadata: metaMerged,
     createdAt: Date.now(),
   };
 
@@ -446,7 +479,11 @@ async function handleVoteUpdate(vote) {
       }
     }
 
-    if (config.rateLimitEnabled && !pollAllowsMultipleAnswers(poll)) {
+    if (
+      config.rateLimitEnabled &&
+      !pollAllowsMultipleAnswers(poll) &&
+      isPollCreatedByBot(poll)
+    ) {
       const r = rateLimitAllow(`poll:${voter}`, {
         maxEvents: config.rateLimitPollVoteMax,
         windowMs: config.rateLimitPollVoteWindowMs,
