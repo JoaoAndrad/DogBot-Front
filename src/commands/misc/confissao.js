@@ -1,9 +1,11 @@
+const jsonStore = require("../../storage/jsonStore");
+
 module.exports = {
   name: "confissao",
   description:
     "Enviar uma confissão anonimamente para o grupo configurado (privado apenas).",
   async execute(ctx) {
-    const { message, info, reply, client, services } = ctx;
+    const { message, info, reply, client, services, fromCatchup } = ctx;
 
     // Array to collect poll messages for cleanup
     const pollMessages = [];
@@ -101,6 +103,24 @@ module.exports = {
       return;
     }
 
+    const msgIdSerialized =
+      message && message.id && message.id._serialized
+        ? message.id._serialized
+        : null;
+
+    // Catchup: nunca reabrir fluxo interativo; marca mensagem para não repetir no próximo arranque
+    if (fromCatchup) {
+      try {
+        await reply(
+          "Confissões interativas só em tempo real. Envie um novo /confissao com a sua mensagem.",
+        );
+      } catch (e) {
+        /* ignore */
+      }
+      if (msgIdSerialized) jsonStore.markProcessed(msgIdSerialized);
+      return;
+    }
+
     // determine sender identifier
     // privateChatId = message.from = the actual WhatsApp chat this message came from.
     // This is ALWAYS the correct destination for polls/replies (@c.us or @lid — both work).
@@ -174,6 +194,9 @@ module.exports = {
       );
       return;
     }
+
+    // Marca cedo para o catchup não reprocessar o mesmo /confissao se o bot reiniciar antes do fim do fluxo (enquetes).
+    if (msgIdSerialized) jsonStore.markProcessed(msgIdSerialized);
 
     // media helpers (images/videos) — implemented below
 

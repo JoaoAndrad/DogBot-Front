@@ -133,25 +133,88 @@ const rotinaFlow = createFlow("rotina", {
         data: { repeatKind: "weekdays" },
       },
       {
-        label: "Semanal (mesmo dia da semana)",
+        label: "Semanal",
         action: "exec",
-        handler: "pickRepeat",
-        data: { repeatKind: "weekly", weeklyDays: [] },
+        handler: "goWeekdayPick",
+        data: { repeatKind: "weekly" },
       },
       {
         label: "Semana sim, semana não",
         action: "exec",
-        handler: "pickRepeat",
+        handler: "goWeekdayPick",
         data: { repeatKind: "biweekly" },
       },
       {
-        label: "Mensal (dia do mês da data de início)",
+        label: "Mensal",
         action: "exec",
-        handler: "pickRepeat",
-        data: { repeatKind: "monthly", monthlyDay: null },
+        handler: "pickRepeatMonthly",
+        data: {},
       },
       { label: "🔙 Voltar", action: "back" },
     ],
+  },
+
+  "/create/weekday": {
+    title: "📅 *Dia da semana*",
+    dynamic: true,
+    handler: async (ctx) => {
+      const pending = ctx.state?.context?.pendingRepeatKind;
+      if (!pending || (pending !== "weekly" && pending !== "biweekly")) {
+        return {
+          title: "❌ Contexto perdido. Use o comando /rotina de novo.",
+          skipPoll: true,
+        };
+      }
+      const dayOpts = [
+        {
+          label: "Domingo",
+          action: "exec",
+          handler: "confirmWeekdayAndStartWizard",
+          data: { luxonWeekday: 7 },
+        },
+        {
+          label: "Segunda-feira",
+          action: "exec",
+          handler: "confirmWeekdayAndStartWizard",
+          data: { luxonWeekday: 1 },
+        },
+        {
+          label: "Terça-feira",
+          action: "exec",
+          handler: "confirmWeekdayAndStartWizard",
+          data: { luxonWeekday: 2 },
+        },
+        {
+          label: "Quarta-feira",
+          action: "exec",
+          handler: "confirmWeekdayAndStartWizard",
+          data: { luxonWeekday: 3 },
+        },
+        {
+          label: "Quinta-feira",
+          action: "exec",
+          handler: "confirmWeekdayAndStartWizard",
+          data: { luxonWeekday: 4 },
+        },
+        {
+          label: "Sexta-feira",
+          action: "exec",
+          handler: "confirmWeekdayAndStartWizard",
+          data: { luxonWeekday: 5 },
+        },
+        {
+          label: "Sábado",
+          action: "exec",
+          handler: "confirmWeekdayAndStartWizard",
+          data: { luxonWeekday: 6 },
+        },
+        { label: "🔙 Voltar", action: "back" },
+      ];
+      return {
+        title: "📅 *Em que dia da semana se repete?*",
+        options: dayOpts,
+      };
+    },
   },
 
   handlers: {
@@ -174,6 +237,67 @@ const rotinaFlow = createFlow("rotina", {
       });
       await ctx.reply(
         "📝 *Nome da rotina*\nEnvie o nome (só quem usou /rotina pode responder).",
+      );
+      return { end: true };
+    },
+
+    goWeekdayPick: async (ctx, data) => {
+      ctx.state.context = ctx.state.context || {};
+      ctx.state.context.pendingRepeatKind = data.repeatKind;
+      ctx.state.history = ctx.state.history || [];
+      ctx.state.history.push(ctx.state.path || "/create/repeat");
+      ctx.state.path = "/create/weekday";
+      return {};
+    },
+
+    confirmWeekdayAndStartWizard: async (ctx, data) => {
+      const rk = ctx.state?.context?.pendingRepeatKind;
+      const luxonWeekday = data.luxonWeekday;
+      if (
+        !rk ||
+        (rk !== "weekly" && rk !== "biweekly") ||
+        luxonWeekday == null
+      ) {
+        await ctx.reply("❌ Contexto perdido. Use /rotina de novo.");
+        return { end: true };
+      }
+      const draft = {
+        repeatKind: rk,
+        weeklyDays: [luxonWeekday],
+      };
+      const aliasKeys = [ctx.userId, ctx.chatId];
+      const uuid = await resolveEditorUuid(ctx.userId);
+      if (uuid) aliasKeys.push(uuid);
+      conversationState.startFlowWithAliases(aliasKeys, "rotina", {
+        step: "await_name",
+        draft,
+        invokerUserId: ctx.userId,
+        chatId: ctx.chatId,
+        isGroup: String(ctx.chatId).endsWith("@g.us"),
+      });
+      await ctx.reply(
+        "📝 *Nome da rotina*\nEnvie o nome (só quem usou /rotina pode responder).",
+      );
+      return { end: true };
+    },
+
+    pickRepeatMonthly: async (ctx) => {
+      const draft = {
+        repeatKind: "monthly",
+        monthlyDay: null,
+      };
+      const aliasKeys = [ctx.userId, ctx.chatId];
+      const uuid = await resolveEditorUuid(ctx.userId);
+      if (uuid) aliasKeys.push(uuid);
+      conversationState.startFlowWithAliases(aliasKeys, "rotina", {
+        step: "await_monthly_day",
+        draft,
+        invokerUserId: ctx.userId,
+        chatId: ctx.chatId,
+        isGroup: String(ctx.chatId).endsWith("@g.us"),
+      });
+      await ctx.reply(
+        "📅 *Qual dia do mês?*\nEnvie um número de *1* a *31* (só quem usou /rotina pode responder).",
       );
       return { end: true };
     },

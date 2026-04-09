@@ -2,6 +2,22 @@
  * Labels PT para repeatKind e texto de resumo de rotina (rascunho ou API).
  */
 
+/** Luxon weekday 1–7 (Seg–Dom) → rótulo curto em PT */
+const LUXON_WEEKDAY_PT = {
+  1: "segundas-feira",
+  2: "terças-feira",
+  3: "quartas-feira",
+  4: "quintas-feira",
+  5: "sextas-feira",
+  6: "sábados",
+  7: "domingos",
+};
+
+function luxonWeekdayLabelPlural(n) {
+  const x = Number(n);
+  return LUXON_WEEKDAY_PT[x] || "—";
+}
+
 function repeatKindLabel(draft) {
   if (!draft || !draft.repeatKind) return "—";
   const k = draft.repeatKind;
@@ -11,9 +27,27 @@ function repeatKindLabel(draft) {
     return `A cada ${n} dias`;
   }
   if (k === "weekdays") return "Dias úteis";
-  if (k === "weekly") return "Semanal";
-  if (k === "biweekly") return "Semana sim, semana não";
-  if (k === "monthly") return "Mensal";
+  if (k === "weekly") {
+    const days = Array.isArray(draft.weeklyDays) ? draft.weeklyDays : [];
+    if (days.length === 1) {
+      return `Semanal (${luxonWeekdayLabelPlural(days[0])})`;
+    }
+    return "Semanal";
+  }
+  if (k === "biweekly") {
+    const days = Array.isArray(draft.weeklyDays) ? draft.weeklyDays : [];
+    if (days.length === 1) {
+      return `Semana sim, semana não (${luxonWeekdayLabelPlural(days[0])})`;
+    }
+    return "Semana sim, semana não";
+  }
+  if (k === "monthly") {
+    const md = draft.monthlyDay;
+    if (md != null && md >= 1 && md <= 31) {
+      return `Mensal (dia ${md})`;
+    }
+    return "Mensal";
+  }
   return String(k);
 }
 

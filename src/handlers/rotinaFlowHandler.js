@@ -274,6 +274,31 @@ async function sendRepeatEditPoll(client, chatId, userId) {
   );
 }
 
+/** Enquete de dia da semana após escolher Semanal / Quinzenal na edição. */
+async function sendRepeatWeekdayEditPoll(client, chatId, userId) {
+  const labels = [
+    "Domingo",
+    "Segunda",
+    "Terça",
+    "Quarta",
+    "Quinta",
+    "Sexta",
+    "Sábado",
+  ];
+  const weekdayLuxonByIndex = [7, 1, 2, 3, 4, 5, 6];
+  await polls.createPoll(client, chatId, "🔁 Qual dia da semana?", labels, {
+    metadata: {
+      actionType: "rotina_wizard",
+      wizardStep: "repeat_weekday_pick",
+      weekdayLuxonByIndex,
+      flowId: "rotina",
+      userId,
+      chatId,
+    },
+    options: { allowMultipleAnswers: false },
+  });
+}
+
 function getRotinaStateKey(data) {
   return data.userId;
 }
@@ -397,10 +422,53 @@ async function executeRotinaWizardAction(result, client) {
   if (action === "rotina_wizard_repeat_applied") {
     const ch = data.repeatChoice;
     if (!ch) return;
+    const rk = ch.repeatKind;
+    if (rk === "weekly" || rk === "biweekly") {
+      conversationState.updateData(stateUserId, {
+        pendingRepeatChoice: ch,
+        step: "await_repeat_weekday_edit_poll",
+      });
+      await sendRepeatWeekdayEditPoll(client, chatId, stateUserId);
+      return;
+    }
+    if (rk === "monthly") {
+      const nextDraft = { ...draft, ...ch };
+      conversationState.updateData(stateUserId, {
+        draft: nextDraft,
+        step: "await_monthly_day",
+        editReturnTo: "await_final_confirm",
+      });
+      await client.sendMessage(
+        chatId,
+        "📅 *Qual dia do mês?*\nEnvie um número de *1* a *31*.",
+      );
+      return;
+    }
     const nextDraft = { ...draft, ...ch };
     conversationState.updateData(stateUserId, {
       draft: nextDraft,
       step: "await_final_confirm",
+    });
+    await sendPrimaryConfirmPoll(client, chatId, stateUserId, nextDraft, isGroup);
+    return;
+  }
+
+  if (action === "rotina_wizard_repeat_weekday_applied") {
+    const luxonWeekday = data.luxonWeekday;
+    const pending = st.data.pendingRepeatChoice;
+    if (luxonWeekday == null || !pending) {
+      await client.sendMessage(chatId, "❌ Opção inválida ou sessão expirada.");
+      return;
+    }
+    const nextDraft = {
+      ...draft,
+      ...pending,
+      weeklyDays: [luxonWeekday],
+    };
+    conversationState.updateData(stateUserId, {
+      draft: nextDraft,
+      step: "await_final_confirm",
+      pendingRepeatChoice: undefined,
     });
     await sendPrimaryConfirmPoll(client, chatId, stateUserId, nextDraft, isGroup);
   }
@@ -440,6 +508,35 @@ async function handleRotinaFlow(userId, body, state, reply, context) {
   }
 
   const text = String(body || "").trim();
+
+  if (step === "await_monthly_day") {
+    const n = parseInt(text, 10);
+    if (!Number.isFinite(n) || n < 1 || n > 31) {
+      await reply("❌ Envie um dia do mês entre 1 e 31.");
+      return true;
+    }
+    data.draft = data.draft || {};
+    data.draft.monthlyDay = n;
+    if (data.editReturnTo === "await_final_confirm" && client) {
+      conversationState.updateData(userId, {
+        ...data,
+        draft: data.draft,
+        step: "await_final_confirm",
+        editReturnTo: undefined,
+      });
+      await sendPrimaryConfirmPoll(client, chatId, invoker, data.draft, isGroup);
+      return true;
+    }
+    conversationState.updateData(userId, {
+      ...data,
+      draft: data.draft,
+      step: "await_name",
+    });
+    await reply(
+      "📝 *Nome da rotina*\nEnvie o nome (só quem usou /rotina pode responder).",
+    );
+    return true;
+  }
 
   if (step === "await_name") {
     if (!text) {
@@ -536,7 +633,11 @@ async function handleRotinaFlow(userId, body, state, reply, context) {
     return true;
   }
 
-  if (step === "await_final_confirm" || step === "await_repeat_edit_poll") {
+  if (
+    step === "await_final_confirm" ||
+    step === "await_repeat_edit_poll" ||
+    step === "await_repeat_weekday_edit_poll"
+  ) {
     await reply(
       "👆 Use a *enquete* acima para confirmar, editar ou escolher repetição.",
     );
@@ -579,6 +680,7 @@ module.exports = {
   handleRotinaFlow,
   sendAssignPoll,
   sendPrimaryConfirmPoll,
+  sendRepeatWeekdayEditPoll,
   executeRotinaWizardAction,
   finalizeCreateFromContext,
   resolveUuid,

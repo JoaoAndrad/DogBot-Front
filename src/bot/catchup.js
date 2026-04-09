@@ -135,7 +135,11 @@ async function runCatchup(client, options = {}) {
       for (const msg of newMsgs) {
         try {
           // Delegar para pipeline; pipeline fará dedupe também
-          await pipeline.processMessage({ client, msg });
+          await pipeline.processMessage({
+            client,
+            msg,
+            fromCatchup: true,
+          });
           if (msg.id && msg.id._serialized)
             storage.markProcessed(msg.id._serialized);
           if (msg.timestamp) storage.setLastTs(chatId, msg.timestamp);

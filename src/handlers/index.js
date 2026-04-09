@@ -838,6 +838,7 @@ async function handle(context) {
       args,
       services: { backend: backendClient, spotify: spotifyService },
       lookupResult,
+      fromCatchup: !!context.fromCatchup,
     };
 
     botMetricsReporter
