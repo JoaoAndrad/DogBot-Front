@@ -6,7 +6,9 @@ let server = null;
 async function startInternalApi(client, opts = {}) {
   if (server) return server;
   const PORT = Number(opts.port || process.env.INTERNAL_API_PORT || 3001);
-  const HOST = "127.0.0.1";
+  // 0.0.0.0: aceita ligações de fora do container (backend noutro host precisa disto).
+  // Em dev local podes forçar 127.0.0.1 com INTERNAL_API_BIND=127.0.0.1
+  const HOST = process.env.INTERNAL_API_BIND || "0.0.0.0";
   const SECRET = opts.secret || process.env.POLL_SHARED_SECRET;
 
   server = http.createServer(async (req, res) => {
