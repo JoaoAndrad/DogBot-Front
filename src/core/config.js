@@ -17,10 +17,10 @@ module.exports = {
 
   /** Rate limiting (frontend): desligar com RATE_LIMIT_ENABLED=false */
   rateLimitEnabled: process.env.RATE_LIMIT_ENABLED !== "false",
-  /** Máx. de comandos por utilizador por janela (só / ou ! ou confissao em DM) — evita rajadas */
+  /** Máx. de comandos por Usuário por janela (só / ou ! ou confissao em DM) — evita rajadas */
   rateLimitCmdMax: intEnv("RATE_LIMIT_CMD_MAX", 3),
   rateLimitCmdWindowMs: intEnv("RATE_LIMIT_CMD_WINDOW_MS", 5_000),
-  /** Máx. de interações com enquetes de voto único por utilizador por janela — default 5 em 10s (enquetes com allowMultipleAnswers não usam este limite) */
+  /** Máx. de interações com enquetes de voto único por Usuário por janela — default 5 em 10s (enquetes com allowMultipleAnswers não usam este limite) */
   rateLimitPollVoteMax: intEnv("RATE_LIMIT_POLL_VOTE_MAX", 3),
   rateLimitPollVoteWindowMs: intEnv("RATE_LIMIT_POLL_VOTE_WINDOW_MS", 5_000),
   /** Ban (ms) ao exceder limite de comandos ou de votos em enquetes */

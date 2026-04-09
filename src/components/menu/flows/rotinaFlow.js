@@ -7,7 +7,10 @@ const conversationState = require("../../../services/conversationState");
 const routineClient = require("../../../services/routineClient");
 const polls = require("../../poll");
 const flowManager = require("../flowManager");
-const { routineApiToDraft, sendEditFieldPoll } = require("../../../handlers/rotinaFlowHandler");
+const {
+  routineApiToDraft,
+  sendEditFieldPoll,
+} = require("../../../handlers/rotinaFlowHandler");
 
 const WA_POLL_MAX_OPTIONS = 12;
 
@@ -27,7 +30,9 @@ async function resolveEditorUuid(userId) {
 }
 
 function truncateLabel(s, max = 130) {
-  const t = String(s || "?").replace(/\n/g, " ").trim();
+  const t = String(s || "?")
+    .replace(/\n/g, " ")
+    .trim();
   return t.length > max ? `${t.slice(0, max - 1)}…` : t;
 }
 
@@ -37,7 +42,7 @@ function truncateLabel(s, max = 130) {
 async function sendRoutineListPoll(ctx) {
   const uuid = await resolveEditorUuid(ctx.userId);
   if (!uuid) {
-    await ctx.reply("❌ Não foi possível identificar o utilizador.");
+    await ctx.reply("❌ Não foi possível identificar o Usuário.");
     return;
   }
   const { routines } = await routineClient.getRoutines(ctx.chatId, uuid);
@@ -102,7 +107,10 @@ const rotinaFlow = createFlow("rotina", {
         },
         { label: "👋 Sair", action: "exec", handler: "leaveRotina" },
       ];
-      return { title: isGroup ? "📋 *Rotinas* (grupo)" : "📋 *Rotinas*", options: opts };
+      return {
+        title: isGroup ? "📋 *Rotinas* (grupo)" : "📋 *Rotinas*",
+        options: opts,
+      };
     },
   },
 
@@ -359,29 +367,23 @@ const rotinaFlow = createFlow("rotina", {
           data: {},
         },
       ];
-      await polls.createPoll(
-        ctx.client,
-        ctx.chatId,
-        `⚙️ *${t}*`,
-        labels,
-        {
-          metadata: {
-            actionType: "menu",
-            flowId: "rotina",
-            path: "/manage",
-            userId: ctx.userId,
-            options: optionsMeta,
-          },
-          options: { allowMultipleAnswers: false },
+      await polls.createPoll(ctx.client, ctx.chatId, `⚙️ *${t}*`, labels, {
+        metadata: {
+          actionType: "menu",
+          flowId: "rotina",
+          path: "/manage",
+          userId: ctx.userId,
+          options: optionsMeta,
         },
-      );
+        options: { allowMultipleAnswers: false },
+      });
       return { noRender: true };
     },
 
     routineMarkDoneToday: async (ctx, data) => {
       const uuid = await resolveEditorUuid(ctx.userId);
       if (!uuid) {
-        await ctx.reply("❌ Utilizador não identificado.");
+        await ctx.reply("❌ Usuário não identificado.");
         return { noRender: true };
       }
       try {
@@ -390,8 +392,7 @@ const rotinaFlow = createFlow("rotina", {
           uuid,
         );
         if (out.kind === "already_completed") {
-          let msg =
-            "ℹ️ Já estava registado como concluído para este período.";
+          let msg = "ℹ️ Já estava registado como concluído para este período.";
           if (out.nextDueYmd) {
             msg += `\n⏭️ Próximo dia previsto: ${out.nextDueYmd}`;
           }
@@ -435,7 +436,7 @@ const rotinaFlow = createFlow("rotina", {
     routineStartEdit: async (ctx, data) => {
       const uuid = await resolveEditorUuid(ctx.userId);
       if (!uuid) {
-        await ctx.reply("❌ Utilizador não identificado.");
+        await ctx.reply("❌ Usuário não identificado.");
         return { noRender: true };
       }
       const { routines } = await routineClient.getRoutines(ctx.chatId, uuid);
@@ -463,16 +464,14 @@ const rotinaFlow = createFlow("rotina", {
         isGroup,
         true,
       );
-      await ctx.reply(
-        "👆 Escolha o que deseja alterar na enquete acima.",
-      );
+      await ctx.reply("👆 Escolha o que deseja alterar na enquete acima.");
       return { noRender: true };
     },
 
     routineToggleActive: async (ctx, data) => {
       const uuid = await resolveEditorUuid(ctx.userId);
       if (!uuid) {
-        await ctx.reply("❌ Utilizador não identificado.");
+        await ctx.reply("❌ Usuário não identificado.");
         return { noRender: true };
       }
       const { routines } = await routineClient.getRoutines(ctx.chatId, uuid);
@@ -532,15 +531,13 @@ const rotinaFlow = createFlow("rotina", {
     routineExecuteDelete: async (ctx, data) => {
       const uuid = await resolveEditorUuid(ctx.userId);
       if (!uuid) {
-        await ctx.reply("❌ Utilizador não identificado.");
+        await ctx.reply("❌ Usuário não identificado.");
         return { noRender: true };
       }
       try {
         await routineClient.deleteRoutine(data.routineId, uuid);
         const name = truncateLabel(data.title || "—", 80);
-        await ctx.reply(
-          `🗑️ Rotina (*${name}*) excluída com sucesso.`,
-        );
+        await ctx.reply(`🗑️ Rotina (*${name}*) excluída com sucesso.`);
       } catch (e) {
         await ctx.reply(`❌ ${e.message || e}`);
       }

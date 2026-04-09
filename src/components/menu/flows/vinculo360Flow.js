@@ -1,5 +1,5 @@
 /**
- * Flow /vinculo360 — [Admin] círculo → membro Life360 → utilizador do bot → confirmar.
+ * Flow /vinculo360 — [Admin] círculo → membro Life360 → Usuário do bot → confirmar.
  */
 
 const { createFlow } = require("../flowBuilder");
@@ -143,7 +143,7 @@ const vinculo360Flow = createFlow("vinculo360", {
         (truncated
           ? `1️⃣ Círculo (primeiros ${MAX_CIRCLES}):`
           : "1️⃣ Escolha o círculo:") +
-        "\n\nDepois: membro Life360 → utilizador do bot a atribuir.";
+        "\n\nDepois: membro Life360 → Usuário do bot a atribuir.";
 
       const options = slice.map((c) => ({
         label: truncateLabel(`⭕ ${c.name || c.id || "?"}`),
@@ -262,7 +262,7 @@ const vinculo360Flow = createFlow("vinculo360", {
 
       if (!users.length) {
         return {
-          title: "Nenhum utilizador cadastrado na base de dados.",
+          title: "Nenhum Usuário cadastrado na base de dados.",
           skipPoll: true,
         };
       }
@@ -279,7 +279,7 @@ const vinculo360Flow = createFlow("vinculo360", {
       const slice = users.slice(start, start + USERS_PER_PAGE);
 
       const title =
-        `3️⃣ Utilizador a receber o vínculo — página ${page + 1}/${totalPages}\n` +
+        `3️⃣ Usuário a receber o vínculo — página ${page + 1}/${totalPages}\n` +
         `Total: ${users.length} · Ordem: match com *${truncateLabel(pending.displayName || "membro", 40)}* (push_name priorizado em empates)`;
 
       const options = slice.map((u) => ({
@@ -334,7 +334,7 @@ const vinculo360Flow = createFlow("vinculo360", {
         `4️⃣ Confirmar vínculo?\n\n` +
         `*Membro Life360:* ${pending.displayName}\n` +
         `ID: \`${pending.memberId}\`\n\n` +
-        `*Utilizador do bot:* ${target.displayName}\n` +
+        `*Usuário do bot:* ${target.displayName}\n` +
         `${target.sender_number}`;
       return {
         title,
@@ -409,7 +409,7 @@ const vinculo360Flow = createFlow("vinculo360", {
         );
         await ctx.reply(
           `✅ Vínculo criado: membro Life360 *${pending.displayName}* → ` +
-            `utilizador *${target.displayName}*.`,
+            `Usuário *${target.displayName}*.`,
         );
         invalidateVinculoUsersListCache(adminWa, pending.memberId);
       } catch (e) {

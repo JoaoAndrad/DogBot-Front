@@ -1,5 +1,5 @@
 /**
- * Cancela todos os fluxos pendentes do utilizador: conversationState (memória)
+ * Cancela todos os fluxos pendentes do Usuário: conversationState (memória)
  * e registos MenuState no backend (flows de menu / enquetes).
  */
 

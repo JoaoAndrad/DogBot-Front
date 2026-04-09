@@ -5,14 +5,13 @@ module.exports = {
   name: "vinculo360",
   aliases: ["link360", "mapear360"],
   description:
-    "[Admin] Vincular membro Life360 a um utilizador do bot (só no privado)",
+    "[Admin] Vincular membro Life360 a um Usuário do bot (só no privado)",
 
   async execute(context) {
     const { client, message } = context;
     const chatId = message.from;
     const isGroup =
-      !!(message && message.isGroup) ||
-      (chatId && chatId.endsWith("@g.us"));
+      !!(message && message.isGroup) || (chatId && chatId.endsWith("@g.us"));
     if (isGroup) {
       await client.sendMessage(
         chatId,
@@ -41,10 +40,7 @@ module.exports = {
         );
         return;
       }
-      await client.sendMessage(
-        chatId,
-        "❌ " + (e.message || String(e)),
-      );
+      await client.sendMessage(chatId, "❌ " + (e.message || String(e)));
       return;
     }
 

@@ -64,13 +64,19 @@ function samePhone(a, b) {
   return d(a).length > 6 && d(b).length > 6 && d(a) === d(b);
 }
 
-async function sendAssignPoll(client, chatId, userId, draft, flowId = "rotina") {
+async function sendAssignPoll(
+  client,
+  chatId,
+  userId,
+  draft,
+  flowId = "rotina",
+) {
   const backendUrl = process.env.BACKEND_URL || "http://localhost:8000";
   const creatorUuid = await resolveUuid(backendUrl, userId);
   if (!creatorUuid) {
     await client.sendMessage(
       chatId,
-      "❌ Não foi possível resolver o seu utilizador. Use /cadastro no privado.",
+      "❌ Não foi possível resolver o seu Usuário. Use /cadastro no privado.",
     );
     return;
   }
@@ -85,8 +91,7 @@ async function sendAssignPoll(client, chatId, userId, draft, flowId = "rotina") 
   const indexToUserId = {};
   let idx = 1;
   for (const p of participants) {
-    const partId =
-      p.id && p.id._serialized ? p.id._serialized : p.id || "";
+    const partId = p.id && p.id._serialized ? p.id._serialized : p.id || "";
     if (!partId || partId === userId) continue;
     if (botJid && (partId === botJid || samePhone(partId, botJid))) continue;
     const contact = await client.getContactById(partId).catch(() => null);
@@ -158,9 +163,7 @@ async function buildDraftSummaryText(
   const creatorName = await fetchUserLabel(backendUrl, invokerWaId);
 
   let peopleBlock = "";
-  const ids = Array.isArray(draft.assigneeUserIds)
-    ? draft.assigneeUserIds
-    : [];
+  const ids = Array.isArray(draft.assigneeUserIds) ? draft.assigneeUserIds : [];
   if (!isGroup) {
     peopleBlock =
       `👤 *Criador:* *${creatorName}*\n` +
@@ -255,13 +258,14 @@ async function sendPrimaryConfirmPoll(
   );
 }
 
-async function sendEditFieldPoll(client, chatId, userId, isGroup, isEdit = false) {
-  const labels = [
-    "📝 Nome",
-    "📅 Data de início",
-    "⏰ Horário",
-    "🔁 Repetição",
-  ];
+async function sendEditFieldPoll(
+  client,
+  chatId,
+  userId,
+  isGroup,
+  isEdit = false,
+) {
+  const labels = ["📝 Nome", "📅 Data de início", "⏰ Horário", "🔁 Repetição"];
   const fields = ["name", "startDate", "time", "repeat"];
   if (isGroup) {
     labels.push("👥 Participantes");
@@ -321,7 +325,12 @@ async function sendRepeatEditPoll(client, chatId, userId, isEdit = false) {
 }
 
 /** Enquete de dia da semana após escolher Semanal / Quinzenal na edição. */
-async function sendRepeatWeekdayEditPoll(client, chatId, userId, isEdit = false) {
+async function sendRepeatWeekdayEditPoll(
+  client,
+  chatId,
+  userId,
+  isEdit = false,
+) {
   const labels = [
     "Domingo",
     "Segunda",
@@ -361,10 +370,7 @@ async function executeRotinaWizardAction(result, client) {
   let st = conversationState.getState(stateUserId);
   if (!st && data.chatId) st = conversationState.getState(data.chatId);
   const isEditFlow =
-    st &&
-    st.flowType === "rotina_edit" &&
-    st.data &&
-    st.data.routineId;
+    st && st.flowType === "rotina_edit" && st.data && st.data.routineId;
   if (
     !st ||
     !st.data ||
@@ -372,7 +378,10 @@ async function executeRotinaWizardAction(result, client) {
     (st.flowType !== "rotina" && st.flowType !== "rotina_edit") ||
     (st.flowType === "rotina_edit" && !st.data.routineId)
   ) {
-    await client.sendMessage(chatId, "❌ Sessão expirada. Use /rotina de novo.");
+    await client.sendMessage(
+      chatId,
+      "❌ Sessão expirada. Use /rotina de novo.",
+    );
     return;
   }
 
@@ -434,10 +443,7 @@ async function executeRotinaWizardAction(result, client) {
       }
     } catch (e) {
       logger.error("[rotina] wizard confirm", e);
-      await client.sendMessage(
-        chatId,
-        `❌ Erro: ${e.message || e}`,
-      );
+      await client.sendMessage(chatId, `❌ Erro: ${e.message || e}`);
     }
     return;
   }
@@ -681,9 +687,7 @@ async function handleRotinaFlow(userId, body, state, reply, context) {
       draft: data.draft,
       step: "await_start_date",
     });
-    await reply(
-      "📅 *Data de início* (ex.: `DD/MM/AAAA`, `hoje`, `amanhã`).",
-    );
+    await reply("📅 *Data de início* (ex.: `DD/MM/AAAA`, `hoje`, `amanhã`).");
     return true;
   }
 
@@ -753,9 +757,7 @@ async function handleRotinaFlow(userId, body, state, reply, context) {
         step: "await_assign_poll",
       });
       await sendAssignPoll(client, chatId, invoker, data.draft);
-      await reply(
-        "👆 Marque quem participa e *Continuar* (última opção).",
-      );
+      await reply("👆 Marque quem participa e *Continuar* (última opção).");
       return true;
     }
 
@@ -799,7 +801,12 @@ async function handleRotinaFlow(userId, body, state, reply, context) {
 /**
  * Chamado pelo processor após rotina_assign (fluxo alternativo) — criar rotina no API
  */
-async function finalizeCreateFromContext(userId, chatId, draft, assigneeUserIds) {
+async function finalizeCreateFromContext(
+  userId,
+  chatId,
+  draft,
+  assigneeUserIds,
+) {
   const backendUrl = process.env.BACKEND_URL || "http://localhost:8000";
   const creatorUuid = await resolveUuid(backendUrl, userId);
   if (!creatorUuid) throw new Error("creator_not_found");
