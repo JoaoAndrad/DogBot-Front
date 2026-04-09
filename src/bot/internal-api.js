@@ -22,6 +22,24 @@ async function startInternalApi(client, opts = {}) {
         return;
       }
 
+      if (method === "GET" && url.split("?")[0] === "/internal/whatsapp-status") {
+        const info = client && client.info;
+        const whatsappReady = Boolean(info);
+        let phone = null;
+        try {
+          if (info && info.wid && info.wid.user != null) {
+            phone = String(info.wid.user);
+          }
+        } catch (e) {
+          /* ignore */
+        }
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(
+          JSON.stringify({ ok: true, whatsappReady, phone }),
+        );
+        return;
+      }
+
       if (method === "POST" && url === "/internal/send-poll") {
         let body = "";
         let size = 0;
