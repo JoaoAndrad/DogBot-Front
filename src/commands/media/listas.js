@@ -1,5 +1,5 @@
 /**
- * commands/misc/listas.js — Comando para gerenciar listas de filmes/séries
+ * commands/media/listas.js — Comando para gerenciar listas de filmes/séries
  * Uso: .listas
  */
 

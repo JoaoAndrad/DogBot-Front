@@ -1,5 +1,5 @@
 /**
- * commands/misc/livro.js — Buscar livro (Open Library por nome; Google Livros para gb:/ISBN)
+ * commands/media/livro.js — Buscar livro (Open Library por nome; Google Livros para gb:/ISBN)
  * Uso: /livro nome | /livro ol:OL…W | /livro gb:… | URL books.google | ISBN
  */
 

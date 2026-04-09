@@ -1,5 +1,5 @@
 /**
- * commands/misc/filme.js — Get movie/series info
+ * commands/media/filme.js — Get movie/series info
  * Usage: /filme nome_do_filme
  */
 

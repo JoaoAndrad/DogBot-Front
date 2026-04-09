@@ -94,8 +94,7 @@ function formatBatteryLine(loc) {
 function formatMovementLine(loc) {
   /** Sem lugar/endereço/coordenadas na API — localização não partilhada (modo fantasma). */
   const sharingLocation = formatLife360PlaceLine(loc) != null;
-  const stationary = () =>
-    sharingLocation ? "🚶 Parado" : "👻 Desaparecido";
+  const stationary = () => (sharingLocation ? "🚶 Parado" : "👻 Desaparecido");
 
   const speed = Number(loc.speed);
   const driving = loc.isDriving === "1" || loc.isDriving === true;
@@ -107,11 +106,11 @@ function formatMovementLine(loc) {
   }
   if (kmh != null && kmh > 0) {
     if (driving || transit) {
-      return `🚗 Em deslocação · ~${kmh} km/h`;
+      return `🚗 Deslocando-se · ~${kmh} km/h`;
     }
-    return `🏃 Em movimento · ~${kmh} km/h`;
+    return `🏃 Movendo-se · ~${kmh} km/h`;
   }
-  if (driving || transit) return "🚗 Em deslocação";
+  if (driving || transit) return "🚗 Deslocando-se";
   return stationary();
 }
 
@@ -428,9 +427,7 @@ const life360Flow = createFlow("life360", {
             );
           }
         } catch (e) {
-          logger.warn(
-            "[life360Flow] figurinha: " + (e.message || String(e)),
-          );
+          logger.warn("[life360Flow] figurinha: " + (e.message || String(e)));
         }
       } else {
         logger.info(

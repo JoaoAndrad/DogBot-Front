@@ -1,5 +1,5 @@
 /**
- * commands/misc/assisti.js — Mark movie as watched
+ * commands/media/assisti.js — Mark movie as watched
  * Usage: /assisti tmdbId or /assisti "movie name"
  */
 
