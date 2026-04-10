@@ -2,6 +2,7 @@ const logger = require("../utils/logger");
 const storage = require("./storage");
 const pipeline = require("./pipeline");
 const chatCleaner = require("../utils/chatCleaner");
+const groupDisplayNameSync = require("../services/groupDisplayNameSync");
 const fs = require("fs");
 const path = require("path");
 
@@ -94,6 +95,16 @@ async function runCatchup(client, options = {}) {
       );
     }
     logger.info("Catchup: todos os chats marcados como atualizados");
+    try {
+      await groupDisplayNameSync.syncAllGroupDisplayNames(client, {
+        force: true,
+      });
+    } catch (e) {
+      logger.warn(
+        "[Catchup] groupDisplayNameSync:",
+        e && e.message ? e.message : e,
+      );
+    }
     return;
   }
 
@@ -170,6 +181,16 @@ async function runCatchup(client, options = {}) {
     );
   }
   logger.info("Catchup: concluído");
+  try {
+    await groupDisplayNameSync.syncAllGroupDisplayNames(client, {
+      force: true,
+    });
+  } catch (e) {
+    logger.warn(
+      "[Catchup] groupDisplayNameSync:",
+      e && e.message ? e.message : e,
+    );
+  }
 }
 
 module.exports = { runCatchup };

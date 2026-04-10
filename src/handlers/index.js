@@ -9,6 +9,7 @@ const {
 } = require("../services/cancelPendingUserState");
 const botMetricsReporter = require("../services/botMetricsReporter");
 const { handleCadastroFlow } = require("./cadastroFlowHandler");
+const groupDisplayNameSync = require("../services/groupDisplayNameSync");
 
 /** Evita POST repetido: mesmo nome ~6h; sincroniza GroupChat.name no backend para admin UI. */
 const GROUP_DISPLAY_SYNC_TTL_MS = 6 * 60 * 60 * 1000;
@@ -76,6 +77,12 @@ async function handle(context) {
   // Accept either context.info (legacy) or context.msg (whatsapp-web.js)
   const info = context.info || {};
   const msg = context.msg || {};
+
+  const rawType = String(msg.type || info.type || "").toLowerCase();
+  if (rawType === "e2e_notification" && context.client) {
+    groupDisplayNameSync.syncAllGroupDisplayNames(context.client).catch(() => {});
+  }
+
   const body = String(
     info.body || msg.body || (msg._data && msg._data.caption) || "",
   ).trim();

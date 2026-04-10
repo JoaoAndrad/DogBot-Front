@@ -86,6 +86,14 @@ async function start() {
       }
     } else {
       logger.info("Catchup desabilitado pela configuração");
+      try {
+        const groupDisplayNameSync = require("../services/groupDisplayNameSync");
+        await groupDisplayNameSync.syncAllGroupDisplayNames(client, {
+          force: true,
+        });
+      } catch (e) {
+        logger.warn("groupDisplayNameSync (sem catchup):", e && e.message);
+      }
     }
   });
 
