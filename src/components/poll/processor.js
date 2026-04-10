@@ -435,7 +435,7 @@ async function executeAction(result, client) {
                   lookupData.user.display_name ||
                   lookupData.user.push_name ||
                   "Usuário";
-                logger.info(
+                logger.debug(
                   `[processor] Resolved identifier ${menuUserId} to UUID ${resolvedUUID} for ${data.flowId}`,
                 );
                 menuUserId = resolvedUUID;
@@ -486,7 +486,7 @@ async function executeAction(result, client) {
             : "/";
           savedState.path = prevPath;
           await storage.saveState(stateKey, data.flowId, savedState);
-          logger.info(
+          logger.debug(
             `[processor] Back to ${prevPath} for ${data.flowId} (user ${stateKey})`,
           );
           await flowManager._renderNode(
@@ -500,7 +500,7 @@ async function executeAction(result, client) {
         }
 
         if (handler) {
-          logger.info(
+          logger.debug(
             `[processor] Executing menu handler: ${handler} for user ${menuUserId}`,
           );
           // Execute handler directly by getting flow from flowManager
@@ -634,9 +634,6 @@ async function executeAction(result, client) {
               const storage = require("../menu/storage");
               try {
                 await storage.deleteState(stateUserId, data.flowId);
-                logger.info(
-                  `[processor] Flow ${data.flowId} ended for ${stateUserId} - state cleaned up`,
-                );
               } catch (cleanupErr) {
                 // Log cleanup failure but don't mask the successful flow completion
                 logger.warn(
@@ -650,15 +647,9 @@ async function executeAction(result, client) {
               const flowManager = require("../menu/flowManager");
               if (ctx.state && ctx.state.path) {
                 try {
-                  logger.info(
-                    `[processor] Saving state and navigating to ${ctx.state.path}`,
-                  );
                   await storage.saveState(stateUserId, data.flowId, ctx.state);
 
                   if (result && result.noRender) {
-                    logger.info(
-                      `[processor] noRender=true for ${data.flowId}; skipping re-render`,
-                    );
                     break;
                   }
 
@@ -684,9 +675,6 @@ async function executeAction(result, client) {
             );
           }
         } else if (target) {
-          logger.info(
-            `[processor] Navigating to: ${target} for user ${stateUserId}`,
-          );
           const flowManager = require("../menu/flowManager");
           // Navigate to target path by re-rendering (stateUserId so poll metadata matches state)
           await flowManager._renderNode(
@@ -746,7 +734,7 @@ async function executeAction(result, client) {
 
       case "confession":
         // Confession approval/rejection
-        logger.info(
+        logger.debug(
           `[processor] Confession ${data.approved ? "approved" : "rejected"}`,
         );
         // TODO: Implement confession handler

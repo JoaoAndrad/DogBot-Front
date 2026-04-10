@@ -116,7 +116,7 @@ async function ensureUploadQpl(client) {
       );
     }
   }
-  logger.warn(
+  logger.debug(
     "[StickerHelper] Could not initialize MediaUploadQpl on any known page handle",
   );
   return false;
@@ -152,7 +152,7 @@ async function downloadImageToBuffer(imageUrl, opts = {}) {
     }
     return Buffer.from(await response.arrayBuffer());
   } catch (e) {
-    logger.warn("[StickerHelper] downloadImageToBuffer: " + e.message);
+    logger.debug("[StickerHelper] downloadImageToBuffer: " + e.message);
     return null;
   }
 }
@@ -166,11 +166,9 @@ async function downloadImageToBuffer(imageUrl, opts = {}) {
 async function downloadAndConvertToWebp(imageUrl, trackId) {
   try {
     if (!imageUrl) {
-      logger.warn("[StickerHelper] No image URL provided");
+      logger.debug("[StickerHelper] No image URL provided");
       return null;
     }
-
-    logger.info(`[StickerHelper] Downloading image for track ${trackId}`);
 
     // Download image
     const response = await fetch(imageUrl);
@@ -195,9 +193,6 @@ async function downloadAndConvertToWebp(imageUrl, trackId) {
       .webp({ quality: 80 })
       .toBuffer();
 
-    logger.info(
-      `[StickerHelper] Converted to WebP: ${webpBuffer.length} bytes`,
-    );
     return webpBuffer;
   } catch (error) {
     logger.error(`[StickerHelper] Error processing image: ${error.message}`);
@@ -215,13 +210,9 @@ async function downloadAndConvertToWebp(imageUrl, trackId) {
 async function sendTrackSticker(client, chatId, track) {
   try {
     if (!track || !track.image) {
-      logger.warn("[StickerHelper] No track image available");
+      logger.debug("[StickerHelper] No track image available");
       return false;
     }
-
-    logger.info(
-      `[StickerHelper] Sending sticker for ${track.trackName} to ${chatId}`,
-    );
 
     // Download and convert
     const webpBuffer = await downloadAndConvertToWebp(
@@ -229,7 +220,7 @@ async function sendTrackSticker(client, chatId, track) {
       track.trackId,
     );
     if (!webpBuffer) {
-      logger.warn("[StickerHelper] Failed to create WebP buffer");
+      logger.debug("[StickerHelper] Failed to create WebP buffer");
       return false;
     }
 
@@ -255,9 +246,6 @@ async function sendTrackSticker(client, chatId, track) {
       await client.sendMessage(chatId, media, {
         sendMediaAsSticker: true,
       });
-      logger.info(
-        `[StickerHelper] ✅ Sticker sent successfully for ${track.trackName}`,
-      );
       return true;
     } catch (sendErr) {
       // Log full error for debugging (stack and raw object if available)
@@ -265,13 +253,10 @@ async function sendTrackSticker(client, chatId, track) {
         `[StickerHelper] Error sending sticker (stack): ${sendErr && sendErr.stack ? sendErr.stack : String(sendErr)}`,
       );
       try {
-        logger.warn(
+        logger.debug(
           `[StickerHelper] Attempting fallback: send as regular image for ${track.trackName}`,
         );
         await client.sendMessage(chatId, media); // fallback: send as image
-        logger.info(
-          `[StickerHelper] ✅ Fallback image sent for ${track.trackName}`,
-        );
         return true;
       } catch (fallbackErr) {
         logger.error(
@@ -322,7 +307,7 @@ async function createCompositeWebp(tracks) {
   for (let i = 0; i < tracks.length && i < 9; i++) {
     const url = tracks[i].image;
     if (!url) {
-      logger.warn(`[StickerHelper] Track ${i} has no image URL`);
+      logger.debug(`[StickerHelper] Track ${i} has no image URL`);
       continue;
     }
 
@@ -331,7 +316,7 @@ async function createCompositeWebp(tracks) {
       imgs.push(buf);
       logger.debug(`[StickerHelper] Successfully downloaded image ${i}`);
     } else {
-      logger.warn(`[StickerHelper] Failed to download image ${i} from ${url}`);
+      logger.debug(`[StickerHelper] Failed to download image ${i} from ${url}`);
     }
   }
 
@@ -340,8 +325,6 @@ async function createCompositeWebp(tracks) {
     logger.error("[StickerHelper] No images could be downloaded");
     return null;
   }
-
-  logger.info(`[StickerHelper] Creating composite with ${n} images`);
 
   try {
     if (n === 1) {
@@ -509,13 +492,9 @@ async function createCompositeWebp(tracks) {
 async function sendCompositeSticker(client, chatId, tracks) {
   try {
     if (!tracks || tracks.length === 0) {
-      logger.warn("[StickerHelper] No tracks provided for composite sticker");
+      logger.debug("[StickerHelper] No tracks provided for composite sticker");
       return false;
     }
-
-    logger.info(
-      `[StickerHelper] Building composite sticker with ${tracks.length} tracks`,
-    );
 
     // Build composite webp
     const webpBuf = await createCompositeWebp(tracks.slice(0, 9));
@@ -544,7 +523,6 @@ async function sendCompositeSticker(client, chatId, tracks) {
       await client.sendMessage(chatId, media, {
         sendMediaAsSticker: true,
       });
-      logger.info(`[StickerHelper] ✅ Composite sticker sent successfully`);
       return true;
     } catch (sendErr) {
       logger.error(
@@ -553,11 +531,10 @@ async function sendCompositeSticker(client, chatId, tracks) {
 
       // Fallback: try sending as regular image
       try {
-        logger.warn(
+        logger.debug(
           `[StickerHelper] Attempting fallback: send as regular image`,
         );
         await client.sendMessage(chatId, media);
-        logger.info(`[StickerHelper] ✅ Fallback image sent successfully`);
         return true;
       } catch (fallbackErr) {
         logger.error(
@@ -627,7 +604,6 @@ async function sendBufferAsSticker(client, chatId, buffer, opts = {}) {
           sendMediaAsSticker: true,
           ...(opts.quoted ? { quoted: opts.quoted } : {}),
         });
-        logger.info("[StickerHelper] ✅ Full-only sticker sent successfully");
         return true;
       } catch (sendErr) {
         logger.error(
@@ -692,7 +668,6 @@ async function sendBufferAsSticker(client, chatId, buffer, opts = {}) {
           ),
         );
 
-        logger.info("[StickerHelper] ✅ Dual stickers sent (crop + full-fit)");
         return true;
       } catch (sendErr) {
         logger.error(
@@ -714,7 +689,6 @@ async function sendBufferAsSticker(client, chatId, buffer, opts = {}) {
             media2,
             opts.quoted ? { quoted: opts.quoted } : {},
           );
-          logger.info("[StickerHelper] ✅ Fallback single sticker sent");
           return true;
         } catch (fallbackErr) {
           logger.error(
@@ -739,7 +713,6 @@ async function sendBufferAsSticker(client, chatId, buffer, opts = {}) {
         opts.quoted ? { quoted: opts.quoted } : {},
       );
       await client.sendMessage(chatId, media, sendOpts);
-      logger.info("[StickerHelper] ✅ Buffer sticker sent successfully");
       return true;
     } catch (sendErr) {
       logger.error(
@@ -749,7 +722,6 @@ async function sendBufferAsSticker(client, chatId, buffer, opts = {}) {
       try {
         const sendOpts = opts.quoted ? { quoted: opts.quoted } : {};
         await client.sendMessage(chatId, media, sendOpts);
-        logger.info("[StickerHelper] ✅ Fallback image sent for buffer");
         return true;
       } catch (fallbackErr) {
         logger.error(

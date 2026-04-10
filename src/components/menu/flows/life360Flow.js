@@ -390,7 +390,7 @@ const life360Flow = createFlow("life360", {
             circleId = resolved.circleId || circleId;
           }
         } catch (e) {
-          logger.warn(
+          logger.debug(
             "[life360Flow] resolveLife360Member: " + (e.message || String(e)),
           );
         }
@@ -414,23 +414,22 @@ const life360Flow = createFlow("life360", {
         try {
           const buf = await downloadImageToBuffer(avatarUrl);
           if (buf && buf.length) {
-            const ok = await sendBufferAsSticker(ctx.client, ctx.chatId, buf, {
+            await sendBufferAsSticker(ctx.client, ctx.chatId, buf, {
               fullOnly: true,
               filename: "life360-avatar.webp",
             });
-            logger.info(
-              `[life360Flow] figurinha avatar memberId=${memberId} ok=${ok}`,
-            );
           } else {
-            logger.warn(
+            logger.debug(
               `[life360Flow] downloadImageToBuffer vazio memberId=${memberId}`,
             );
           }
         } catch (e) {
-          logger.warn("[life360Flow] figurinha: " + (e.message || String(e)));
+          logger.error(
+            "[life360Flow] figurinha: " + (e.message || String(e)),
+          );
         }
       } else {
-        logger.info(
+        logger.debug(
           `[life360Flow] sem URL de avatar após merge memberId=${memberId}`,
         );
       }
