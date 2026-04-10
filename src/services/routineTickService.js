@@ -3,6 +3,110 @@ const routineClient = require("./routineClient");
 
 const DEFAULT_CHECKIN_OPTIONS = ["Eu fiz", "Ainda não"];
 
+/** HH:mm a partir de minutos desde meia-noite (alinhado ao payload da rotina). */
+function minutesToClockLabel(minute) {
+  const m = Number(minute);
+  if (!Number.isFinite(m)) return "";
+  const h = Math.floor(m / 60);
+  const min = Math.round(m % 60);
+  return `${String(h).padStart(2, "0")}:${String(min).padStart(2, "0")}`;
+}
+
+/**
+ * Resolve nomes de conversa para log (sem expor JID como título principal).
+ * @param {import("whatsapp-web.js").Client} client
+ * @param {string[]} chatIds
+ */
+async function fetchChatDisplayNames(client, chatIds) {
+  const map = new Map();
+  const unique = [...new Set((chatIds || []).filter(Boolean))];
+  for (const id of unique) {
+    const sid = String(id);
+    try {
+      const ch = await client.getChatById(sid);
+      const n = ch && ch.name ? String(ch.name).trim() : "";
+      if (n) {
+        map.set(sid, n);
+      } else if (sid.endsWith("@g.us")) {
+        map.set(sid, "Grupo (nome indisponível)");
+      } else {
+        map.set(sid, "Privada");
+      }
+    } catch {
+      map.set(sid, sid.endsWith("@c.us") ? "Privada" : "Grupo");
+    }
+  }
+  return map;
+}
+
+function collectMentionJidsFromPayload(p) {
+  const pre = p.preambleMentionWaIds || p.metadata?.preambleMentionWaIds;
+  const body = p.bodyMentionWaIds || p.metadata?.bodyMentionWaIds;
+  const a = [...(Array.isArray(pre) ? pre : []), ...(Array.isArray(body) ? body : [])];
+  return [...new Set(a.map(String))];
+}
+
+function jidsToPhoneList(jids) {
+  if (!jids.length) return "nenhuma (só texto)";
+  return jids.map((j) => String(j).replace(/@c\.us$/i, "")).join(", ");
+}
+
+/**
+ * Texto curto: data/slot ou modo retrospectiva.
+ * @param {object} a ação do tick (kind + payload)
+ */
+function describeRoutineTiming(a) {
+  const p = a.payload || {};
+  const meta = p.metadata || {};
+  if (a.kind === "checkin_poll_group") {
+    const n = Array.isArray(meta.occurrenceIds) ? meta.occurrenceIds.length : 0;
+    const slot = meta.groupSlotLabel ? String(meta.groupSlotLabel).trim() : "";
+    return `várias rotinas (${n}) no mesmo intervalo${slot ? ` · janela/slot: ${slot}` : ""}`;
+  }
+  if (a.kind === "checkin_poll") {
+    const ld = meta.localDate ? String(meta.localDate) : "";
+    const hm =
+      meta.checkinSlotMinute != null
+        ? minutesToClockLabel(meta.checkinSlotMinute)
+        : "";
+    if (ld && hm) return `dia ${ld} · horário do slot ${hm}`;
+    if (ld) return `dia ${ld}`;
+    return "—";
+  }
+  if (a.kind === "retrospective") {
+    return meta.localDate ? `retrospectiva · dia ${meta.localDate}` : "retrospectiva";
+  }
+  return "—";
+}
+
+/**
+ * Log visível no terminal (independente do nível do winston).
+ * Agregação no backend: vários check-in no mesmo grupo + mesma janela temporal → um único
+ * dispatch `checkin_poll_group` (ver mergeOverlappingCheckinDispatches no routineService).
+ */
+function logRoutineTickDispatchConsole({
+  serverTime,
+  chatDisplayName,
+  chatKind,
+  actionKind,
+  timingText,
+  mentionPhones,
+  aggregationNote,
+}) {
+  console.log(
+    [
+      "[routineTick] ——————————————————————————————",
+      `  Hora de referência (servidor): ${serverTime || "—"}`,
+      `  O quê: ${actionKind}`,
+      `  Quando (rotina / slot): ${timingText}`,
+      `  Para: «${chatDisplayName}» (${chatKind})`,
+      `  Menções (@ número): ${mentionPhones}`,
+      `  Modo: ${aggregationNote}`,
+      "[routineTick] ——————————————————————————————",
+    ].join("\n"),
+  );
+}
+
 /**
  * @param {import("whatsapp-web.js").Client} client
  * @param {string} chatId
@@ -150,12 +254,52 @@ async function processRoutineTick(client) {
 
     const { primary, extraDispatchIdsByKey } = dedupeRoutineDispatchActions(actions);
 
+    const primaryChatIds = primary
+      .map(({ action: a }) => {
+        const p = a.payload || {};
+        return p.chatId || a.chatId;
+      })
+      .filter(Boolean);
+    const chatNameById = await fetchChatDisplayNames(client, primaryChatIds);
+
     for (const { action: a, key: dispatchKey } of primary) {
       const p = a.payload || {};
       const chatId = p.chatId || a.chatId;
       if (!chatId) continue;
 
       const isGroup = a.kind === "checkin_poll_group";
+      const meta = p.metadata || {};
+      const mentionJids = collectMentionJidsFromPayload(p);
+      const mentionPhones = jidsToPhoneList(mentionJids);
+      const timingText = describeRoutineTiming(a);
+      const chatDisplayName = chatNameById.get(String(chatId)) || "—";
+      const chatKind = String(chatId).endsWith("@g.us") ? "grupo" : "privado";
+
+      let actionKind = "Check-in";
+      let aggregationNote =
+        "Uma enquete para esta rotina (sem agregação com outras neste envio).";
+      if (a.kind === "checkin_poll_group") {
+        const n = Array.isArray(meta.occurrenceIds) ? meta.occurrenceIds.length : 0;
+        actionKind = "Check-in agrupado";
+        aggregationNote =
+          n > 1
+            ? `Uma só enquete para ${n} rotinas — o backend já agregou vários check-ins no mesmo grupo e na mesma janela temporal (mergeOverlappingCheckinDispatches).`
+            : "Enquete agrupada (metadados de grupo).";
+      } else if (a.kind === "retrospective") {
+        actionKind = "Retrospectiva";
+        aggregationNote =
+          "Uma enquete de retrospectiva (dia anterior sem conclusão).";
+      }
+
+      logRoutineTickDispatchConsole({
+        serverTime: res.serverTime,
+        chatDisplayName,
+        chatKind,
+        actionKind,
+        timingText,
+        mentionPhones,
+        aggregationNote,
+      });
 
       const preamble = p.preambleText || null;
       const preambleMentions =
@@ -188,7 +332,6 @@ async function processRoutineTick(client) {
 
       const title = p.title || "Rotina";
       const options = p.options || DEFAULT_CHECKIN_OPTIONS;
-      const meta = p.metadata || {};
 
       const send = await polls.createPoll(client, chatId, title, options, {
         metadata: meta,
