@@ -62,6 +62,9 @@ async function runCatchup(client, options = {}) {
   }
 
   if (isFirstRun) {
+    console.log(
+      "[Catchup] first run: checkpoints.json/processed.json ausentes ou vazios — a marcar última mensagem por chat como checkpoint (sem reprocessar histórico)",
+    );
     logger.info(
       "Catchup: primeira execução detectada - marcando todas as mensagens antigas como processadas",
     );
