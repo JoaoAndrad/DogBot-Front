@@ -1,11 +1,21 @@
 const backendClient = require("../../services/backendClient");
 const logger = require("../../utils/logger");
 
+/** `true` = comando desativado (voltar a `false` para reativar). */
+const ALEATORIO_DESATIVADO = true;
+
 module.exports = {
   name: "aleatorio",
   description: "Toca faixas aleatórias únicas baseadas na playlist do grupo",
 
   async execute(ctx) {
+    if (ALEATORIO_DESATIVADO) {
+      const { reply } = ctx;
+      return reply(
+        "⏸️ O comando /aleatorio está temporariamente desativado.",
+      );
+    }
+
     const { message, reply } = ctx;
     const msg = message;
     const chatId = msg.from;
