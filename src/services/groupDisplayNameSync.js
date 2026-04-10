@@ -1,5 +1,9 @@
 const backendClient = require("./backendClient");
 const logger = require("../utils/logger");
+const {
+  archiveInactiveChat,
+  addToIgnoredChats,
+} = require("../utils/chatCleaner");
 
 let lastFullSyncAt = 0;
 /** Entre e2e_notification repetidos, evita rajadas de getChats + POST. */
@@ -31,6 +35,31 @@ async function botIsGroupParticipant(client, chat) {
   }
   if (!participants || participants.length === 0) return false;
   return participants.some((p) => p && p.id && p.id._serialized === botId);
+}
+
+/**
+ * Tenta sair do grupo e remove o chat local (getChats pode manter entrada fantasma após kick).
+ * @param {import("whatsapp-web.js").Chat} chat
+ * @param {string} chatId
+ */
+async function leaveAndRemoveOrphanGroupChat(chat, chatId) {
+  try {
+    if (chat && typeof chat.leave === "function") {
+      await chat.leave();
+    }
+  } catch (e) {
+    logger.debug(
+      `[groupDisplayNameSync] leave órfão ${chatId}:`,
+      e && e.message,
+    );
+  }
+  const deleted = await archiveInactiveChat(
+    chat,
+    chatId,
+    "órfão: bot não é participante",
+  );
+  addToIgnoredChats(chatId);
+  return deleted;
 }
 
 /**
@@ -69,6 +98,8 @@ async function syncAllGroupDisplayNames(client, opts = {}) {
   let ok = 0;
   let skippedEmpty = 0;
   let skippedNotParticipant = 0;
+  let orphanRemoved = 0;
+  let orphanRemoveFail = 0;
   let fail = 0;
 
   for (const chat of groups) {
@@ -77,6 +108,18 @@ async function syncAllGroupDisplayNames(client, opts = {}) {
     const inGroup = await botIsGroupParticipant(client, chat);
     if (!inGroup) {
       skippedNotParticipant++;
+      try {
+        const removed = await leaveAndRemoveOrphanGroupChat(chat, chatId);
+        if (removed) orphanRemoved++;
+        else orphanRemoveFail++;
+      } catch (e) {
+        orphanRemoveFail++;
+        logger.warn(
+          `[groupDisplayNameSync] órfão ${chatId}:`,
+          e && e.message,
+        );
+      }
+      await new Promise((r) => setTimeout(r, 50));
       continue;
     }
 
@@ -98,13 +141,15 @@ async function syncAllGroupDisplayNames(client, opts = {}) {
   }
 
   logger.info(
-    `[groupDisplayNameSync] BD ← ${ok}/${groups.length} grupos (fora do grupo/órfão: ${skippedNotParticipant}; sem nome c/ participação: ${skippedEmpty}; HTTP: ${fail} falhas)`,
+    `[groupDisplayNameSync] BD ← ${ok}/${groups.length} grupos (órfãos: ${skippedNotParticipant} → removidos: ${orphanRemoved}, falha delete: ${orphanRemoveFail}; sem nome c/ participação: ${skippedEmpty}; HTTP: ${fail} falhas)`,
   );
   return {
     ok,
     total: groups.length,
     skippedEmpty,
     skippedNotParticipant,
+    orphanRemoved,
+    orphanRemoveFail,
     fail,
   };
 }
