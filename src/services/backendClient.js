@@ -11,7 +11,16 @@ function getBackendHeaders() {
   return headers;
 }
 
-async function sendToBackend(path, body, method = "POST") {
+/**
+ * @param {string} path
+ * @param {object|null} body
+ * @param {string} [method]
+ * @param {{ silentHttpStatuses?: number[] }} [opts] - não logar console.error para estes códigos (ex.: 404 esperado no sync companion)
+ */
+async function sendToBackend(path, body, method = "POST", opts = {}) {
+  const silentHttpStatuses = Array.isArray(opts.silentHttpStatuses)
+    ? opts.silentHttpStatuses
+    : [];
   const url = process.env.BACKEND_URL || "http://localhost:8000";
   const options = {
     method,
@@ -56,13 +65,15 @@ async function sendToBackend(path, body, method = "POST") {
       errorBody?.message ||
       res.statusText ||
       "Unknown error";
-    console.error("[backendClient] resposta HTTP não OK", {
-      method,
-      path: path.slice(0, 200),
-      status: res.status,
-      message: msg,
-      body: errorBody,
-    });
+    if (!silentHttpStatuses.includes(res.status)) {
+      console.error("[backendClient] resposta HTTP não OK", {
+        method,
+        path: path.slice(0, 200),
+        status: res.status,
+        message: msg,
+        body: errorBody,
+      });
+    }
     const err = new Error(`HTTP ${res.status}: ${msg}`);
     err.status = res.status;
     err.body = errorBody;

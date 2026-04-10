@@ -58,6 +58,8 @@ async function syncSharedChatsToBackend(client) {
             waId,
             chats: chatsPayload,
           },
+          "POST",
+          { silentHttpStatuses: [404] },
         );
         ok++;
       } catch (e) {
