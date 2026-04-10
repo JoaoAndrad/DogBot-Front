@@ -3,6 +3,7 @@ const logger = require("../utils/logger");
 const {
   archiveInactiveChat,
   addToIgnoredChats,
+  loadIgnoredChats,
 } = require("../utils/chatCleaner");
 
 let lastFullSyncAt = 0;
@@ -95,8 +96,11 @@ async function syncAllGroupDisplayNames(client, opts = {}) {
       String(c.id._serialized).endsWith("@g.us"),
   );
 
+  const ignoredChats = loadIgnoredChats();
+
   let ok = 0;
   let skippedEmpty = 0;
+  let skippedIgnored = 0;
   let skippedNotParticipant = 0;
   let orphanRemoved = 0;
   let orphanRemoveFail = 0;
@@ -104,6 +108,11 @@ async function syncAllGroupDisplayNames(client, opts = {}) {
 
   for (const chat of groups) {
     const chatId = chat.id._serialized;
+
+    if (ignoredChats.has(chatId)) {
+      skippedIgnored++;
+      continue;
+    }
 
     const inGroup = await botIsGroupParticipant(client, chat);
     if (!inGroup) {
@@ -140,12 +149,15 @@ async function syncAllGroupDisplayNames(client, opts = {}) {
     await new Promise((r) => setTimeout(r, 25));
   }
 
+  const processed = groups.length - skippedIgnored;
   logger.info(
-    `[groupDisplayNameSync] BD ← ${ok}/${groups.length} grupos (órfãos: ${skippedNotParticipant} → removidos: ${orphanRemoved}, falha delete: ${orphanRemoveFail}; sem nome c/ participação: ${skippedEmpty}; HTTP: ${fail} falhas)`,
+    `[groupDisplayNameSync] BD ← ${ok}/${processed} grupos (cache ignorados: ${skippedIgnored}; órfãos: ${skippedNotParticipant} → removidos: ${orphanRemoved}, falha delete: ${orphanRemoveFail}; sem nome c/ participação: ${skippedEmpty}; HTTP: ${fail} falhas)`,
   );
   return {
     ok,
     total: groups.length,
+    processed,
+    skippedIgnored,
     skippedEmpty,
     skippedNotParticipant,
     orphanRemoved,

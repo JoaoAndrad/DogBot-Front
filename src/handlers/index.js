@@ -8,6 +8,7 @@ const {
   cancelPendingForUser,
 } = require("../services/cancelPendingUserState");
 const botMetricsReporter = require("../services/botMetricsReporter");
+const { loadIgnoredChats } = require("../utils/chatCleaner");
 const { handleCadastroFlow } = require("./cadastroFlowHandler");
 const groupDisplayNameSync = require("../services/groupDisplayNameSync");
 
@@ -107,6 +108,13 @@ async function handle(context) {
         (msg._data && msg._data.notifyName) || info.pushName || author;
       const msgType = msg.type || info.type || "text";
 
+      if (
+        String(msgType).toLowerCase() === "e2e_notification" &&
+        from &&
+        loadIgnoredChats().has(String(from))
+      ) {
+        // Grupo já tratado como órfão (cache); evita repetir a mesma linha em cada arranque
+      } else {
       let logMsg = `📩 ${msgType}`;
       if (isGroup) {
         // Get group name - use getChat() to get full info
@@ -129,6 +137,7 @@ async function handle(context) {
         logMsg += ` | 💬 ${body.slice(0, 50)}${body.length > 50 ? "..." : ""}`;
 
       console.log(logMsg);
+      }
     }
   } catch (err) {
     // Silent fail on logging error
