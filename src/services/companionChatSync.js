@@ -2,6 +2,26 @@ const logger = require("../utils/logger");
 const backendClient = require("./backendClient");
 
 /**
+ * Nome legível do chat (grupos: subject em groupMetadata se name vier vazio).
+ * @param {object} chat
+ * @returns {string|null}
+ */
+function resolveChatTitle(chat) {
+  if (!chat) return null;
+  const n =
+    (chat.name != null && String(chat.name).trim()) ||
+    (chat.formattedTitle != null && String(chat.formattedTitle).trim()) ||
+    "";
+  if (n) return n;
+  if (chat.isGroup && chat.groupMetadata) {
+    const gm = chat.groupMetadata;
+    const subj = gm.subject != null ? String(gm.subject).trim() : "";
+    if (subj) return subj;
+  }
+  return null;
+}
+
+/**
  * Envia para o backend a lista de chats em partilha user+bot (para GET /api/companion/chats).
  * Um POST por contacto WA conhecido; falhas 404 (user não existe na BD) ignoram-se.
  */
@@ -17,10 +37,7 @@ async function syncSharedChatsToBackend(client) {
       try {
         const chatId = chat.id && chat.id._serialized;
         if (!chatId) continue;
-        const title =
-          (chat.name != null && String(chat.name)) ||
-          (chat.formattedTitle != null && String(chat.formattedTitle)) ||
-          null;
+        const title = resolveChatTitle(chat);
         const isGroup = !!chat.isGroup;
 
         if (isGroup) {

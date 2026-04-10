@@ -14,8 +14,8 @@ module.exports = {
       (msg && (msg.author || msg.from)) || (ctx.info && ctx.info.from);
     const reply = ctx.reply;
 
-    // Usar getContact() para obter o número real (@c.us)
-    if (msg) {
+    // Mensagens reais do wa têm getContact(); simuladas (gateway) não.
+    if (msg && typeof msg.getContact === "function") {
       try {
         const contact = await msg.getContact();
         if (contact && contact.id && contact.id._serialized) {
