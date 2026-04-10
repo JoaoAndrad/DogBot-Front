@@ -5,6 +5,7 @@
 
 const backendClient = require("../../services/backendClient");
 const logger = require("../../utils/logger");
+const bootLog = require("../../lib/bootLog");
 
 /** Título da rotina a partir do título da enquete de check-in / retrospectiva. */
 function routineNameFromPollTitle(title) {
@@ -42,7 +43,7 @@ function registerActionHandler(actionType, handler) {
     throw new Error("Handler must be a function");
   }
   actionHandlers.set(actionType, handler);
-  logger.info(`[processor] Registered handler for actionType: ${actionType}`);
+  logger.debug(`[processor] Registered handler for actionType: ${actionType}`);
 }
 
 /**
@@ -832,13 +833,13 @@ async function processGenericVote(poll, votes, stats, client) {
  */
 async function restoreAllPolls(client) {
   try {
-    logger.info("[processor] Validating poll recovery from backend...");
+    logger.debug("[processor] Validating poll recovery from backend...");
 
     // Get all polls from backend (could filter by recent/active later)
     const polls = await backendClient.sendToBackend("/api/polls/", null, "GET");
 
-    logger.debug("[processor] Backend response type:", typeof polls);
-    logger.debug("[processor] Is array:", Array.isArray(polls));
+    bootLog.debug("poll recovery backend response type:", typeof polls);
+    bootLog.debug("poll recovery is array:", Array.isArray(polls));
 
     if (!Array.isArray(polls)) {
       logger.error(
@@ -849,10 +850,9 @@ async function restoreAllPolls(client) {
         "[processor] Response content:",
         JSON.stringify(polls).substring(0, 200),
       );
+      bootLog.line("polls", { ok: false, extra: "backend response invalid" });
       return;
     }
-
-    logger.info(`[processor] Found ${polls.length} total polls in database`);
 
     // Count polls by action type
     const pollsByType = {};
@@ -875,17 +875,25 @@ async function restoreAllPolls(client) {
       }
     }
 
-    logger.info(`[processor] Poll types:`, pollsByType);
-    logger.info(
-      `[processor] ${recoverable}/${polls.length} polls have registered handlers`,
-    );
-    logger.info(
+    const typesStr = Object.entries(pollsByType)
+      .map(([k, v]) => `${k}=${v}`)
+      .join(" ");
+    bootLog.line("polls", {
+      ok: true,
+      extra: `db=${polls.length} handlers=${recoverable}/${polls.length}${typesStr ? ` ${typesStr}` : ""}`,
+    });
+    logger.debug("[processor] Poll types:", pollsByType);
+    logger.debug(
       "[processor] Poll recovery ready - votes will be processed automatically",
     );
   } catch (error) {
     logger.error("[processor] Failed to validate polls:", error.message);
     logger.error("[processor] Stack trace:", error.stack);
     logger.error("[processor] Full error:", error);
+    bootLog.line("polls", {
+      ok: false,
+      extra: error && error.message ? String(error.message) : "error",
+    });
   }
 }
 

@@ -1,5 +1,6 @@
 const http = require("http");
 const logger = require("../utils/logger");
+const bootLog = require("../lib/bootLog");
 
 let server = null;
 
@@ -194,7 +195,10 @@ async function startInternalApi(client, opts = {}) {
   await new Promise((resolve, reject) => {
     server.listen(PORT, HOST, (err) => {
       if (err) return reject(err);
-      console.log("Internal API listening on http://" + HOST + ":" + PORT);
+      bootLog.line("internal", {
+        ok: true,
+        extra: `http://${HOST}:${PORT}`,
+      });
       resolve();
     });
   });
@@ -207,7 +211,7 @@ async function stopInternalApi() {
   await new Promise((resolve) => {
     try {
       server.close(() => {
-        console.log("Internal API stopped");
+        logger.info("Internal API stopped");
         server = null;
         resolve();
       });

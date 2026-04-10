@@ -30,6 +30,12 @@ flowManager.registerFlow(rotinaFlow);
 flowManager.registerFlow(life360Flow);
 flowManager.registerFlow(vinculo360Flow);
 
+const bootLog = require("../../lib/bootLog");
+bootLog.line("flows", {
+  ok: true,
+  extra: `n=${flowManager.flows.size}`,
+});
+
 module.exports = {
   name: "menu",
   aliases: ["m"],

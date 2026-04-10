@@ -394,7 +394,7 @@ function registerSpotifyPollHandlers() {
   processor.registerActionHandler("spotify_track", handleTrackVote);
   processor.registerActionHandler("spotify_collection", handleCollectionVote);
 
-  logger.info("[SpotifyPollHandlers] Handlers registered with processor");
+  logger.debug("[SpotifyPollHandlers] Handlers registered with processor");
 }
 
 module.exports = {

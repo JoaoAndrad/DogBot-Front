@@ -1,5 +1,6 @@
 const storage = require("./storage");
 const logger = require("../../utils/logger");
+const bootLog = require("../../lib/bootLog");
 const { validateFlow } = require("./flowBuilder");
 const resolveUserUuidForMenu = require("../../utils/resolveUserUuidForMenu");
 
@@ -25,7 +26,7 @@ class FlowManager {
     }
 
     this.flows.set(flow.flowId, flow);
-    console.log(`[FlowManager] Registered flow: ${flow.flowId}`);
+    bootLog.debug(`flow ${flow.flowId}`);
   }
 
   /**

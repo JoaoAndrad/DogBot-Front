@@ -127,7 +127,7 @@ async function sendPollAbuseBanNotice(chatId, voterJid, banMs) {
 
 function setWhatsAppClient(client) {
   whatsappClient = client;
-  logger.info("[PollComponent] Cliente WhatsApp configurado");
+  logger.debug("[PollComponent] Cliente WhatsApp configurado");
 }
 
 function registerVoteHandler(voteType, handler) {
