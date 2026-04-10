@@ -9,7 +9,7 @@ const botMetricsReporter = require("../services/botMetricsReporter");
 async function processEvent(context) {
   try {
     if (await dedupe.isDuplicate(context)) {
-      console.log("pipeline: duplicate message, skipping");
+      //console.log("pipeline: duplicate message, skipping");
       return false;
     }
 
@@ -43,9 +43,7 @@ async function processEvent(context) {
         banKey: `rl:${fromId}`,
       });
       if (!r.ok) {
-        logger.debug(
-          `[rateLimit] comando bloqueado (${r.reason}): ${fromId}`,
-        );
+        logger.debug(`[rateLimit] comando bloqueado (${r.reason}): ${fromId}`);
         return false;
       }
     }

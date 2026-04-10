@@ -9,7 +9,7 @@ async function processMessage(context) {
       msg && msg.id && msg.id._serialized ? msg.id._serialized : null;
 
     if (msgId && storage.isProcessed(msgId)) {
-      console.log("Pipeline: mensagem já processada, pulando", { msgId });
+      //console.log("Pipeline: mensagem já processada, pulando", { msgId });
       return false;
     }
 
