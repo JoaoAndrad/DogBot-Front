@@ -288,6 +288,33 @@ async function removeItem(itemId, userId) {
   }
 }
 
+/**
+ * Após /filme ou /livro: alinhar ListItems ao mesmo assistido/nota (escopo DM vs grupo).
+ * @param {string} userId
+ * @param {string} chatId
+ * @param {{ listKind: "movie"|"book", externalId: string, watched: boolean, rating?: number }} opts
+ * @returns {Promise<{ itemsUpdated: number, listsUpdated: number }>}
+ */
+async function syncFromDirectRating(userId, chatId, opts) {
+  const { listKind, externalId, watched, rating } = opts;
+  const body = {
+    userId,
+    chatId,
+    listKind,
+    externalId,
+    watched,
+  };
+  if (rating !== undefined && rating !== null) {
+    body.rating = rating;
+  }
+  const response = await sendToBackend(
+    "/api/lists/sync-from-direct-rating",
+    body,
+    "POST",
+  );
+  return response;
+}
+
 module.exports = {
   searchMovies,
   getUserLists,
@@ -299,4 +326,5 @@ module.exports = {
   markWatched,
   addRating,
   removeItem,
+  syncFromDirectRating,
 };

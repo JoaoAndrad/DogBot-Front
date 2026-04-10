@@ -4,6 +4,7 @@
 
 const { createFlow } = require("../flowBuilder");
 const bookClient = require("../../../services/bookClient");
+const listClient = require("../../../services/listClient");
 const flowManager = require("../flowManager");
 const {
   downloadImageToBuffer,
@@ -60,6 +61,32 @@ async function refreshBookCardContext(state, workId, userId) {
     state.context.bookInfo = refreshed;
   } catch (err) {
     logger.warn("[BookCardFlow] refresh bookInfo:", err.message);
+  }
+}
+
+function listsSyncSuffix(sync) {
+  const n = sync?.listsUpdated;
+  if (n == null || n < 1) return "";
+  return `\n\n📋 Também atualizado em ${n} lista(s).`;
+}
+
+async function trySyncBookLists(ctx, { watched, rating }) {
+  const { userId, chatId, state } = ctx;
+  const workId = state?.context?.workId;
+  if (!userId || !chatId || !workId) return {};
+  try {
+    const payload = {
+      listKind: "book",
+      externalId: String(workId),
+      watched,
+    };
+    if (rating !== undefined && rating !== null) {
+      payload.rating = rating;
+    }
+    return await listClient.syncFromDirectRating(userId, chatId, payload);
+  } catch (e) {
+    logger.warn("[BookCardFlow] sync lists from /livro:", e.message);
+    return {};
   }
 }
 
@@ -152,8 +179,9 @@ const bookCardFlow = createFlow("book-card", {
           posterUrl: bookInfo.posterUrl,
         });
         const displayName = ctx.voterDisplayName || "Você";
+        const sync = await trySyncBookLists(ctx, { watched: true });
         await ctx.reply(
-          `✅ *${bookInfo.title}${bookInfo.year ? ` (${bookInfo.year})` : ""}*\n\nMarcado como lido para *${displayName}*! 📖`,
+          `✅ *${bookInfo.title}${bookInfo.year ? ` (${bookInfo.year})` : ""}*\n\nMarcado como lido para *${displayName}*! 📖${listsSyncSuffix(sync)}`,
         );
       } catch (err) {
         logger.error("[BookCardFlow] markRead error:", err.message);
@@ -194,6 +222,10 @@ const bookCardFlow = createFlow("book-card", {
           year: bookInfo.year,
           posterUrl: bookInfo.posterUrl,
         });
+        const sync = await trySyncBookLists(ctx, {
+          watched: true,
+          rating: numRating,
+        });
         const stars = "⭐".repeat(Math.round(numRating));
         const displayName = ctx.voterDisplayName || "Você";
         const ratingStr =
@@ -201,7 +233,7 @@ const bookCardFlow = createFlow("book-card", {
             ? String(Math.round(numRating))
             : String(numRating);
         await ctx.reply(
-          `⭐ *${bookInfo.title}${bookInfo.year ? ` (${bookInfo.year})` : ""}*\n\n${stars} ${ratingStr}/5\n\n✅ Avaliação salva para *${displayName}* com sucesso!\n✅ Também marcado como lido.`,
+          `⭐ *${bookInfo.title}${bookInfo.year ? ` (${bookInfo.year})` : ""}*\n\n${stars} ${ratingStr}/5\n\n✅ Avaliação salva para *${displayName}* com sucesso!\n✅ Também marcado como lido.${listsSyncSuffix(sync)}`,
         );
         if (bookInfo.posterUrl) {
           try {

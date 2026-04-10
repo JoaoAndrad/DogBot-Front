@@ -6,6 +6,7 @@
 
 const { createFlow } = require("../flowBuilder");
 const movieClient = require("../../../services/movieClient");
+const listClient = require("../../../services/listClient");
 const flowManager = require("../flowManager");
 const {
   downloadImageToBuffer,
@@ -90,6 +91,33 @@ async function refreshMovieCardContext(state, tmdbId, userId) {
     state.context.movieInfo = refreshed;
   } catch (err) {
     logger.warn("[FilmCardFlow] refresh movieInfo:", err.message);
+  }
+}
+
+function listsSyncSuffix(sync) {
+  const n = sync?.listsUpdated;
+  if (n == null || n < 1) return "";
+  return `\n\n📋 Também atualizado em ${n} lista(s).`;
+}
+
+/** Alinha itens em listas ao mesmo assistido/nota (escopo DM vs grupo). */
+async function trySyncMovieLists(ctx, { watched, rating }) {
+  const { userId, chatId, state } = ctx;
+  const tmdbId = state?.context?.tmdbId;
+  if (!userId || !chatId || !tmdbId) return {};
+  try {
+    const payload = {
+      listKind: "movie",
+      externalId: String(tmdbId),
+      watched,
+    };
+    if (rating !== undefined && rating !== null) {
+      payload.rating = rating;
+    }
+    return await listClient.syncFromDirectRating(userId, chatId, payload);
+  } catch (e) {
+    logger.warn("[FilmCardFlow] sync lists from /filme:", e.message);
+    return {};
   }
 }
 
@@ -230,8 +258,9 @@ const filmCardFlow = createFlow("film-card", {
         });
         if (mw?.viewingLogId) state.context.flowViewingLogIds.push(mw.viewingLogId);
         const displayName = ctx.voterDisplayName || "Você";
+        const sync = await trySyncMovieLists(ctx, { watched: true });
         await ctx.reply(
-          `✅ *${movieInfo.title}${movieInfo.year ? ` (${movieInfo.year})` : ""}*\n\nMarcado como assistido para *${displayName}*! 🎬`,
+          `✅ *${movieInfo.title}${movieInfo.year ? ` (${movieInfo.year})` : ""}*\n\nMarcado como assistido para *${displayName}*! 🎬${listsSyncSuffix(sync)}`,
         );
       } catch (err) {
         logger.error("[FilmCardFlow] markWatched error:", err.message);
@@ -275,6 +304,10 @@ const filmCardFlow = createFlow("film-card", {
           posterUrl: movieInfo.posterUrl,
         });
         if (rm?.viewingLogId) state.context.flowViewingLogIds.push(rm.viewingLogId);
+        const sync = await trySyncMovieLists(ctx, {
+          watched: true,
+          rating: numRating,
+        });
         const stars = "⭐".repeat(Math.round(numRating));
         const displayName = ctx.voterDisplayName || "Você";
         const ratingStr =
@@ -282,7 +315,7 @@ const filmCardFlow = createFlow("film-card", {
             ? String(Math.round(numRating))
             : String(numRating);
         await ctx.reply(
-          `⭐ *${movieInfo.title}${movieInfo.year ? ` (${movieInfo.year})` : ""}*\n\n${stars} ${ratingStr}/5\n\n✅ Avaliação salva para *${displayName}* com sucesso!\n✅ Também marcado como visto.`,
+          `⭐ *${movieInfo.title}${movieInfo.year ? ` (${movieInfo.year})` : ""}*\n\n${stars} ${ratingStr}/5\n\n✅ Avaliação salva para *${displayName}* com sucesso!\n✅ Também marcado como visto.${listsSyncSuffix(sync)}`,
         );
         if (movieInfo.posterUrl) {
           try {
