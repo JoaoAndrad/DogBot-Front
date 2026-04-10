@@ -86,6 +86,51 @@ function dedupeRoutineDispatchActions(actions) {
 }
 
 /**
+ * Log agregado com nomes de grupo (WhatsApp) e resumo das ações. Opt-in: ROUTINE_TICK_SNAPSHOT_LOG=1.
+ * @param {import("whatsapp-web.js").Client} client
+ * @param {unknown[]} actions
+ */
+async function logRoutineTickSnapshotIfEnabled(client, actions) {
+  if (
+    process.env.ROUTINE_TICK_SNAPSHOT_LOG !== "1" &&
+    process.env.ROUTINE_TICK_SNAPSHOT_LOG !== "true"
+  ) {
+    return;
+  }
+  const chatIds = [
+    ...new Set(
+      actions
+        .map((a) => {
+          const p = a && a.payload ? a.payload : {};
+          return p.chatId || (a && a.chatId);
+        })
+        .filter(Boolean),
+    ),
+  ];
+  const chatLabels = [];
+  for (const id of chatIds) {
+    try {
+      const chat = await client.getChatById(id);
+      const name = chat && chat.name ? String(chat.name).trim() : "";
+      chatLabels.push(`${id} → ${name || id}`);
+    } catch (e) {
+      logger.debug("[routineTick] snapshot getChatById", id, e && e.message);
+      chatLabels.push(`${id} → (erro)`);
+    }
+  }
+  const lines = actions.map((a) => {
+    const p = a && a.payload ? a.payload : {};
+    const chatId = p.chatId || a.chatId || "?";
+    const title = p.title || "—";
+    const k = a && a.kind ? a.kind : "?";
+    return `  • [${k}] "${title}" chat=${chatId}`;
+  });
+  logger.info(
+    `[routineTick] snapshot (${actions.length} ação/ões)\nChats: ${chatLabels.join(" | ")}\n${lines.join("\n")}`,
+  );
+}
+
+/**
  * Processa fila de dispatches devolvidos pelo backend (enquetes de check-in / retrospectiva).
  * @param {import("whatsapp-web.js").Client} client
  */
@@ -94,6 +139,8 @@ async function processRoutineTick(client) {
     const res = await routineClient.routineTick();
     const actions = res.actions || [];
     if (!actions.length) return;
+
+    await logRoutineTickSnapshotIfEnabled(client, actions);
 
     const polls = require("../components/poll");
     const dispatchIds = [];
