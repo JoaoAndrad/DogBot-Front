@@ -184,7 +184,6 @@ async function processVoteViaBackend(pollId, vote, client) {
       selectedIndex === undefined ||
       Number.isNaN(selectedIndex)
     ) {
-      logger.warn(`[processor] No selected index found in vote for ${pollId}`);
       return;
     }
 
