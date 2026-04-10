@@ -6,6 +6,7 @@
 const backendClient = require("../../services/backendClient");
 const logger = require("../../utils/logger");
 const bootLog = require("../../lib/bootLog");
+const storage = require("./storage");
 
 /** Título da rotina a partir do título da enquete de check-in / retrospectiva. */
 function routineNameFromPollTitle(title) {
@@ -53,8 +54,9 @@ function registerActionHandler(actionType, handler) {
  */
 async function getPollState(pollId) {
   try {
+    const enc = encodeURIComponent(String(pollId));
     const data = await backendClient.sendToBackend(
-      `/api/polls/${pollId}/state`,
+      `/api/polls/${enc}/state`,
       null,
       "GET",
     );
@@ -129,6 +131,82 @@ async function resolveVoterIdForBackend(client, voterId) {
 }
 
 /**
+ * Espelha a lógica de `handleVoteUpdate` em poll/index.js: o WhatsApp por vezes envia
+ * opções só com `name` (texto), sem `localId` — sem isto process-vote saía sem índices e não fazia nada.
+ */
+function selectedIndexesFromVoteAndPoll(vote, storedPoll) {
+  const selectedOptions =
+    vote.selectedOptions ||
+    vote.selected ||
+    vote.selectedOptionIndexes ||
+    [];
+  let rawSelected = selectedOptions;
+  let selectedIndexes = [];
+  let rawOpts = storedPoll && (storedPoll.poll_options || storedPoll.pollOptions);
+  if (typeof rawOpts === "string") {
+    try {
+      rawOpts = JSON.parse(rawOpts);
+    } catch {
+      rawOpts = null;
+    }
+  }
+  let plainOpts = storedPoll && storedPoll.options;
+  if (typeof plainOpts === "string") {
+    try {
+      plainOpts = JSON.parse(plainOpts);
+    } catch {
+      plainOpts = null;
+    }
+  }
+  let optsArr = null;
+  if (Array.isArray(rawOpts) && rawOpts.length) {
+    optsArr = rawOpts;
+  } else if (Array.isArray(plainOpts) && plainOpts.length) {
+    optsArr = plainOpts.map((o, i) =>
+      typeof o === "string"
+        ? { name: o, localId: i }
+        : { name: o && o.name != null ? o.name : String(o), localId: i },
+    );
+  }
+
+  if (Array.isArray(rawSelected) && rawSelected.length) {
+    if (typeof rawSelected[0] === "object") {
+      for (const s of rawSelected) {
+        const lid =
+          s.localId != null ? s.localId : s.local_id != null ? s.local_id : null;
+        const name = s.name || s.option || null;
+        if (lid != null) {
+          selectedIndexes.push(Number(lid));
+        } else if (name && optsArr) {
+          const idx = optsArr.findIndex((o) => {
+            const on = o && (o.name != null ? o.name : o);
+            return (
+              String(on).trim() === String(name).trim() ||
+              String(on).normalize("NFC") === String(name).normalize("NFC")
+            );
+          });
+          if (idx >= 0) selectedIndexes.push(idx);
+        }
+      }
+    } else {
+      selectedIndexes = rawSelected.map((n) => Number(n));
+    }
+  }
+
+  if (
+    (!selectedIndexes || selectedIndexes.length === 0) &&
+    vote.selectedIndex != null &&
+    !Number.isNaN(Number(vote.selectedIndex))
+  ) {
+    selectedIndexes = [Number(vote.selectedIndex)];
+  }
+
+  return (selectedIndexes || []).filter(
+    (n) => !Number.isNaN(n) && n >= 0,
+  );
+}
+
+/**
  * Process a poll vote via backend (NEW approach)
  * Backend interprets metadata and returns action to execute
  * @param {string} pollId - Poll message ID
@@ -154,46 +232,33 @@ async function processVoteViaBackend(pollId, vote, client) {
 
     voterId = await resolveVoterIdForBackend(client, voterId);
 
-    const selectedOptions = vote.selectedOptions || vote.selected || [];
-    const selectedIndexes = [];
-
-    if (Array.isArray(selectedOptions) && selectedOptions.length > 0) {
-      for (const opt of selectedOptions) {
-        if (typeof opt === "object" && opt != null) {
-          const lid =
-            opt.localId != null ? opt.localId : opt.local_id != null ? opt.local_id : null;
-          if (lid != null) selectedIndexes.push(Number(lid));
-        } else if (opt != null && opt !== "") {
-          selectedIndexes.push(Number(opt));
-        }
-      }
+    let storedPoll = null;
+    try {
+      storedPoll = await storage.getPoll(pollId);
+    } catch (e) {
+      logger.debug(`[processor] getPoll falhou: ${e && e.message}`);
     }
 
-    let selectedIndex =
-      selectedIndexes.length > 0 ? selectedIndexes[0] : null;
-    if (
-      (selectedIndex === null || selectedIndex === undefined) &&
-      vote.selectedIndex != null
-    ) {
-      selectedIndex = Number(vote.selectedIndex);
-      selectedIndexes.push(selectedIndex);
-    }
+    const selectedIndexes = selectedIndexesFromVoteAndPoll(vote, storedPoll);
 
-    if (
-      selectedIndex === null ||
-      selectedIndex === undefined ||
-      Number.isNaN(selectedIndex)
-    ) {
+    if (!selectedIndexes.length) {
+      logger.warn(
+        `[processor] process-vote: nenhum índice de opção (pollId=${String(pollId).slice(0, 96)})`,
+      );
       return;
     }
 
-    const body = { voterId, selectedIndex, selectedIndexes };
-    if (!selectedIndexes.length) {
-      body.selectedIndexes = [selectedIndex];
-    }
+    const selectedIndex = selectedIndexes[0];
 
+    const body = {
+      voterId,
+      selectedIndex,
+      selectedIndexes,
+    };
+
+    const enc = encodeURIComponent(String(pollId));
     const result = await backendClient.sendToBackend(
-      `/api/polls/${pollId}/process-vote`,
+      `/api/polls/${enc}/process-vote`,
       body,
       "POST",
     );
@@ -310,6 +375,20 @@ async function executeAction(result, client) {
         const gr = result.routineGroupResult;
         const chatId = poll.chatId;
         if (!chatId || !gr || !Array.isArray(gr.results)) break;
+
+        if (!gr.ok && gr.results.length) {
+          const summary = gr.results
+            .map((r, i) =>
+              r.reason
+                ? `${r.idx != null ? r.idx : i}:${r.reason}`
+                : null,
+            )
+            .filter(Boolean)
+            .join("; ");
+          if (summary) {
+            logger.info(`[processor] routine_checkin_group: ${summary}`);
+          }
+        }
 
         for (const row of gr.results) {
           if (row.ok && row.outcome === "self_done") {
