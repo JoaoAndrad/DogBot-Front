@@ -1,8 +1,6 @@
 const backendClient = require("../../services/backendClient");
 const logger = require("../../utils/logger");
 
-const BACKEND_URL = process.env.BACKEND_URL || "http://localhost:8000";
-
 module.exports = {
   name: "democratizar",
   aliases: ["colaborativo", "colab", "democratica", "colaborativa"],
@@ -52,18 +50,35 @@ module.exports = {
 
       const jam = jamsRes.jams[0];
 
-      // Get user from backend
-      const senderNumber = whatsappId.replace("@c.us", "");
-      const userResponse = await fetch(
-        `${BACKEND_URL}/api/users/by-sender-number/${senderNumber}`,
-      );
-
-      if (!userResponse.ok) {
+      // Resolver utilizador pelo mesmo endpoint que o resto da API (fallbacks @c.us / @lid / número base)
+      let userData;
+      try {
+        userData = await backendClient.sendToBackend(
+          `/api/users/by-identifier/${encodeURIComponent(whatsappId)}`,
+          null,
+          "GET",
+        );
+      } catch (lookupErr) {
+        if (lookupErr.status === 404) {
+          logger.warn(
+            "[DemocratizarCommand] Utilizador não encontrado no backend (by-identifier)",
+          );
+          return reply(
+            "❌ Não encontrámos o teu utilizador no sistema. Interage com o bot ou associa a conta para sincronizar.",
+          );
+        }
+        logger.error(
+          "[DemocratizarCommand] Erro ao resolver utilizador:",
+          lookupErr,
+        );
         return reply("❌ Erro ao buscar usuário.");
       }
 
-      const userData = await userResponse.json();
-      if (!userData.success) {
+      if (!userData.success || !userData.user) {
+        logger.warn(
+          "[DemocratizarCommand] Resposta inesperada ao resolver utilizador",
+          userData,
+        );
         return reply("❌ Erro ao buscar usuário.");
       }
 
@@ -78,17 +93,18 @@ module.exports = {
       const newType =
         jam.jamType === "collaborative" ? "classic" : "collaborative";
 
-      const updateResponse = await fetch(`${BACKEND_URL}/api/jam/${jam.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ jamType: newType }),
-      });
-
-      if (!updateResponse.ok) {
+      let updateData;
+      try {
+        updateData = await backendClient.sendToBackend(
+          `/api/jam/${jam.id}`,
+          { jamType: newType },
+          "PATCH",
+        );
+      } catch (patchErr) {
+        logger.error("[DemocratizarCommand] Erro ao atualizar jam:", patchErr);
         return reply("❌ Erro ao atualizar jam.");
       }
 
-      const updateData = await updateResponse.json();
       if (!updateData.success) {
         return reply(
           `❌ Erro ao atualizar jam: ${updateData.message || updateData.error}`,
