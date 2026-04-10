@@ -97,50 +97,31 @@ async function handle(context) {
     (from && String(from).endsWith("@g.us"))
   );
 
-  // Log de todas as mensagens recebidas
+  // Sincroniza nome de exibição do grupo (sem log por mensagem)
   try {
-    // Skip logging for /confissao command messages
     const isConfissao = body && /^\s*\/?confiss[aã]o\b/i.test(body);
 
-    if (!isConfissao) {
-      const author = msg.author || msg.from || info.from;
-      const authorName =
-        (msg._data && msg._data.notifyName) || info.pushName || author;
+    if (!isConfissao && isGroup) {
       const msgType = msg.type || info.type || "text";
-
       if (
         String(msgType).toLowerCase() === "e2e_notification" &&
         from &&
         loadIgnoredChats().has(String(from))
       ) {
-        // Grupo já tratado como órfão (cache); evita repetir a mesma linha em cada arranque
+        // Grupo órfão (cache): não sincronizar em cada e2e
       } else {
-      let logMsg = `📩 ${msgType}`;
-      if (isGroup) {
-        // Get group name - use getChat() to get full info
-        let groupName = from.split("@")[0];
         try {
           const chat = await msg.getChat();
           if (chat && chat.name) {
-            groupName = chat.name;
             maybeSyncGroupDisplayName(from, chat.name);
           }
         } catch (e) {
-          // keep fallback groupName
+          // ignore
         }
-
-        logMsg += ` | 👥 ${groupName} | 👤 ${authorName}`;
-      } else {
-        logMsg += ` | 👤 ${authorName}`;
-      }
-      if (body)
-        logMsg += ` | 💬 ${body.slice(0, 50)}${body.length > 50 ? "..." : ""}`;
-
-      console.log(logMsg);
       }
     }
   } catch (err) {
-    // Silent fail on logging error
+    // ignore
   }
 
   // Note: No longer auto-creating users on regular messages
