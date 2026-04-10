@@ -138,7 +138,7 @@ async function resolveVoterIdForBackend(client, voterId) {
  */
 async function processVoteViaBackend(pollId, vote, client) {
   try {
-    logger.info(`[processor] Processing vote via backend for poll ${pollId}`);
+    logger.debug(`[processor] Processing vote via backend for poll ${pollId}`);
 
     // Extract voter ID
     let voterId =
@@ -199,7 +199,7 @@ async function processVoteViaBackend(pollId, vote, client) {
       "POST",
     );
 
-    logger.info(
+    logger.debug(
       `[processor] Backend returned action: ${result.action}`,
       result.handler || result.target || "",
     );
@@ -770,7 +770,7 @@ async function executeAction(result, client) {
  */
 async function processPollVote(pollId, client) {
   try {
-    logger.info(`[processor] Processing vote for poll ${pollId}`);
+    logger.debug(`[processor] Processing vote for poll ${pollId}`);
 
     // Fetch complete state from backend
     const { poll, votes, stats } = await getPollState(pollId);
@@ -782,7 +782,7 @@ async function processPollVote(pollId, client) {
 
     // Determine action type
     const actionType = getActionType(poll);
-    logger.info(`[processor] Poll ${pollId} actionType: ${actionType}`);
+    logger.debug(`[processor] Poll ${pollId} actionType: ${actionType}`);
 
     // Get handler for this action type
     const handler = actionHandlers.get(actionType);
@@ -799,7 +799,7 @@ async function processPollVote(pollId, client) {
 
     // Execute action-specific handler
     await handler(poll, votes, stats, client);
-    logger.info(
+    logger.debug(
       `[processor] Successfully processed ${actionType} vote for poll ${pollId}`,
     );
   } catch (error) {

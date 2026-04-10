@@ -20,7 +20,7 @@ function buildPollPayload(chatId, title, options, opts = {}) {
   const isConfissaoPoll = title && /confiss[aã]o/i.test(title);
 
   if (!isConfissaoPoll) {
-    console.log("pollBuilder: built payload", {
+    logger.debug("pollBuilder: built payload", {
       chatId,
       title,
       optionsCount: payload.options.length,

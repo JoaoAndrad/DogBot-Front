@@ -97,7 +97,7 @@ async function handle(context) {
       if (body)
         logMsg += ` | 💬 ${body.slice(0, 50)}${body.length > 50 ? "..." : ""}`;
 
-      console.log(logMsg);
+      logger.debug(logMsg);
     }
   } catch (err) {
     // Silent fail on logging error

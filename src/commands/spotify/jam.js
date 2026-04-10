@@ -1,4 +1,5 @@
 const backend = require("../../services/backendClient");
+const logger = require("../../utils/logger");
 const polls = require("../../components/poll");
 
 /**
@@ -438,10 +439,7 @@ module.exports = {
                       },
                     );
 
-                    console.log(
-                      "Invite poll sent:",
-                      inviteRes && inviteRes.msgId,
-                    );
+                    logger.debug("Invite poll sent:", inviteRes && inviteRes.msgId);
                   } catch (invErr) {
                     console.error(
                       "[jam] Failed to send invite poll:",
@@ -458,7 +456,7 @@ module.exports = {
             },
           );
 
-          console.log(
+          logger.debug(
             "Confirmation poll sent:",
             confirmRes && confirmRes.msgId,
           );
@@ -815,7 +813,7 @@ module.exports = {
             },
           },
         );
-        console.log("Unified poll sent:", createRes && createRes.msgId);
+        logger.debug("Unified poll sent:", createRes && createRes.msgId);
       } catch (pollErr) {
         console.error(
           "[jam] Failed to send unified poll:",
