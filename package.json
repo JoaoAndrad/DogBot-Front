@@ -9,6 +9,7 @@
     "test": "echo \"No tests configured\""
   },
   "dependencies": {
+    "express": "^4.21.2",
     "luxon": "^3.4.4",
     "qrcode": "^1.5.1",
     "sharp": "^0.34.5",
