@@ -749,7 +749,7 @@ async function handle(context) {
     }
 
     // Commands that don't require user registration
-    const publicCommands = ["cadastro", "ajuda", "help"];
+    const publicCommands = ["cadastro", "ajuda", "help", "app"];
     const requiresRegistration = !publicCommands.includes(cmdName);
 
     // Check if user exists before executing command (unless public command)

@@ -95,6 +95,13 @@ async function start() {
         logger.warn("groupDisplayNameSync (sem catchup):", e && e.message);
       }
     }
+
+    try {
+      const { syncSharedChatsToBackend } = require("../services/companionChatSync");
+      await syncSharedChatsToBackend(client);
+    } catch (e) {
+      logger.warn("[companionChatSync] não iniciado:", e && e.message);
+    }
   });
 
   client.on("message", async (msg) => {
