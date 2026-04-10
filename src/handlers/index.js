@@ -10,6 +10,29 @@ const {
 const botMetricsReporter = require("../services/botMetricsReporter");
 const { handleCadastroFlow } = require("./cadastroFlowHandler");
 
+/** Evita POST repetido: mesmo nome ~6h; sincroniza GroupChat.name no backend para admin UI. */
+const GROUP_DISPLAY_SYNC_TTL_MS = 6 * 60 * 60 * 1000;
+const groupDisplaySyncCache = new Map();
+
+function maybeSyncGroupDisplayName(chatId, name) {
+  if (!chatId || !name || typeof name !== "string") return;
+  const n = name.trim();
+  if (!n) return;
+  const now = Date.now();
+  const prev = groupDisplaySyncCache.get(chatId);
+  if (
+    prev &&
+    prev.name === n &&
+    now - prev.at < GROUP_DISPLAY_SYNC_TTL_MS
+  ) {
+    return;
+  }
+  groupDisplaySyncCache.set(chatId, { name: n, at: now });
+  backendClient
+    .sendToBackend("/api/internal/group-chat-display", { chatId, name: n })
+    .catch(() => {});
+}
+
 /** Estado pode estar em UUID, @c.us ou id do chat (startFlowWithAliases). */
 function findActiveConversationState(flowUserId, actualNumber, author, from) {
   const candidates = [flowUserId, actualNumber, author, from].filter(Boolean);
@@ -85,6 +108,7 @@ async function handle(context) {
           const chat = await msg.getChat();
           if (chat && chat.name) {
             groupName = chat.name;
+            maybeSyncGroupDisplayName(from, chat.name);
           }
         } catch (e) {
           // keep fallback groupName
@@ -97,7 +121,7 @@ async function handle(context) {
       if (body)
         logMsg += ` | 💬 ${body.slice(0, 50)}${body.length > 50 ? "..." : ""}`;
 
-      logger.debug(logMsg);
+      console.log(logMsg);
     }
   } catch (err) {
     // Silent fail on logging error
