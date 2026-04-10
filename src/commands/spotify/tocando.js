@@ -1,8 +1,11 @@
 const fetch = require("node-fetch");
+const backendClient = require("../../services/backendClient");
 const { sendTrackSticker } = require("../../utils/stickerHelper");
 const { MessageMedia } = require("whatsapp-web.js");
 
-const BACKEND_URL = process.env.BACKEND_URL || "http://localhost:8000";
+const BACKEND_BASE = (
+  process.env.BACKEND_URL || "http://localhost:8000"
+).replace(/\/$/, "");
 
 async function resolveUserUuid(externalId) {
   if (!externalId) return null;
@@ -13,12 +16,11 @@ async function resolveUserUuid(externalId) {
   if (isUUID) return externalId;
 
   try {
-    const url = `${BACKEND_URL}/api/users/by-identifier/${encodeURIComponent(
-      externalId
-    )}`;
-    const res = await fetch(url, { method: "GET" });
-    if (!res.ok) return null;
-    const json = await res.json();
+    const json = await backendClient.sendToBackend(
+      `/api/users/by-identifier/${encodeURIComponent(externalId)}`,
+      null,
+      "GET",
+    );
     return json && json.user && json.user.id ? json.user.id : null;
   } catch (e) {
     return null;
@@ -63,27 +65,20 @@ module.exports = {
     try {
       const resolved = await resolveUserUuid(userId);
       const userParam = resolved || userId;
-      const url = `${BACKEND_URL}/api/spotify/current?userId=${encodeURIComponent(
-        userParam
-      )}`;
-      const res = await fetch(url, { method: "GET" });
-      const ct =
-        (res.headers && res.headers.get
-          ? res.headers.get("content-type")
-          : null) || "";
       let json;
-      if (!ct.includes("application/json")) {
-        const text = await res.text().catch(() => "");
-        console.log(
-          "[Command:tocando] Non-JSON response from backend:",
-          text.slice(0, 1000)
+      try {
+        json = await backendClient.sendToBackend(
+          `/api/spotify/current?userId=${encodeURIComponent(userParam)}`,
+          null,
+          "GET",
         );
+      } catch (e) {
+        console.log("[Command:tocando] Error from backend current:", e);
         await reply(
-          "❌ Resposta inválida do servidor ao consultar tocando agora."
+          "❌ Erro ao consultar o servidor. Tenta novamente em instantes."
         );
         return;
       }
-      json = await res.json();
 
       if (json && json.notice) {
         await reply(json.notice);
@@ -145,10 +140,7 @@ module.exports = {
 
         // Then use backend proxy to fetch cached preview (avoids CORS and centralizes rate-limits)
         try {
-          const proxyUrl = `${BACKEND_URL.replace(
-            /\/$/,
-            ""
-          )}/api/spotify/preview?trackId=${encodeURIComponent(t.id)}`;
+          const proxyUrl = `${BACKEND_BASE}/api/spotify/preview?trackId=${encodeURIComponent(t.id)}`;
           console.log(`[tocando] proxy preview url: ${proxyUrl}`);
           const pres = await fetch(proxyUrl);
           console.log(

@@ -1,8 +1,6 @@
 const backendClient = require("../../services/backendClient");
 const logger = require("../../utils/logger");
 
-const BACKEND_URL = process.env.BACKEND_URL || "http://localhost:8000";
-
 module.exports = {
   name: "limpar-fila",
   aliases: ["limparfila", "clear-queue", "clear"],
@@ -52,35 +50,37 @@ module.exports = {
 
       const jam = jamsRes.jams[0];
 
-      // Get user ID
-      const senderNumber = whatsappId.replace("@c.us", "");
-      const userResponse = await fetch(
-        `${BACKEND_URL}/api/users/by-sender-number/${senderNumber}`,
-      );
-
-      if (!userResponse.ok) {
+      let userId;
+      try {
+        const lookup = await backendClient.sendToBackend(
+          `/api/users/lookup?identifier=${encodeURIComponent(whatsappId)}`,
+          null,
+          "GET",
+        );
+        if (!lookup.found || !lookup.userId) {
+          return reply(
+            "❌ Não encontrámos o teu utilizador no sistema. Usa /cadastro ou associa a conta.",
+          );
+        }
+        userId = lookup.userId;
+      } catch (e) {
+        logger.error("[LimparFilaCommand] Erro ao resolver utilizador:", e);
         return reply("❌ Erro ao buscar usuário.");
       }
-
-      const userData = await userResponse.json();
-      if (!userData.success) {
-        return reply("❌ Erro ao buscar usuário.");
-      }
-
-      const userId = userData.user.id;
 
       // Clear queue
-      const response = await fetch(`${BACKEND_URL}/api/jam/${jam.id}/queue`, {
-        method: "DELETE",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId }),
-      });
-
-      if (!response.ok) {
+      let data;
+      try {
+        data = await backendClient.sendToBackend(
+          `/api/jam/${jam.id}/queue`,
+          { userId },
+          "DELETE",
+        );
+      } catch (e) {
+        logger.error("[LimparFilaCommand] Erro ao limpar fila:", e);
         return reply("❌ Erro ao limpar fila.");
       }
 
-      const data = await response.json();
       if (!data.success) {
         return reply(`❌ ${data.message || data.error}`);
       }

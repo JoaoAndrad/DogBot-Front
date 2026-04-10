@@ -5,6 +5,10 @@ const logger = require("../../utils/logger");
 const polls = require("../../components/poll");
 const { sendTrackSticker } = require("../../utils/stickerHelper");
 
+const BACKEND_BASE = (
+  process.env.BACKEND_URL || "http://localhost:8000"
+).replace(/\/$/, "");
+
 module.exports = {
   name: "voto",
   aliases: ["votar", "vote"],
@@ -452,12 +456,7 @@ module.exports = {
 
         // Fetch and send preview audio (after sticker) using backend proxy
         try {
-          const BACKEND_URL =
-            process.env.BACKEND_URL || "http://localhost:8000";
-          const proxyUrl = `${BACKEND_URL.replace(
-            /\/$/,
-            "",
-          )}/api/spotify/preview?trackId=${encodeURIComponent(
+          const proxyUrl = `${BACKEND_BASE}/api/spotify/preview?trackId=${encodeURIComponent(
             currentTrack.trackId,
           )}`;
           logger.debug(`[Voto] fetching preview from: ${proxyUrl}`);

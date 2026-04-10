@@ -50,19 +50,18 @@ module.exports = {
     // Check if user is admin via backend (NOT WhatsApp group admin)
     let isAdmin = false;
     try {
-      const cleanNumber = senderNumber.replace(/@c\.us$/i, "");
-      const userResp = await backendClient.sendToBackend(
-        `/api/users/by-sender-number/${encodeURIComponent(cleanNumber)}`,
+      const lookup = await backendClient.sendToBackend(
+        `/api/users/lookup?identifier=${encodeURIComponent(senderNumber)}`,
         null,
         "GET",
       );
 
-      if (userResp && userResp.user && userResp.user.isAdmin) {
+      if (lookup && lookup.found && lookup.isAdmin) {
         isAdmin = true;
       }
 
       console.log(
-        `[ativartreinos] Usuário ${cleanNumber} tentou executar comando. isAdmin: ${userResp?.user?.isAdmin || false}`,
+        `[ativartreinos] Usuário ${senderNumber.replace(/@c\.us$/i, "")} tentou executar comando. isAdmin: ${!!lookup?.isAdmin}`,
       );
     } catch (err) {
       console.error(

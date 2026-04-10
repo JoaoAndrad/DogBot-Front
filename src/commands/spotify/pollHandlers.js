@@ -1,7 +1,6 @@
 const logger = require("../../utils/logger");
 const processor = require("../../components/poll/processor");
-
-const BACKEND_URL = process.env.BACKEND_URL || "http://localhost:8000";
+const backendClient = require("../../services/backendClient");
 
 /**
  * Handler for individual track voting (approve/reject single track)
@@ -50,58 +49,49 @@ async function handleTrackVote(poll, votes, stats, client) {
     }
 
     const isFor = selectedIndexes && selectedIndexes.includes(0);
-    const voterNumber = voter.replace("@c.us", "");
 
     // Get chat to send messages (get early for error handling)
     const chatId = poll.chat_id;
     const chat = await client.getChatById(chatId);
 
-    // Get voter user ID
-    const voterResponse = await fetch(
-      `${BACKEND_URL}/api/users/by-sender-number/${voterNumber}`,
-    );
-
-    if (!voterResponse.ok) {
-      logger.error(
-        `[PollHandlers] Failed to get voter user: ${voterResponse.status}`,
+    // Get voter user ID (lookup com identificador completo @c.us / @lid)
+    let voterUserId;
+    try {
+      const lookup = await backendClient.sendToBackend(
+        `/api/users/lookup?identifier=${encodeURIComponent(voter)}`,
+        null,
+        "GET",
       );
+      if (!lookup.found || !lookup.userId) {
+        logger.error("[PollHandlers] Voter not found via lookup");
+        await chat.sendMessage(
+          `⚠️ Usuário não cadastrado. Use /cadastro primeiro.`,
+        );
+        return;
+      }
+      voterUserId = lookup.userId;
+    } catch (e) {
+      logger.error("[PollHandlers] Failed to get voter user:", e);
       await chat.sendMessage(
         `⚠️ Erro ao identificar votante. Certifique-se de estar cadastrado.`,
       );
       return;
     }
 
-    const voterData = await voterResponse.json();
-    if (!voterData.success) {
-      logger.error("[PollHandlers] Voter data not found");
-      await chat.sendMessage(
-        `⚠️ Usuário não cadastrado. Use /cadastro primeiro.`,
-      );
-      return;
-    }
-
-    const voterUserId = voterData.user.id;
-
     // Cast vote
-    const voteResponse = await fetch(
-      `${BACKEND_URL}/api/jam/queue/${queueEntryId}/vote`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId: voterUserId, isFor }),
-      },
-    );
-
-    if (!voteResponse.ok) {
-      const errorText = await voteResponse.text().catch(() => "Unknown error");
-      logger.error(
-        `[PollHandlers] Failed to cast vote: ${voteResponse.status} - ${errorText}`,
+    let voteResultData;
+    try {
+      voteResultData = await backendClient.sendToBackend(
+        `/api/jam/queue/${queueEntryId}/vote`,
+        { userId: voterUserId, isFor },
+        "POST",
       );
+    } catch (e) {
+      logger.error("[PollHandlers] Failed to cast vote:", e);
       await chat.sendMessage(`⚠️ Erro ao processar voto. Tente novamente.`);
       return;
     }
 
-    const voteResultData = await voteResponse.json();
     if (!voteResultData.success) {
       logger.error(
         "[PollHandlers] Vote result not successful:",
@@ -212,33 +202,33 @@ async function handleCollectionVote(poll, votes, stats, client) {
     }
 
     const isFor = selectedIndexes && selectedIndexes.includes(0);
-    const voterNumber = voter.replace("@c.us", "");
 
     // Get voter user ID
-    const voterResponse = await fetch(
-      `${BACKEND_URL}/api/users/by-sender-number/${voterNumber}`,
-    );
-
-    if (!voterResponse.ok) {
+    let voterUserId;
+    try {
+      const lookup = await backendClient.sendToBackend(
+        `/api/users/lookup?identifier=${encodeURIComponent(voter)}`,
+        null,
+        "GET",
+      );
+      if (!lookup.found || !lookup.userId) {
+        logger.error("[PollHandlers] Voter user data not found for collection");
+        await chat.sendMessage(
+          `⚠️ Usuário não cadastrado. Use /cadastro primeiro.`,
+        );
+        return;
+      }
+      voterUserId = lookup.userId;
+    } catch (e) {
       logger.error(
-        `[PollHandlers] Failed to get voter user for collection: ${voterResponse.status}`,
+        "[PollHandlers] Failed to get voter user for collection:",
+        e,
       );
       await chat.sendMessage(
         `⚠️ Erro ao identificar votante. Certifique-se de estar cadastrado.`,
       );
       return;
     }
-
-    const voterUserData = await voterResponse.json();
-    if (!voterUserData.success) {
-      logger.error("[PollHandlers] Voter user data not found for collection");
-      await chat.sendMessage(
-        `⚠️ Usuário não cadastrado. Use /cadastro primeiro.`,
-      );
-      return;
-    }
-
-    const voterUserId = voterUserData.user.id;
 
     // Initialize or load votes from metadata
     let votesFor = storedVotes?.for || [userId]; // Requester auto-votes YES
@@ -302,27 +292,26 @@ async function handleCollectionVote(poll, votes, stats, client) {
             trackImage: track.album.images[0]?.url || null,
           };
 
-          const addResponse = await fetch(
-            `${BACKEND_URL}/api/jam/${jamId}/queue`,
-            {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
+          let addData;
+          try {
+            addData = await backendClient.sendToBackend(
+              `/api/jam/${jamId}/queue`,
+              {
                 userId,
                 trackData,
                 skipVoting: true,
-              }),
-            },
-          );
+              },
+              "POST",
+            );
+          } catch (e) {
+            logger.error(`[PollHandlers] Failed to add track: ${track.name}`, e);
+            failedCount++;
+            addData = null;
+          }
 
-          if (addResponse.ok) {
-            const addData = await addResponse.json();
-            if (addData.success) {
-              addedCount++;
-            } else {
-              failedCount++;
-            }
-          } else {
+          if (addData && addData.success) {
+            addedCount++;
+          } else if (addData !== null) {
             failedCount++;
           }
 

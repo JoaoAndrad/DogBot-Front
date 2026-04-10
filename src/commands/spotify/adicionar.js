@@ -2,8 +2,6 @@ const backendClient = require("../../services/backendClient");
 const logger = require("../../utils/logger");
 const polls = require("../../components/poll");
 
-const BACKEND_URL = process.env.BACKEND_URL || "http://localhost:8000";
-
 /**
  * Resolve user name from WhatsApp contact
  */
@@ -51,15 +49,11 @@ function extractAlbumId(url) {
  */
 async function getPlaylistTracks(playlistId) {
   try {
-    const response = await fetch(
-      `${BACKEND_URL}/api/spotify/playlist/${playlistId}/tracks`,
+    const data = await backendClient.sendToBackend(
+      `/api/spotify/playlist/${playlistId}/tracks`,
+      null,
+      "GET",
     );
-
-    if (!response.ok) {
-      return { success: false, error: "FETCH_FAILED" };
-    }
-
-    const data = await response.json();
 
     if (!data.success) {
       return { success: false, error: data.error };
@@ -81,13 +75,11 @@ async function getPlaylistTracks(playlistId) {
  */
 async function getAlbumTracks(albumId) {
   try {
-    const response = await fetch(`${BACKEND_URL}/api/spotify/album/${albumId}`);
-
-    if (!response.ok) {
-      return { success: false, error: "FETCH_FAILED" };
-    }
-
-    const data = await response.json();
+    const data = await backendClient.sendToBackend(
+      `/api/spotify/album/${albumId}`,
+      null,
+      "GET",
+    );
 
     if (!data.success || !data.album) {
       return { success: false, error: data.error };
@@ -109,18 +101,16 @@ async function getAlbumTracks(albumId) {
  */
 async function searchSpotifyTrack(query) {
   try {
-    const url = new URL(`${BACKEND_URL}/api/spotify/search`);
-    url.searchParams.set("query", query);
-    url.searchParams.set("type", "track");
-    url.searchParams.set("limit", "20");
-
-    const response = await fetch(url.toString());
-
-    if (!response.ok) {
-      return { success: false, error: "FETCH_FAILED" };
-    }
-
-    const data = await response.json();
+    const qs = new URLSearchParams({
+      query,
+      type: "track",
+      limit: "20",
+    });
+    const data = await backendClient.sendToBackend(
+      `/api/spotify/search?${qs.toString()}`,
+      null,
+      "GET",
+    );
 
     if (!data.success) {
       return { success: false, error: data.error };
@@ -173,7 +163,7 @@ module.exports = {
         return reply("⚠️ Não foi possível identificar o usuário.");
       }
 
-      const senderNumber = whatsappId.replace("@c.us", "");
+      const senderNumber = whatsappId.replace(/@c\.us$/i, "");
 
       // Get active jam for this group
       const jamsRes = await backendClient.sendToBackend(
@@ -188,21 +178,24 @@ module.exports = {
 
       const jam = jamsRes.jams[0];
 
-      // Get user ID from backend
-      const userResponse = await fetch(
-        `${BACKEND_URL}/api/users/by-sender-number/${senderNumber}`,
-      );
-
-      if (!userResponse.ok) {
+      // Get user ID from backend (identificador completo, com fallbacks no servidor)
+      let userId;
+      try {
+        const lookup = await backendClient.sendToBackend(
+          `/api/users/lookup?identifier=${encodeURIComponent(whatsappId)}`,
+          null,
+          "GET",
+        );
+        if (!lookup.found || !lookup.userId) {
+          return reply(
+            "❌ Não encontrámos o teu utilizador. Usa /cadastro ou associa a conta.",
+          );
+        }
+        userId = lookup.userId;
+      } catch (e) {
+        logger.error("[AdicionarCommand] Erro ao verificar usuário:", e);
         return reply("❌ Erro ao verificar usuário.");
       }
-
-      const userData = await userResponse.json();
-      if (!userData.success) {
-        return reply("❌ Erro ao verificar usuário.");
-      }
-
-      const userId = userData.user.id;
 
       // Check if user is the host
       const isHost = jam.hostUserId === userId;
@@ -315,36 +308,28 @@ module.exports = {
           // In collaborative mode, skip voting
           const skipVoting = jam.jamType === "collaborative";
 
-          const addResponse = await fetch(
-            `${BACKEND_URL}/api/jam/${jam.id}/queue`,
-            {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ userId, trackData, skipVoting }),
-            },
-          );
-
-          let addData = null;
+          let addData;
           try {
-            addData = await addResponse.json();
+            addData = await backendClient.sendToBackend(
+              `/api/jam/${jam.id}/queue`,
+              { userId, trackData, skipVoting },
+              "POST",
+            );
           } catch (e) {
-            const txt = await addResponse.text().catch(() => null);
-            logger.error(
-              "[AdicionarCommand] addResponse not JSON:",
-              e && e.stack ? e.stack : e,
-              txt,
-            );
-            await safeChatSend(
-              `❌ Erro ao adicionar música. status=${addResponse.status}`,
-            );
+            logger.error("[AdicionarCommand] Erro ao adicionar à fila:", e);
+            const msg =
+              e && e.body && (e.body.message || e.body.error)
+                ? e.body.message || e.body.error
+                : e.message || "Erro ao adicionar música";
+            await safeChatSend(`❌ ${msg}`);
             return;
           }
 
-          if (!addResponse.ok || !addData || !addData.success) {
+          if (!addData || !addData.success) {
             const msg =
               addData && (addData.message || addData.error)
                 ? addData.message || addData.error
-                : `Erro ao adicionar música (status=${addResponse.status})`;
+                : "Erro ao adicionar música";
             await safeChatSend(`❌ ${msg}`);
             return;
           }
@@ -368,11 +353,11 @@ module.exports = {
 
           // Automatically cast YES vote from requester
           try {
-            await fetch(`${BACKEND_URL}/api/jam/queue/${queueEntry.id}/vote`, {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ userId, isFor: true }),
-            });
+            await backendClient.sendToBackend(
+              `/api/jam/queue/${queueEntry.id}/vote`,
+              { userId, isFor: true },
+              "POST",
+            );
             logger.info(
               `[AdicionarCommand] Auto-voted YES for requester: ${userId}`,
             );
@@ -564,15 +549,22 @@ module.exports = {
                           trackImage: t.album.images[0]?.url || null,
                         };
 
-                        await fetch(`${BACKEND_URL}/api/jam/${jam.id}/queue`, {
-                          method: "POST",
-                          headers: { "Content-Type": "application/json" },
-                          body: JSON.stringify({
-                            userId,
-                            trackData,
-                            skipVoting: true,
-                          }),
-                        });
+                        try {
+                          await backendClient.sendToBackend(
+                            `/api/jam/${jam.id}/queue`,
+                            {
+                              userId,
+                              trackData,
+                              skipVoting: true,
+                            },
+                            "POST",
+                          );
+                        } catch (queueErr) {
+                          logger.error(
+                            "[AdicionarCommand] Error adding collection track:",
+                            queueErr,
+                          );
+                        }
                         // small delay
                         await new Promise((r) => setTimeout(r, 150));
                       } catch (err) {

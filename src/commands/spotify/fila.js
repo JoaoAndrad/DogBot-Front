@@ -1,8 +1,6 @@
 const backendClient = require("../../services/backendClient");
 const logger = require("../../utils/logger");
 
-const BACKEND_URL = process.env.BACKEND_URL || "http://localhost:8000";
-
 /**
  * Resolve user name from WhatsApp contact
  */
@@ -71,13 +69,17 @@ module.exports = {
       const jam = jamsRes.jams[0];
 
       // Get queue from backend
-      const response = await fetch(`${BACKEND_URL}/api/jam/${jam.id}/queue`);
-
-      if (!response.ok) {
+      let data;
+      try {
+        data = await backendClient.sendToBackend(
+          `/api/jam/${jam.id}/queue`,
+          null,
+          "GET",
+        );
+      } catch (e) {
+        logger.error("[FilaCommand] Erro ao buscar fila:", e);
         return reply("❌ Erro ao buscar fila.");
       }
-
-      const data = await response.json();
 
       if (!data.success) {
         return reply(`❌ Erro ao buscar fila: ${data.message || data.error}`);
