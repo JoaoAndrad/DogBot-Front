@@ -46,12 +46,13 @@ module.exports = {
         const contact = await msg.getContact();
         userId = contact.id._serialized || contact.id;
       } else {
-        userId = (msg && (msg.from || msg.author)) || ctx.sender || null;
+        // Em grupos, `from` é o @g.us; o remetente está em `author` (também na simulação companion).
+        userId = (msg && (msg.author || msg.from)) || ctx.sender || null;
       }
     } catch (err) {
       console.log("[jam] Failed to resolve contact:", err.message);
       userId =
-        (ctx.message && (ctx.message.from || ctx.message.author)) ||
+        (ctx.message && (ctx.message.author || ctx.message.from)) ||
         ctx.sender ||
         null;
     }
