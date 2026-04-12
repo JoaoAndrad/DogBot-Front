@@ -1,6 +1,10 @@
 const express = require("express");
 const logger = require("../utils/logger");
 const bootLog = require("../lib/bootLog");
+const {
+  loadIgnoredChats,
+  addToIgnoredChats,
+} = require("../utils/chatCleaner");
 
 let server = null;
 let appInstance = null;
@@ -230,6 +234,92 @@ function createApp(client) {
         ok: false,
         error: err && (err.message || String(err)),
       });
+    }
+  });
+
+  router.get("/internal/bot-groups", async (_req, res) => {
+    try {
+      const ignored = loadIgnoredChats();
+      const chats = await client.getChats();
+      const groups = [];
+      for (const chat of chats) {
+        try {
+          if (!chat || !chat.isGroup) continue;
+          const chatId = chat.id && chat.id._serialized;
+          if (!chatId || !String(chatId).endsWith("@g.us")) continue;
+          let name =
+            chat.name != null && String(chat.name).trim()
+              ? String(chat.name).trim()
+              : null;
+          if (!name && chat.groupMetadata && chat.groupMetadata.subject) {
+            name = String(chat.groupMetadata.subject).trim() || null;
+          }
+          let participantsCount = 0;
+          try {
+            participantsCount = Array.isArray(chat.participants)
+              ? chat.participants.length
+              : 0;
+          } catch (_) {
+            /* ignore */
+          }
+          groups.push({
+            chatId,
+            name,
+            participantsCount,
+            ignored: ignored.has(chatId),
+          });
+        } catch (e) {
+          logger.debug(
+            "[internal/bot-groups] skip chat",
+            e && e.message ? e.message : e,
+          );
+        }
+      }
+      res.json({ ok: true, groups });
+    } catch (err) {
+      const errMsg = err && (err.stack || err.message || String(err));
+      logger.error("[internal/bot-groups] GET failed", errMsg);
+      res.status(500).json({ ok: false, error: errMsg });
+    }
+  });
+
+  router.post("/internal/bot-groups/leave", async (req, res) => {
+    const chatId = String((req.body || {}).chatId || "").trim();
+    if (!chatId || !chatId.endsWith("@g.us")) {
+      return res.status(400).json({ ok: false, error: "invalid_chatId" });
+    }
+    try {
+      const chat = await client.getChatById(chatId);
+      if (!chat) {
+        return res.status(404).json({ ok: false, error: "chat_not_found" });
+      }
+      if (!chat.isGroup) {
+        return res.status(400).json({ ok: false, error: "not_a_group" });
+      }
+      if (typeof chat.leave !== "function") {
+        return res.status(500).json({ ok: false, error: "leave_unavailable" });
+      }
+      await chat.leave();
+      res.json({ ok: true });
+    } catch (err) {
+      const errMsg = err && (err.message || String(err));
+      logger.error("[internal/bot-groups/leave]", errMsg);
+      res.status(500).json({ ok: false, error: errMsg });
+    }
+  });
+
+  router.post("/internal/bot-groups/ignore", async (req, res) => {
+    const chatId = String((req.body || {}).chatId || "").trim();
+    if (!chatId) {
+      return res.status(400).json({ ok: false, error: "invalid_chatId" });
+    }
+    try {
+      addToIgnoredChats(chatId);
+      res.json({ ok: true });
+    } catch (err) {
+      const errMsg = err && (err.message || String(err));
+      logger.error("[internal/bot-groups/ignore]", errMsg);
+      res.status(500).json({ ok: false, error: errMsg });
     }
   });
 

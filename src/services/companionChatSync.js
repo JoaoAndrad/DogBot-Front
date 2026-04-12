@@ -1,4 +1,5 @@
 const logger = require("../utils/logger");
+const { loadIgnoredChats } = require("../utils/chatCleaner");
 const backendClient = require("./backendClient");
 
 /**
@@ -30,6 +31,7 @@ async function syncSharedChatsToBackend(client) {
     if (!client || !client.info || !client.info.wid) return;
     const botId = client.info.wid._serialized;
     const chats = await client.getChats();
+    const ignoredChats = loadIgnoredChats();
     /** @type {Map<string, Map<string, { chatId: string, title: string|null, isGroup: boolean }>>} */
     const byUser = new Map();
 
@@ -39,6 +41,10 @@ async function syncSharedChatsToBackend(client) {
         if (!chatId) continue;
         const title = resolveChatTitle(chat);
         const isGroup = !!chat.isGroup;
+
+        if (isGroup && ignoredChats.has(chatId)) {
+          continue;
+        }
 
         if (isGroup) {
           const parts = chat.participants || [];
