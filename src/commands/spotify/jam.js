@@ -288,7 +288,7 @@ module.exports = {
           } else {
             announce += `⚠️ Nenhuma música tocando no momento. Inicie uma música no Spotify!\n`;
           }
-          announce += `\nUse o aplicativo ou digite */sair* a qualquer momento para encerrar a jam.`;
+          announce += `\nUse o *DogBubble* ou digite */sair* a qualquer momento para encerrar a jam.`;
 
           await reply(announce);
           return;

@@ -4,6 +4,7 @@ const backendClient = require("../../services/backendClient");
 const logger = require("../../utils/logger");
 const polls = require("../../components/poll");
 const { sendTrackSticker } = require("../../utils/stickerHelper");
+const { isFromApp, prefix } = require("./fromAppText");
 
 const BACKEND_BASE = (
   process.env.BACKEND_URL || "http://localhost:8000"
@@ -18,6 +19,7 @@ module.exports = {
   async execute(ctx) {
     const { message, reply, client } = ctx;
     const msg = message;
+    const fromApp = isFromApp(msg);
     const chatId = msg.from;
 
     // Check if is group: either msg.isGroup or chatId ends with @g.us
@@ -247,7 +249,7 @@ module.exports = {
                 ? top.artists.map((a) => a.name || a).join(", ")
                 : String(top.artists)
               : "";
-          const infoMsg = `Uma versão dessa música talvez já exista na playlist (Nome: ${
+          const infoMsg = `${prefix(fromApp)}Uma versão dessa música talvez já exista na playlist (Nome: ${
             top.name || ""
           } do artista: ${artistsText})`;
           await client.sendMessage(chatId, infoMsg);
@@ -259,7 +261,7 @@ module.exports = {
         }
         // Before creating a full group vote, ask the initiator for confirmation.
         // Only the initiator is allowed to vote on this confirmation poll.
-        const confirmTitle = `Confirma iniciar votação para adicionar:\n${currentTrack.trackName} — ${currentTrack.artists}`;
+        const confirmTitle = `${prefix(fromApp)}Confirma iniciar votação para adicionar:\n${currentTrack.trackName} — ${currentTrack.artists}`;
         const confirmOptions = ["✅ Sim", "❌ Não"];
 
         const confirmResult = await polls.createPoll(
@@ -360,6 +362,7 @@ module.exports = {
             client,
             chatId,
             initiatorAccountId: initiatorLookup.spotifyAccount?.id,
+            fromApp,
           });
           return;
         }
@@ -397,7 +400,9 @@ module.exports = {
         }
 
         // Create poll (apenas título e opções)
-        const pollTitle = `🎵 Adicionar: ${currentTrack.trackName}\nDe: ${currentTrack.artists}`;
+        const pollTitle = fromApp
+          ? `🎵 Adicionar (DogBubble): ${currentTrack.trackName}\nDe: ${currentTrack.artists}`
+          : `🎵 Adicionar: ${currentTrack.trackName}\nDe: ${currentTrack.artists}`;
         const pollOptions = ["✅ Sim, adicionar", "❌ Não"];
 
         // Create poll with callback
@@ -429,7 +434,8 @@ module.exports = {
           (m) => m.userId !== initiatorUserId,
         );
 
-        let contextMessage = playlistName
+        let contextMessage = prefix(fromApp);
+        contextMessage += playlistName
           ? `${initiatorDisplayName} deseja adicionar a música à playlist ${playlistName}\n`
           : `${initiatorDisplayName} deseja adicionar a música à playlist\n`;
         const mentionsList = [];
@@ -522,6 +528,7 @@ async function addPassedTrackToPlaylist({
   client,
   chatId,
   initiatorAccountId,
+  fromApp = false,
 }) {
   const playlistSpotifyId = group.playlist?.spotifyId;
 
@@ -552,9 +559,12 @@ async function addPassedTrackToPlaylist({
   );
 
   if (addRes.success) {
+    const head = fromApp
+      ? "✅ Música adicionada à playlist pelo DogBubble!"
+      : "✅ Música adicionada à playlist!";
     await client.sendMessage(
       chatId,
-      `✅ Música adicionada à playlist! (${stats.votesFor}/${stats.totalEligible} votos)\n\n🎵 ${vote.trackName}\n${vote.trackArtists}`,
+      `${head} (${stats.votesFor}/${stats.totalEligible} votos)\n\n🎵 ${vote.trackName}\n${vote.trackArtists}`,
     );
 
     try {
@@ -734,6 +744,7 @@ async function handleAddVote(
         client,
         chatId,
         initiatorAccountId,
+        fromApp: false,
       });
     } else if (updatedVote.status === "failed") {
       await client.sendMessage(

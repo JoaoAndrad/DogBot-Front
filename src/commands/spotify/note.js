@@ -13,6 +13,7 @@ module.exports = {
     let author =
       (msg && (msg.author || msg.from)) || (ctx.info && ctx.info.from);
     const reply = ctx.reply;
+    const fromApp = Boolean(msg && msg.fromApp);
 
     // Mensagens reais do wa têm getContact(); simuladas (gateway) não.
     if (msg && typeof msg.getContact === "function") {
@@ -32,7 +33,7 @@ module.exports = {
 
     const payload = {
       userId: author,
-      source: "whatsapp",
+      source: fromApp ? "companion_app" : "whatsapp",
     };
     if (ratingRaw != null && ratingRaw !== "") payload.rating = ratingRaw;
 
@@ -89,6 +90,13 @@ module.exports = {
           album || "Desconhecido"
         }\n\n${lineNota}\n${lineMedia}${lineWho ? "\n" + lineWho : ""}`;
 
+        const registroLabel = fromApp
+          ? "✅ Nota registrada pelo DogBubble!"
+          : "✅ Nota registrada!";
+        const atualizadaLabel = fromApp
+          ? "✅ Nota atualizada pelo DogBubble!"
+          : "✅ Nota atualizada!";
+
         let confirmationText = block;
         if (noteCreated) {
           if (prev != null) {
@@ -99,11 +107,11 @@ module.exports = {
                   year: "numeric",
                 }).format(new Date(prevDate))
               : null;
-            confirmationText = `✅ Nota atualizada!\n${block}\n\n🔁 Sua nota anterior: ${prev}${
+            confirmationText = `${atualizadaLabel}\n${block}\n\n🔁 Sua nota anterior: ${prev}${
               prevDateStr ? " — em " + prevDateStr : ""
             }`;
           } else {
-            confirmationText = `✅ Nota registrada!\n${block}`;
+            confirmationText = `${registroLabel}\n${block}`;
           }
         }
 

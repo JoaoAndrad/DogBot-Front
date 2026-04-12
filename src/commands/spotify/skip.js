@@ -2,6 +2,7 @@ const backendClient = require("../../services/backendClient");
 const logger = require("../../utils/logger");
 const polls = require("../../components/poll");
 const { sendTrackSticker } = require("../../utils/stickerHelper");
+const { isFromApp, prefix } = require("./fromAppText");
 
 module.exports = {
   name: "skip",
@@ -23,6 +24,7 @@ module.exports = {
       }
     };
     const msg = message;
+    const fromApp = isFromApp(msg);
     const chatId = msg.from;
 
     // Check if is group: either msg.isGroup or chatId ends with @g.us
@@ -276,10 +278,13 @@ module.exports = {
             );
 
             if (skipRes && skipRes.success) {
+              const okHead = fromApp
+                ? "✅ Votação aprovada pelo DogBubble! Pulando música e sincronizando ouvintes..."
+                : "✅ Votação aprovada! Pulando música e sincronizando ouvintes...";
               await safeSend(
                 client,
                 chatId,
-                `✅ Votação aprovada! Pulando música e sincronizando ouvintes... (${stats.votesFor}/${stats.totalEligible} votos)`,
+                `${okHead} (${stats.votesFor}/${stats.totalEligible} votos)`,
               );
             } else {
               const errText =
@@ -317,7 +322,9 @@ module.exports = {
       const pollResult = await polls.createPoll(
         client,
         chatId,
-        `Pular ${jam.currentTrackName || "música atual"}?`,
+        fromApp
+          ? `Pular (DogBubble) ${jam.currentTrackName || "música atual"}?`
+          : `Pular ${jam.currentTrackName || "música atual"}?`,
         ["Sim", "Não"],
         {
           voteType: "skip",
@@ -366,7 +373,7 @@ module.exports = {
         (num) => num !== creatorWhatsAppId.replace("@c.us", ""),
       );
 
-      let contextMessage = `🎵 *${initiatorDisplayName}* iniciou votação para pular:\n*${jam.currentTrackName || "música atual"}*\n\n`;
+      let contextMessage = `${prefix(fromApp)}🎵 *${initiatorDisplayName}* iniciou votação para pular:\n*${jam.currentTrackName || "música atual"}*\n\n`;
 
       if (otherVoters.length > 0) {
         const mentions = otherVoters
