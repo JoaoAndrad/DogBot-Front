@@ -4,6 +4,14 @@ const polls = require("../../components/poll");
 const { sendTrackSticker } = require("../../utils/stickerHelper");
 const { isFromApp, prefix } = require("./fromAppText");
 
+/** JID estável para menção (alinhado ao que se usa nos outros votantes). */
+function normalizeUserJid(raw) {
+  const s = String(raw || "").trim();
+  if (!s) return null;
+  if (s.includes("@")) return s;
+  return `${s}@c.us`;
+}
+
 module.exports = {
   name: "skip",
   description: "Votação colaborativa para pular a música atual na jam",
@@ -354,32 +362,43 @@ module.exports = {
         }
       }
 
-      // Get initiator display name
+      // Iniciador: @ + mentions[] (comando pelo DogBubble não tem getContact — nome só não gera ping)
+      const creatorJid = normalizeUserJid(creatorWhatsAppId);
+      const creatorBase = creatorJid ? creatorJid.split("@")[0] : "";
+
       let initiatorDisplayName = null;
       try {
-        const contact = await client.getContactById(creatorWhatsAppId);
+        const contact = await client.getContactById(
+          creatorJid || creatorWhatsAppId,
+        );
         initiatorDisplayName = contact?.pushname || contact?.name || null;
       } catch (err) {
         logger.debug(`[Skip] Erro ao obter nome do iniciador:`, err);
       }
 
       if (!initiatorDisplayName) {
-        initiatorDisplayName = creatorWhatsAppId.split("@")[0];
+        initiatorDisplayName = creatorBase || String(creatorWhatsAppId).split("@")[0];
       }
 
-      // Build mentions list (all eligible voters except initiator)
+      const initiatorMentionText = creatorJid
+        ? `@${creatorBase}`
+        : `*${initiatorDisplayName}*`;
+
+      // Menções: iniciador + restantes (mesmo padrão)
       const mentionsList = [];
+      if (creatorJid) mentionsList.push(creatorJid);
+
       const otherVoters = eligibleWhatsAppIds.filter(
-        (num) => num !== creatorWhatsAppId.replace("@c.us", ""),
+        (num) => num !== creatorBase && num !== creatorWhatsAppId.replace("@c.us", ""),
       );
 
-      let contextMessage = `${prefix(fromApp)}🎵 *${initiatorDisplayName}* iniciou votação para pular:\n*${jam.currentTrackName || "música atual"}*\n\n`;
+      let contextMessage = `${prefix(fromApp)}🎵 ${initiatorMentionText} iniciou votação para pular:\n*${jam.currentTrackName || "música atual"}*\n\n`;
 
       if (otherVoters.length > 0) {
         const mentions = otherVoters
           .map((num) => {
-            const whatsappId = `${num}@c.us`;
-            mentionsList.push(whatsappId);
+            const wid = `${num}@c.us`;
+            if (wid !== creatorJid) mentionsList.push(wid);
             return `@${num}`;
           })
           .join(" ");

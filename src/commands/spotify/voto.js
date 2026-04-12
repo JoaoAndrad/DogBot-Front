@@ -10,6 +10,24 @@ const BACKEND_BASE = (
   process.env.BACKEND_URL || "http://localhost:8000"
 ).replace(/\/$/, "");
 
+/**
+ * Mesmo JID usado em spotifyMembers[].identifier — necessário para menção real no grupo
+ * (comando simulado pelo DogBubble não tem getContact()).
+ */
+function jidForMentionInitiator(spotifyMembers, initiatorUserId, whatsappIdFallback) {
+  const row = spotifyMembers.find((m) => m.userId === initiatorUserId);
+  if (row && row.identifier) return String(row.identifier).trim();
+  const raw = String(whatsappIdFallback || "").trim();
+  if (!raw) return null;
+  if (raw.includes("@")) return raw;
+  return `${raw}@c.us`;
+}
+
+function atTextFromJid(jid) {
+  if (!jid) return "?";
+  return `@${jid.split("@")[0]}`;
+}
+
 module.exports = {
   name: "voto",
   aliases: ["votar", "vote"],
@@ -429,22 +447,33 @@ module.exports = {
           },
         );
 
-        // Enviar mensagem de contexto separada com menções
+        // Enviar mensagem de contexto separada com menções (iniciador = mesmo esquema @ + mentions[] que os outros)
         const otherMembers = spotifyMembers.filter(
           (m) => m.userId !== initiatorUserId,
         );
 
+        const initiatorJid = jidForMentionInitiator(
+          spotifyMembers,
+          initiatorUserId,
+          whatsappId,
+        );
+        const initiatorAt = initiatorJid
+          ? atTextFromJid(initiatorJid)
+          : initiatorDisplayName;
+
         let contextMessage = prefix(fromApp);
         contextMessage += playlistName
-          ? `${initiatorDisplayName} deseja adicionar a música à playlist ${playlistName}\n`
-          : `${initiatorDisplayName} deseja adicionar a música à playlist\n`;
-        const mentionsList = [];
+          ? `${initiatorAt} deseja adicionar a música à playlist ${playlistName}\n`
+          : `${initiatorAt} deseja adicionar a música à playlist\n`;
+        const mentionsList = initiatorJid ? [initiatorJid] : [];
 
         if (otherMembers.length > 0) {
           const mentions = otherMembers
             .map((m) => {
               const phoneNumber = m.identifier.split("@")[0];
-              mentionsList.push(m.identifier);
+              if (m.identifier && m.identifier !== initiatorJid) {
+                mentionsList.push(m.identifier);
+              }
               return `@${phoneNumber}`;
             })
             .join(" ");
@@ -574,11 +603,7 @@ async function addPassedTrackToPlaylist({
         "GET",
       );
 
-      if (
-        playlistRes &&
-        playlistRes.images &&
-        playlistRes.images.length > 0
-      ) {
+      if (playlistRes && playlistRes.images && playlistRes.images.length > 0) {
         const playlistSticker = {
           trackId: playlistSpotifyId,
           trackName: playlistRes.name || "Playlist",
