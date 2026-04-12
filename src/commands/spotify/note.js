@@ -1,5 +1,11 @@
+const fetch = require("node-fetch");
+const { MessageMedia } = require("whatsapp-web.js");
 const backendClient = require("../../services/backendClient");
 const { sendTrackSticker } = require("../../utils/stickerHelper");
+
+const BACKEND_BASE = (
+  process.env.BACKEND_URL || "http://localhost:8000"
+).replace(/\/$/, "");
 
 module.exports = {
   name: "nota",
@@ -97,6 +103,9 @@ module.exports = {
           ? "✅ Nota atualizada pelo DogBubble!"
           : "✅ Nota atualizada!";
 
+        /** Uma linha em branco extra após o rótulo DogBubble antes do bloco da faixa. */
+        const afterLabel = fromApp ? "\n\n" : "\n";
+
         let confirmationText = block;
         if (noteCreated) {
           if (prev != null) {
@@ -107,11 +116,11 @@ module.exports = {
                   year: "numeric",
                 }).format(new Date(prevDate))
               : null;
-            confirmationText = `${atualizadaLabel}\n${block}\n\n🔁 Sua nota anterior: ${prev}${
+            confirmationText = `${atualizadaLabel}${afterLabel}${block}\n\n🔁 Sua nota anterior: ${prev}${
               prevDateStr ? " — em " + prevDateStr : ""
             }`;
           } else {
-            confirmationText = `${registroLabel}\n${block}`;
+            confirmationText = `${registroLabel}${afterLabel}${block}`;
           }
         }
 
@@ -131,6 +140,41 @@ module.exports = {
             "Erro ao enviar figurinha da faixa:",
             stErr && stErr.message ? stErr.message : stErr
           );
+        }
+
+        // Prévia de áudio (proxy do backend), igual /tocando e /voto
+        if (res.trackId) {
+          try {
+            const proxyUrl = `${BACKEND_BASE}/api/spotify/preview?trackId=${encodeURIComponent(
+              res.trackId,
+            )}`;
+            const pres = await fetch(proxyUrl);
+            const contentType =
+              (pres.headers && pres.headers.get
+                ? pres.headers.get("content-type")
+                : null) || "";
+            if (pres && pres.ok && contentType.includes("audio")) {
+              const arrayBuffer = await pres.arrayBuffer();
+              const buffer = Buffer.from(arrayBuffer);
+              const base64 = buffer.toString("base64");
+              const media = new MessageMedia("audio/mpeg", base64);
+              await ctx.client.sendMessage(msg.from, media, {
+                caption: `▶️ Prévia — ${trackName}`,
+              });
+            } else {
+              try {
+                const body = await pres.json().catch(() => null);
+                console.log("[nota] prévia indisponível (não é áudio):", body);
+              } catch (e) {
+                console.log("[nota] prévia: resposta sem áudio");
+              }
+            }
+          } catch (e) {
+            console.log(
+              "[nota] prévia:",
+              e && e.stack ? e.stack : e,
+            );
+          }
         }
 
         return;

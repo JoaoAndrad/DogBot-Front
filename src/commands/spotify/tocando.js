@@ -2,6 +2,7 @@ const fetch = require("node-fetch");
 const backendClient = require("../../services/backendClient");
 const { sendTrackSticker } = require("../../utils/stickerHelper");
 const { MessageMedia } = require("whatsapp-web.js");
+const { isFromApp } = require("./fromAppText");
 
 const BACKEND_BASE = (
   process.env.BACKEND_URL || "http://localhost:8000"
@@ -50,17 +51,31 @@ module.exports = {
   async execute(context) {
     const { message, reply, client } = context;
     const msg = message;
+    const fromBubble = isFromApp(msg);
+    const isGroup =
+      !!(msg && msg.isGroup) ||
+      (msg.from && String(msg.from).endsWith("@g.us"));
 
-    // Usar getContact() para obter o número real (@c.us)
+    // Usar getContact() para obter o número real (@c.us); gateway simulado define msg.author.
     let userId = msg.author || msg.from;
-    try {
-      const contact = await msg.getContact();
-      if (contact && contact.id && contact.id._serialized) {
-        userId = contact.id._serialized;
+    if (msg && typeof msg.getContact === "function") {
+      try {
+        const contact = await msg.getContact();
+        if (contact && contact.id && contact.id._serialized) {
+          userId = contact.id._serialized;
+        }
+      } catch (err) {
+        console.log("[Command:tocando] Error getting contact:", err.message);
       }
-    } catch (err) {
-      console.log("[Command:tocando] Error getting contact:", err.message);
     }
+
+    const mentionJid =
+      userId &&
+      typeof userId === "string" &&
+      !userId.endsWith("@g.us") &&
+      userId.includes("@")
+        ? userId
+        : null;
 
     try {
       const resolved = await resolveUserUuid(userId);
@@ -98,7 +113,12 @@ module.exports = {
         );
         const bar = renderProgressBar(percent, 18);
 
-        let replyText = `▶️ Tocando agora — ${t.name}\n`;
+        const headLine =
+          fromBubble && isGroup && mentionJid
+            ? `▶️ @${mentionJid.split("@")[0]} está tocando agora — ${t.name}\n`
+            : `▶️ Tocando agora — ${t.name}\n`;
+
+        let replyText = headLine;
         replyText += `${
           Array.isArray(t.artists) ? t.artists.join(", ") : t.artists || ""
         }\n`;
@@ -128,7 +148,17 @@ module.exports = {
           replyText += `Iniciado: ${new Date(json.startedAt).toLocaleString()}`;
         }
 
-        await reply(replyText);
+        if (fromBubble) {
+          replyText += `\n\nSolicitado pelo DogBubble`;
+        }
+
+        if (fromBubble && isGroup && mentionJid) {
+          await client.sendMessage(msg.from, replyText, {
+            mentions: [mentionJid],
+          });
+        } else {
+          await reply(replyText);
+        }
 
         // Send track artwork as sticker first
         const trackWithImage = {

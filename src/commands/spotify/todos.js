@@ -5,6 +5,7 @@ const {
   sendTrackSticker,
   sendCompositeSticker,
 } = require("../../utils/stickerHelper");
+const { isFromApp } = require("./fromAppText");
 
 module.exports = {
   name: "todos",
@@ -14,11 +15,25 @@ module.exports = {
   async execute(ctx) {
     const { message, reply, client } = ctx;
     const msg = message;
+    const fromBubble = isFromApp(msg);
     const chatId = msg.from;
 
     const isGroup =
       !!(msg && msg.isGroup) || (chatId && chatId.endsWith("@g.us"));
     if (!isGroup) return reply("⚠️ Este comando só funciona em grupos.");
+
+    // Mesmo esquema que note.js: JID real do remetente (getContact em WA; gateway define msg.author).
+    let author = (msg && (msg.author || msg.from)) || null;
+    if (msg && typeof msg.getContact === "function") {
+      try {
+        const contact = await msg.getContact();
+        if (contact && contact.id && contact.id._serialized) {
+          author = contact.id._serialized;
+        }
+      } catch (err) {
+        logger.info("[Todos] getContact: " + (err.message || err));
+      }
+    }
 
     try {
       // Get group members
@@ -82,8 +97,29 @@ module.exports = {
         byTrack.get(key).push({ who, track: t, userId: l.userId });
       }
 
+      const mentionJid =
+        author &&
+        typeof author === "string" &&
+        !author.endsWith("@g.us") &&
+        author.includes("@")
+          ? author
+          : null;
+
       const lines = [];
-      lines.push("🎵 O que a galera está ouvindo:\n");
+      if (fromBubble) {
+        if (mentionJid) {
+          const base = mentionJid.split("@")[0];
+          lines.push(
+            `@${base} perguntou o que a galera está ouvindo através do DogBubble:\n`,
+          );
+        } else {
+          lines.push(
+            "Usuário perguntou o que a galera está ouvindo através do DogBubble:\n",
+          );
+        }
+      } else {
+        lines.push("🎵 O que a galera está ouvindo:\n");
+      }
 
       // Helper to compute percent if available
       function pct(track) {
@@ -133,8 +169,11 @@ module.exports = {
 
       const finalMsg = lines.join("\n");
 
-      // Send the text summary first.
-      await client.sendMessage(chatId, finalMsg);
+      const sendOpts =
+        fromBubble && mentionJid ? { mentions: [mentionJid] } : {};
+
+      // Send the text summary first (menção ao remetente no DogBubble, como skip/voto).
+      await client.sendMessage(chatId, finalMsg, sendOpts);
 
       // Then try to send a composite sticker representing the distinct tracks.
       try {
