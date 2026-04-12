@@ -8,6 +8,13 @@ const polls = require("../../components/poll");
  * @param {Object} client - WhatsApp client instance
  * @returns {Promise<string>} Resolved host name
  */
+function normalizeWaJidForMention(raw) {
+  const s = String(raw || "").trim();
+  if (!s) return null;
+  if (s.includes("@")) return s;
+  return `${s}@c.us`;
+}
+
 async function resolveHostName(jam, client) {
   // Try database fields first
   let name = jam.host?.push_name || jam.host?.display_name;
@@ -277,20 +284,33 @@ module.exports = {
 
           const jam = createResult.jam;
 
-          // Announce jam created in chat
+          // Anúncio no grupo com menção ao host (reply() não suporta mentions)
+          const hostJid = normalizeWaJidForMention(userId);
+          const hostAt = hostJid ? `@${hostJid.split("@")[0]}` : "";
+
           let announce = `🎵 *Jam iniciada pelo DogBubble!* 🎵\n\n`;
-          announce += `Você está transmitindo sua música.\n`;
-          announce += `Outros podem digitar */jam* neste grupo para entrar.\n\n`;
+          announce += hostAt
+            ? `${hostAt} está transmitindo sua música.\n`
+            : `O anfitrião está transmitindo sua música.\n`;
+          announce +=
+            `Caso deseje participar, envie */jam* aqui para sincronizar.\n\n`;
 
           if (jam && jam.currentTrackName) {
             announce += `🎶 Tocando agora: *${jam.currentTrackName}*\n`;
             if (jam.currentArtists) announce += `👤 ${jam.currentArtists}\n`;
           } else {
-            announce += `⚠️ Nenhuma música tocando no momento. Inicie uma música no Spotify!\n`;
+            announce += hostAt
+              ? `⚠️ ${hostAt} você está tocando nada no momento. Inicie uma música no Spotify para compartilhar!\n`
+              : `⚠️ Você está tocando nada no momento. Inicie uma música no Spotify para compartilhar!\n`;
           }
-          announce += `\nUse o *DogBubble* ou digite */sair* a qualquer momento para encerrar a jam.`;
 
-          await reply(announce);
+          if (ctx.client && chatId) {
+            await ctx.client.sendMessage(chatId, announce, {
+              mentions: hostJid ? [hostJid] : [],
+            });
+          } else {
+            await reply(announce);
+          }
           return;
         }
 
