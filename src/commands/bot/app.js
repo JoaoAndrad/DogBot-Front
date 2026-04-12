@@ -47,14 +47,14 @@ module.exports = {
       let expiresLine = "";
       if (expiresAt && !Number.isNaN(expiresAt.getTime())) {
         try {
-          expiresLine = `\n\nVálido até: ${expiresAt.toLocaleString("pt-PT")}`;
+          expiresLine = `${expiresAt.toLocaleString("pt-PT")}`;
         } catch (e) {
-          expiresLine = `\n\nVálido até: ${expiresAt.toISOString()}`;
+          expiresLine = `${expiresAt.toISOString()}`;
         }
       }
       await reply(
         `📱 *Código para a app DogBot:* ${code}\n\n` +
-          `Abre a app, confirma o URL do servidor se precisares, e introduz estes 6 dígitos.${expiresLine}`,
+          `Digite esse código no app para sincronizar, o código irá expirar em ${expiresLine}.`,
       );
     } catch (err) {
       const status = err && err.status;
