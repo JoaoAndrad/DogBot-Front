@@ -51,7 +51,9 @@ async function start() {
     logger.info("WhatsApp client pronto");
 
     try {
-      const { startRoutineTickLoop } = require("../services/routineTickService");
+      const {
+        startRoutineTickLoop,
+      } = require("../services/routineTickService");
       startRoutineTickLoop(client, 60000);
       logger.info("[routineTick] loop iniciado (60s)");
     } catch (err) {
@@ -97,7 +99,9 @@ async function start() {
     }
 
     try {
-      const { syncSharedChatsToBackend } = require("../services/companionChatSync");
+      const {
+        syncSharedChatsToBackend,
+      } = require("../services/companionChatSync");
       await syncSharedChatsToBackend(client);
     } catch (e) {
       logger.warn("[companionChatSync] não iniciado:", e && e.message);
