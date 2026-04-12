@@ -446,7 +446,7 @@ async function updateAllGroupRankings() {
 
 /**
  * No-op: ranking updates are now triggered only on explicit events
- * (workout logged/removed, system activated).
+ * (workout logged/removed, system ativated).
  */
 function scheduleRankingUpdates() {
   logger.info(

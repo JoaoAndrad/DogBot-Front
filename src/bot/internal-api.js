@@ -23,19 +23,18 @@ function gatewayAuth(req, res, next) {
     });
   }
   const authHeader = req.get("authorization") || "";
-  const bearer =
-    authHeader.startsWith("Bearer ") ? authHeader.slice(7).trim() : "";
+  const bearer = authHeader.startsWith("Bearer ")
+    ? authHeader.slice(7).trim()
+    : "";
   const incoming =
-    req.get("x-bot-gateway-secret") ||
-    req.get("x-internal-secret") ||
-    bearer;
+    req.get("x-bot-gateway-secret") || req.get("x-internal-secret") || bearer;
   if (incoming !== secret) {
     return res.status(403).json({ ok: false, error: "forbidden" });
   }
   next();
 }
 
-function buildSimulatedMessage(client, { text, chatId, authorJid }) {
+function buildSimulatedMessage(client, { text, chatId, authorJid, fromApp }) {
   const cid = String(chatId || "").trim();
   if (!cid) return null;
   const isGroup = cid.endsWith("@g.us");
@@ -59,6 +58,7 @@ function buildSimulatedMessage(client, { text, chatId, authorJid }) {
     timestamp: Math.floor(Date.now() / 1000),
     isGroup,
     author: author || undefined,
+    fromApp: Boolean(fromApp),
     _data: { from: cid, body: bodyText },
     getChat: async () => {
       try {
@@ -180,11 +180,9 @@ function createApp(client) {
   });
 
   router.post("/v1/simulate-command", async (req, res) => {
-    const timeoutMs = Number(
-      process.env.SIMULATE_COMMAND_TIMEOUT_MS || 120000,
-    );
+    const timeoutMs = Number(process.env.SIMULATE_COMMAND_TIMEOUT_MS || 120000);
     try {
-      const { text, chatId, authorJid } = req.body || {};
+      const { text, chatId, authorJid, fromApp } = req.body || {};
       const cid = String(chatId || "").trim();
       if (!cid) {
         return res.status(400).json({ ok: false, error: "missing_chatId" });
@@ -196,7 +194,12 @@ function createApp(client) {
         });
       }
 
-      const msg = buildSimulatedMessage(client, { text, chatId: cid, authorJid });
+      const msg = buildSimulatedMessage(client, {
+        text,
+        chatId: cid,
+        authorJid,
+        fromApp,
+      });
       if (!msg) {
         return res.status(400).json({ ok: false, error: "invalid_message" });
       }

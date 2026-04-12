@@ -251,9 +251,48 @@ module.exports = {
       }
 
       // No active jams: ask confirmation via poll (only initiator can vote)
+      // Skip poll if request came from the app
       if (activeJams.length === 0) {
         const chatId = ctx.message?.from || null;
         const hostWhatsAppId = userId; // original WhatsApp identifier (e.g., 5581...@c.us)
+
+        if (ctx.message?.fromApp) {
+          // User confirmed via app automatically - create jam via backend
+          const createResult = await backend.sendToBackend(
+            "/api/jam/create",
+            { userId: userUuid, chatId },
+            "POST",
+          );
+
+          if (!createResult.success) {
+            if (createResult.error === "USER_ALREADY_HOSTING") {
+              await reply("❌ Você já está hospedando uma jam ativa.");
+              return;
+            }
+            await reply(
+              `❌ Erro ao criar jam: ${createResult.error || createResult.message}`,
+            );
+            return;
+          }
+
+          const jam = createResult.jam;
+
+          // Announce jam created in chat
+          let announce = `🎵 *Jam iniciada pelo DogBubble!* 🎵\n\n`;
+          announce += `Você está transmitindo sua música.\n`;
+          announce += `Outros podem digitar */jam* neste grupo para entrar.\n\n`;
+
+          if (jam && jam.currentTrackName) {
+            announce += `🎶 Tocando agora: *${jam.currentTrackName}*\n`;
+            if (jam.currentArtists) announce += `👤 ${jam.currentArtists}\n`;
+          } else {
+            announce += `⚠️ Nenhuma música tocando no momento. Inicie uma música no Spotify!\n`;
+          }
+          announce += `\nUse o aplicativo ou digite */sair* a qualquer momento para encerrar a jam.`;
+
+          await reply(announce);
+          return;
+        }
 
         try {
           // Confirmation poll — only the initiator's vote will be considered
@@ -440,7 +479,10 @@ module.exports = {
                       },
                     );
 
-                    logger.debug("Invite poll sent:", inviteRes && inviteRes.msgId);
+                    logger.debug(
+                      "Invite poll sent:",
+                      inviteRes && inviteRes.msgId,
+                    );
                   } catch (invErr) {
                     console.error(
                       "[jam] Failed to send invite poll:",
