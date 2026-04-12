@@ -3,7 +3,7 @@ const groupRankingService = require("../../services/groupRankingService");
 
 module.exports = {
   name: "ativartreinos",
-  aliases: ["ativar-treinos", "ativatetreino"],
+  aliases: ["ativar-treinos", "activatetreino"],
   description: "Ativa sistema de treinos no grupo (apenas admin do sistema).",
 
   async execute(ctx) {
@@ -80,7 +80,7 @@ module.exports = {
       return;
     }
 
-    // Check if already ativated
+    // Check if already activated
     try {
       const settings = await backendClient.sendToBackend(
         `/api/workouts/groups/${encodeURIComponent(chatId)}/settings`,
@@ -98,16 +98,16 @@ module.exports = {
       }
     } catch (err) {
       console.error("[ativartreinos] Error checking group status:", err);
-      // Continue with ativation if check fails
+      // Continue with activation if check fails
     }
 
-    // ativate group
+    // Activate group
     try {
       const result = await backendClient.sendToBackend(
-        "/api/workouts/ativate-group",
+        "/api/workouts/activate-group",
         {
           chatId,
-          ativatedBy: senderNumber,
+          activatedBy: senderNumber,
         },
         "POST",
       );
@@ -139,7 +139,7 @@ module.exports = {
         await reply("❌ Erro ao ativar sistema de treinos. Tente novamente.");
       }
     } catch (err) {
-      console.error("[ativartreinos] Error ativating group:", err);
+      console.error("[ativartreinos] Error activating group:", err);
       await reply("❌ Erro ao ativar sistema de treinos. Tente novamente.");
     }
   },
