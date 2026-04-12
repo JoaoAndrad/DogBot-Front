@@ -53,8 +53,8 @@ module.exports = {
         }
       }
       await reply(
-        `📱 *Código para a app DogBot:* ${code}\n\n` +
-          `Digite esse código no app para sincronizar, o código irá expirar em ${expiresLine}.`,
+        `📱 *Código para sincronização com o DogBubble:* ${code}\n\n` +
+          `Digite esse código no app para sincronizar com sua conta, o código irá expirar em ${expiresLine}.`,
       );
     } catch (err) {
       const status = err && err.status;
