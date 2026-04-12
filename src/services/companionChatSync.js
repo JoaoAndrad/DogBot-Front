@@ -37,8 +37,9 @@ async function syncSharedChatsToBackend(client) {
 
     for (const chat of chats) {
       try {
-        const chatId = chat.id && chat.id._serialized;
-        if (!chatId) continue;
+        const chatIdRaw = chat.id && chat.id._serialized;
+        if (!chatIdRaw) continue;
+        const chatId = String(chatIdRaw).trim();
         const title = resolveChatTitle(chat);
         const isGroup = !!chat.isGroup;
 
@@ -54,13 +55,13 @@ async function syncSharedChatsToBackend(client) {
             if (!byUser.has(jid)) byUser.set(jid, new Map());
             byUser
               .get(jid)
-              .set(chatId, { chatId, title, isGroup: true });
+              .set(chatId, { chatId: chatId, title, isGroup: true });
           }
         } else if (String(chatId).endsWith("@c.us") && chatId !== botId) {
           if (!byUser.has(chatId)) byUser.set(chatId, new Map());
           byUser
             .get(chatId)
-            .set(chatId, { chatId, title, isGroup: false });
+            .set(chatId, { chatId: chatId, title, isGroup: false });
         }
       } catch (e) {
         logger.debug(

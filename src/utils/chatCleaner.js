@@ -28,7 +28,13 @@ function loadIgnoredChats() {
     if (fs.existsSync(IGNORED_CHATS_FILE)) {
       const data = fs.readFileSync(IGNORED_CHATS_FILE, "utf8");
       const parsed = JSON.parse(data);
-      return new Set(parsed.chats || []);
+      // Só array — se `chats` for string, `new Set(str)` iterava chars e corrompia o cache.
+      const arr = Array.isArray(parsed.chats) ? parsed.chats : [];
+      return new Set(
+        arr
+          .map((x) => (x == null ? "" : String(x).trim()))
+          .filter(Boolean),
+      );
     }
   } catch (error) {
     logger.warn(
@@ -63,8 +69,10 @@ function saveIgnoredChats(ignoredChats) {
  * @param {string} chatId - Chat ID to ignore
  */
 function addToIgnoredChats(chatId) {
+  const id = chatId == null ? "" : String(chatId).trim();
+  if (!id) return;
   const ignoredChats = loadIgnoredChats();
-  ignoredChats.add(chatId);
+  ignoredChats.add(id);
   saveIgnoredChats(ignoredChats);
 }
 
@@ -73,8 +81,10 @@ function addToIgnoredChats(chatId) {
  * @param {string} chatId - Chat ID to remove from ignore list
  */
 function removeFromIgnoredChats(chatId) {
+  const id = chatId == null ? "" : String(chatId).trim();
+  if (!id) return;
   const ignoredChats = loadIgnoredChats();
-  ignoredChats.delete(chatId);
+  ignoredChats.delete(id);
   saveIgnoredChats(ignoredChats);
 }
 

@@ -2,9 +2,21 @@ const express = require("express");
 const logger = require("../utils/logger");
 const bootLog = require("../lib/bootLog");
 const { loadIgnoredChats, addToIgnoredChats } = require("../utils/chatCleaner");
-const { syncSharedChatsToBackend } = require("../services/companionChatSync");
 
 let server = null;
+
+/** Evita require circular / carga prematura; só carrega companionChatSync quando necessário. */
+async function syncCompanionChatsAfterGroupAction(client) {
+  try {
+    const { syncSharedChatsToBackend } = require("../services/companionChatSync");
+    await syncSharedChatsToBackend(client);
+  } catch (syncErr) {
+    logger.warn(
+      "[internal/bot-groups] sync companion:",
+      syncErr && syncErr.message ? syncErr.message : syncErr,
+    );
+  }
+}
 let appInstance = null;
 
 function getGatewaySecret() {
@@ -298,14 +310,7 @@ function createApp(client) {
         return res.status(500).json({ ok: false, error: "leave_unavailable" });
       }
       await chat.leave();
-      try {
-        await syncSharedChatsToBackend(client);
-      } catch (syncErr) {
-        logger.warn(
-          "[internal/bot-groups/leave] sync companion:",
-          syncErr && syncErr.message ? syncErr.message : syncErr,
-        );
-      }
+      await syncCompanionChatsAfterGroupAction(client);
       res.json({ ok: true });
     } catch (err) {
       const errMsg = err && (err.message || String(err));
@@ -321,14 +326,7 @@ function createApp(client) {
     }
     try {
       addToIgnoredChats(chatId);
-      try {
-        await syncSharedChatsToBackend(client);
-      } catch (syncErr) {
-        logger.warn(
-          "[internal/bot-groups/ignore] sync companion:",
-          syncErr && syncErr.message ? syncErr.message : syncErr,
-        );
-      }
+      await syncCompanionChatsAfterGroupAction(client);
       res.json({ ok: true });
     } catch (err) {
       const errMsg = err && (err.message || String(err));
