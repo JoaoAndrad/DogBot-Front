@@ -154,8 +154,8 @@ function mergeDuplicateUserMaps(byUser) {
 
 /**
  * Envia para o backend a lista de chats em partilha user+bot (para GET /api/companion/chats).
- * Um POST por contacto WA conhecido; falhas 404 (user não existe na BD) ignoram-se.
- * `replace: true` — snapshot completo por utilizador (merge de duplicados antes).
+ * Um POST batch com todos os contactos; o backend funde por userId (evita snapshot parcial).
+ * `replace: true` — snapshot completo por utilizador (merge de duplicados no bot antes).
  */
 async function syncSharedChatsToBackend(client) {
   try {
@@ -230,35 +230,28 @@ async function syncSharedChatsToBackend(client) {
 
     const mergedByUser = mergeDuplicateUserMaps(byUser);
 
-    let ok = 0;
-    let skipped = 0;
-    for (const [waId, chatMap] of mergedByUser) {
-      const chatsPayload = [...chatMap.values()];
-      try {
-        await backendClient.sendToBackend(
-          "/api/internal/companion/sync-chats",
-          {
-            waId,
-            chats: chatsPayload,
-            replace: true,
-          },
-          "POST",
-          { silentHttpStatuses: [404] },
-        );
-        ok++;
-      } catch (e) {
-        if (e && e.status === 404) {
-          skipped++;
-          continue;
-        }
-        logger.debug(
-          `[companionChatSync] ${waId}: ${e && e.message ? e.message : e}`,
-        );
-      }
+    const batches = [...mergedByUser.entries()].map(([waId, chatMap]) => ({
+      waId,
+      chats: [...chatMap.values()],
+    }));
+
+    try {
+      await backendClient.sendToBackend(
+        "/api/internal/companion/sync-chats-batch",
+        {
+          batches,
+          replace: true,
+        },
+        "POST",
+      );
+    } catch (e) {
+      logger.debug(
+        `[companionChatSync] batch: ${e && e.message ? e.message : e}`,
+      );
     }
 
     logger.info(
-      `[companionChatSync] contatos =${mergedByUser.size} (raw=${byUser.size}) ok=${ok} skipped_404=${skipped}`,
+      `[companionChatSync] contatos =${mergedByUser.size} (raw=${byUser.size}) batches=${batches.length}`,
     );
   } catch (e) {
     logger.warn(
