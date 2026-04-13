@@ -1,5 +1,7 @@
 const conversationState = require("../services/conversationState");
 const routineClient = require("../services/routineClient");
+const backendClient = require("../services/backendClient");
+const { lookupByIdentifier } = require("../utils/whatsapp/getUserData");
 const { parseRoutineDatePtBr } = require("../utils/parses/parseRoutineDatePtBr");
 const { parseRoutineTimePtBr } = require("../utils/parses/parseRoutineTimePtBr");
 const logger = require("../utils/logger");
@@ -19,17 +21,20 @@ function looksLikeUserUuid(s) {
   return typeof s === "string" && USER_UUID_RE.test(s.trim());
 }
 
-async function resolveUuid(backendUrl, identifier) {
+async function resolveUuid(identifier) {
   try {
-    const fetch = require("node-fetch");
     const id = String(identifier || "").trim();
-    const url = looksLikeUserUuid(id)
-      ? `${backendUrl}/api/users/${encodeURIComponent(id)}`
-      : `${backendUrl}/api/users/by-identifier/${encodeURIComponent(identifier)}`;
-    const res = await fetch(url);
-    if (!res.ok) return null;
-    const j = await res.json();
-    return j && j.user && j.user.id ? j.user.id : null;
+    if (!id) return null;
+    if (looksLikeUserUuid(id)) {
+      const j = await backendClient.sendToBackend(
+        `/api/users/${encodeURIComponent(id)}`,
+        null,
+        "GET",
+      );
+      return j && j.user && j.user.id ? j.user.id : null;
+    }
+    const lu = await lookupByIdentifier(id);
+    return lu && lu.found && lu.userId ? lu.userId : null;
   } catch {
     return null;
   }
@@ -71,8 +76,7 @@ async function sendAssignPoll(
   draft,
   flowId = "rotina",
 ) {
-  const backendUrl = process.env.BACKEND_URL || "http://localhost:8000";
-  const creatorUuid = await resolveUuid(backendUrl, userId);
+  const creatorUuid = await resolveUuid(userId);
   if (!creatorUuid) {
     await client.sendMessage(
       chatId,
@@ -100,7 +104,7 @@ async function sendAssignPoll(
       (contact && (contact.pushname || contact.name)) ||
       partId.split("@")[0] ||
       "?";
-    const uuid = await resolveUuid(backendUrl, partId);
+    const uuid = await resolveUuid(partId);
     if (!uuid) continue;
     options.push(label.slice(0, 60));
     indexToUserId[String(idx)] = uuid;
@@ -129,27 +133,30 @@ async function sendAssignPoll(
   });
 }
 
-async function fetchUserLabel(backendUrl, userIdOrWaId) {
+async function fetchUserLabel(userIdOrWaId) {
   if (!userIdOrWaId) return "?";
   const raw = String(userIdOrWaId).trim();
   try {
-    const fetch = require("node-fetch");
-    const url = looksLikeUserUuid(raw)
-      ? `${backendUrl}/api/users/${encodeURIComponent(raw)}`
-      : `${backendUrl}/api/users/by-identifier/${encodeURIComponent(raw)}`;
-    const res = await fetch(url);
-    if (!res.ok) return String(raw).slice(0, 8) + "…";
-    const j = await res.json();
-    const u = j && j.user;
-    if (!u) return "?";
-    return u.display_name || u.push_name || u.sender_number || "?";
+    if (looksLikeUserUuid(raw)) {
+      const j = await backendClient.sendToBackend(
+        `/api/users/${encodeURIComponent(raw)}`,
+        null,
+        "GET",
+      );
+      const u = j && j.user;
+      if (!u) return String(raw).slice(0, 8) + "…";
+      return u.display_name || u.push_name || u.sender_number || "?";
+    }
+    const lu = await lookupByIdentifier(raw);
+    if (!lu || !lu.found)
+      return String(raw).slice(0, 8) + "…";
+    return lu.displayName || "?";
   } catch {
     return "?";
   }
 }
 
 async function buildDraftSummaryText(
-  backendUrl,
   invokerWaId,
   draft,
   isGroup,
@@ -159,8 +166,7 @@ async function buildDraftSummaryText(
   const rep = repeatKindLabel(draft);
   const start = formatYmdToBr(draft.startDate);
   const time = formatTimeMinutes(draft.anchorTimeMinutes);
-  // Preferir JID do WhatsApp: GET by-identifier funciona como no fluxo de assignees; UUID em /users/:id pode falhar.
-  const creatorName = await fetchUserLabel(backendUrl, invokerWaId);
+  const creatorName = await fetchUserLabel(invokerWaId);
 
   let peopleBlock = "";
   const ids = Array.isArray(draft.assigneeUserIds) ? draft.assigneeUserIds : [];
@@ -174,7 +180,7 @@ async function buildDraftSummaryText(
       `👥 *Participantes:* *somente o criador* (opção “Somente a mim”).`;
   } else {
     const labels = await Promise.all(
-      ids.map((id) => fetchUserLabel(backendUrl, id)),
+      ids.map((id) => fetchUserLabel(id)),
     );
     peopleBlock =
       `👤 *Criador:* *${creatorName}*\n` +
@@ -229,9 +235,7 @@ async function sendPrimaryConfirmPoll(
   isGroup,
   isEdit = false,
 ) {
-  const backendUrl = process.env.BACKEND_URL || "http://localhost:8000";
   const summary = await buildDraftSummaryText(
-    backendUrl,
     userId,
     draft,
     isGroup,
@@ -392,10 +396,7 @@ async function executeRotinaWizardAction(result, client) {
 
   if (action === "rotina_wizard_confirm") {
     try {
-      const editorUuid = await resolveUuid(
-        process.env.BACKEND_URL || "http://localhost:8000",
-        invoker,
-      );
+      const editorUuid = await resolveUuid(invoker);
       if (!editorUuid) throw new Error("creator_not_found");
       if (isEdit) {
         const patchBody = {
@@ -807,8 +808,7 @@ async function finalizeCreateFromContext(
   draft,
   assigneeUserIds,
 ) {
-  const backendUrl = process.env.BACKEND_URL || "http://localhost:8000";
-  const creatorUuid = await resolveUuid(backendUrl, userId);
+  const creatorUuid = await resolveUuid(userId);
   if (!creatorUuid) throw new Error("creator_not_found");
 
   await routineClient.createRoutine({
