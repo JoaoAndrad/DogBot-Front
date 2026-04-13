@@ -1,4 +1,8 @@
-const backend = require("../../../src/services/backendClient");
+const backend = require("../../services/backendClient");
+const logger = require("../../utils/logger");
+const { jidFromContact, lookupByIdentifierPost } = require(
+  "../../utils/whatsapp/getUserData",
+);
 
 module.exports = {
   // primary command name (users send `/conectar`) and an alias
@@ -8,7 +12,9 @@ module.exports = {
   async execute(ctx) {
     // ctx may have message, reply, sender info
     const reply =
-      typeof ctx.reply === "function" ? ctx.reply : (t) => console.log(t);
+      typeof ctx.reply === "function"
+        ? ctx.reply
+        : (t) => logger.debug("[conectar]", t);
 
     // Check if it's a group chat
     const chatId = ctx.message?.from || null;
@@ -19,18 +25,17 @@ module.exports = {
       return;
     }
 
-    // Usar getContact() para obter o número real (@c.us) em vez de @lid
     let userId = null;
     try {
       const msg = ctx.message;
       if (msg && typeof msg.getContact === "function") {
         const contact = await msg.getContact();
-        userId = contact.id._serialized || contact.id;
+        userId = jidFromContact(contact) || contact.id._serialized || contact.id;
       } else {
         userId = (msg && (msg.author || msg.from)) || ctx.sender || null;
       }
     } catch (err) {
-      console.log("[conectar] Failed to resolve contact:", err.message);
+      logger.warn("[conectar] Falha ao resolver contacto:", err.message);
       userId =
         (ctx.message && (ctx.message.author || ctx.message.from)) ||
         ctx.sender ||
@@ -42,11 +47,7 @@ module.exports = {
       // (so we can show the right success message after auth)
       let isReconnect = false;
       try {
-        const preLookup = await backend.sendToBackend(
-          `/api/users/lookup`,
-          { identifier: userId },
-          "POST",
-        );
+        const preLookup = await lookupByIdentifierPost(userId);
         isReconnect = !!(preLookup && preLookup.found && preLookup.hasSpotify);
       } catch (_) {
         // Ignore; treat as new user
@@ -80,11 +81,7 @@ module.exports = {
 
           try {
             // Check if user has spotify connected now
-            const lookupResult = await backend.sendToBackend(
-              `/api/users/lookup`,
-              { identifier: userId },
-              "POST",
-            );
+            const lookupResult = await lookupByIdentifierPost(userId);
 
             if (lookupResult && lookupResult.found && lookupResult.hasSpotify) {
               clearInterval(interval);
@@ -104,23 +101,23 @@ module.exports = {
               }
             }
           } catch (err) {
-            console.log("[conectar] Polling error:", err.message);
+            logger.warn("[conectar] Erro no polling:", err.message);
           }
 
           // Stop after max attempts
           if (attempts >= maxAttempts) {
             clearInterval(interval);
-            console.log("[conectar] Polling timeout for userId:", userId);
+            logger.debug("[conectar] Polling timeout userId:", userId);
           }
         }, 10000); // Check every 10 seconds
       };
 
       // Start polling in background (don't await)
       pollAuth().catch((err) => {
-        console.log("[conectar] Polling failed:", err.message);
+        logger.warn("[conectar] Polling falhou:", err.message);
       });
     } catch (err) {
-      console.log("spotify.conectar error", err && err.message);
+      logger.error("spotify.conectar error", err && err.message);
       await reply("Falha ao iniciar conexão com o Spotify.");
     }
   },

@@ -1,6 +1,7 @@
 const logger = require("../../utils/logger");
 const processor = require("../../components/poll/processor");
 const backendClient = require("../../services/backendClient");
+const { lookupByIdentifier } = require("../../utils/whatsapp/getUserData");
 
 /**
  * Handler for individual track voting (approve/reject single track)
@@ -57,12 +58,8 @@ async function handleTrackVote(poll, votes, stats, client) {
     // Get voter user ID (lookup com identificador completo @c.us / @lid)
     let voterUserId;
     try {
-      const lookup = await backendClient.sendToBackend(
-        `/api/users/lookup?identifier=${encodeURIComponent(voter)}`,
-        null,
-        "GET",
-      );
-      if (!lookup.found || !lookup.userId) {
+      const lookup = await lookupByIdentifier(voter);
+      if (!lookup || !lookup.found || !lookup.userId) {
         logger.error("[PollHandlers] Voter not found via lookup");
         await chat.sendMessage(
           `⚠️ Usuário não cadastrado. Use /cadastro primeiro.`,
@@ -206,12 +203,8 @@ async function handleCollectionVote(poll, votes, stats, client) {
     // Get voter user ID
     let voterUserId;
     try {
-      const lookup = await backendClient.sendToBackend(
-        `/api/users/lookup?identifier=${encodeURIComponent(voter)}`,
-        null,
-        "GET",
-      );
-      if (!lookup.found || !lookup.userId) {
+      const lookup = await lookupByIdentifier(voter);
+      if (!lookup || !lookup.found || !lookup.userId) {
         logger.error("[PollHandlers] Voter user data not found for collection");
         await chat.sendMessage(
           `⚠️ Usuário não cadastrado. Use /cadastro primeiro.`,

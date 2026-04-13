@@ -1,5 +1,10 @@
 const fetch = require("node-fetch");
 const backendClient = require("../../services/backendClient");
+const logger = require("../../utils/logger");
+const {
+  jidFromContact,
+  lookupByIdentifier,
+} = require("../../utils/whatsapp/getUserData");
 const { sendTrackSticker } = require("../../utils/media/stickerHelper");
 const { MessageMedia } = require("whatsapp-web.js");
 const { isFromApp } = require("./fromAppText");
@@ -7,26 +12,6 @@ const { isFromApp } = require("./fromAppText");
 const BACKEND_BASE = (
   process.env.BACKEND_URL || "http://localhost:8000"
 ).replace(/\/$/, "");
-
-async function resolveUserUuid(externalId) {
-  if (!externalId) return null;
-  const isUUID =
-    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
-      externalId,
-    );
-  if (isUUID) return externalId;
-
-  try {
-    const json = await backendClient.sendToBackend(
-      `/api/users/by-identifier/${encodeURIComponent(externalId)}`,
-      null,
-      "GET",
-    );
-    return json && json.user && json.user.id ? json.user.id : null;
-  } catch (e) {
-    return null;
-  }
-}
 
 function msToTime(ms) {
   if (!ms && ms !== 0) return "0:00";
@@ -56,16 +41,14 @@ module.exports = {
       !!(msg && msg.isGroup) ||
       (msg.from && String(msg.from).endsWith("@g.us"));
 
-    // Usar getContact() para obter o número real (@c.us); gateway simulado define msg.author.
     let userId = msg.author || msg.from;
     if (msg && typeof msg.getContact === "function") {
       try {
         const contact = await msg.getContact();
-        if (contact && contact.id && contact.id._serialized) {
-          userId = contact.id._serialized;
-        }
+        const jid = jidFromContact(contact);
+        if (jid) userId = jid;
       } catch (err) {
-        console.log("[Command:tocando] Error getting contact:", err.message);
+        logger.warn("[Command:tocando] Erro ao obter contacto:", err.message);
       }
     }
 
@@ -78,8 +61,15 @@ module.exports = {
         : null;
 
     try {
-      const resolved = await resolveUserUuid(userId);
-      const userParam = resolved || userId;
+      const isUUID =
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+          String(userId || ""),
+        );
+      let userParam = userId;
+      if (!isUUID) {
+        const lu = await lookupByIdentifier(userId);
+        if (lu && lu.found && lu.userId) userParam = lu.userId;
+      }
       let json;
       try {
         json = await backendClient.sendToBackend(
@@ -88,7 +78,7 @@ module.exports = {
           "GET",
         );
       } catch (e) {
-        console.log("[Command:tocando] Error from backend current:", e);
+        logger.warn("[Command:tocando] Erro do backend current:", e);
         await reply(
           "❌ Erro ao consultar o servidor. Tenta novamente em instantes.",
         );
@@ -191,7 +181,7 @@ module.exports = {
         }
       }
     } catch (err) {
-      console.log("[Command:tocando] Error:", err);
+      logger.warn("[Command:tocando] Erro:", err);
       await reply(
         "❌ Erro ao consultar tocando agora: " + (err.message || err),
       );

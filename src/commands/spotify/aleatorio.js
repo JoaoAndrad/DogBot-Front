@@ -1,5 +1,9 @@
 const backendClient = require("../../services/backendClient");
 const logger = require("../../utils/logger");
+const {
+  jidFromContact,
+  lookupByIdentifier,
+} = require("../../utils/whatsapp/getUserData");
 
 module.exports = {
   name: "aleatorio",
@@ -30,21 +34,16 @@ module.exports = {
         );
       }
 
-      // Get user WhatsApp identifier
-      let whatsappId = null;
+      let whatsappId = msg.author || msg.from;
       try {
         const contact = await msg.getContact();
-        whatsappId = contact.id._serialized || msg.author || msg.from;
+        const jid = jidFromContact(contact);
+        if (jid) whatsappId = jid;
       } catch (e) {
         whatsappId = msg.author || msg.from;
       }
 
-      // Lookup user UUID
-      const userLookup = await backendClient.sendToBackend(
-        `/api/users/lookup?identifier=${encodeURIComponent(whatsappId)}`,
-        null,
-        "GET",
-      );
+      const userLookup = await lookupByIdentifier(whatsappId);
 
       if (!userLookup || !userLookup.found || !userLookup.userId) {
         return reply(

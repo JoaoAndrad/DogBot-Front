@@ -1,6 +1,10 @@
 const backendClient = require("../../services/backendClient");
 const logger = require("../../utils/logger");
 const polls = require("../../components/poll");
+const {
+  jidFromContact,
+  lookupByIdentifier,
+} = require("../../utils/whatsapp/getUserData");
 
 module.exports = {
   name: "host",
@@ -21,25 +25,18 @@ module.exports = {
     }
 
     try {
-      // Get user WhatsApp identifier
-      let whatsappId = null;
+      let whatsappId = msg.author || msg.from;
       try {
         const contact = await msg.getContact();
-        if (contact && contact.id && contact.id._serialized) {
-          whatsappId = contact.id._serialized;
-        }
+        const jid = jidFromContact(contact);
+        if (jid) whatsappId = jid;
       } catch (err) {
         whatsappId = msg.author || msg.from;
       }
 
       logger.info(`[Host] Iniciando transferência no grupo ${chatId}`);
 
-      // Get user info
-      const userRes = await backendClient.sendToBackend(
-        `/api/users/lookup?identifier=${encodeURIComponent(whatsappId)}`,
-        null,
-        "GET",
-      );
+      const userRes = await lookupByIdentifier(whatsappId);
 
       if (!userRes || !userRes.found) {
         return reply(

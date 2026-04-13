@@ -1,5 +1,9 @@
 const backendClient = require("../../services/backendClient");
 const logger = require("../../utils/logger");
+const {
+  jidFromContact,
+  lookupByIdentifier,
+} = require("../../utils/whatsapp/getUserData");
 const polls = require("../../components/poll");
 const { sendTrackSticker } = require("../../utils/media/stickerHelper");
 const { isFromApp, prefix } = require("./fromAppText");
@@ -44,25 +48,18 @@ module.exports = {
     }
 
     try {
-      // Get user WhatsApp identifier
-      let whatsappId = null;
+      let whatsappId = msg.author || msg.from;
       try {
         const contact = await msg.getContact();
-        if (contact && contact.id && contact.id._serialized) {
-          whatsappId = contact.id._serialized;
-        }
+        const jid = jidFromContact(contact);
+        if (jid) whatsappId = jid;
       } catch (err) {
         whatsappId = msg.author || msg.from;
       }
 
       logger.info(`[Skip] Iniciando votação no grupo ${chatId}`);
 
-      // Get initiator user info
-      const userRes = await backendClient.sendToBackend(
-        `/api/users/lookup?identifier=${encodeURIComponent(whatsappId)}`,
-        null,
-        "GET",
-      );
+      const userRes = await lookupByIdentifier(whatsappId);
 
       if (!userRes || !userRes.found) {
         return reply(
@@ -176,12 +173,7 @@ module.exports = {
             `[Skip] Voto recebido: voter=${voter} isFor=${isFor} voteId=${collaborativeVoteId}`,
           );
 
-          // Get voter's userId by looking up in database
-          const voterUserRes = await backendClient.sendToBackend(
-            `/api/users/lookup?identifier=${encodeURIComponent(voter)}`,
-            null,
-            "GET",
-          );
+          const voterUserRes = await lookupByIdentifier(voter);
 
           if (!voterUserRes || !voterUserRes.found) {
             logger.warn(`[Skip] Voter ${voter} não encontrado no banco`);

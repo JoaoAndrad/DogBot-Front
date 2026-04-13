@@ -1,4 +1,9 @@
 const flowManager = require("../../components/menu/flowManager");
+const logger = require("../../utils/logger");
+const {
+  jidFromContact,
+  lookupByIdentifierPost,
+} = require("../../utils/whatsapp/getUserData");
 
 module.exports = {
   name: "spotify",
@@ -11,26 +16,21 @@ module.exports = {
     const chatId = msg.from;
     const isGroup = chatId.endsWith("@g.us");
 
-    // Usar getContact() para obter o número real (@c.us)
     let userId = msg.author || msg.from;
-    try {
-      const contact = await msg.getContact();
-      if (contact && contact.id && contact.id._serialized) {
-        userId = contact.id._serialized;
+    if (msg && typeof msg.getContact === "function") {
+      try {
+        const contact = await msg.getContact();
+        const jid = jidFromContact(contact);
+        if (jid) userId = jid;
+      } catch (err) {
+        logger.warn("[Command:spotify] Erro ao obter contacto:", err.message);
       }
-    } catch (err) {
-      console.log("[Command:spotify] Error getting contact:", err.message);
     }
 
     // Se for grupo, verificar se usuário tem Spotify conectado
     if (isGroup) {
       try {
-        const backendClient = require("../../services/backendClient");
-        const lookupResult = await backendClient.sendToBackend(
-          `/api/users/lookup`,
-          { identifier: userId },
-          "POST"
-        );
+        const lookupResult = await lookupByIdentifierPost(userId);
 
         if (!lookupResult || !lookupResult.found || !lookupResult.hasSpotify) {
           return reply(
@@ -39,14 +39,14 @@ module.exports = {
           );
         }
       } catch (err) {
-        console.log("[Command:spotify] Error checking Spotify:", err.message);
+        logger.warn("[Command:spotify] Erro ao verificar Spotify:", err.message);
       }
     }
 
     try {
       await flowManager.startFlow(client, chatId, userId, "spotify");
     } catch (err) {
-      console.log("[Command:spotify] Error starting flow:", err);
+      logger.warn("[Command:spotify] Erro ao iniciar fluxo:", err);
       await client.sendMessage(
         chatId,
         "❌ Erro ao iniciar menu Spotify: " + err.message

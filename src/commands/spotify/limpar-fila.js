@@ -1,5 +1,9 @@
 const backendClient = require("../../services/backendClient");
 const logger = require("../../utils/logger");
+const {
+  jidFromContact,
+  lookupByIdentifier,
+} = require("../../utils/whatsapp/getUserData");
 
 module.exports = {
   name: "limpar-fila",
@@ -22,13 +26,13 @@ module.exports = {
     }
 
     try {
-      // Get user WhatsApp identifier
       let whatsappId = null;
       try {
         const contact = await msg.getContact();
-        if (contact && contact.id && contact.id._serialized) {
-          whatsappId = contact.id._serialized;
-        }
+        whatsappId =
+          jidFromContact(contact) ||
+          (contact && contact.id && contact.id._serialized) ||
+          null;
       } catch (err) {
         logger.error("[LimparFilaCommand] Could not resolve contact:", err);
       }
@@ -52,12 +56,8 @@ module.exports = {
 
       let userId;
       try {
-        const lookup = await backendClient.sendToBackend(
-          `/api/users/lookup?identifier=${encodeURIComponent(whatsappId)}`,
-          null,
-          "GET",
-        );
-        if (!lookup.found || !lookup.userId) {
+        const lookup = await lookupByIdentifier(whatsappId);
+        if (!lookup || !lookup.found || !lookup.userId) {
           return reply(
             "❌ Não encontrámos o teu usuário no sistema. Usa /cadastro ou associa a conta.",
           );

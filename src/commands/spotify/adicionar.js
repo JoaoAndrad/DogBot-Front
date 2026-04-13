@@ -1,6 +1,10 @@
 const backendClient = require("../../services/backendClient");
 const logger = require("../../utils/logger");
 const polls = require("../../components/poll");
+const {
+  jidFromContact,
+  lookupByIdentifier,
+} = require("../../utils/whatsapp/getUserData");
 
 /**
  * Resolve user name from WhatsApp contact
@@ -148,13 +152,13 @@ module.exports = {
     }
 
     try {
-      // Get user WhatsApp identifier
       let whatsappId = null;
       try {
         const contact = await msg.getContact();
-        if (contact && contact.id && contact.id._serialized) {
-          whatsappId = contact.id._serialized;
-        }
+        whatsappId =
+          jidFromContact(contact) ||
+          (contact && contact.id && contact.id._serialized) ||
+          null;
       } catch (err) {
         logger.error("[AdicionarCommand] Could not resolve contact:", err);
       }
@@ -181,12 +185,8 @@ module.exports = {
       // Get user ID from backend (identificador completo, com fallbacks no servidor)
       let userId;
       try {
-        const lookup = await backendClient.sendToBackend(
-          `/api/users/lookup?identifier=${encodeURIComponent(whatsappId)}`,
-          null,
-          "GET",
-        );
-        if (!lookup.found || !lookup.userId) {
+        const lookup = await lookupByIdentifier(whatsappId);
+        if (!lookup || !lookup.found || !lookup.userId) {
           return reply(
             "❌ Não encontrámos o teu usuário. Usa /cadastro ou associa a conta.",
           );

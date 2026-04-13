@@ -1,6 +1,7 @@
 const backend = require("../../services/backendClient");
 const { sendCompositeSticker } = require("../../utils/media/stickerHelper");
 const logger = require("../../utils/logger");
+const { lookupByIdentifier } = require("../../utils/whatsapp/getUserData");
 
 /**
  * Resolve host name with WhatsApp fallback
@@ -37,7 +38,9 @@ module.exports = {
     "Mostra informações sobre jams ativas (música, álbum, artista e ouvintes)",
   async execute(ctx) {
     const reply =
-      typeof ctx.reply === "function" ? ctx.reply : (t) => console.log(t);
+      typeof ctx.reply === "function"
+        ? ctx.reply
+        : (t) => logger.debug("[jams]", t);
 
     try {
       const chatId = ctx.message?.from || null;
@@ -59,11 +62,7 @@ module.exports = {
           // Resolve each participant to a user UUID and query their jam status
           for (const pid of ids) {
             try {
-              const lookup = await backend.sendToBackend(
-                `/api/users/lookup?identifier=${encodeURIComponent(pid)}`,
-                null,
-                "GET",
-              );
+              const lookup = await lookupByIdentifier(pid);
               if (!lookup || !lookup.found || !lookup.userId) continue;
               const userUuid = lookup.userId;
               const status = await backend.sendToBackend(
@@ -85,7 +84,7 @@ module.exports = {
 
           jams = Array.from(jamMap.values());
         } catch (e) {
-          console.error("[jams] Error fetching group participants:", e);
+          logger.error("[jams] Error fetching group participants:", e);
           // fallback to global active list
         }
       }
@@ -249,7 +248,7 @@ module.exports = {
         logger.error("[Jams] Stack trace: " + err.stack);
       }
     } catch (err) {
-      console.error("[jams] Error:", err);
+      logger.error("[jams] Error:", err);
       await reply(`❌ Erro ao listar jams: ${err.message}`);
     }
   },

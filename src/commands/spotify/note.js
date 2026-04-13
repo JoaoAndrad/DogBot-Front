@@ -1,6 +1,8 @@
 const fetch = require("node-fetch");
 const { MessageMedia } = require("whatsapp-web.js");
 const backendClient = require("../../services/backendClient");
+const logger = require("../../utils/logger");
+const { jidFromContact } = require("../../utils/whatsapp/getUserData");
 const { sendTrackSticker } = require("../../utils/media/stickerHelper");
 
 const BACKEND_BASE = (
@@ -25,11 +27,10 @@ module.exports = {
     if (msg && typeof msg.getContact === "function") {
       try {
         const contact = await msg.getContact();
-        if (contact && contact.id && contact.id._serialized) {
-          author = contact.id._serialized;
-        }
+        const jid = jidFromContact(contact);
+        if (jid) author = jid;
       } catch (err) {
-        console.log("[Command:nota] Error getting contact:", err.message);
+        logger.warn("[Command:nota] Erro ao obter contacto:", err.message);
       }
     }
 
@@ -133,7 +134,7 @@ module.exports = {
         try {
           await reply(confirmationText);
         } catch (e) {
-          console.error(
+          logger.error(
             "Erro ao enviar confirmação de nota:",
             e && e.message ? e.message : e,
           );
@@ -142,7 +143,7 @@ module.exports = {
         try {
           await sendTrackSticker(ctx.client, msg.from, trackWithImage);
         } catch (stErr) {
-          console.error(
+          logger.error(
             "Erro ao enviar figurinha da faixa:",
             stErr && stErr.message ? stErr.message : stErr,
           );
@@ -170,13 +171,13 @@ module.exports = {
             } else {
               try {
                 const body = await pres.json().catch(() => null);
-                console.log("[nota] prévia indisponível (não é áudio):", body);
+                logger.debug("[nota] prévia indisponível (não é áudio):", body);
               } catch (e) {
-                console.log("[nota] prévia: resposta sem áudio");
+                logger.debug("[nota] prévia: resposta sem áudio");
               }
             }
           } catch (e) {
-            console.log("[nota] prévia:", e && e.stack ? e.stack : e);
+            logger.debug("[nota] prévia:", e && e.stack ? e.stack : e);
           }
         }
 
@@ -200,7 +201,7 @@ module.exports = {
 
       return reply("Falha ao registrar nota. Tente novamente.");
     } catch (err) {
-      console.error("nota command error", err && err.message);
+      logger.error("nota command error", err && err.message);
       return reply("Erro ao registrar nota. Tente novamente.");
     }
   },

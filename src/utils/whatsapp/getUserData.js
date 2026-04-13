@@ -45,6 +45,28 @@ async function lookupByIdentifier(identifier) {
 }
 
 /**
+ * Mesmo contrato que GET /api/users/lookup; útil quando o caller já usava POST com body.
+ * @param {string} identifier
+ * @returns {Promise<object|null>}
+ */
+async function lookupByIdentifierPost(identifier) {
+  if (identifier == null || String(identifier).trim() === "") return null;
+  try {
+    const raw = await backendClient.sendToBackend(
+      `/api/users/lookup`,
+      { identifier: String(identifier).trim() },
+      "POST",
+    );
+    return raw || null;
+  } catch (err) {
+    logger.warn(
+      `[getUserData] lookupByIdentifierPost falhou (${String(identifier).slice(0, 40)}…): ${err.message}`,
+    );
+    return null;
+  }
+}
+
+/**
  * Tenta resolver LID → telefone/JID quando a API existir na fork do wwebjs.
  * @param {import("whatsapp-web.js").Client} client
  * @param {string} rawId
@@ -246,8 +268,7 @@ async function resolveDisplayLabel({ client, memberRow, userId }) {
  * @param {import("whatsapp-web.js").Client|null} client
  */
 async function resolveVoterDisplayName(spotifyMembers, userId, client) {
-  const m =
-    spotifyMembers && spotifyMembers.find((x) => x.userId === userId);
+  const m = spotifyMembers && spotifyMembers.find((x) => x.userId === userId);
   return resolveDisplayLabel({ client, memberRow: m, userId });
 }
 
@@ -255,9 +276,7 @@ function displayNameForUserId(spotifyMembers, userId) {
   if (!spotifyMembers || !userId) return null;
   const m = spotifyMembers.find((x) => x.userId === userId);
   if (!m) return null;
-  return (
-    m.displayName || (m.identifier && m.identifier.split("@")[0]) || null
-  );
+  return m.displayName || (m.identifier && m.identifier.split("@")[0]) || null;
 }
 
 /**
@@ -317,6 +336,7 @@ async function createVotoUserContext({ message, client }) {
 module.exports = {
   jidFromContact,
   lookupByIdentifier,
+  lookupByIdentifierPost,
   normalizeIdentifierForLookup,
   resolveUserLookup,
   lookupMemberIdentifier,

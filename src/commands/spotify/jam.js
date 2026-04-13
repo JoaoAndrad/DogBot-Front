@@ -1,6 +1,10 @@
 const backend = require("../../services/backendClient");
 const logger = require("../../utils/logger");
 const polls = require("../../components/poll");
+const {
+  jidFromContact,
+  lookupByIdentifier,
+} = require("../../utils/whatsapp/getUserData");
 
 /**
  * Resolve host name with WhatsApp fallback
@@ -43,21 +47,23 @@ module.exports = {
   description: "Cria ou entra em uma jam/rádio para ouvir música sincronizada",
   async execute(ctx) {
     const reply =
-      typeof ctx.reply === "function" ? ctx.reply : (t) => console.log(t);
+      typeof ctx.reply === "function"
+        ? ctx.reply
+        : (t) => logger.debug("[jam]", t);
 
-    // Get user ID
     let userId = null;
     try {
       const msg = ctx.message;
       if (msg && typeof msg.getContact === "function") {
         const contact = await msg.getContact();
-        userId = contact.id._serialized || contact.id;
+        userId =
+          jidFromContact(contact) || contact.id._serialized || contact.id;
       } else {
         // Em grupos, `from` é o @g.us; o remetente está em `author` (também na simulação companion).
         userId = (msg && (msg.author || msg.from)) || ctx.sender || null;
       }
     } catch (err) {
-      console.log("[jam] Failed to resolve contact:", err.message);
+      logger.warn("[jam] Falha ao resolver contacto:", err.message);
       userId =
         (ctx.message && (ctx.message.author || ctx.message.from)) ||
         ctx.sender ||
@@ -70,12 +76,7 @@ module.exports = {
     }
 
     try {
-      // Resolve WhatsApp identifier to User UUID
-      const userLookup = await backend.sendToBackend(
-        `/api/users/lookup?identifier=${encodeURIComponent(userId)}`,
-        null,
-        "GET",
-      );
+      const userLookup = await lookupByIdentifier(userId);
 
       if (!userLookup || !userLookup.found || !userLookup.userId) {
         await reply(
@@ -208,11 +209,7 @@ module.exports = {
           // Resolve each WhatsApp ID to UUID
           for (const whatsappId of participantWhatsAppIds) {
             try {
-              const lookup = await backend.sendToBackend(
-                `/api/users/lookup?identifier=${encodeURIComponent(whatsappId)}`,
-                null,
-                "GET",
-              );
+              const lookup = await lookupByIdentifier(whatsappId);
               if (lookup && lookup.found && lookup.userId) {
                 participantUuids.add(lookup.userId);
               }
@@ -252,7 +249,7 @@ module.exports = {
             });
           }
         } catch (err) {
-          console.log("[jam] Could not filter by group members:", err.message);
+          logger.warn("[jam] Could not filter by group members:", err.message);
           // Continue with original jams
         }
       }
@@ -410,12 +407,7 @@ module.exports = {
                               inviteVote.selectedIndexes[0];
                             if (sel !== 0) return;
 
-                            // Resolve voter to user UUID via backend lookup
-                            const lookup = await backend.sendToBackend(
-                              `/api/users/lookup?identifier=${encodeURIComponent(voterId)}`,
-                              null,
-                              "GET",
-                            );
+                            const lookup = await lookupByIdentifier(voterId);
 
                             if (!lookup || !lookup.found || !lookup.userId) {
                               // Notify voter they must be registered
@@ -489,7 +481,7 @@ module.exports = {
                               mentions: [voterId],
                             });
                           } catch (ivErr) {
-                            console.error(
+                            logger.error(
                               "[jam] invite onVote error:",
                               ivErr && ivErr.message,
                             );
@@ -503,13 +495,13 @@ module.exports = {
                       inviteRes && inviteRes.msgId,
                     );
                   } catch (invErr) {
-                    console.error(
+                    logger.error(
                       "[jam] Failed to send invite poll:",
                       invErr && invErr.message,
                     );
                   }
                 } catch (err) {
-                  console.error(
+                  logger.error(
                     "[jam] confirm onVote error:",
                     err && err.message,
                   );
@@ -523,7 +515,7 @@ module.exports = {
             confirmRes && confirmRes.msgId,
           );
         } catch (err) {
-          console.error(
+          logger.error(
             "[jam] Error creating confirmation poll:",
             err && err.message,
           );
@@ -627,12 +619,7 @@ module.exports = {
 
                 // If user chose to create a new jam
                 if (selectedJamId === "create") {
-                  // Resolve voter to UUID
-                  const lookup = await backend.sendToBackend(
-                    `/api/users/lookup?identifier=${encodeURIComponent(voter)}`,
-                    null,
-                    "GET",
-                  );
+                  const lookup = await lookupByIdentifier(voter);
 
                   if (!lookup || !lookup.found || !lookup.userId) {
                     await ctx.client.sendMessage(
@@ -705,12 +692,7 @@ module.exports = {
                               inviteVote.selectedIndexes[0];
                             if (sel !== 0) return;
 
-                            // Resolve voter to UUID
-                            const lookup = await backend.sendToBackend(
-                              `/api/users/lookup?identifier=${encodeURIComponent(voterId)}`,
-                              null,
-                              "GET",
-                            );
+                            const lookup = await lookupByIdentifier(voterId);
 
                             if (!lookup || !lookup.found || !lookup.userId) {
                               await ctx.client.sendMessage(
@@ -782,7 +764,7 @@ module.exports = {
                               mentions: [voterId],
                             });
                           } catch (err) {
-                            console.error(
+                            logger.error(
                               "[jam] invite vote error:",
                               err && err.message,
                             );
@@ -791,7 +773,7 @@ module.exports = {
                       },
                     );
                   } catch (invErr) {
-                    console.error(
+                    logger.error(
                       "[jam] Failed to send invite poll:",
                       invErr && invErr.message,
                     );
@@ -802,12 +784,7 @@ module.exports = {
 
                 // Otherwise, join existing jam
                 const joinRes = await (async () => {
-                  // Resolve voter to UUID
-                  const lookup = await backend.sendToBackend(
-                    `/api/users/lookup?identifier=${encodeURIComponent(voter)}`,
-                    null,
-                    "GET",
-                  );
+                  const lookup = await lookupByIdentifier(voter);
                   if (!lookup || !lookup.found || !lookup.userId) {
                     await ctx.client.sendMessage(
                       voter,
@@ -867,7 +844,7 @@ module.exports = {
                   mentions: [voter],
                 });
               } catch (cbErr) {
-                console.error(
+                logger.error(
                   "[jam] unified poll onVote error:",
                   cbErr && cbErr.message,
                 );
@@ -877,13 +854,13 @@ module.exports = {
         );
         logger.debug("Unified poll sent:", createRes && createRes.msgId);
       } catch (pollErr) {
-        console.error(
+        logger.error(
           "[jam] Failed to send unified poll:",
           pollErr && pollErr.message,
         );
       }
     } catch (err) {
-      console.error("[jam] Error:", err);
+      logger.error("[jam] Error:", err);
       await reply(`❌ Erro ao processar comando /jam: ${err.message}`);
     }
   },
@@ -893,7 +870,9 @@ module.exports = {
    */
   async handlePollResponse(ctx, pollContext, selectedOption) {
     const reply =
-      typeof ctx.reply === "function" ? ctx.reply : (t) => console.log(t);
+      typeof ctx.reply === "function"
+        ? ctx.reply
+        : (t) => logger.debug("[jam handlePollResponse]", t);
 
     const { userId, jamIdMap } = pollContext;
     const selectedJamId = jamIdMap[selectedOption];
@@ -931,7 +910,7 @@ module.exports = {
 
         await reply(msg);
       } catch (err) {
-        console.error("[jam] Error creating:", err);
+        logger.error("[jam] Error creating:", err);
         await reply(`❌ Erro ao criar jam: ${err.message}`);
       }
       return;
@@ -982,7 +961,7 @@ module.exports = {
 
       await reply(msg);
     } catch (err) {
-      console.error("[jam] Error joining:", err);
+      logger.error("[jam] Error joining:", err);
       await reply(`❌ Erro ao entrar na jam: ${err.message}`);
     }
   },

@@ -1,4 +1,9 @@
 const backend = require("../../services/backendClient");
+const logger = require("../../utils/logger");
+const {
+  jidFromContact,
+  lookupByIdentifier,
+} = require("../../utils/whatsapp/getUserData");
 
 module.exports = {
   name: "sair",
@@ -6,20 +11,22 @@ module.exports = {
   description: "Sair da jam/rádio atual",
   async execute(ctx) {
     const reply =
-      typeof ctx.reply === "function" ? ctx.reply : (t) => console.log(t);
+      typeof ctx.reply === "function"
+        ? ctx.reply
+        : (t) => logger.debug("[sair]", t);
 
-    // Get user ID
     let userId = null;
     try {
       const msg = ctx.message;
       if (msg && typeof msg.getContact === "function") {
         const contact = await msg.getContact();
-        userId = contact.id._serialized || contact.id;
+        userId =
+          jidFromContact(contact) || contact.id._serialized || contact.id;
       } else {
         userId = (msg && (msg.author || msg.from)) || ctx.sender || null;
       }
     } catch (err) {
-      console.log("[sair] Failed to resolve contact:", err.message);
+      logger.warn("[sair] Falha ao resolver contacto:", err.message);
       userId =
         (ctx.message && (ctx.message.author || ctx.message.from)) ||
         ctx.sender ||
@@ -32,12 +39,7 @@ module.exports = {
     }
 
     try {
-      // Resolve WhatsApp identifier to User UUID
-      const userLookup = await backend.sendToBackend(
-        `/api/users/lookup?identifier=${encodeURIComponent(userId)}`,
-        null,
-        "GET",
-      );
+      const userLookup = await lookupByIdentifier(userId);
 
       if (!userLookup || !userLookup.found || !userLookup.userId) {
         await reply(
@@ -122,7 +124,7 @@ module.exports = {
         await reply(msg);
       }
     } catch (err) {
-      console.error("[sair] Error:", err);
+      logger.error("[sair] Error:", err);
       await reply(`❌ Erro ao sair da jam: ${err.message}`);
     }
   },
