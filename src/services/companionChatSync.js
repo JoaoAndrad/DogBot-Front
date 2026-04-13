@@ -258,7 +258,7 @@ async function syncSharedChatsToBackend(client) {
     }
 
     logger.info(
-      `[companionChatSync] contactos=${mergedByUser.size} (raw=${byUser.size}) ok=${ok} skipped_404=${skipped}`,
+      `[companionChatSync] contatos =${mergedByUser.size} (raw=${byUser.size}) ok=${ok} skipped_404=${skipped}`,
     );
   } catch (e) {
     logger.warn(
