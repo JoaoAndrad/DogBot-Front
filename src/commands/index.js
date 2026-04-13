@@ -3,6 +3,13 @@ const path = require("path");
 
 const commands = new Map();
 
+/** Pasta de primeiro nível sob `commands/` (ex.: spotify, workout). */
+function getCommandTypeForDir(dir) {
+  const rel = path.relative(__dirname, dir);
+  const parts = rel.split(path.sep).filter(Boolean);
+  return parts.length > 0 ? parts[0] : "misc";
+}
+
 function loadCommands(dir = __dirname) {
   const entries = fs.readdirSync(dir);
   for (const entry of entries) {
@@ -16,8 +23,9 @@ function loadCommands(dir = __dirname) {
     try {
       const mod = require(full);
       if (mod && mod.name) {
+        const commandType = getCommandTypeForDir(dir);
+        mod.commandType = commandType;
         commands.set(mod.name, mod);
-        // Register aliases if present
         if (Array.isArray(mod.aliases)) {
           for (const alias of mod.aliases) {
             if (alias && typeof alias === "string") {
@@ -29,12 +37,6 @@ function loadCommands(dir = __dirname) {
     } catch (err) {
       console.log("Failed to load command", full, err && err.message);
     }
-  }
-
-  // load any commands that use dotted names like 'poll.results' by their file basename too
-  // this allows commands named 'poll.results' to be required and registered
-  for (const [name, mod] of Array.from(commands.entries())) {
-    // already registered
   }
 }
 
@@ -65,10 +67,28 @@ function listCanonicalCommandNames() {
   return out;
 }
 
+/** Lista para sync: nome canónico + tipo (pasta). */
+function listCommandsForPolicySync() {
+  const seen = new Set();
+  const out = [];
+  for (const mod of allCommands()) {
+    if (!mod?.name || seen.has(mod.name)) continue;
+    seen.add(mod.name);
+    const commandType =
+      typeof mod.commandType === "string" && mod.commandType
+        ? mod.commandType
+        : "misc";
+    out.push({ commandKey: mod.name, commandType });
+  }
+  out.sort((a, b) => a.commandKey.localeCompare(b.commandKey));
+  return out;
+}
+
 module.exports = {
   loadCommands,
   getCommand,
   allCommands,
   listCanonicalCommandNames,
+  listCommandsForPolicySync,
   commands,
 };

@@ -1,6 +1,6 @@
 # Pasta `commands`
 
-Comandos do bot são carregados em startup por `index.js` (varredura recursiva de `*.js`, exceto `index.js`). Cada módulo exporta pelo menos `name`, `description` e `async execute(ctx)`.
+Comandos do bot são carregados em startup por `index.js` (varredura recursiva de `*.js`, exceto `index.js`). Cada módulo exporta pelo menos `name`, `description` e `async execute(ctx)`. O carregador define `mod.commandType` com o nome da pasta de primeiro nível (ex.: `spotify`, `workout`) para políticas no painel admin.
 
 ## Uso
 
@@ -21,7 +21,6 @@ console.log(commands.allCommands().map((c) => c.name));
 | `bot/`       | Operação do bot: menu, cadastro, ping, status, notificações, estatísticas |
 | `utilities/` | Ferramentas transversais (ex.: rotinas/hábitos) |
 | `social/`    | Interações sociais (confissões) |
-| `polls/`     | Enquetes e resultados |
 | `spotify/`   | Integração Spotify (inclui o comando genérico `spotify.js`) |
 | `life360/`   | Integração Life360 |
 
@@ -36,7 +35,6 @@ commands/
   bot/
   life360/
   media/
-  polls/
   social/
   spotify/
   utilities/

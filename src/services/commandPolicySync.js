@@ -2,19 +2,19 @@ const backendClient = require("./backendClient");
 const logger = require("../utils/logger");
 
 /**
- * Envia a lista de comandos registados ao backend; cria linhas em falta
- * (enabled=true, vip_only=false) sem alterar as existentes.
+ * Envia comandos (nome + pasta/tipo) ao backend; cria linhas em falta
+ * (enabled=true, vip_only=false). Actualiza `command_type` se a pasta mudar.
  *
- * @param {string[]} commandKeys
+ * @param {Array<{ commandKey: string, commandType: string }>} commands
  */
-async function syncRegisteredCommandsToBackend(commandKeys) {
+async function syncRegisteredCommandsToBackend(commands) {
   const res = await backendClient.sendToBackend(
     "/api/bot/command-policies/sync",
-    { commandKeys },
+    { commands },
     "POST",
   );
   logger.info(
-    `[commandPolicySync] políticas: created=${res.created ?? 0} skipped=${res.skipped ?? 0} invalid=${res.invalid ?? 0}`,
+    `[commandPolicySync] políticas: created=${res.created ?? 0} skipped=${res.skipped ?? 0} typesUpdated=${res.commandTypesUpdated ?? 0} invalid=${res.invalid ?? 0}`,
   );
   return res;
 }

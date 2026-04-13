@@ -19,7 +19,7 @@ async function main() {
       const { syncRegisteredCommandsToBackend } = require("./services/commandPolicySync");
       const tSync = Date.now();
       const sync = await syncRegisteredCommandsToBackend(
-        commands.listCanonicalCommandNames(),
+        commands.listCommandsForPolicySync(),
       );
       bootLog.line("commandPolicySync", {
         ok: true,
