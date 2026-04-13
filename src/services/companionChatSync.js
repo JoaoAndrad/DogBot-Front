@@ -250,7 +250,7 @@ async function syncSharedChatsToBackend(client) {
       );
     }
 
-    logger.info(
+    logger.debug(
       `[companionChatSync] contatos =${mergedByUser.size} (raw=${byUser.size}) batches=${batches.length}`,
     );
   } catch (e) {
