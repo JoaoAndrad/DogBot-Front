@@ -50,7 +50,7 @@ module.exports = {
 
       const jam = jamsRes.jams[0];
 
-      // Resolver utilizador pelo mesmo endpoint que o resto da API (fallbacks @c.us / @lid / número base)
+      // Resolver usuário pelo mesmo endpoint que o resto da API (fallbacks @c.us / @lid / número base)
       let userData;
       try {
         userData = await backendClient.sendToBackend(
@@ -61,14 +61,14 @@ module.exports = {
       } catch (lookupErr) {
         if (lookupErr.status === 404) {
           logger.warn(
-            "[DemocratizarCommand] Utilizador não encontrado no backend (by-identifier)",
+            "[DemocratizarCommand] usuário não encontrado no backend (by-identifier)",
           );
           return reply(
-            "❌ Não encontrámos o teu utilizador no sistema. Interage com o bot ou associa a conta para sincronizar.",
+            "❌ Não encontrámos o teu usuário no sistema. Interage com o bot ou associa a conta para sincronizar.",
           );
         }
         logger.error(
-          "[DemocratizarCommand] Erro ao resolver utilizador:",
+          "[DemocratizarCommand] Erro ao resolver usuário:",
           lookupErr,
         );
         return reply("❌ Erro ao buscar usuário.");
@@ -76,7 +76,7 @@ module.exports = {
 
       if (!userData.success || !userData.user) {
         logger.warn(
-          "[DemocratizarCommand] Resposta inesperada ao resolver utilizador",
+          "[DemocratizarCommand] Resposta inesperada ao resolver usuário",
           userData,
         );
         return reply("❌ Erro ao buscar usuário.");

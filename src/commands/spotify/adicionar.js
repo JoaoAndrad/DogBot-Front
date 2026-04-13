@@ -188,7 +188,7 @@ module.exports = {
         );
         if (!lookup.found || !lookup.userId) {
           return reply(
-            "❌ Não encontrámos o teu utilizador. Usa /cadastro ou associa a conta.",
+            "❌ Não encontrámos o teu usuário. Usa /cadastro ou associa a conta.",
           );
         }
         userId = lookup.userId;

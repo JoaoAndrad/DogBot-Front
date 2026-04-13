@@ -115,7 +115,7 @@ function groupChatIdsInMap(chatMap) {
 
 /**
  * Junta entradas @lid com @c.us quando o mapa LID só tem grupos que já estão no mapa telefone
- * (mesmo utilizador, duas chaves antes da resolução canónica).
+ * (mesmo usuário, duas chaves antes da resolução canónica).
  *
  * @param {Map<string, Map<string, { chatId: string, title: string|null, isGroup: boolean }>>} byUser
  */
@@ -155,7 +155,7 @@ function mergeDuplicateUserMaps(byUser) {
 /**
  * Envia para o backend a lista de chats em partilha user+bot (para GET /api/companion/chats).
  * Um POST batch com todos os contactos; o backend funde por userId (evita snapshot parcial).
- * `replace: true` — snapshot completo por utilizador (merge de duplicados no bot antes).
+ * `replace: true` — snapshot completo por usuário (merge de duplicados no bot antes).
  */
 async function syncSharedChatsToBackend(client) {
   try {
@@ -184,9 +184,11 @@ async function syncSharedChatsToBackend(client) {
           const parts = chat.participants || [];
           for (const p of parts) {
             let jid = serializedParticipantId(p);
-            if (!jid || jid === botId || String(jid).endsWith("@g.us")) continue;
+            if (!jid || jid === botId || String(jid).endsWith("@g.us"))
+              continue;
             jid = await resolveCanonicalWaId(client, jid, lidToCanonical);
-            if (!jid || jid === botId || String(jid).endsWith("@g.us")) continue;
+            if (!jid || jid === botId || String(jid).endsWith("@g.us"))
+              continue;
             if (!byUser.has(jid)) byUser.set(jid, new Map());
             byUser
               .get(jid)
@@ -254,10 +256,7 @@ async function syncSharedChatsToBackend(client) {
       `[companionChatSync] contatos =${mergedByUser.size} (raw=${byUser.size}) batches=${batches.length}`,
     );
   } catch (e) {
-    logger.warn(
-      "[companionChatSync] falhou:",
-      e && e.message ? e.message : e,
-    );
+    logger.warn("[companionChatSync] falhou:", e && e.message ? e.message : e);
   }
 }
 

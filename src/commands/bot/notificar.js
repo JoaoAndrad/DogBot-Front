@@ -1,7 +1,7 @@
 const backendClient = require("../../services/backendClient");
 const polls = require("../../components/poll");
 
-/** Compara JIDs do mesmo utilizador (ex.: @c.us vs @lid resolvido). */
+/** Compara JIDs do mesmo usuário (ex.: @c.us vs @lid resolvido). */
 function jidMatches(a, b) {
   if (!a || !b) return false;
   if (a === b) return true;
@@ -103,10 +103,10 @@ module.exports = {
     if (!text || text.length === 0) {
       await reply(
         "📢 *Comando /notificar* (só administradores, só no privado com o bot)\n\n" +
-          "Envia a *mesma mensagem* a *todos os utilizadores registados* no sistema.\n\n" +
+          "Envia a *mesma mensagem* a *todos os usuários registados* no sistema.\n\n" +
           "*Como usar*\n" +
           "• `/notificar <texto>` — será enviada uma *enquete* e, se confirmar, envia mensagem a todos.\n" +
-          "• `/notificar dryrun <texto>` — *ensaiar*: mostra quantos utilizadores receberiam e o texto, *sem enviar* nada.\n\n" +
+          "• `/notificar dryrun <texto>` — *ensaiar*: mostra quantos usuários receberiam e o texto, *sem enviar* nada.\n\n" +
           "*Também pode usar:* `/notify`, `/notificacao` ou `/notificacoes` (com o mesmo significado).\n\n" +
           "*Exemplos*\n" +
           "`/notificar dryrun Vamos fazer manutenção amanhã de manhã.`\n" +
@@ -145,9 +145,7 @@ module.exports = {
     }
 
     const chatId =
-      (message && message.from) ||
-      (info && info.from) ||
-      senderNumber;
+      (message && message.from) || (info && info.from) || senderNumber;
 
     const runBroadcastAfterConfirm = async () => {
       try {

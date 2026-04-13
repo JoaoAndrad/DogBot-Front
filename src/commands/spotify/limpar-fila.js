@@ -59,12 +59,12 @@ module.exports = {
         );
         if (!lookup.found || !lookup.userId) {
           return reply(
-            "❌ Não encontrámos o teu utilizador no sistema. Usa /cadastro ou associa a conta.",
+            "❌ Não encontrámos o teu usuário no sistema. Usa /cadastro ou associa a conta.",
           );
         }
         userId = lookup.userId;
       } catch (e) {
-        logger.error("[LimparFilaCommand] Erro ao resolver utilizador:", e);
+        logger.error("[LimparFilaCommand] Erro ao resolver usuário:", e);
         return reply("❌ Erro ao buscar usuário.");
       }
 

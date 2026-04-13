@@ -57,19 +57,12 @@ async function runCatchup(client, options = {}) {
         Object.keys(processedData).length === 0;
     }
   } catch (err) {
-    logger.warn("Erro ao verificar primeira execução:", err);
     isFirstRun = false;
   }
 
   if (isFirstRun) {
-    console.log(
-      "[Catchup] first run: checkpoints.json/processed.json ausentes ou vazios — a marcar última mensagem por chat como checkpoint (sem reprocessar histórico)",
-    );
-    logger.info(
-      "Catchup: primeira execução detectada - marcando todas as mensagens antigas como processadas",
-    );
+    logger.info("Catchup: firstrun");
     // Criar checkpoints com timestamp atual para todos os chats
-    let firstRunTransient = 0;
     for (const chat of chats) {
       try {
         const chatId =
@@ -83,37 +76,18 @@ async function runCatchup(client, options = {}) {
           storage.setLastTs(chatId, messages[0].timestamp);
         }
       } catch (err) {
-        if (isTransientWaChatError(err)) {
-          firstRunTransient++;
-        } else {
-          logger.warn(
-            `Catchup: erro ao marcar chat ${chat.id?._serialized}: ${err?.message}`,
-          );
-        }
+        /* transientes ignorados */
       }
     }
-    if (firstRunTransient > 0) {
-      logger.info(
-        `Catchup: ${firstRunTransient} chat(s) omitidos na marcação inicial (WA Web Sincronizando)`,
-      );
-    }
-    logger.info("Catchup: todos os chats marcados como atualizados");
     try {
       await groupDisplayNameSync.syncAllGroupDisplayNames(client, {
         force: true,
       });
     } catch (e) {
-      logger.warn(
-        "[Catchup] groupDisplayNameSync:",
-        e && e.message ? e.message : e,
-      );
+      /* silencioso */
     }
     return;
   }
-
-  logger.info(`Catchup: iniciando para ${chats.length} chats`);
-
-  let transientChatSkips = 0;
 
   for (const chat of chats) {
     try {
@@ -144,8 +118,6 @@ async function runCatchup(client, options = {}) {
 
       if (newMsgs.length === 0) continue;
 
-      logger.info(`Catchup: ${newMsgs.length} mensagens novas em ${chatId}`);
-
       for (const msg of newMsgs) {
         try {
           // Delegar para pipeline; pipeline fará dedupe também
@@ -158,41 +130,21 @@ async function runCatchup(client, options = {}) {
             storage.markProcessed(msg.id._serialized);
           if (msg.timestamp) storage.setLastTs(chatId, msg.timestamp);
         } catch (err) {
-          logger.warn(
-            `Catchup: erro processando mensagem ${
-              msg.id ? msg.id._serialized : "?"
-            } em ${chatId}: ${err && err.message}`,
-          );
+          /* silencioso */
         }
       }
     } catch (err) {
-      if (isTransientWaChatError(err)) {
-        transientChatSkips++;
-        continue;
-      }
-      logger.warn(
-        `Catchup: erro no chat ${chat.id && chat.id._serialized}: ${
-          err && err.message
-        }`,
-      );
+      if (isTransientWaChatError(err)) continue;
     }
   }
 
-  if (transientChatSkips > 0) {
-    logger.info(
-      `Catchup: ${transientChatSkips} chat(s) ignorados (WA Web ainda está sincronizando, mensagens em falta chegam em tempo real)`,
-    );
-  }
   logger.info("Catchup: concluído");
   try {
     await groupDisplayNameSync.syncAllGroupDisplayNames(client, {
       force: true,
     });
   } catch (e) {
-    logger.warn(
-      "[Catchup] groupDisplayNameSync:",
-      e && e.message ? e.message : e,
-    );
+    /* silencioso */
   }
 }
 
