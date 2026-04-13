@@ -23,10 +23,21 @@ function resolveChatTitle(chat) {
   return null;
 }
 
+/** @param {import("whatsapp-web.js").structures.Contact} contact */
+function serializedIdFromContact(contact) {
+  if (!contact || contact.id == null) return null;
+  const id = contact.id;
+  if (typeof id === "string") return id.trim();
+  if (id._serialized) return String(id._serialized).trim();
+  return null;
+}
+
 /**
- * Um mesmo contacto aparece como @lid nos participantes e como @c.us no privado.
- * Sem isto, geram-se dois POSTs de sync para o mesmo User na BD — o segundo apaga
- * os chats do primeiro (deleteMany por payload incompleto).
+ * Privado 1:1 com @lid: preferir `chat.getContact()` (API do WA para o chat actual).
+ * Participantes de grupo: `getContactById` via {@link resolveCanonicalWaId}.
+ *
+ * Um mesmo contacto aparece como @lid e como @c.us. Sem canónico único, geram-se
+ * dois POSTs de sync para o mesmo User — o segundo apaga os chats do primeiro.
  *
  * @param {import("whatsapp-web.js").Client} client
  * @param {string|null} jid
@@ -46,12 +57,7 @@ async function resolveCanonicalWaId(client, jid, cache) {
   }
   try {
     const contact = await client.getContactById(s);
-    const ser =
-      contact &&
-      contact.id &&
-      (contact.id._serialized ||
-        (typeof contact.id === "string" ? contact.id : null));
-    const serStr = ser != null ? String(ser).trim() : "";
+    const serStr = serializedIdFromContact(contact) || "";
     if (serStr.endsWith("@c.us") || serStr.endsWith("@s.whatsapp.net")) {
       cache.set(s, serStr);
       return serStr;
@@ -65,6 +71,39 @@ async function resolveCanonicalWaId(client, jid, cache) {
   }
   cache.set(s, s);
   return s;
+}
+
+/**
+ * JID canónico (@c.us) para um chat privado, incluindo quando o id do chat é @lid.
+ * @param {import("whatsapp-web.js").Chat} chat
+ * @param {string} chatId
+ * @param {import("whatsapp-web.js").Client} client
+ * @param {Map<string, string>} cache
+ */
+async function resolvePrivateChatCanonicalId(chat, chatId, client, cache) {
+  const cid = String(chatId).trim();
+  if (cid.endsWith("@c.us") || cid.endsWith("@s.whatsapp.net")) {
+    return cid;
+  }
+  if (!cid.endsWith("@lid")) return cid;
+
+  try {
+    if (typeof chat.getContact === "function") {
+      const contact = await chat.getContact();
+      const serStr = serializedIdFromContact(contact) || "";
+      if (serStr.endsWith("@c.us") || serStr.endsWith("@s.whatsapp.net")) {
+        cache.set(cid, serStr);
+        return serStr;
+      }
+    }
+  } catch (e) {
+    logger.debug(
+      "[companionChatSync] chat.getContact",
+      cid,
+      e && e.message ? e.message : e,
+    );
+  }
+  return resolveCanonicalWaId(client, cid, cache);
 }
 
 /**
@@ -106,11 +145,33 @@ async function syncSharedChatsToBackend(client) {
               .get(jid)
               .set(chatId, { chatId: chatId, title, isGroup: true });
           }
-        } else if (String(chatId).endsWith("@c.us") && chatId !== botId) {
-          if (!byUser.has(chatId)) byUser.set(chatId, new Map());
-          byUser
-            .get(chatId)
-            .set(chatId, { chatId: chatId, title, isGroup: false });
+        } else if (!isGroup && chatId !== botId) {
+          const canonicalPrivateId = await resolvePrivateChatCanonicalId(
+            chat,
+            chatId,
+            client,
+            lidToCanonical,
+          );
+          if (
+            !canonicalPrivateId ||
+            canonicalPrivateId === botId ||
+            String(canonicalPrivateId).endsWith("@g.us")
+          ) {
+            continue;
+          }
+          if (
+            !String(canonicalPrivateId).endsWith("@c.us") &&
+            !String(canonicalPrivateId).endsWith("@s.whatsapp.net")
+          ) {
+            continue;
+          }
+          if (!byUser.has(canonicalPrivateId))
+            byUser.set(canonicalPrivateId, new Map());
+          byUser.get(canonicalPrivateId).set(canonicalPrivateId, {
+            chatId: canonicalPrivateId,
+            title,
+            isGroup: false,
+          });
         }
       } catch (e) {
         logger.debug(
