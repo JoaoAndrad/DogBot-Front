@@ -58,15 +58,25 @@ async function getGroupsWithTrackingForUser(client, senderNumber) {
 }
 
 /**
- * Send workout message to a list of group chat IDs (used after /treinei to notify all groups).
+ * Send workout message to a list of group chat IDs (used after /treinei to notify other groups).
  * @param {Object} client - WhatsApp client instance
  * @param {string[]} chatIds - Group chat IDs to notify
  * @param {Object} stats - Workout stats (streak, etc.)
  * @param {string} displayName - User display name
+ * @param {string|null} [excludeChatId] - Grupo onde o treino foi registado (já recebeu a confirmação via reply; não duplicar o anúncio)
  */
-async function sendWorkoutMessageToGroups(client, chatIds, stats, displayName) {
+async function sendWorkoutMessageToGroups(
+  client,
+  chatIds,
+  stats,
+  displayName,
+  excludeChatId = null,
+) {
   const message = `🏋️ ${displayName || "Usuário"} registrou um treino!\n🔥 Sequência: ${stats.streak} dia${stats.streak > 1 ? "s" : ""}`;
   for (const groupChatId of chatIds) {
+    if (excludeChatId && isSameGroupChat(groupChatId, excludeChatId)) {
+      continue;
+    }
     try {
       await client.sendMessage(groupChatId, message);
       await new Promise((r) => setTimeout(r, 300));

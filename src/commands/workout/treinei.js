@@ -99,12 +99,13 @@ module.exports = {
           senderNumber,
         );
 
-        // Notify all groups (including current)
+        // Anúncio nos *outros* grupos; o grupo atual já recebeu a confirmação com msg.reply
         await workoutNotificationService.sendWorkoutMessageToGroups(
           ctx.client,
           groupChatIds,
           result.stats,
           displayName,
+          from,
         );
 
         // Update description in all groups the user is in
