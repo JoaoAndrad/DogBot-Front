@@ -1,5 +1,10 @@
 const backendClient = require("../../services/backendClient");
 const groupRankingService = require("../../services/groupRankingService");
+const logger = require("../../utils/logger");
+const {
+  jidFromContact,
+  lookupByIdentifier,
+} = require("../../utils/whatsapp/getUserData");
 
 module.exports = {
   name: "ativartreinos",
@@ -27,12 +32,13 @@ module.exports = {
     try {
       if (message && typeof message.getContact === "function") {
         const contact = await message.getContact();
-        if (contact && contact.id && contact.id._serialized) {
-          senderNumber = contact.id._serialized;
-        }
+        senderNumber =
+          jidFromContact(contact) ||
+          (contact && contact.id && contact.id._serialized) ||
+          null;
       }
     } catch (err) {
-      // ignore
+      logger.debug("[ativartreinos] Erro ao obter contacto:", err.message);
     }
 
     if (!senderNumber) {
@@ -50,22 +56,18 @@ module.exports = {
     // Check if user is admin via backend (NOT WhatsApp group admin)
     let isAdmin = false;
     try {
-      const lookup = await backendClient.sendToBackend(
-        `/api/users/lookup?identifier=${encodeURIComponent(senderNumber)}`,
-        null,
-        "GET",
-      );
+      const lookup = await lookupByIdentifier(senderNumber);
 
       if (lookup && lookup.found && lookup.isAdmin) {
         isAdmin = true;
       }
 
-      console.log(
+      logger.info(
         `[ativartreinos] Usuário ${senderNumber.replace(/@c\.us$/i, "")} tentou executar comando. isAdmin: ${!!lookup?.isAdmin}`,
       );
     } catch (err) {
-      console.error(
-        "[ativartreinos] Erro ao verificar admin status:",
+      logger.error(
+        "[ativartreinos] Erro ao verificar status de admin:",
         err?.message,
       );
       await reply("❌ Erro ao verificar permissões de administrador.");
@@ -97,7 +99,7 @@ module.exports = {
         return;
       }
     } catch (err) {
-      console.error("[ativartreinos] Error checking group status:", err);
+      logger.error("[ativartreinos] Erro ao verificar estado do grupo:", err);
       // Continue with activation if check fails
     }
 
@@ -128,18 +130,18 @@ module.exports = {
         setTimeout(async () => {
           try {
             await groupRankingService.updateGroupRanking(chatId);
-            console.log(
-              `[ativartreinos] Initial ranking update completed for ${chatId}`,
+            logger.info(
+              `[ativartreinos] Atualização inicial de ranking concluída para ${chatId}`,
             );
           } catch (err) {
-            console.error(`[ativartreinos] Error updating ranking:`, err);
+            logger.error(`[ativartreinos] Erro ao atualizar ranking:`, err);
           }
         }, 1000);
       } else {
         await reply("❌ Erro ao ativar sistema de treinos. Tente novamente.");
       }
     } catch (err) {
-      console.error("[ativartreinos] Error activating group:", err);
+      logger.error("[ativartreinos] Erro ao ativar grupo:", err);
       await reply("❌ Erro ao ativar sistema de treinos. Tente novamente.");
     }
   },

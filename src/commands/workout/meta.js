@@ -1,5 +1,6 @@
 const conversationState = require("../../services/conversationState");
 const logger = require("../../utils/logger");
+const { jidFromContact } = require("../../utils/whatsapp/getUserData");
 
 module.exports = {
   name: "meta",
@@ -32,8 +33,10 @@ module.exports = {
     let actualNumber = null;
     try {
       const contact = await msg.getContact();
-      if (contact && contact.id && contact.id._serialized) {
-        actualNumber = contact.id._serialized;
+      const jid = jidFromContact(contact);
+      actualNumber =
+        jid || (contact && contact.id && contact.id._serialized) || null;
+      if (actualNumber) {
         logger.debug(`[Meta] Número do contato: ${actualNumber}`);
       }
     } catch (err) {

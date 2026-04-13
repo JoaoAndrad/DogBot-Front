@@ -1,4 +1,6 @@
 const flowManager = require("../../components/menu/flowManager");
+const logger = require("../../utils/logger");
+const { jidFromContact } = require("../../utils/whatsapp/getUserData");
 
 module.exports = {
   name: "rotina",
@@ -11,11 +13,10 @@ module.exports = {
     let userId = message.author || message.from;
     try {
       const contact = await message.getContact();
-      if (contact && contact.id && contact.id._serialized) {
-        userId = contact.id._serialized;
-      }
+      const jid = jidFromContact(contact);
+      if (jid) userId = jid;
     } catch (e) {
-      /* ignore */
+      logger.debug("[rotina] Erro ao obter contacto:", e.message);
     }
 
     try {

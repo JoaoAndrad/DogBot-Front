@@ -1,6 +1,10 @@
 const polls = require("../../components/poll");
 const backendClient = require("../../services/backendClient");
 const logger = require("../../utils/logger");
+const {
+  jidFromContact,
+  lookupByIdentifier,
+} = require("../../utils/whatsapp/getUserData");
 
 // In-memory contest votes tracking
 const activeContests = new Map();
@@ -41,9 +45,8 @@ module.exports = {
       if (contesterId.includes("@lid")) {
         try {
           const contact = await ctx.client.getContactById(contesterId);
-          if (contact && contact.id && contact.id._serialized) {
-            contesterNumber = contact.id._serialized;
-          }
+          const jid = jidFromContact(contact);
+          if (jid) contesterNumber = jid;
         } catch (err) {
           logger.error(
             `[contestar] Erro ao resolver contestador @lid: ${err.message}`,
@@ -55,11 +58,7 @@ module.exports = {
 
       // Verificar se o contestador tem cadastro no sistema
       try {
-        const lookupRes = await backendClient.sendToBackend(
-          `/api/users/lookup?identifier=${encodeURIComponent(contesterNumber)}`,
-          null,
-          "GET",
-        );
+        const lookupRes = await lookupByIdentifier(contesterNumber);
         if (!lookupRes || !lookupRes.found) {
           await ctx.reply(
             "❌ Você precisa se cadastrar antes de usar este comando!\n\nEnvie /cadastro no meu privado para se registrar.",
@@ -78,9 +77,8 @@ module.exports = {
       if (targetUserId.includes("@lid")) {
         try {
           const contact = await ctx.client.getContactById(targetUserId);
-          if (contact && contact.id && contact.id._serialized) {
-            targetNumber = contact.id._serialized;
-          }
+          const jid = jidFromContact(contact);
+          if (jid) targetNumber = jid;
         } catch (err) {
           logger.error(
             `[contestar] Erro ao resolver alvo @lid: ${err.message}`,

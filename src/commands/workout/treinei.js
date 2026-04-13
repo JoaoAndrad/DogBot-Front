@@ -1,5 +1,6 @@
 const backendClient = require("../../services/backendClient");
 const logger = require("../../utils/logger");
+const { jidFromContact } = require("../../utils/whatsapp/getUserData");
 
 /**
  * Comando /treinei para registrar treino
@@ -31,13 +32,13 @@ module.exports = {
         );
         if (!settings || !settings.workoutTrackingEnabled) {
           logger.info(
-            `[treinei] Group ${from} does not have workout tracking enabled, ignoring.`,
+            `[treinei] Grupo ${from} sem treinos ativados, ignorando.`,
           );
           return;
         }
       } catch (err) {
         logger.warn(
-          `[treinei] Could not verify group settings for ${from}, aborting:`,
+          `[treinei] Não foi possível verificar configurações do grupo ${from}, abortando:`,
           err?.message,
         );
         return;
@@ -50,17 +51,17 @@ module.exports = {
       let displayName = null;
       try {
         const contact = await ctx.client.getContactById(author);
-        const resolvedAuthor = contact?.id?._serialized || author;
+        const resolvedAuthor =
+          jidFromContact(contact) || contact?.id?._serialized || author;
         senderNumber = resolvedAuthor.replace(/@c\.us$/i, "");
         displayName =
           contact?.pushname || contact?.name || contact?.notify || null;
         logger.info(
-          `[treinei] Author resolved: ${author} → ${resolvedAuthor} → ${senderNumber} (${displayName})`,
+          `[treinei] Autor resolvido: ${author} → ${resolvedAuthor} → ${senderNumber} (${displayName})`,
         );
       } catch (err) {
-        // Fallback to original author
         senderNumber = author.replace(/@(c\.us|lid)$/i, "");
-        logger.info(`[treinei] Author fallback: ${author} → ${senderNumber}`);
+        logger.info(`[treinei] Fallback do autor: ${author} → ${senderNumber}`);
       }
 
       // Extract note: remove "/treinei" command
@@ -71,9 +72,7 @@ module.exports = {
           .replace(/^(\/|!)treinei\s*/i, "") // Remove command
           .trim() || null;
 
-      logger.info(
-        `[treinei] Processing workout for ${senderNumber} in ${from}`,
-      );
+      logger.info(`[treinei] Processando treino de ${senderNumber} em ${from}`);
 
       // Send to backend
       const workoutNotificationService = require("../../services/workoutNotificationService");
@@ -115,7 +114,10 @@ module.exports = {
               await groupRankingService.updateGroupRanking(chatId);
               await new Promise((r) => setTimeout(r, 500));
             } catch (err) {
-              logger.error("[treinei] Error updating ranking for " + chatId, err);
+              logger.error(
+                "[treinei] Erro ao atualizar ranking em " + chatId,
+                err,
+              );
             }
           }
         }, 1000);
@@ -123,7 +125,7 @@ module.exports = {
         await msg.reply("Você já registrou treino hoje! 💪");
       }
     } catch (err) {
-      logger.error("[treinei] Error processing workout:", err);
+      logger.error("[treinei] Erro ao processar treino:", err);
       await ctx.reply("❌ Erro ao registrar treino. Tente novamente.");
     }
   },
