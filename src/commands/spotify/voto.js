@@ -1,4 +1,5 @@
 const fetch = require("node-fetch");
+const { DateTime } = require("luxon");
 const { MessageMedia } = require("whatsapp-web.js");
 const backendClient = require("../../services/backendClient");
 const logger = require("../../utils/logger");
@@ -30,6 +31,13 @@ function jidForMentionInitiator(
 function atTextFromJid(jid) {
   if (!jid) return "?";
   return `@${jid.split("@")[0]}`;
+}
+
+function displayNameForUserId(spotifyMembers, userId) {
+  if (!spotifyMembers || !userId) return null;
+  const m = spotifyMembers.find((x) => x.userId === userId);
+  if (!m) return null;
+  return m.displayName || (m.identifier && m.identifier.split("@")[0]) || null;
 }
 
 module.exports = {
@@ -367,6 +375,15 @@ module.exports = {
           },
         );
 
+        if (voteRes && voteRes.cooldown) {
+          await client.sendMessage(
+            chatId,
+            voteRes.message ||
+              "⏳ Aguarde alguns minutos para iniciar outra votação para esta faixa.",
+          );
+          return;
+        }
+
         if (!voteRes || !voteRes.vote) {
           await client.sendMessage(
             chatId,
@@ -385,6 +402,7 @@ module.exports = {
             chatId,
             initiatorAccountId: initiatorLookup.spotifyAccount?.id,
             fromApp,
+            spotifyMembers,
           });
           return;
         }
@@ -446,6 +464,7 @@ module.exports = {
                 chatId,
                 whatsappId,
                 initiatorLookup.spotifyAccount?.id,
+                spotifyMembers,
               );
             },
           },
@@ -484,7 +503,7 @@ module.exports = {
           contextMessage += `\n${mentions}\n`;
         }
 
-        contextMessage += `\nVotos: ${stats.votesFor}/${stats.totalEligible} (${stats.needed} necessários)`;
+        contextMessage += `\nVotos: ${stats.votesFor}/${stats.needed} (mínimo para aprovar)`;
 
         await client.sendMessage(chatId, contextMessage, {
           mentions: mentionsList,
@@ -562,6 +581,7 @@ async function addPassedTrackToPlaylist({
   chatId,
   initiatorAccountId,
   fromApp = false,
+  spotifyMembers = [],
 }) {
   const playlistSpotifyId = group.playlist?.spotifyId;
 
@@ -623,10 +643,32 @@ async function addPassedTrackToPlaylist({
     const head = fromApp
       ? "✅ Música adicionada à playlist pelo *DogBubble*!"
       : "✅ Música adicionada à playlist!";
-    await client.sendMessage(
-      chatId,
-      `${head} (${stats.votesFor}/${stats.totalEligible} votos)\n\n🎵 ${vote.trackName}\n${vote.trackArtists}`,
-    );
+    const needed = stats.needed != null ? stats.needed : stats.totalEligible;
+    const ratio = `${stats.votesFor}/${needed}`;
+    let body = `${head} (${ratio} votos)\n\n🎵 ${vote.trackName}\n${vote.trackArtists || ""}`;
+    const details = stats.votersForDetail;
+    if (Array.isArray(details) && details.length > 0) {
+      body += "\n\n*Quem votou a favor:*";
+      for (const row of details) {
+        const name =
+          displayNameForUserId(spotifyMembers, row.userId) ||
+          String(row.userId).slice(0, 8);
+        let line = `\n• ${name}`;
+        if (row.votedAt) {
+          try {
+            const dt = DateTime.fromISO(row.votedAt, { zone: "utc" }).setZone(
+              "America/Sao_Paulo",
+            );
+            line += ` — ${dt.toFormat("dd/MM/yyyy HH:mm")}`;
+            if (row.fromEarlierRound) line += " (outra ronda)";
+          } catch (e) {
+            line += ` — ${row.votedAt}`;
+          }
+        }
+        body += line;
+      }
+    }
+    await client.sendMessage(chatId, body);
 
     try {
       const playlistRes = await backendClient.sendToBackend(
@@ -667,6 +709,7 @@ async function handleAddVote(
   chatId,
   creatorId,
   initiatorAccountId,
+  spotifyMembers,
 ) {
   try {
     const voter = voteData.voter; // Já vem resolvido para @c.us pelo pollComponent
@@ -759,7 +802,7 @@ async function handleAddVote(
     const stats = castRes.stats;
 
     logger.info(
-      `[Voto] Voto registrado. Status: ${updatedVote.status}, Stats: ${stats.votesFor}/${stats.totalEligible}`,
+      `[Voto] Voto registrado. Status: ${updatedVote.status}, Stats: ${stats.votesFor}/${stats.needed}`,
     );
 
     // Se o voto já foi resolvido antes (por outro evento concorrente), não processar novamente
@@ -776,7 +819,7 @@ async function handleAddVote(
       voterContact?.pushname || voterContact?.name || voter.split("@")[0];
 
     // Enviar atualização sobre o voto (se ainda não passou nem falhou)
-    if (updatedVote.status === "pending") {
+    if (updatedVote.status === "active") {
       const votesNeeded = stats.needed - stats.votesFor;
 
       await client.sendMessage(
@@ -802,11 +845,12 @@ async function handleAddVote(
         chatId,
         initiatorAccountId,
         fromApp: false,
+        spotifyMembers,
       });
     } else if (updatedVote.status === "failed") {
       await client.sendMessage(
         chatId,
-        `❌ Votação rejeitada. Música não foi adicionada. (${stats.votesFor}/${stats.totalEligible} votos)`,
+        `❌ Votação rejeitada. Música não foi adicionada. (${stats.votesFor}/${stats.needed})`,
       );
     }
   } catch (err) {

@@ -90,7 +90,7 @@ module.exports = {
       const jamId = jam.id;
 
       logger.info(
-        `[Skip] Jam encontrada: ${jamId}, track: ${jam.currentTrack}`,
+        `[Skip] Jam encontrada: ${jamId}, track: ${jam.currentTrackId}`,
       );
 
       // Build list of eligible voters (host + active listeners)
@@ -135,7 +135,7 @@ module.exports = {
         `/api/groups/${encodeURIComponent(chatId)}/vote`,
         {
           voteType: "skip",
-          trackId: jam.currentTrack,
+          trackId: jam.currentTrackId || null,
           trackName: jam.currentTrackName || "música atual",
           trackArtists: jam.currentArtists || "",
           initiatorUserId: creatorUserId,
@@ -144,6 +144,13 @@ module.exports = {
         },
         "POST",
       );
+
+      if (castRes && castRes.cooldown) {
+        return reply(
+          castRes.message ||
+            "⏳ Aguarde alguns minutos para iniciar outra votação para esta faixa.",
+        );
+      }
 
       if (!castRes || !castRes.vote) {
         logger.error("[Skip] Erro ao criar votação colaborativa", castRes);
@@ -249,7 +256,7 @@ module.exports = {
             voterContact?.pushname || voterContact?.name || voter.split("@")[0];
 
           // Enviar atualização sobre o voto (se ainda não passou nem falhou)
-          if (updatedVote.status === "pending") {
+          if (updatedVote.status === "active") {
             const votesNeeded = stats.needed - stats.votesFor;
 
             await safeSend(
@@ -277,6 +284,37 @@ module.exports = {
                 `⚠️ Votação aprovada, mas falha ao identificar a jam.`,
               );
               return;
+            }
+
+            let jamFresh = null;
+            try {
+              jamFresh = await backendClient.sendToBackend(
+                `/api/jam/${encodeURIComponent(jamId)}`,
+                null,
+                "GET",
+              );
+            } catch (e) {
+              logger.debug("[Skip] não foi possível obter estado atual da jam:", e);
+            }
+            if (jamFresh && jamFresh.jam) {
+              const nowId = jamFresh.jam.currentTrackId || null;
+              const voteTrackId = updatedVote.trackId || null;
+              if (voteTrackId && nowId && nowId !== voteTrackId) {
+                await safeSend(
+                  client,
+                  chatId,
+                  `⚠️ Maioria alcançada, mas *essa música já não está tocando* (a faixa mudou).`,
+                );
+                return;
+              }
+              if (voteTrackId && !nowId) {
+                await safeSend(
+                  client,
+                  chatId,
+                  `⚠️ Maioria alcançada, mas *não há música em reprodução* no host neste momento.`,
+                );
+                return;
+              }
             }
 
             const skipRes = await backendClient.sendToBackend(
@@ -423,8 +461,8 @@ module.exports = {
 
       // Send track sticker if available
       try {
-        if (jam.currentTrack) {
-          await sendTrackSticker(client, chatId, jam.currentTrack);
+        if (jam.currentTrackId) {
+          await sendTrackSticker(client, chatId, jam.currentTrackId);
         }
       } catch (err) {
         logger.warn("[Skip] Erro ao enviar sticker:", err.message);
