@@ -63,9 +63,10 @@ module.exports = {
         "⏳ Verificando a playlist do grupo e preparando músicas recomendadas...",
       );
 
-      const shuffleTimeoutMs = Math.max(
-        120000,
-        parseInt(process.env.BACKEND_SHUFFLE_TIMEOUT_MS || "600000", 10) || 600000,
+      // Pedido devolve 202 em segundos; o shuffle corre no servidor (vários minutos).
+      const shufflePostTimeoutMs = Math.max(
+        15000,
+        parseInt(process.env.BACKEND_SHUFFLE_TIMEOUT_MS || "60000", 10) || 60000,
       );
       const shuffleRes = await backendClient.sendToBackend(
         `/api/groups/${encodeURIComponent(chatId)}/playlist/shuffle`,
@@ -76,13 +77,19 @@ module.exports = {
           userId: userLookup.userId, // Pass user ID to create playlist in their account
         },
         "POST",
-        { timeoutMs: shuffleTimeoutMs },
+        { timeoutMs: shufflePostTimeoutMs },
       );
 
       if (!shuffleRes) return reply("❌ Falha ao comunicar com o servidor.");
       if (shuffleRes.error) return reply(`❌ Erro: ${shuffleRes.error}`);
 
-      // Provide a brief summary to group
+      if (shuffleRes.queued) {
+        const msg =
+          shuffleRes.message ||
+          "Pedido aceite. As recomendações estão a ser geradas em segundo plano.";
+        return reply(`✅ ${msg}`);
+      }
+
       const out = "✅ Fila de indicações criada! Verifique seu Spotify";
       await reply(out);
     } catch (err) {
