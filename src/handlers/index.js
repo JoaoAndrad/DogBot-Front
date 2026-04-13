@@ -55,23 +55,40 @@ const { handleAddFilmFlow } = require("./addFilmFlowHandler");
 const { handleIncomingTextMessage } = require("../components/menu/handleIncomingText");
 const mediaHelper = require("../utils/mediaHelper");
 const stickerHelper = require("../utils/stickerHelper");
+const commandPolicyService = require("../services/commandPolicyService");
+
+/**
+ * Comandos utilizáveis sem utilizador pré-registado na BD (fluxo /cadastro).
+ * As políticas enabled/vip do painel aplicam-se a estes e a todos os outros.
+ */
+const PUBLIC_COMMANDS = new Set(["cadastro", "ajuda", "help", "app"]);
 
 // Cache de lookup por identificador (evita muitos GET /api/users/lookup para o mesmo usuário em sequência)
 const USER_LOOKUP_CACHE_TTL_MS = 60 * 1000; // 1 minuto
-const userLookupCache = new Map(); // identifier -> { userId, ts }
+const userLookupCache = new Map(); // identifier -> { userId, confessions_vip?, ts }
 
-function getCachedUserId(identifier) {
+function getCachedLookup(identifier) {
   const key = String(identifier || "").trim().toLowerCase();
   if (!key) return null;
   const entry = userLookupCache.get(key);
   if (!entry || Date.now() - entry.ts > USER_LOOKUP_CACHE_TTL_MS) return null;
-  return entry.userId;
+  return entry;
 }
 
-function setCachedUserId(identifier, userId) {
+function getCachedUserId(identifier) {
+  const e = getCachedLookup(identifier);
+  return e ? e.userId : null;
+}
+
+function setCachedUserId(identifier, userId, confessions_vip) {
   const key = String(identifier || "").trim().toLowerCase();
   if (!key || !userId) return;
-  userLookupCache.set(key, { userId, ts: Date.now() });
+  userLookupCache.set(key, {
+    userId,
+    confessions_vip:
+      typeof confessions_vip === "boolean" ? confessions_vip : false,
+    ts: Date.now(),
+  });
 }
 
 async function handle(context) {
@@ -313,7 +330,7 @@ async function handle(context) {
         );
         if (lookup && lookup.found) {
           dbUserId = lookup.userId;
-          setCachedUserId(actualNumber, dbUserId);
+          setCachedUserId(actualNumber, dbUserId, lookup.confessions_vip);
         }
       }
     }
@@ -748,27 +765,47 @@ async function handle(context) {
       return;
     }
 
-    // Commands that don't require user registration
-    const publicCommands = ["cadastro", "ajuda", "help", "app"];
-    const requiresRegistration = !publicCommands.includes(cmdName);
+    const canonical = cmd.name;
 
-    // Check if user exists before executing command (unless public command)
+    let policyForCmd = null;
+    try {
+      const policies = await commandPolicyService.getPoliciesMap();
+      policyForCmd =
+        policies && policies[canonical] ? policies[canonical] : null;
+      if (policyForCmd && policyForCmd.enabled === false) {
+        await reply("Este comando está temporariamente desativado.");
+        return;
+      }
+    } catch (e) {
+      logger.debug("[commandPolicy]", e && e.message);
+    }
+
+    const requiresRegistration = !PUBLIC_COMMANDS.has(canonical);
+    const needsUserLookup =
+      requiresRegistration || !!(policyForCmd && policyForCmd.vipOnly);
+
     let lookupResult = null;
-    if (requiresRegistration) {
+    if (needsUserLookup) {
+      let commandLookupIdentifier = null;
       try {
         // Try to reuse early lookup if available, otherwise do new lookup
         if (dbUserId) {
-          // We already did lookup for flow checking, construct result
-          lookupResult = { found: true, userId: dbUserId };
-          const author = msg.author || msg.from || info.from;
-          const isGroup = !!(msg && msg.isGroup) || !!info.is_group;
+          commandLookupIdentifier = actualNumber || null;
+          const earlyCached = getCachedLookup(actualNumber);
+          lookupResult = {
+            found: true,
+            userId: dbUserId,
+            confessions_vip:
+              earlyCached && typeof earlyCached.confessions_vip === "boolean"
+                ? earlyCached.confessions_vip
+                : undefined,
+          };
           const isConfissao = body && /^\s*\/?confiss[aã]o\b/i.test(body);
           if (!isConfissao) {
             logger.debug(`[Handler] Reutilizando lookup: ${lookupResult}`);
           }
         } else {
           // Not in group, need to do fresh lookup
-          const author = msg.author || msg.from || info.from;
           const isGroup = !!(msg && msg.isGroup) || !!info.is_group;
 
           // Check if it's confissao command to skip debug logs
@@ -803,9 +840,22 @@ async function handle(context) {
           }
 
           if (cmdActualNumber) {
-            const cached = getCachedUserId(cmdActualNumber);
-            if (cached) {
-              lookupResult = { found: true, userId: cached };
+            commandLookupIdentifier = cmdActualNumber;
+            const cached = getCachedLookup(cmdActualNumber);
+            const needVipFlag = !!(
+              policyForCmd &&
+              policyForCmd.vipOnly
+            );
+            const cacheUsable =
+              cached &&
+              (!needVipFlag ||
+                typeof cached.confessions_vip === "boolean");
+            if (cacheUsable) {
+              lookupResult = {
+                found: true,
+                userId: cached.userId,
+                confessions_vip: cached.confessions_vip,
+              };
             } else {
               if (!isConfissao) {
                 logger.debug(
@@ -818,7 +868,11 @@ async function handle(context) {
                 "GET",
               );
               if (lookupResult && lookupResult.found) {
-                setCachedUserId(cmdActualNumber, lookupResult.userId);
+                setCachedUserId(
+                  cmdActualNumber,
+                  lookupResult.userId,
+                  lookupResult.confessions_vip,
+                );
               }
             }
             if (!isConfissao) {
@@ -827,17 +881,67 @@ async function handle(context) {
           }
         }
 
-        if (!lookupResult || !lookupResult.found) {
-          const isGroup = !!(msg && msg.isGroup) || !!info.is_group;
-          if (isGroup) {
-            await reply(
-              "hmmm parece que não te conheço... venha no meu privado e digite /cadastro",
+        if (
+          policyForCmd &&
+          policyForCmd.vipOnly &&
+          lookupResult &&
+          lookupResult.found &&
+          typeof lookupResult.confessions_vip !== "boolean" &&
+          commandLookupIdentifier
+        ) {
+          try {
+            const fresh = await backendClient.sendToBackend(
+              `/api/users/lookup?identifier=${encodeURIComponent(commandLookupIdentifier)}`,
+              null,
+              "GET",
             );
+            if (fresh && fresh.found) {
+              lookupResult = {
+                found: true,
+                userId: fresh.userId,
+                confessions_vip: !!fresh.confessions_vip,
+              };
+              setCachedUserId(
+                commandLookupIdentifier,
+                fresh.userId,
+                fresh.confessions_vip,
+              );
+            }
+          } catch (e) {
+            logger.debug("[vip lookup refresh]", e && e.message);
+          }
+        }
+
+        if (!lookupResult || !lookupResult.found) {
+          if (requiresRegistration) {
+            const isGroup = !!(msg && msg.isGroup) || !!info.is_group;
+            if (isGroup) {
+              await reply(
+                "hmmm parece que não te conheço... venha no meu privado e digite /cadastro",
+              );
+            } else {
+              await reply(
+                "É necessário enviar /cadastro no privado antes de utilizar qualquer comando",
+              );
+            }
           } else {
             await reply(
-              "É necessário enviar /cadastro no privado antes de utilizar qualquer comando",
+              "Este comando é exclusivo para utilizadores VIP de confissões.",
             );
           }
+          return;
+        }
+
+        if (
+          policyForCmd &&
+          policyForCmd.vipOnly &&
+          lookupResult &&
+          lookupResult.found &&
+          lookupResult.confessions_vip !== true
+        ) {
+          await reply(
+            "Este comando é exclusivo para utilizadores VIP de confissões.",
+          );
           return;
         }
       } catch (err) {

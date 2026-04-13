@@ -46,4 +46,29 @@ function allCommands() {
   return Array.from(commands.values());
 }
 
-module.exports = { loadCommands, getCommand, allCommands, commands };
+/** Nomes canónicos únicos (mod.name), ordenados — para sincronizar políticas no backend. */
+function listCanonicalCommandNames() {
+  const seen = new Set();
+  const out = [];
+  for (const mod of allCommands()) {
+    if (
+      mod &&
+      typeof mod.name === "string" &&
+      mod.name &&
+      !seen.has(mod.name)
+    ) {
+      seen.add(mod.name);
+      out.push(mod.name);
+    }
+  }
+  out.sort((a, b) => a.localeCompare(b));
+  return out;
+}
+
+module.exports = {
+  loadCommands,
+  getCommand,
+  allCommands,
+  listCanonicalCommandNames,
+  commands,
+};

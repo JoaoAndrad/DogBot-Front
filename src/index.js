@@ -15,6 +15,25 @@ async function main() {
       extra: `keys=${commands.commands.size}`,
     });
 
+    try {
+      const { syncRegisteredCommandsToBackend } = require("./services/commandPolicySync");
+      const tSync = Date.now();
+      const sync = await syncRegisteredCommandsToBackend(
+        commands.listCanonicalCommandNames(),
+      );
+      bootLog.line("commandPolicySync", {
+        ok: true,
+        ms: Date.now() - tSync,
+        extra: `created=${sync.created ?? 0} skipped=${sync.skipped ?? 0}`,
+      });
+    } catch (err) {
+      bootLog.line("commandPolicySync", {
+        ok: false,
+        ms: 0,
+        extra: err && err.message ? String(err.message) : "sync failed",
+      });
+    }
+
     const tBot = Date.now();
     await BotService.start();
     bootLog.line("bot", {

@@ -17,10 +17,10 @@ console.log(commands.allCommands().map((c) => c.name));
 | Pasta        | Conteúdo |
 | ------------ | -------- |
 | `media/`     | Filmes, séries, livros, listas e consumo de conteúdo |
-| `workout/`   | Treinos, metas e ativação de treinos |
+| `workout/`   | Treinos, metas, ativação de treinos, `/contestar` |
 | `bot/`       | Operação do bot: menu, cadastro, ping, status, notificações, estatísticas |
 | `utilities/` | Ferramentas transversais (ex.: rotinas/hábitos) |
-| `social/`    | Interações sociais (confissões, contestações) |
+| `social/`    | Interações sociais (confissões) |
 | `polls/`     | Enquetes e resultados |
 | `spotify/`   | Integração Spotify (inclui o comando genérico `spotify.js`) |
 | `life360/`   | Integração Life360 |

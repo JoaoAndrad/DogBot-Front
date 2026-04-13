@@ -1,5 +1,44 @@
 const jsonStore = require("../../storage/jsonStore");
 
+/** Plural correcto em português: 1 confissão, 0/2+ confissões */
+function pluralConfissao(count) {
+  const n = Number(count);
+  if (n === 1) return "confissão";
+  return "confissões";
+}
+
+function linhaSaldoRestante(remaining) {
+  return `*Saldo restante:* ${remaining} ${pluralConfissao(remaining)}`;
+}
+
+/**
+ * Consome 1 confissão no backend. Erros de rede/5xx voltam a lançar.
+ * 409 insufficient_balance e 404 user_not_found são resultados tratáveis (não lançam).
+ */
+async function consumeConfessionBalance(backend, senderNumber) {
+  try {
+    const res = await backend.sendToBackend(
+      "/api/confessions/consume",
+      { senderNumber },
+      "POST",
+    );
+    if (res && res.ok) {
+      return { ok: true, remaining: res.remaining };
+    }
+    return { ok: false, reason: "unknown" };
+  } catch (err) {
+    const status = err && err.status;
+    const body = (err && err.body) || {};
+    if (status === 409 && body.reason === "insufficient_balance") {
+      return { ok: false, reason: "insufficient_balance" };
+    }
+    if (status === 404 || body.error === "user_not_found") {
+      return { ok: false, reason: "user_not_found" };
+    }
+    throw err;
+  }
+}
+
 module.exports = {
   name: "confissao",
   description:
@@ -813,40 +852,60 @@ module.exports = {
 
               // consume balance
               try {
-                const res = await services.backend.sendToBackend(
-                  "/api/confessions/consume",
-                  { senderNumber },
-                  "POST",
-                );
+                let consumeResult;
                 try {
-                  const remaining = res && res.remaining;
+                  consumeResult = await consumeConfessionBalance(
+                    services.backend,
+                    senderNumber,
+                  );
+                } catch (err) {
+                  console.error(
+                    "Erro ao notificar backend sobre consumo de confissão (menção):",
+                    err && err.message ? err.message : err,
+                  );
+                  try {
+                    await reply(
+                      "✅ Confissão enviada. O servidor não conseguiu atualizar o saldo agora (rede ou erro temporário). O envio ao grupo já foi feito — tenta mais tarde se o saldo não bater certo.",
+                    );
+                  } catch (e) {}
+                  return;
+                }
+
+                try {
+                  const remaining = consumeResult.ok
+                    ? consumeResult.remaining
+                    : null;
                   const isVip =
-                    remaining === null ||
-                    remaining === Infinity ||
-                    String(remaining).toLowerCase() === "infinity";
+                    consumeResult.ok &&
+                    (remaining === null ||
+                      remaining === Infinity ||
+                      String(remaining).toLowerCase() === "infinity");
                   let confirmMsg;
-                  if (isVip) {
+                  if (consumeResult.ok && isVip) {
                     confirmMsg = await reply(
                       "*🎉 Sua confissão foi enviada anonimamente com sucesso!* \n\n🙏 Você possui confissões vitalícias — não será debitado. 💸",
                     );
-                  } else if (res && res.ok) {
+                  } else if (consumeResult.ok) {
                     confirmMsg = await reply(
                       `*✅ Sua confissão foi enviada anonimamente com sucesso!* \n\n📩 *Enviada para:* ${
                         targetGroup.name
-                      }\n*Saldo restante:* ${remaining} confissão${
-                        remaining === 1 ? "" : "ões"
-                      }`,
+                      }\n${linhaSaldoRestante(remaining)}`,
                     );
-                  } else if (res && res.reason === "insufficient_balance") {
+                  } else if (
+                    consumeResult.reason === "insufficient_balance"
+                  ) {
                     confirmMsg = await reply(
                       `⚠️ Sua confissão foi enviada ao grupo ${targetGroup.name}, porém seu saldo está insuficiente para futuras confissões.`,
                     );
+                  } else if (consumeResult.reason === "user_not_found") {
+                    confirmMsg = await reply(
+                      `✅ Confissão enviada ao grupo ${targetGroup.name}.\n\n⚠️ Não encontrámos a tua conta no sistema para debitar/atualizar o saldo. Se deves ter saldo, contacta um administrador.`,
+                    );
                   } else {
                     confirmMsg = await reply(
-                      `✅ Confissão enviada ao grupo ${targetGroup.name}. Não foi possível atualizar seu saldo no momento.`,
+                      `✅ Confissão enviada ao grupo ${targetGroup.name}. Não foi possível confirmar o saldo no momento.`,
                     );
                   }
-                  // Cleanup messages after successful send
                   await cleanupAfterConfession(message, confirmMsg);
                 } catch (e) {
                   // ignore reply errors
@@ -856,11 +915,6 @@ module.exports = {
                   "Erro ao notificar backend sobre consumo de confissão (menção):",
                   err && err.message ? err.message : err,
                 );
-                try {
-                  await reply(
-                    "Confissão enviada, porém ocorreu um erro ao atualizar seu saldo.",
-                  );
-                } catch (e) {}
               }
 
               return;
@@ -986,40 +1040,58 @@ module.exports = {
 
       // consume balance
       try {
-        const res = await services.backend.sendToBackend(
-          "/api/confessions/consume",
-          { senderNumber },
-          "POST",
-        );
+        let consumeResult;
         try {
-          const remaining = res && res.remaining;
+          consumeResult = await consumeConfessionBalance(
+            services.backend,
+            senderNumber,
+          );
+        } catch (err) {
+          console.error(
+            "Erro ao notificar backend sobre consumo de confissão (único grupo):",
+            err && err.message ? err.message : err,
+          );
+          try {
+            await reply(
+              "✅ Confissão enviada. O servidor não conseguiu atualizar o saldo agora (rede ou erro temporário). O envio ao grupo já foi feito — tenta mais tarde se o saldo não bater certo.",
+            );
+          } catch (e) {}
+          return;
+        }
+
+        try {
+          const remaining = consumeResult.ok
+            ? consumeResult.remaining
+            : null;
           const isVip =
-            remaining === null ||
-            remaining === Infinity ||
-            String(remaining).toLowerCase() === "infinity";
+            consumeResult.ok &&
+            (remaining === null ||
+              remaining === Infinity ||
+              String(remaining).toLowerCase() === "infinity");
           let confirmMsg;
-          if (isVip) {
+          if (consumeResult.ok && isVip) {
             confirmMsg = await reply(
               "*🎉 Sua confissão foi enviada anonimamente com sucesso!* \n\n🙏 Você possui confissões vitalícias — não será debitado. 💸",
             );
-          } else if (res && res.ok) {
+          } else if (consumeResult.ok) {
             confirmMsg = await reply(
               `*✅ Sua confissão foi enviada anonimamente com sucesso!* \n\n📩 *Enviada para:* ${
                 target.name
-              }\n*Saldo restante:* ${remaining} confissão${
-                remaining === 1 ? "" : "ões"
-              }`,
+              }\n${linhaSaldoRestante(remaining)}`,
             );
-          } else if (res && res.reason === "insufficient_balance") {
+          } else if (consumeResult.reason === "insufficient_balance") {
             confirmMsg = await reply(
               `⚠️ Sua confissão foi enviada ao grupo ${target.name}, porém seu saldo está insuficiente para futuras confissões.`,
             );
+          } else if (consumeResult.reason === "user_not_found") {
+            confirmMsg = await reply(
+              `✅ Confissão enviada ao grupo ${target.name}.\n\n⚠️ Não encontrámos a tua conta no sistema para debitar/atualizar o saldo. Se deves ter saldo, contacta um administrador.`,
+            );
           } else {
             confirmMsg = await reply(
-              `✅ Confissão enviada ao grupo ${target.name}. Não foi possível atualizar seu saldo no momento.`,
+              `✅ Confissão enviada ao grupo ${target.name}. Não foi possível confirmar o saldo no momento.`,
             );
           }
-          // Cleanup messages after successful send
           await cleanupAfterConfession(message, confirmMsg);
         } catch (e) {
           // ignore reply errors
@@ -1029,11 +1101,6 @@ module.exports = {
           "Erro ao notificar backend sobre consumo de confissão (único grupo):",
           err && err.message ? err.message : err,
         );
-        try {
-          await reply(
-            "Confissão enviada, porém ocorreu um erro ao atualizar seu saldo.",
-          );
-        } catch (e) {}
       }
 
       return;
@@ -1180,58 +1247,66 @@ module.exports = {
 
         // notify backend to consume balance
         try {
-          const res = await services.backend.sendToBackend(
-            "/api/confessions/consume",
-            { senderNumber },
-            "POST",
-          );
-          if (res && res.ok) {
-            try {
-              const remaining = res.remaining;
-              const isVip =
-                remaining === null ||
-                remaining === Infinity ||
-                String(remaining).toLowerCase() === "infinity";
-              let confirmMsg;
-              if (isVip) {
-                confirmMsg = await reply(
-                  "*🎉 Sua confissão foi enviada anonimamente com sucesso!* \n\n🙏 Você possui confissões vitalícias — não será debitado. 💸",
-                );
-              } else {
-                confirmMsg = await reply(
-                  `*✅ Sua confissão foi enviada anonimamente com sucesso!* \n\n📩 *Enviada para:* ${
-                    candidateGroups[pick].name
-                  }\n*Saldo restante:* ${remaining} confissão${
-                    remaining === 1 ? "" : "ões"
-                  }`,
-                );
-              }
-              // Cleanup messages after successful send
-              await cleanupAfterConfession(message, confirmMsg);
-            } catch (e) {}
-          } else if (res && res.reason === "insufficient_balance") {
+          let consumeResult;
+          try {
+            consumeResult = await consumeConfessionBalance(
+              services.backend,
+              senderNumber,
+            );
+          } catch (err) {
+            console.error(
+              "Erro ao notificar backend sobre consumo de confissão:",
+              err && err.message ? err.message : err,
+            );
             try {
               await reply(
-                `⚠️ Sua confissão foi enviada ao grupo ${candidateGroups[pick].name}, porém seu saldo está insuficiente para futuras confissões.`,
+                "✅ Confissão enviada. O servidor não conseguiu atualizar o saldo agora (rede ou erro temporário). O envio ao grupo já foi feito — tenta mais tarde se o saldo não bater certo.",
               );
             } catch (e) {}
-          } else {
-            try {
-              await reply(
-                `✅ Confissão enviada ao grupo ${candidateGroups[pick].name}. Não foi possível atualizar seu saldo no momento.`,
-              );
-            } catch (e) {}
+            return;
           }
+
+          const pickedName = candidateGroups[pick].name;
+          try {
+            const remaining = consumeResult.ok
+              ? consumeResult.remaining
+              : null;
+            const isVip =
+              consumeResult.ok &&
+              (remaining === null ||
+                remaining === Infinity ||
+                String(remaining).toLowerCase() === "infinity");
+            let confirmMsg;
+            if (consumeResult.ok && isVip) {
+              confirmMsg = await reply(
+                "*🎉 Sua confissão foi enviada anonimamente com sucesso!* \n\n🙏 Você possui confissões vitalícias — não será debitado. 💸",
+              );
+            } else if (consumeResult.ok) {
+              confirmMsg = await reply(
+                `*✅ Sua confissão foi enviada anonimamente com sucesso!* \n\n📩 *Enviada para:* ${pickedName}\n${linhaSaldoRestante(
+                  remaining,
+                )}`,
+              );
+            } else if (consumeResult.reason === "insufficient_balance") {
+              confirmMsg = await reply(
+                `⚠️ Sua confissão foi enviada ao grupo ${pickedName}, porém seu saldo está insuficiente para futuras confissões.`,
+              );
+            } else if (consumeResult.reason === "user_not_found") {
+              confirmMsg = await reply(
+                `✅ Confissão enviada ao grupo ${pickedName}.\n\n⚠️ Não encontrámos a tua conta no sistema para debitar/atualizar o saldo. Se deves ter saldo, contacta um administrador.`,
+              );
+            } else {
+              confirmMsg = await reply(
+                `✅ Confissão enviada ao grupo ${pickedName}. Não foi possível confirmar o saldo no momento.`,
+              );
+            }
+            await cleanupAfterConfession(message, confirmMsg);
+          } catch (e) {}
         } catch (err) {
           console.error(
             "Erro ao notificar backend sobre consumo de confissão:",
             err && err.message ? err.message : err,
           );
-          try {
-            await reply(
-              "Confissão enviada, porém ocorreu um erro ao atualizar seu saldo.",
-            );
-          } catch (e) {}
         }
       } catch (err) {
         console.error(
