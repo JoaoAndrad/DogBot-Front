@@ -287,7 +287,7 @@ module.exports = {
 
             if (skipRes && skipRes.success) {
               const okHead = fromApp
-                ? "✅ Votação aprovada pelo DogBubble! Pulando música e sincronizando ouvintes..."
+                ? "✅ Votação aprovada pelo *DogBubble*! Pulando música e sincronizando ouvintes..."
                 : "✅ Votação aprovada! Pulando música e sincronizando ouvintes...";
               await safeSend(
                 client,
@@ -331,7 +331,7 @@ module.exports = {
         client,
         chatId,
         fromApp
-          ? `Pular (DogBubble) ${jam.currentTrackName || "música atual"}?`
+          ? `Pular (*DogBubble*) ${jam.currentTrackName || "música atual"}?`
           : `Pular ${jam.currentTrackName || "música atual"}?`,
         ["Sim", "Não"],
         {
@@ -362,7 +362,7 @@ module.exports = {
         }
       }
 
-      // Iniciador: @ + mentions[] (comando pelo DogBubble não tem getContact — nome só não gera ping)
+      // Iniciador: @ + mentions[] (comando pelo *DogBubble* não tem getContact — nome só não gera ping)
       const creatorJid = normalizeUserJid(creatorWhatsAppId);
       const creatorBase = creatorJid ? creatorJid.split("@")[0] : "";
 
@@ -377,7 +377,8 @@ module.exports = {
       }
 
       if (!initiatorDisplayName) {
-        initiatorDisplayName = creatorBase || String(creatorWhatsAppId).split("@")[0];
+        initiatorDisplayName =
+          creatorBase || String(creatorWhatsAppId).split("@")[0];
       }
 
       const initiatorMentionText = creatorJid
@@ -389,7 +390,8 @@ module.exports = {
       if (creatorJid) mentionsList.push(creatorJid);
 
       const otherVoters = eligibleWhatsAppIds.filter(
-        (num) => num !== creatorBase && num !== creatorWhatsAppId.replace("@c.us", ""),
+        (num) =>
+          num !== creatorBase && num !== creatorWhatsAppId.replace("@c.us", ""),
       );
 
       let contextMessage = `${prefix(fromApp)}🎵 ${initiatorMentionText} iniciou votação para pular:\n*${jam.currentTrackName || "música atual"}*\n\n`;

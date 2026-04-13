@@ -12,9 +12,13 @@ const BACKEND_BASE = (
 
 /**
  * Mesmo JID usado em spotifyMembers[].identifier — necessário para menção real no grupo
- * (comando simulado pelo DogBubble não tem getContact()).
+ * (comando simulado pelo *DogBubble* não tem getContact()).
  */
-function jidForMentionInitiator(spotifyMembers, initiatorUserId, whatsappIdFallback) {
+function jidForMentionInitiator(
+  spotifyMembers,
+  initiatorUserId,
+  whatsappIdFallback,
+) {
   const row = spotifyMembers.find((m) => m.userId === initiatorUserId);
   if (row && row.identifier) return String(row.identifier).trim();
   const raw = String(whatsappIdFallback || "").trim();
@@ -419,7 +423,7 @@ module.exports = {
 
         // Create poll (apenas título e opções)
         const pollTitle = fromApp
-          ? `🎵 Adicionar (DogBubble): ${currentTrack.trackName}\nDe: ${currentTrack.artists}`
+          ? `🎵 Adicionar (*DogBubble*): ${currentTrack.trackName}\nDe: ${currentTrack.artists}`
           : `🎵 Adicionar: ${currentTrack.trackName}\nDe: ${currentTrack.artists}`;
         const pollOptions = ["✅ Sim, adicionar", "❌ Não"];
 
@@ -589,7 +593,7 @@ async function addPassedTrackToPlaylist({
 
   if (addRes.success) {
     const head = fromApp
-      ? "✅ Música adicionada à playlist pelo DogBubble!"
+      ? "✅ Música adicionada à playlist pelo *DogBubble*!"
       : "✅ Música adicionada à playlist!";
     await client.sendMessage(
       chatId,

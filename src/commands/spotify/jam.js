@@ -288,12 +288,11 @@ module.exports = {
           const hostJid = normalizeWaJidForMention(userId);
           const hostAt = hostJid ? `@${hostJid.split("@")[0]}` : "";
 
-          let announce = `🎵 *Jam iniciada pelo DogBubble!* 🎵\n\n`;
+          let announce = `🎵 *Jam iniciada pelo *DogBubble*!* 🎵\n\n`;
           announce += hostAt
             ? `${hostAt} está transmitindo sua música.\n`
             : `O anfitrião está transmitindo sua música.\n`;
-          announce +=
-            `Caso deseje participar, envie */jam* aqui para sincronizar.\n\n`;
+          announce += `Caso deseje participar, envie */jam* aqui para sincronizar.\n\n`;
 
           if (jam && jam.currentTrackName) {
             announce += `🎶 Tocando agora: *${jam.currentTrackName}*\n`;

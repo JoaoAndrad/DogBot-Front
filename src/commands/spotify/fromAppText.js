@@ -1,7 +1,7 @@
 "use strict";
 
 /**
- * Comandos simulados pelo DogBubble (gateway: msg.fromApp).
+ * Comandos simulados pelo *DogBubble* (gateway: msg.fromApp).
  */
 function isFromApp(msg) {
   return Boolean(msg && msg.fromApp);
@@ -14,7 +14,7 @@ function prefix(fromApp) {
 
 /** Rodapé opcional em confirmações curtas. */
 function suffix(fromApp) {
-  return fromApp ? "\n\n🫧 _Pedido feito pelo DogBubble._" : "";
+  return fromApp ? "\n\n🫧 _Pedido feito pelo *DogBubble*._" : "";
 }
 
 module.exports = { isFromApp, prefix, suffix };

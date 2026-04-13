@@ -110,11 +110,11 @@ module.exports = {
         if (mentionJid) {
           const base = mentionJid.split("@")[0];
           lines.push(
-            `@${base} perguntou o que a galera está ouvindo através do DogBubble:\n`,
+            `@${base} perguntou o que a galera está ouvindo através do *DogBubble*:\n`,
           );
         } else {
           lines.push(
-            "Usuário perguntou o que a galera está ouvindo através do DogBubble:\n",
+            "Usuário perguntou o que a galera está ouvindo através do *DogBubble*:\n",
           );
         }
       } else {
@@ -172,7 +172,7 @@ module.exports = {
       const sendOpts =
         fromBubble && mentionJid ? { mentions: [mentionJid] } : {};
 
-      // Send the text summary first (menção ao remetente no DogBubble, como skip/voto).
+      // Send the text summary first (menção ao remetente no *DogBubble*, como skip/voto).
       await client.sendMessage(chatId, finalMsg, sendOpts);
 
       // Then try to send a composite sticker representing the distinct tracks.

@@ -53,7 +53,7 @@ module.exports = {
         }
       }
       await reply(
-        `📱 *Código para sincronização com o DogBubble:* ${code}\n\n` +
+        `📱 *Código para sincronização com o *DogBubble*:* ${code}\n\n` +
           `Digite esse código no app para sincronizar com sua conta, o código irá expirar em ${expiresLine}.`,
       );
     } catch (err) {

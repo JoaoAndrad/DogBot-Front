@@ -13,7 +13,7 @@ module.exports = {
     "Ver ou registrar nota da música que você está ouvindo. Ex: /nota ou /nota 8.5",
   async execute(ctx) {
     const body = String(
-      (ctx.info && ctx.info.body) || (ctx.message && ctx.message.body) || ""
+      (ctx.info && ctx.info.body) || (ctx.message && ctx.message.body) || "",
     ).trim();
     const msg = ctx.message;
     let author =
@@ -44,7 +44,10 @@ module.exports = {
     if (ratingRaw != null && ratingRaw !== "") payload.rating = ratingRaw;
 
     try {
-      const res = await backendClient.sendToBackend("/api/spotify/notes", payload);
+      const res = await backendClient.sendToBackend(
+        "/api/spotify/notes",
+        payload,
+      );
 
       if (res && res.success) {
         const trackName = res.trackName || "Música";
@@ -53,11 +56,14 @@ module.exports = {
         const imageUrl = res.imageUrl || null;
         const hasUserRating = res.hasUserRating === true;
         const noteCreated = res.noteCreated === true;
-        const rating = res.rating != null ? Number(res.rating).toFixed(1) : null;
-        const avg = res.avgRating != null ? Number(res.avgRating).toFixed(1) : null;
+        const rating =
+          res.rating != null ? Number(res.rating).toFixed(1) : null;
+        const avg =
+          res.avgRating != null ? Number(res.avgRating).toFixed(1) : null;
         const count = res.ratingCount || 0;
         const countLabel = Number(count) === 1 ? "avaliação" : "avaliações";
-        const prev = res.previousRating != null ? String(res.previousRating) : null;
+        const prev =
+          res.previousRating != null ? String(res.previousRating) : null;
         const prevDate = res.previousRatingDate || null;
 
         const trackWithImage = {
@@ -87,7 +93,7 @@ module.exports = {
               ratingsByUser
                 .map(
                   (r) =>
-                    `${r.displayName || "?"}: ${Number(r.rating).toFixed(1)}`
+                    `${r.displayName || "?"}: ${Number(r.rating).toFixed(1)}`,
                 )
                 .join(", ")
             : "";
@@ -97,13 +103,13 @@ module.exports = {
         }\n\n${lineNota}\n${lineMedia}${lineWho ? "\n" + lineWho : ""}`;
 
         const registroLabel = fromApp
-          ? "✅ Nota registrada pelo DogBubble!"
+          ? "✅ Nota registrada pelo *DogBubble*!"
           : "✅ Nota registrada!";
         const atualizadaLabel = fromApp
-          ? "✅ Nota atualizada pelo DogBubble!"
+          ? "✅ Nota atualizada pelo *DogBubble*!"
           : "✅ Nota atualizada!";
 
-        /** Uma linha em branco extra após o rótulo DogBubble antes do bloco da faixa. */
+        /** Uma linha em branco extra após o rótulo *DogBubble* antes do bloco da faixa. */
         const afterLabel = fromApp ? "\n\n" : "\n";
 
         let confirmationText = block;
@@ -129,7 +135,7 @@ module.exports = {
         } catch (e) {
           console.error(
             "Erro ao enviar confirmação de nota:",
-            e && e.message ? e.message : e
+            e && e.message ? e.message : e,
           );
         }
 
@@ -138,7 +144,7 @@ module.exports = {
         } catch (stErr) {
           console.error(
             "Erro ao enviar figurinha da faixa:",
-            stErr && stErr.message ? stErr.message : stErr
+            stErr && stErr.message ? stErr.message : stErr,
           );
         }
 
@@ -170,10 +176,7 @@ module.exports = {
               }
             }
           } catch (e) {
-            console.log(
-              "[nota] prévia:",
-              e && e.stack ? e.stack : e,
-            );
+            console.log("[nota] prévia:", e && e.stack ? e.stack : e);
           }
         }
 
@@ -185,13 +188,11 @@ module.exports = {
         if (res.message) return reply(res.message);
 
         if (res.error === "not_playing" || res.error === "no_track_playing") {
-          return reply(
-            res.message || "Nenhuma música tocando no momento."
-          );
+          return reply(res.message || "Nenhuma música tocando no momento.");
         }
         if (res.error === "invalid_rating") {
           return reply(
-            "Valor inválido. Use número entre 0.0 e 10.0 (ex: 8.5 ou 8,5)"
+            "Valor inválido. Use número entre 0.0 e 10.0 (ex: 8.5 ou 8,5)",
           );
         }
         return reply(`Erro: ${res.error}`);

@@ -12,7 +12,7 @@ async function resolveUserUuid(externalId) {
   if (!externalId) return null;
   const isUUID =
     /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
-      externalId
+      externalId,
     );
   if (isUUID) return externalId;
 
@@ -90,7 +90,7 @@ module.exports = {
       } catch (e) {
         console.log("[Command:tocando] Error from backend current:", e);
         await reply(
-          "❌ Erro ao consultar o servidor. Tenta novamente em instantes."
+          "❌ Erro ao consultar o servidor. Tenta novamente em instantes.",
         );
         return;
       }
@@ -109,7 +109,7 @@ module.exports = {
           Math.round(((json.percentPlayed || 0) / 100) * durationMs);
         const percent = Math.round(
           json.percentPlayed ||
-            (durationMs ? (positionMs / durationMs) * 100 : 0)
+            (durationMs ? (positionMs / durationMs) * 100 : 0),
         );
         const bar = renderProgressBar(percent, 18);
 
@@ -124,22 +124,22 @@ module.exports = {
         }\n`;
         if (t.album) replyText += `Álbum: ${t.album}\n`;
         replyText += `\n${bar} ${percent}%\n${msToTime(
-          positionMs
+          positionMs,
         )} / ${msToTime(durationMs)}\n`;
         // Format startedAt as DD/MM/YYYY HH:MM:SS in UTC-3 (24h)
         try {
           const started = new Date(json.startedAt);
           // convert to UTC-3 by subtracting 3 hours
           const startedUtcMinus3 = new Date(
-            started.getTime() - 3 * 60 * 60 * 1000
+            started.getTime() - 3 * 60 * 60 * 1000,
           );
           const pad = (n) => String(n).padStart(2, "0");
           const startedStr = `${pad(startedUtcMinus3.getUTCDate())}/${pad(
-            startedUtcMinus3.getUTCMonth() + 1
+            startedUtcMinus3.getUTCMonth() + 1,
           )}/${startedUtcMinus3.getUTCFullYear()}, ${pad(
-            startedUtcMinus3.getUTCHours()
+            startedUtcMinus3.getUTCHours(),
           )}:${pad(startedUtcMinus3.getUTCMinutes())}:${pad(
-            startedUtcMinus3.getUTCSeconds()
+            startedUtcMinus3.getUTCSeconds(),
           )}`;
 
           replyText += `Iniciado: ${startedStr}`;
@@ -149,7 +149,7 @@ module.exports = {
         }
 
         if (fromBubble) {
-          replyText += `\n\nSolicitado pelo DogBubble`;
+          replyText += `\n\nSolicitado pelo *DogBubble*`;
         }
 
         if (fromBubble && isGroup && mentionJid) {
@@ -174,7 +174,7 @@ module.exports = {
           console.log(`[tocando] proxy preview url: ${proxyUrl}`);
           const pres = await fetch(proxyUrl);
           console.log(
-            `[tocando] proxy preview fetch status: ${pres && pres.status}`
+            `[tocando] proxy preview fetch status: ${pres && pres.status}`,
           );
 
           const contentType =
@@ -195,25 +195,25 @@ module.exports = {
               const body = await pres.json().catch(() => null);
               console.log(
                 "[tocando] proxy preview response not audio, body:",
-                body
+                body,
               );
             } catch (e) {
               console.log(
-                "[tocando] proxy preview: non-audio response and failed to parse body"
+                "[tocando] proxy preview: non-audio response and failed to parse body",
               );
             }
           }
         } catch (e) {
           console.log(
             "[tocando] failed to fetch/send preview via proxy:",
-            e && e.stack ? e.stack : e
+            e && e.stack ? e.stack : e,
           );
         }
       }
     } catch (err) {
       console.log("[Command:tocando] Error:", err);
       await reply(
-        "❌ Erro ao consultar tocando agora: " + (err.message || err)
+        "❌ Erro ao consultar tocando agora: " + (err.message || err),
       );
     }
   },
