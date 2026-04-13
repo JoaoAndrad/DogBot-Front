@@ -350,8 +350,7 @@ const spotifyFlow = createFlow("spotify", {
           if (t.album) reply += `Álbum: ${t.album}\n`;
           reply += `\n${bar} ${percent}%\n${msToTime(positionMs)} / ${msToTime(
             durationMs,
-          )}\n`;
-          reply += `Iniciado: ${formatPlaybackInstant(json.startedAt)}`;
+          )}`;
 
           await ctx.reply(reply);
 
