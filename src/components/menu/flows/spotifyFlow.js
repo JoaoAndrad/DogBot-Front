@@ -3,6 +3,8 @@ const fetch = require("node-fetch");
 const spotifyClient = require("../../../services/spotifyClient");
 const polls = require("../../poll");
 const backendClient = require("../../../services/backendClient");
+const logger = require("../../../utils/logger");
+const { lookupByIdentifier } = require("../../../utils/whatsapp/getUserData");
 const {
   renderCard,
   renderRatingsCard,
@@ -18,27 +20,17 @@ const {
   formatPlaybackInstant,
 } = require("../../../utils/datetime/musicTimezone");
 
+/** Só para prévia de áudio (binário); o resto usa backendClient. */
 const BACKEND_URL = process.env.BACKEND_URL || "http://localhost:8000";
+
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 async function resolveUserUuid(externalId) {
   if (!externalId) return null;
-  const isUUID =
-    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
-      externalId,
-    );
-  if (isUUID) return externalId;
-
-  try {
-    const url = `${BACKEND_URL}/api/users/by-identifier/${encodeURIComponent(
-      externalId,
-    )}`;
-    const res = await fetch(url, { method: "GET" });
-    if (!res.ok) return null;
-    const json = await res.json();
-    return json && json.user && json.user.id ? json.user.id : null;
-  } catch (e) {
-    return null;
-  }
+  if (UUID_RE.test(String(externalId).trim())) return String(externalId).trim();
+  const lu = await lookupByIdentifier(externalId);
+  return lu && lu.found && lu.userId ? lu.userId : null;
 }
 
 /** Cartão "Top músicas": prioriza topTracks (tempo ouvido no período); fallback = repeats (só faixas repetidas). */
@@ -186,9 +178,8 @@ const spotifyFlow = createFlow("spotify", {
         const userParam = resolved || ctx.userId;
 
         // Buscar períodos disponíveis
-        const url = `${BACKEND_URL}/api/spotify/available-periods?userId=${encodeURIComponent(userParam)}`;
-        const res = await fetch(url, { method: "GET" });
-        const json = await res.json();
+        const path = `/api/spotify/available-periods?userId=${encodeURIComponent(userParam)}`;
+        const json = await backendClient.sendToBackend(path, null, "GET");
 
         if (!json || !json.periods || json.periods.length === 0) {
           await ctx.reply("❌ Nenhum período com dados encontrado.");
@@ -245,9 +236,8 @@ const spotifyFlow = createFlow("spotify", {
         const userParam = resolved || ctx.userId;
 
         // Buscar períodos disponíveis
-        const url = `${BACKEND_URL}/api/spotify/available-periods?userId=${encodeURIComponent(userParam)}`;
-        const res = await fetch(url, { method: "GET" });
-        const json = await res.json();
+        const path = `/api/spotify/available-periods?userId=${encodeURIComponent(userParam)}`;
+        const json = await backendClient.sendToBackend(path, null, "GET");
 
         if (!json || !json.periods || json.periods.length === 0) {
           await ctx.reply("❌ Nenhum período encontrado.");
@@ -337,11 +327,10 @@ const spotifyFlow = createFlow("spotify", {
       try {
         const resolved = await resolveUserUuid(ctx.userId);
         const userParam = resolved || ctx.userId;
-        const url = `${BACKEND_URL}/api/spotify/current?userId=${encodeURIComponent(
+        const path = `/api/spotify/current?userId=${encodeURIComponent(
           userParam,
         )}`;
-        const res = await fetch(url, { method: "GET" });
-        const json = await res.json();
+        const json = await backendClient.sendToBackend(path, null, "GET");
         if (json && json.notice) {
           await ctx.reply(json.notice);
         } else if (!json || !json.playing) {
@@ -385,9 +374,7 @@ const spotifyFlow = createFlow("spotify", {
               const proxyUrl = `${BACKEND_URL}/api/spotify/preview?trackId=${encodeURIComponent(
                 trackId,
               )}`;
-              console.log(
-                `[spotifyFlow] fetching preview from proxy: ${proxyUrl}`,
-              );
+              logger.debug(`[spotifyFlow] prévia: ${proxyUrl}`);
               const ares = await fetch(proxyUrl, { method: "GET" });
               if (ares && ares.ok) {
                 const contentType = ares.headers.get("content-type") || "";
@@ -403,23 +390,23 @@ const spotifyFlow = createFlow("spotify", {
                     buf.toString("base64"),
                   );
                   await ctx.client.sendMessage(ctx.chatId, media, {});
-                  console.log("[spotifyFlow] preview audio sent");
+                  logger.debug("[spotifyFlow] prévia de áudio enviada");
                 } else {
-                  console.log(
-                    "[spotifyFlow] preview proxy returned non-audio content-type:",
+                  logger.debug(
+                    "[spotifyFlow] prévia: content-type não é áudio:",
                     contentType,
                   );
                 }
               } else {
-                console.log(
-                  "[spotifyFlow] preview unavailable from proxy; status:",
+                logger.debug(
+                  "[spotifyFlow] prévia indisponível; status:",
                   ares && ares.status,
                 );
               }
             }
           } catch (audioErr) {
-            console.warn(
-              "[spotifyFlow] error fetching/sending preview audio:",
+            logger.warn(
+              "[spotifyFlow] prévia:",
               audioErr && audioErr.message ? audioErr.message : audioErr,
             );
           }
@@ -561,13 +548,13 @@ const spotifyFlow = createFlow("spotify", {
               tracksArr,
             );
             if (!ok)
-              console.info(
-                "[spotifyFlow] sendCompositeSticker failed after text",
+              logger.info(
+                "[spotifyFlow] sendCompositeSticker falhou após o texto",
               );
           }
         } catch (e) {
-          console.error(
-            "[spotifyFlow] error sending composite sticker after text:",
+          logger.error(
+            "[spotifyFlow] figurinha composta:",
             e && e.message ? e.message : e,
           );
         }
@@ -595,14 +582,13 @@ const spotifyFlow = createFlow("spotify", {
 
         // pagination helper: fetch and display a page, then create poll to navigate
         async function renderPage(page = 1) {
-          const url = `${BACKEND_URL}/api/spotify/history?userId=${encodeURIComponent(
+          const path = `/api/spotify/history?userId=${encodeURIComponent(
             userParam,
           )}&from=${from.toISOString()}&to=${to.toISOString()}&limit=10&page=${page}${
             isGroup ? "&scope=group" : ""
           }`;
 
-          const res = await fetch(url, { method: "GET" });
-          const json = await res.json();
+          const json = await backendClient.sendToBackend(path, null, "GET");
           if (!json || !json.items || json.items.length === 0) {
             await ctx.reply("📭 Nenhuma reprodução encontrada neste período.");
             return { totalPages: 0 };
@@ -652,8 +638,8 @@ const spotifyFlow = createFlow("spotify", {
                 },
               );
             } catch (e) {
-              console.error(
-                "[spotifyFlow] failed to create history navigation poll:",
+              logger.error(
+                "[spotifyFlow] poll de navegação do histórico:",
                 e && e.message ? e.message : e,
               );
             }
@@ -683,7 +669,7 @@ const spotifyFlow = createFlow("spotify", {
           data && typeof data.days !== "undefined" && data.days !== null
             ? data.days
             : 7;
-        let url = `${BACKEND_URL}/api/spotify/stats?userId=${encodeURIComponent(
+        let statsPath = `/api/spotify/stats?userId=${encodeURIComponent(
           userParam,
         )}`;
 
@@ -691,31 +677,29 @@ const spotifyFlow = createFlow("spotify", {
         if (period === "month") {
           const { from: monthStart, to: monthTo } =
             musicCurrentMonthRangeToNowUtc();
-          url += `&from=${encodeURIComponent(monthStart.toISOString())}`;
-          url += `&to=${encodeURIComponent(monthTo.toISOString())}`;
+          statsPath += `&from=${encodeURIComponent(monthStart.toISOString())}`;
+          statsPath += `&to=${encodeURIComponent(monthTo.toISOString())}`;
           displayLabel = new Date(monthStart).toLocaleString("pt-BR", {
             month: "long",
             timeZone: "America/Sao_Paulo",
           });
         } else {
-          if (days && Number(days) > 0) url += `&days=${Number(days)}`;
+          if (days && Number(days) > 0)
+            statsPath += `&days=${Number(days)}`;
           displayLabel =
             days && Number(days) > 0 ? `últimos ${days} dias` : `Geral`;
         }
 
-        if (isGroup) url += `&scope=group`;
+        if (isGroup) statsPath += `&scope=group`;
 
         // Send the human-friendly display label as `period` so backend echoes it
         // exactly as the user selected (e.g., "Esse mês", "Últimos 7 dias").
-        if (displayLabel) url += `&period=${encodeURIComponent(displayLabel)}`;
+        if (displayLabel)
+          statsPath += `&period=${encodeURIComponent(displayLabel)}`;
 
-        const res = await fetch(url, { method: "GET" });
-        const json = await res.json();
-        console.log(`[spotifyFlow] Período selecionado: ${displayLabel}`);
-        console.log(
-          `[spotifyFlow] Período recebido (raw from backend): ${
-            json && json.period
-          }`,
+        const json = await backendClient.sendToBackend(statsPath, null, "GET");
+        logger.debug(
+          `[spotifyFlow] período: ${displayLabel}; backend period: ${json && json.period}`,
         );
         if (!json) {
           await ctx.reply("❌ Erro ao obter estatísticas.");
@@ -879,14 +863,10 @@ const spotifyFlow = createFlow("spotify", {
           }
 
           // Use the display label derived from the selected option (no fallback to hardcoded "Esse mês")
-          const path = require("path");
+          const pathMod = require("path");
           // Caminho correto: em produção fica em /application/templates/logo.png
-          const logoPath = path.join(process.cwd(), "templates", "logo.png");
-          console.log(
-            "[spotifyFlow/LOGO] Caminho do logo calculado:",
-            logoPath,
-          );
-          console.log("[spotifyFlow/LOGO] process.cwd():", process.cwd());
+          const logoPath = pathMod.join(process.cwd(), "templates", "logo.png");
+          logger.debug("[spotifyFlow/LOGO] logoPath:", logoPath);
 
           const templateData = {
             period: displayLabel,
@@ -952,9 +932,12 @@ const spotifyFlow = createFlow("spotify", {
 
           // Relatório de avaliações (mesmo período): GET com kind=rating
           try {
-            const ratingUrl = `${url}&kind=rating`;
-            const ratingRes = await fetch(ratingUrl, { method: "GET" });
-            const ratingJson = await ratingRes.json();
+            const ratingPath = `${statsPath}&kind=rating`;
+            const ratingJson = await backendClient.sendToBackend(
+              ratingPath,
+              null,
+              "GET",
+            );
             const totalRat =
               ratingJson &&
               ratingJson.ratingSummary &&
@@ -980,7 +963,7 @@ const spotifyFlow = createFlow("spotify", {
               await ctx.reply("_Nenhuma avaliação registrada neste período._");
             }
           } catch (ratingErr) {
-            console.warn(
+            logger.warn(
               "[spotifyFlow] stats rating card:",
               ratingErr && ratingErr.message ? ratingErr.message : ratingErr,
             );
@@ -1014,24 +997,23 @@ const spotifyFlow = createFlow("spotify", {
 
         const { from: monthStart, to: monthEnd } = musicMonthRangeUtc(month);
 
-        let url = `${BACKEND_URL}/api/spotify/stats?userId=${encodeURIComponent(
+        let statsPath = `/api/spotify/stats?userId=${encodeURIComponent(
           userParam,
         )}`;
-        url += `&from=${encodeURIComponent(monthStart.toISOString())}`;
-        url += `&to=${encodeURIComponent(monthEnd.toISOString())}`;
-        url += `&endExclusive=1`;
+        statsPath += `&from=${encodeURIComponent(monthStart.toISOString())}`;
+        statsPath += `&to=${encodeURIComponent(monthEnd.toISOString())}`;
+        statsPath += `&endExclusive=1`;
 
-        if (isGroup) url += `&scope=group`;
+        if (isGroup) statsPath += `&scope=group`;
 
         const displayLabel = new Date(monthStart).toLocaleString("pt-BR", {
           month: "long",
           year: "numeric",
           timeZone: "America/Sao_Paulo",
         });
-        url += `&period=${encodeURIComponent(displayLabel)}`;
+        statsPath += `&period=${encodeURIComponent(displayLabel)}`;
 
-        const res = await fetch(url, { method: "GET" });
-        const json = await res.json();
+        const json = await backendClient.sendToBackend(statsPath, null, "GET");
 
         if (!json) {
           await ctx.reply("❌ Erro ao obter estatísticas.");
@@ -1045,10 +1027,10 @@ const spotifyFlow = createFlow("spotify", {
         }
 
         const sum = json.summary || {};
-        const path = require("path");
+        const pathMod = require("path");
         // Caminho correto: em produção fica em /application/templates/logo.png
-        const logoPath = path.join(process.cwd(), "templates", "logo.png");
-        console.log("[spotifyFlow/LOGO/statsMonth] Caminho do logo:", logoPath);
+        const logoPath = pathMod.join(process.cwd(), "templates", "logo.png");
+        logger.debug("[spotifyFlow/LOGO/statsMonth] logoPath:", logoPath);
 
         const templateData = {
           period: displayLabel,
@@ -1074,9 +1056,12 @@ const spotifyFlow = createFlow("spotify", {
           await ctx.client.sendMessage(ctx.chatId, media, { caption: "" });
 
           try {
-            const ratingUrl = `${url}&kind=rating`;
-            const ratingRes = await fetch(ratingUrl, { method: "GET" });
-            const ratingJson = await ratingRes.json();
+            const ratingPath = `${statsPath}&kind=rating`;
+            const ratingJson = await backendClient.sendToBackend(
+              ratingPath,
+              null,
+              "GET",
+            );
             const totalRat =
               ratingJson &&
               ratingJson.ratingSummary &&
@@ -1102,7 +1087,7 @@ const spotifyFlow = createFlow("spotify", {
               await ctx.reply("_Nenhuma avaliação registrada neste período._");
             }
           } catch (ratingErr) {
-            console.warn(
+            logger.warn(
               "[spotifyFlow] statsMonth rating card:",
               ratingErr && ratingErr.message ? ratingErr.message : ratingErr,
             );
@@ -1133,11 +1118,10 @@ const spotifyFlow = createFlow("spotify", {
           ctx.chatId &&
           String(ctx.chatId).endsWith("@g.us")
         );
-        const url = `${BACKEND_URL}/api/spotify/summary?userId=${encodeURIComponent(
+        const summaryPath = `/api/spotify/summary?userId=${encodeURIComponent(
           userParam,
         )}&month=${encodeURIComponent(month)}${isGroup ? "&scope=group" : ""}`;
-        const res = await fetch(url, { method: "GET" });
-        const json = await res.json();
+        const json = await backendClient.sendToBackend(summaryPath, null, "GET");
         if (!json) {
           await ctx.reply("Nenhum dado para esse mês.");
           return { end: false };

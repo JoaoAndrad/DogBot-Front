@@ -1,4 +1,5 @@
 const url = require("url");
+const logger = require("../../utils/logger");
 
 const BACKEND_URL = process.env.BACKEND_URL || "http://127.0.0.1:8000";
 const INTERNAL_SECRET = process.env.POLL_SHARED_SECRET || null;
@@ -48,7 +49,7 @@ async function savePoll(msgId, poll) {
     }
     return res.json();
   } catch (err) {
-    console.error(
+    logger.error(
       "poll.storage.savePoll fetch failed",
       err && err.message ? err.message : err
     );
@@ -72,7 +73,7 @@ async function getPoll(msgId) {
     }
     return res.json();
   } catch (err) {
-    console.error(
+    logger.error(
       "poll.storage.getPoll fetch failed",
       err && err.message ? err.message : err
     );
@@ -93,7 +94,7 @@ async function listPolls() {
     }
     return res.json();
   } catch (err) {
-    console.error(
+    logger.error(
       "poll.storage.listPolls fetch failed",
       err && err.message ? err.message : err
     );
@@ -116,7 +117,7 @@ async function findPollsByChat(chatId) {
     }
     return res.json();
   } catch (err) {
-    console.error(
+    logger.error(
       "poll.storage.findPollsByChat fetch failed",
       err && err.message ? err.message : err
     );

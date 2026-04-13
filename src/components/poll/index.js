@@ -263,7 +263,7 @@ async function createPoll(clientOrSender, chatId, title, options, opts = {}) {
   const sendResult = await sender.sendPoll(payload, opts);
   if (!sendResult) {
     // Always log this, even for confissão polls — it means the poll was not sent
-    console.error(`[createPoll] sendResult null — poll não foi enviado. title="${payload.title}" chatId="${payload.chatId}"`);
+    logger.error(`[createPoll] sendResult null — poll não foi enviado. title="${payload.title}" chatId="${payload.chatId}"`);
     return null;
   }
 
@@ -295,7 +295,7 @@ async function createPoll(clientOrSender, chatId, title, options, opts = {}) {
   try {
     await storage.savePoll(msgId, record);
   } catch (err) {
-    console.error("[createPoll] Failed to save poll:", err.message);
+    logger.error("[createPoll] Failed to save poll:", err.message);
     throw err;
   }
 

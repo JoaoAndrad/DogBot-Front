@@ -43,7 +43,7 @@ class FlowManager {
       throw new Error(`Flow ${flowId} not found. Did you register it?`);
     }
 
-    console.log(`[FlowManager] Starting flow ${flowId} for user ${userId}`);
+    logger.info(`[FlowManager] Iniciando flow ${flowId} para ${userId}`);
 
     const initialPath =
       typeof options.initialPath === "string" && options.initialPath.startsWith("/")
@@ -77,14 +77,14 @@ class FlowManager {
   async handleVote(client, chatId, userId, pollMeta, selectedIndex, resolvedOption) {
     const { flowId, path } = pollMeta;
 
-    console.log(
-      `[FlowManager] Vote received: ${flowId}${path} option ${selectedIndex} by ${userId}`,
+    logger.debug(
+      `[FlowManager] Voto: ${flowId}${path} opção ${selectedIndex} por ${userId}`,
     );
 
     const state = await storage.getState(userId, flowId);
     if (!state) {
-      console.log(
-        `[FlowManager] No state found for ${userId}:${flowId} - may have expired`,
+      logger.debug(
+        `[FlowManager] Sem estado para ${userId}:${flowId} (expirado?)`,
       );
       await client.sendMessage(
         chatId,
@@ -95,13 +95,13 @@ class FlowManager {
 
     const flow = this.flows.get(flowId);
     if (!flow) {
-      console.log(`[FlowManager] Flow ${flowId} not registered`);
+      logger.warn(`[FlowManager] Flow ${flowId} não registado`);
       return;
     }
 
     const node = flow.nodes[path];
     if (!node) {
-      console.log(`[FlowManager] Node ${path} not found in flow ${flowId}`);
+      logger.warn(`[FlowManager] Nó ${path} inexistente no flow ${flowId}`);
       return;
     }
 
@@ -109,8 +109,8 @@ class FlowManager {
       resolvedOption ||
       (Array.isArray(node.options) ? node.options[selectedIndex] : undefined);
     if (!option) {
-      console.log(
-        `[FlowManager] Opção inválida ${selectedIndex} para ${path} (nós dinâmicos: passe resolvedOption = metadata.options[index])`,
+      logger.warn(
+        `[FlowManager] Opção inválida ${selectedIndex} para ${path} (nós dinâmicos: resolvedOption)`,
       );
       return;
     }
@@ -159,7 +159,7 @@ class FlowManager {
       // Execute handler
       const handler = flow.handlers[option.handler];
       if (!handler) {
-        console.log(`[FlowManager] Handler ${option.handler} not found`);
+        logger.error(`[FlowManager] Handler ${option.handler} não encontrado`);
         await client.sendMessage(
           chatId,
           "❌ Erro interno: handler não encontrado",
@@ -192,7 +192,7 @@ class FlowManager {
         if (result && result.end) {
           // End flow
           await storage.deleteState(userId, flowId);
-          console.log(`[FlowManager] Flow ${flowId} ended for ${userId}`);
+          logger.debug(`[FlowManager] Flow ${flowId} terminou para ${userId}`);
         } else {
           // Save updated state after handler execution
           await storage.saveState(userId, flowId, state);
@@ -223,7 +223,7 @@ class FlowManager {
           }
         }
       } catch (err) {
-        console.log(`[FlowManager] Handler error:`, err);
+        logger.error(`[FlowManager] Erro no handler:`, err);
         await client.sendMessage(chatId, "❌ Erro ao executar ação");
       }
     }
@@ -240,7 +240,7 @@ class FlowManager {
     let renderOptions = node?.options;
 
     if (!node) {
-      console.log(`[FlowManager] Node ${path} not found in flow ${flowId}`);
+      logger.warn(`[FlowManager] Nó ${path} inexistente no flow ${flowId}`);
       await client.sendMessage(chatId, "❌ Erro: nó não encontrado");
       return;
     }
@@ -286,7 +286,7 @@ class FlowManager {
           return;
         }
       } catch (err) {
-        console.log(`[FlowManager] Dynamic node handler error:`, err);
+        logger.error(`[FlowManager] Erro no handler de nó dinâmico:`, err);
         await client.sendMessage(chatId, "❌ Erro ao carregar opções");
         return;
       }
@@ -315,7 +315,7 @@ class FlowManager {
             await storage.deleteState(userId, flowId);
           }
         } catch (err) {
-          console.log(`[FlowManager] Handler error:`, err);
+          logger.error(`[FlowManager] Erro no handler:`, err);
           await client.sendMessage(chatId, "❌ Erro ao executar");
         }
       }
@@ -372,7 +372,7 @@ class FlowManager {
    */
   async endFlow(userId, flowId) {
     await storage.deleteState(userId, flowId);
-    console.log(`[FlowManager] Flow ${flowId} cancelled for ${userId}`);
+    logger.debug(`[FlowManager] Flow ${flowId} cancelado para ${userId}`);
   }
 
   /**

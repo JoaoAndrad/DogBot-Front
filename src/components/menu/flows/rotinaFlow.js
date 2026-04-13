@@ -11,22 +11,14 @@ const {
   routineApiToDraft,
   sendEditFieldPoll,
 } = require("../../../handlers/rotinaFlowHandler");
+const { lookupByIdentifier } = require("../../../utils/whatsapp/getUserData");
 
 const WA_POLL_MAX_OPTIONS = 12;
 
 async function resolveEditorUuid(userId) {
-  const backendUrl = process.env.BACKEND_URL || "http://localhost:8000";
-  try {
-    const fetch = require("node-fetch");
-    const res = await fetch(
-      `${backendUrl}/api/users/by-identifier/${encodeURIComponent(userId)}`,
-    );
-    if (!res.ok) return null;
-    const j = await res.json();
-    return j && j.user && j.user.id ? j.user.id : null;
-  } catch {
-    return null;
-  }
+  if (!userId) return null;
+  const lu = await lookupByIdentifier(userId);
+  return lu && lu.found && lu.userId ? lu.userId : null;
 }
 
 function truncateLabel(s, max = 130) {

@@ -14,7 +14,7 @@ function createSender(client) {
         await new Promise((r) => setTimeout(r, 1200));
       }
     } catch (e) {
-      console.log(
+      logger.debug(
         "openChatWindow failed (non-fatal)",
         e && (e.message || e.stack)
       );
@@ -27,7 +27,7 @@ function createSender(client) {
     const { chatId, title, options, optionsObj } = payload;
 
     if (typeof Poll !== "function") {
-      console.log("Native Poll not available in runtime");
+      logger.warn("Native Poll not available in runtime");
       return null;
     }
 
@@ -63,7 +63,7 @@ function createSender(client) {
         sent && sent.id && sent.id._serialized ? sent.id._serialized : sent.id;
       return { sent, msgId, type: "native", pollOptions };
     } catch (err) {
-      console.log("sendPoll: failed to send native poll", {
+      logger.error("sendPoll: failed to send native poll", {
         chatId,
         title,
         err: err && (err.stack || err.message || err),

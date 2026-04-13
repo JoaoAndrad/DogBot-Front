@@ -5,6 +5,7 @@
 
 const backendClient = require("../../services/backendClient");
 const logger = require("../../utils/logger");
+const { lookupByIdentifier } = require("../../utils/whatsapp/getUserData");
 const bootLog = require("../../lib/bootLog");
 const storage = require("./storage");
 
@@ -516,32 +517,25 @@ async function executeAction(result, client) {
             logger.debug(
               `[processor] Resolving user to UUID for ${data.flowId}: ${menuUserId}`,
             );
-            const fetch = require("node-fetch");
-            const backendUrl =
-              process.env.BACKEND_URL || "http://localhost:8000";
-            const lookupRes = await fetch(
-              `${backendUrl}/api/users/by-identifier/${encodeURIComponent(menuUserId)}`,
-              { method: "GET" },
-            );
-
-            if (lookupRes.ok) {
-              const lookupData = await lookupRes.json();
-              if (lookupData.success && lookupData.user && lookupData.user.id) {
-                const resolvedUUID = lookupData.user.id;
-                voterDisplayName =
-                  lookupData.user.display_name ||
-                  lookupData.user.push_name ||
-                  "Usuário";
-                logger.debug(
-                  `[processor] Resolved identifier ${menuUserId} to UUID ${resolvedUUID} for ${data.flowId}`,
-                );
-                menuUserId = resolvedUUID;
-                userResolvedToUuid = true;
-              }
+            const uuidRe =
+              /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+            if (uuidRe.test(String(menuUserId).trim())) {
+              userResolvedToUuid = true;
             } else {
-              logger.warn(
-                `[processor] Could not resolve user to UUID: status ${lookupRes.status}`,
-              );
+              const before = menuUserId;
+              const lu = await lookupByIdentifier(menuUserId);
+              if (lu && lu.found && lu.userId) {
+                voterDisplayName = lu.displayName || "Usuário";
+                menuUserId = lu.userId;
+                userResolvedToUuid = true;
+                logger.debug(
+                  `[processor] ${before} → ${menuUserId} (${data.flowId})`,
+                );
+              } else {
+                logger.warn(
+                  `[processor] lookup sem utilizador para ${before} (flow ${data.flowId})`,
+                );
+              }
             }
           } catch (err) {
             logger.warn(`[processor] Error resolving user UUID:`, err.message);

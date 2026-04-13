@@ -14,6 +14,7 @@ const {
   downloadImageToBuffer,
   sendBufferAsSticker,
 } = require("../../../utils/media/stickerHelper");
+const logger = require("../../../utils/logger");
 
 const RATING_OPTIONS = [0.5, 1, 1.5, 2, 2.5, 3, 3.5, 4, 4.5, 5];
 
@@ -57,7 +58,7 @@ async function maybeStartFilmCardViewingDatePrompt(
       initialContext,
     });
   } catch (e) {
-    console.warn("[ListsFlow] film-card viewing date prompt:", e.message);
+    logger.warn("[ListsFlow] film-card viewing date prompt:", e.message);
   }
 }
 
@@ -85,20 +86,20 @@ const listsFlow = createFlow("lists", {
         const isGroup = chatId && String(chatId).endsWith("@g.us");
         const groupChatId = isGroup ? chatId : null;
 
-        console.log(
+        logger.debug(
           `[ListsFlow] Loading lists - userId=${ctx.userId}, chatId=${chatId}, isGroup=${isGroup}, groupChatId=${groupChatId}`,
         );
 
         const lists = await listClient.getUserLists(ctx.userId, 1, groupChatId);
 
         // Log detailed info about each list
-        console.log(`[ListsFlow📊] Listas carregadas: ${lists.length}`);
+        logger.debug(`[ListsFlow📊] Listas carregadas: ${lists.length}`);
         lists.forEach((list, idx) => {
           const ownerInfo = list.owner
             ? `${list.owner.push_name}`
             : "Desconhecido";
           const visibility = list.isPublic ? "🔓 Pública" : "🔒 Privada";
-          console.log(
+          logger.debug(
             `[ListsFlow📋] Lista ${idx + 1}: "${list.title}" | ID: ${list.id} | Items: ${list._count.items} | Owner: ${ownerInfo} | ${visibility}`,
           );
         });
@@ -126,10 +127,10 @@ const listsFlow = createFlow("lists", {
             })
             .join("\n");
 
-          console.log(`📋 Listas de usuários do grupo:\n${groupSummary}`);
+          logger.debug(`📋 Listas de usuários do grupo:\n${groupSummary}`);
         }
 
-        console.log(
+        logger.debug(
           `[ListsFlow] Loaded ${lists.length} lists for ${isGroup ? "group" : "user"}: ${lists.map((l) => l.title).join(", ")}`,
         );
 
@@ -200,7 +201,7 @@ const listsFlow = createFlow("lists", {
           skipPoll: false,
         };
       } catch (err) {
-        console.error("[ListsFlow] Root error:", err.message);
+        logger.error("[ListsFlow] Root error:", err.message);
         return {
           title:
             "❌ Erro ao carregar listas.\n\n" + "Tente novamente ou volte.",
@@ -338,7 +339,7 @@ const listsFlow = createFlow("lists", {
 
         return { title, options, skipPoll: false };
       } catch (err) {
-        console.error("[ListsFlow] List detail error:", err.message);
+        logger.error("[ListsFlow] List detail error:", err.message);
         return {
           title: "❌ Erro ao carregar lista",
           options: [
@@ -464,7 +465,7 @@ const listsFlow = createFlow("lists", {
           options,
         };
       } catch (err) {
-        console.error("[ListsFlow] List items error:", err.message);
+        logger.error("[ListsFlow] List items error:", err.message);
         return {
           title: "❌ Erro ao carregar items",
           options: [
@@ -601,7 +602,7 @@ const listsFlow = createFlow("lists", {
           ],
         };
       } catch (err) {
-        console.error("[ListsFlow] Delete confirm error:", err.message);
+        logger.error("[ListsFlow] Delete confirm error:", err.message);
         return {
           title: "❌ Erro ao confirmar deleção",
           options: [{ label: "🔙 Voltar", action: "back" }],
@@ -622,7 +623,7 @@ const listsFlow = createFlow("lists", {
         }
         return { end: false };
       } catch (err) {
-        console.error("[ListsFlow] retryRoot error:", err.message);
+        logger.error("[ListsFlow] retryRoot error:", err.message);
         await ctx.reply("❌ Erro ao tentar novamente");
         return { end: false };
       }
@@ -637,7 +638,7 @@ const listsFlow = createFlow("lists", {
         // and attempt to load the list data again
         return { end: false };
       } catch (err) {
-        console.error("[ListsFlow] retryListDetail error:", err.message);
+        logger.error("[ListsFlow] retryListDetail error:", err.message);
         await ctx.reply("❌ Erro ao tentar novamente");
         return { end: false };
       }
@@ -651,13 +652,13 @@ const listsFlow = createFlow("lists", {
         // Data comes from ctx.data (backend response) with poll option data
         const { listId, listTitle, listKind } = ctx.data || {};
 
-        console.info(
+        logger.info(
           `[ListsFlow👆] Handler selectList chamado para userId=${ctx.userId}`,
         );
-        console.debug(`[ListsFlow👆] ctx.data:`, JSON.stringify(ctx.data));
+        logger.debug(`[ListsFlow👆] ctx.data:`, JSON.stringify(ctx.data));
 
         if (!listId) {
-          console.error(
+          logger.error(
             `[ListsFlow❌] listId faltando! ctx.data: ${JSON.stringify(
               ctx.data,
             )}`,
@@ -666,14 +667,14 @@ const listsFlow = createFlow("lists", {
           return { end: false };
         }
 
-        console.info(
+        logger.info(
           `[ListsFlow✅] Lista selecionada: ${listTitle} (${listId})`,
         );
 
         // Ensure state exists (may be null from processor)
         if (!ctx.state) {
           ctx.state = { path: "/", history: [], context: {} };
-          console.debug(`[ListsFlow📝] State inicializado`);
+          logger.debug(`[ListsFlow📝] State inicializado`);
         }
         if (!ctx.state.context) {
           ctx.state.context = {};
@@ -692,14 +693,14 @@ const listsFlow = createFlow("lists", {
           ctx.state.context._backendUserId = ctx.userId;
         }
         ctx.state.path = "/list-detail";
-        console.debug(`[ListsFlow📝] Navegando para: /list-detail`);
+        logger.debug(`[ListsFlow📝] Navegando para: /list-detail`);
         if (!ctx.state.history.includes("/")) {
           ctx.state.history.push("/");
         }
 
         return { end: false };
       } catch (err) {
-        console.error("[ListsFlow] selectList error:", err.message);
+        logger.error("[ListsFlow] selectList error:", err.message);
         await ctx.reply("❌ Erro ao selecionar lista");
         return { end: false };
       }
@@ -724,7 +725,7 @@ const listsFlow = createFlow("lists", {
         }
         return { end: false };
       } catch (err) {
-        console.error("[ListsFlow] listItems error:", err.message);
+        logger.error("[ListsFlow] listItems error:", err.message);
         await ctx.reply("❌ Erro ao carregar items");
         return { end: false };
       }
@@ -744,7 +745,7 @@ const listsFlow = createFlow("lists", {
         ctx.state.path = "/list-items";
         return { end: false };
       } catch (err) {
-        console.error("[ListsFlow] listItemsNextPage:", err.message);
+        logger.error("[ListsFlow] listItemsNextPage:", err.message);
         return { end: false };
       }
     },
@@ -763,7 +764,7 @@ const listsFlow = createFlow("lists", {
         ctx.state.path = "/list-items";
         return { end: false };
       } catch (err) {
-        console.error("[ListsFlow] listItemsPrevPage:", err.message);
+        logger.error("[ListsFlow] listItemsPrevPage:", err.message);
         return { end: false };
       }
     },
@@ -804,7 +805,7 @@ const listsFlow = createFlow("lists", {
               });
             }
           } catch (stickerErr) {
-            console.warn(
+            logger.warn(
               "[ListsFlow] Failed to send poster sticker:",
               stickerErr.message,
             );
@@ -813,7 +814,7 @@ const listsFlow = createFlow("lists", {
 
         return { end: false };
       } catch (err) {
-        console.error("[ListsFlow] selectItem error:", err.message);
+        logger.error("[ListsFlow] selectItem error:", err.message);
         await ctx.reply("❌ Erro ao selecionar item");
         return { end: false };
       }
@@ -851,7 +852,7 @@ const listsFlow = createFlow("lists", {
             });
             if (mw?.viewingLogId) flowViewingLogIds.push(mw.viewingLogId);
           } catch (e) {
-            console.warn(
+            logger.warn(
               "[ListsFlow] Sync to MovieRating after markWatched failed:",
               e.message,
             );
@@ -888,7 +889,7 @@ const listsFlow = createFlow("lists", {
         }
         return { end: false };
       } catch (err) {
-        console.error("[ListsFlow] Toggle watched error:", err.message);
+        logger.error("[ListsFlow] Toggle watched error:", err.message);
         await ctx.reply("❌ Erro ao atualizar status");
         return { end: false };
       }
@@ -911,7 +912,7 @@ const listsFlow = createFlow("lists", {
         ctx.state.path = "/rating-item";
         return { end: false };
       } catch (err) {
-        console.error("[ListsFlow] askRatingItem error:", err.message);
+        logger.error("[ListsFlow] askRatingItem error:", err.message);
         await ctx.reply("❌ Erro ao abrir avaliação");
         return { end: false };
       }
@@ -943,7 +944,7 @@ const listsFlow = createFlow("lists", {
         }
         return { end: false };
       } catch (err) {
-        console.error("[ListsFlow] Remove item error:", err.message);
+        logger.error("[ListsFlow] Remove item error:", err.message);
         await ctx.reply("❌ Erro ao remover item");
         return { end: false };
       }
@@ -984,7 +985,7 @@ const listsFlow = createFlow("lists", {
         try {
           await listClient.markWatched(itemId, userId, true);
         } catch (e) {
-          console.warn("[ListsFlow] markWatched before rate:", e.message);
+          logger.warn("[ListsFlow] markWatched before rate:", e.message);
         }
 
         await listClient.addRating(itemId, userId, numRating);
@@ -1015,7 +1016,7 @@ const listsFlow = createFlow("lists", {
             });
             if (rm?.viewingLogId) flowViewingLogIds.push(rm.viewingLogId);
           } catch (e) {
-            console.warn(
+            logger.warn(
               "[ListsFlow] Sync to MovieRating after rate failed:",
               e.message,
             );
@@ -1037,7 +1038,7 @@ const listsFlow = createFlow("lists", {
               });
             }
           } catch (e) {
-            console.warn("[ListsFlow] poster sticker after rate:", e.message);
+            logger.warn("[ListsFlow] poster sticker after rate:", e.message);
           }
         }
 
@@ -1053,7 +1054,7 @@ const listsFlow = createFlow("lists", {
         ctx.state.path = "/item-detail";
         return { end: false };
       } catch (err) {
-        console.error("[ListsFlow] Rate item error:", err.message);
+        logger.error("[ListsFlow] Rate item error:", err.message);
         await ctx.reply("❌ Erro ao adicionar nota");
         ctx.state.path = "/item-detail";
         return { end: false };
@@ -1072,7 +1073,7 @@ const listsFlow = createFlow("lists", {
         ctx.state.path = "/create-list-kind";
         return { end: false };
       } catch (err) {
-        console.error("[ListsFlow] createList error:", err.message);
+        logger.error("[ListsFlow] createList error:", err.message);
         await ctx.reply("❌ Erro ao processar comando");
         return { end: true };
       }
@@ -1095,7 +1096,7 @@ const listsFlow = createFlow("lists", {
         );
         return { end: true };
       } catch (err) {
-        console.error("[ListsFlow] createListPickMovie error:", err.message);
+        logger.error("[ListsFlow] createListPickMovie error:", err.message);
         await ctx.reply("❌ Erro ao processar");
         return { end: true };
       }
@@ -1118,7 +1119,7 @@ const listsFlow = createFlow("lists", {
         );
         return { end: true };
       } catch (err) {
-        console.error("[ListsFlow] createListPickBook error:", err.message);
+        logger.error("[ListsFlow] createListPickBook error:", err.message);
         await ctx.reply("❌ Erro ao processar");
         return { end: true };
       }
@@ -1161,7 +1162,7 @@ const listsFlow = createFlow("lists", {
             `• Use \`/listas\` para gerenciar`,
         );
       } catch (err) {
-        console.error("[ListsFlow] confirmCreateListDraft:", err.message);
+        logger.error("[ListsFlow] confirmCreateListDraft:", err.message);
         conversationState.clearState(ctx.userId);
         await ctx.reply(
           `❌ Erro ao criar lista: ${err.message}\n\n` +
@@ -1210,7 +1211,7 @@ const listsFlow = createFlow("lists", {
         await flowManager.startFlow(ctx.client, ctx.chatId, ctx.userId, "movies");
         return { end: true };
       } catch (err) {
-        console.error("[ListsFlow] openMovieStats:", err.message);
+        logger.error("[ListsFlow] openMovieStats:", err.message);
         await ctx.reply("❌ Não foi possível abrir o resumo de filmes.");
         return { end: false };
       }
@@ -1224,7 +1225,7 @@ const listsFlow = createFlow("lists", {
         await flowManager.startFlow(ctx.client, ctx.chatId, ctx.userId, "books");
         return { end: true };
       } catch (err) {
-        console.error("[ListsFlow] openBookStats:", err.message);
+        logger.error("[ListsFlow] openBookStats:", err.message);
         await ctx.reply("❌ Não foi possível abrir o resumo de livros.");
         return { end: false };
       }
@@ -1252,7 +1253,7 @@ const listsFlow = createFlow("lists", {
         }
         return { end: false };
       } catch (err) {
-        console.error("[ListsFlow] deleteList error:", err.message);
+        logger.error("[ListsFlow] deleteList error:", err.message);
         await ctx.reply("❌ Erro ao deletar lista");
         return { end: false };
       }
@@ -1289,7 +1290,7 @@ const listsFlow = createFlow("lists", {
         ctx.selectedList = null;
         return { end: false };
       } catch (err) {
-        console.error("[ListsFlow] confirmDeleteList error:", err.message);
+        logger.error("[ListsFlow] confirmDeleteList error:", err.message);
         await ctx.reply(`❌ Erro ao deletar lista: ${err.message}`);
         return { end: false };
       }

@@ -4,31 +4,20 @@
  */
 
 const { createFlow } = require("../flowBuilder");
-const fetch = require("node-fetch");
 const path = require("path");
+const backendClient = require("../../../services/backendClient");
+const logger = require("../../../utils/logger");
+const { lookupByIdentifier } = require("../../../utils/whatsapp/getUserData");
 const { renderMoviesCard } = require("../../../services/statsCardService");
 
-const BACKEND_URL = process.env.BACKEND_URL || "http://localhost:8000";
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 async function resolveUserUuid(externalId) {
   if (!externalId) return null;
-  const isUUID =
-    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
-      externalId,
-    );
-  if (isUUID) return externalId;
-
-  try {
-    const url = `${BACKEND_URL}/api/users/by-identifier/${encodeURIComponent(
-      externalId,
-    )}`;
-    const res = await fetch(url, { method: "GET" });
-    if (!res.ok) return null;
-    const json = await res.json();
-    return json && json.user && json.user.id ? json.user.id : null;
-  } catch (e) {
-    return null;
-  }
+  if (UUID_RE.test(String(externalId).trim())) return String(externalId).trim();
+  const lu = await lookupByIdentifier(externalId);
+  return lu && lu.found && lu.userId ? lu.userId : null;
 }
 
 const movieFlow = createFlow("movies", {
@@ -113,7 +102,7 @@ const movieFlow = createFlow("movies", {
             ? data.days
             : 7;
 
-        let url = `${BACKEND_URL}/api/movies/period-stats?userId=${encodeURIComponent(
+        let pathQuery = `/api/movies/period-stats?userId=${encodeURIComponent(
           userParam,
         )}`;
 
@@ -121,21 +110,21 @@ const movieFlow = createFlow("movies", {
         if (period === "month") {
           const now = new Date();
           const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-          url += `&from=${encodeURIComponent(monthStart.toISOString())}`;
-          url += `&to=${encodeURIComponent(new Date().toISOString())}`;
+          pathQuery += `&from=${encodeURIComponent(monthStart.toISOString())}`;
+          pathQuery += `&to=${encodeURIComponent(new Date().toISOString())}`;
           displayLabel = now.toLocaleString("pt-BR", { month: "long" });
         } else {
-          if (days && Number(days) > 0) url += `&days=${Number(days)}`;
+          if (days && Number(days) > 0)
+            pathQuery += `&days=${Number(days)}`;
           displayLabel =
             days && Number(days) > 0 ? `últimos ${days} dias` : `Geral`;
         }
 
         if (displayLabel) {
-          url += `&period=${encodeURIComponent(displayLabel)}`;
+          pathQuery += `&period=${encodeURIComponent(displayLabel)}`;
         }
 
-        const res = await fetch(url, { method: "GET" });
-        const json = await res.json();
+        const json = await backendClient.sendToBackend(pathQuery, null, "GET");
 
         if (!json || !json.summary) {
           await ctx.reply("❌ Erro ao obter estatísticas de filmes.");
@@ -162,7 +151,7 @@ const movieFlow = createFlow("movies", {
         const media = new MessageMedia("image/png", img.toString("base64"));
         await ctx.client.sendMessage(ctx.chatId, media, { caption: "" });
       } catch (e) {
-        console.error("[movieFlow] movieStats:", e && e.message ? e.message : e);
+        logger.error("[movieFlow] movieStats:", e && e.message ? e.message : e);
         await ctx.reply(
           "❌ Erro ao gerar resumo de filmes: " +
             (e && e.message ? e.message : e),
@@ -186,21 +175,20 @@ const movieFlow = createFlow("movies", {
         const monthStart = new Date(parseInt(year, 10), parseInt(monthNum, 10) - 1, 1);
         const monthEnd = new Date(parseInt(year, 10), parseInt(monthNum, 10), 1);
 
-        let url = `${BACKEND_URL}/api/movies/period-stats?userId=${encodeURIComponent(
+        let pathQuery = `/api/movies/period-stats?userId=${encodeURIComponent(
           userParam,
         )}`;
-        url += `&from=${encodeURIComponent(monthStart.toISOString())}`;
-        url += `&to=${encodeURIComponent(monthEnd.toISOString())}`;
+        pathQuery += `&from=${encodeURIComponent(monthStart.toISOString())}`;
+        pathQuery += `&to=${encodeURIComponent(monthEnd.toISOString())}`;
 
         const date = new Date(monthStart);
         const displayLabel = date.toLocaleString("pt-BR", {
           month: "long",
           year: "numeric",
         });
-        url += `&period=${encodeURIComponent(displayLabel)}`;
+        pathQuery += `&period=${encodeURIComponent(displayLabel)}`;
 
-        const res = await fetch(url, { method: "GET" });
-        const json = await res.json();
+        const json = await backendClient.sendToBackend(pathQuery, null, "GET");
 
         if (!json || !json.summary) {
           await ctx.reply("❌ Erro ao obter estatísticas de filmes.");
@@ -227,7 +215,7 @@ const movieFlow = createFlow("movies", {
         const media = new MessageMedia("image/png", img.toString("base64"));
         await ctx.client.sendMessage(ctx.chatId, media, { caption: "" });
       } catch (e) {
-        console.error(
+        logger.error(
           "[movieFlow] movieStatsMonth:",
           e && e.message ? e.message : e,
         );
