@@ -335,6 +335,29 @@ function createApp(client) {
     }
   });
 
+  router.post("/internal/routines/dispatch", async (req, res) => {
+    try {
+      const body = req.body || {};
+      const actions = body.actions;
+      if (!Array.isArray(actions)) {
+        return res.status(400).json({
+          ok: false,
+          error: "actions_must_be_array",
+        });
+      }
+      const { processRoutineTickPayload } = require("../services/routineTickService");
+      await processRoutineTickPayload(client, {
+        actions,
+        serverTime: body.serverTime,
+      });
+      res.json({ ok: true });
+    } catch (err) {
+      const errMsg = err && (err.message || String(err));
+      logger.error("[internal/routines/dispatch]", errMsg);
+      res.status(500).json({ ok: false, error: errMsg });
+    }
+  });
+
   app.use(router);
 
   app.use((_req, res) => {

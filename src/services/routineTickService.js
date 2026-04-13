@@ -235,145 +235,154 @@ async function logRoutineTickSnapshotIfEnabled(client, actions) {
 }
 
 /**
- * Processa fila de dispatches devolvidos pelo backend (enquetes de check-in / retrospectiva).
+ * Processa `actions` já calculadas pelo backend (push HTTP ou fluxo legacy após tick).
+ * @param {import("whatsapp-web.js").Client} client
+ * @param {{ actions?: unknown[]; serverTime?: string }} res
+ */
+async function processRoutineTickPayload(client, res) {
+  const actions = Array.isArray(res.actions) ? res.actions : [];
+  if (!actions.length) return;
+
+  await logRoutineTickSnapshotIfEnabled(client, actions);
+
+  const polls = require("../components/poll");
+  const dispatchIds = [];
+  const waMessageIds = {};
+  /** @type {Map<string, string>} */
+  const keyToMsgId = new Map();
+
+  const { primary, extraDispatchIdsByKey } = dedupeRoutineDispatchActions(actions);
+
+  const primaryChatIds = primary
+    .map(({ action: a }) => {
+      const p = a.payload || {};
+      return p.chatId || a.chatId;
+    })
+    .filter(Boolean);
+  const chatNameById = await fetchChatDisplayNames(client, primaryChatIds);
+
+  for (const { action: a, key: dispatchKey } of primary) {
+    const p = a.payload || {};
+    const chatId = p.chatId || a.chatId;
+    if (!chatId) continue;
+
+    const isGroup = a.kind === "checkin_poll_group";
+    const meta = p.metadata || {};
+    const mentionJids = collectMentionJidsFromPayload(p);
+    const mentionPhones = jidsToPhoneList(mentionJids);
+    const timingText = describeRoutineTiming(a);
+    const chatDisplayName = chatNameById.get(String(chatId)) || "—";
+    const chatKind = String(chatId).endsWith("@g.us") ? "grupo" : "privado";
+
+    let actionKind = "Check-in";
+    let aggregationNote =
+      "Uma enquete para esta rotina (sem agregação com outras neste envio).";
+    if (a.kind === "checkin_poll_group") {
+      const n = Array.isArray(meta.occurrenceIds) ? meta.occurrenceIds.length : 0;
+      actionKind = "Check-in agrupado";
+      aggregationNote =
+        n > 1
+          ? `Uma só enquete para ${n} rotinas — o backend já agregou vários check-ins no mesmo grupo e na mesma janela temporal (mergeOverlappingCheckinDispatches).`
+          : "Enquete agrupada (metadados de grupo).";
+    } else if (a.kind === "retrospective") {
+      actionKind = "Retrospectiva";
+      aggregationNote =
+        "Uma enquete de retrospectiva (dia anterior sem conclusão).";
+    }
+
+    logRoutineTickDispatchConsole({
+      serverTime: res && res.serverTime,
+      chatDisplayName,
+      chatKind,
+      actionKind,
+      timingText,
+      mentionPhones,
+      aggregationNote,
+    });
+
+    const preamble = p.preambleText || null;
+    const preambleMentions =
+      p.preambleMentionWaIds || p.metadata?.preambleMentionWaIds;
+
+    const mentionIds = p.bodyMentionWaIds || p.metadata?.bodyMentionWaIds;
+    if (preamble) {
+      try {
+        await sendBodyWithOptionalMentions(
+          client,
+          chatId,
+          preamble,
+          preambleMentions,
+        );
+      } catch (e) {
+        logger.warn("[routineTick] preambleText", e.message);
+      }
+    } else if (p.bodyText) {
+      try {
+        await sendBodyWithOptionalMentions(
+          client,
+          chatId,
+          p.bodyText,
+          mentionIds,
+        );
+      } catch (e) {
+        logger.warn("[routineTick] bodyText", e.message);
+      }
+    }
+
+    const title = p.title || "Rotina";
+    const options = p.options || DEFAULT_CHECKIN_OPTIONS;
+
+    const send = await polls.createPoll(client, chatId, title, options, {
+      metadata: meta,
+      options: { allowMultipleAnswers: !!isGroup },
+    });
+
+    const occIds =
+      isGroup && Array.isArray(meta.occurrenceIds)
+        ? meta.occurrenceIds
+        : a.occurrenceId
+          ? [a.occurrenceId]
+          : [];
+
+    if (send && send.msgId && occIds.length) {
+      for (const oid of occIds) {
+        try {
+          await routineClient.setActiveCheckinPoll(oid, send.msgId);
+        } catch (e) {
+          logger.warn("[routineTick] setActiveCheckinPoll", e.message);
+        }
+      }
+      dispatchIds.push(a.dispatchId);
+      waMessageIds[a.dispatchId] = send.msgId;
+      if (dispatchKey) keyToMsgId.set(dispatchKey, send.msgId);
+    } else if (a.dispatchId) {
+      dispatchIds.push(a.dispatchId);
+      if (send && send.msgId) waMessageIds[a.dispatchId] = send.msgId;
+    }
+  }
+
+  for (const [dupKey, ids] of extraDispatchIdsByKey) {
+    const msgId = keyToMsgId.get(dupKey);
+    if (!msgId) continue;
+    for (const dispatchId of ids) {
+      dispatchIds.push(dispatchId);
+      waMessageIds[dispatchId] = msgId;
+    }
+  }
+
+  if (dispatchIds.length) {
+    await routineClient.routineTickAck(dispatchIds, waMessageIds);
+  }
+}
+
+/**
+ * Polling legacy: pede tick ao backend e processa o payload.
  * @param {import("whatsapp-web.js").Client} client
  */
 async function processRoutineTick(client) {
   try {
     const res = await routineClient.routineTick();
-    const actions = res.actions || [];
-    if (!actions.length) return;
-
-    await logRoutineTickSnapshotIfEnabled(client, actions);
-
-    const polls = require("../components/poll");
-    const dispatchIds = [];
-    const waMessageIds = {};
-    /** @type {Map<string, string>} */
-    const keyToMsgId = new Map();
-
-    const { primary, extraDispatchIdsByKey } = dedupeRoutineDispatchActions(actions);
-
-    const primaryChatIds = primary
-      .map(({ action: a }) => {
-        const p = a.payload || {};
-        return p.chatId || a.chatId;
-      })
-      .filter(Boolean);
-    const chatNameById = await fetchChatDisplayNames(client, primaryChatIds);
-
-    for (const { action: a, key: dispatchKey } of primary) {
-      const p = a.payload || {};
-      const chatId = p.chatId || a.chatId;
-      if (!chatId) continue;
-
-      const isGroup = a.kind === "checkin_poll_group";
-      const meta = p.metadata || {};
-      const mentionJids = collectMentionJidsFromPayload(p);
-      const mentionPhones = jidsToPhoneList(mentionJids);
-      const timingText = describeRoutineTiming(a);
-      const chatDisplayName = chatNameById.get(String(chatId)) || "—";
-      const chatKind = String(chatId).endsWith("@g.us") ? "grupo" : "privado";
-
-      let actionKind = "Check-in";
-      let aggregationNote =
-        "Uma enquete para esta rotina (sem agregação com outras neste envio).";
-      if (a.kind === "checkin_poll_group") {
-        const n = Array.isArray(meta.occurrenceIds) ? meta.occurrenceIds.length : 0;
-        actionKind = "Check-in agrupado";
-        aggregationNote =
-          n > 1
-            ? `Uma só enquete para ${n} rotinas — o backend já agregou vários check-ins no mesmo grupo e na mesma janela temporal (mergeOverlappingCheckinDispatches).`
-            : "Enquete agrupada (metadados de grupo).";
-      } else if (a.kind === "retrospective") {
-        actionKind = "Retrospectiva";
-        aggregationNote =
-          "Uma enquete de retrospectiva (dia anterior sem conclusão).";
-      }
-
-      logRoutineTickDispatchConsole({
-        serverTime: res.serverTime,
-        chatDisplayName,
-        chatKind,
-        actionKind,
-        timingText,
-        mentionPhones,
-        aggregationNote,
-      });
-
-      const preamble = p.preambleText || null;
-      const preambleMentions =
-        p.preambleMentionWaIds || p.metadata?.preambleMentionWaIds;
-
-      const mentionIds = p.bodyMentionWaIds || p.metadata?.bodyMentionWaIds;
-      if (preamble) {
-        try {
-          await sendBodyWithOptionalMentions(
-            client,
-            chatId,
-            preamble,
-            preambleMentions,
-          );
-        } catch (e) {
-          logger.warn("[routineTick] preambleText", e.message);
-        }
-      } else if (p.bodyText) {
-        try {
-          await sendBodyWithOptionalMentions(
-            client,
-            chatId,
-            p.bodyText,
-            mentionIds,
-          );
-        } catch (e) {
-          logger.warn("[routineTick] bodyText", e.message);
-        }
-      }
-
-      const title = p.title || "Rotina";
-      const options = p.options || DEFAULT_CHECKIN_OPTIONS;
-
-      const send = await polls.createPoll(client, chatId, title, options, {
-        metadata: meta,
-        options: { allowMultipleAnswers: !!isGroup },
-      });
-
-      const occIds =
-        isGroup && Array.isArray(meta.occurrenceIds)
-          ? meta.occurrenceIds
-          : a.occurrenceId
-            ? [a.occurrenceId]
-            : [];
-
-      if (send && send.msgId && occIds.length) {
-        for (const oid of occIds) {
-          try {
-            await routineClient.setActiveCheckinPoll(oid, send.msgId);
-          } catch (e) {
-            logger.warn("[routineTick] setActiveCheckinPoll", e.message);
-          }
-        }
-        dispatchIds.push(a.dispatchId);
-        waMessageIds[a.dispatchId] = send.msgId;
-        if (dispatchKey) keyToMsgId.set(dispatchKey, send.msgId);
-      } else if (a.dispatchId) {
-        dispatchIds.push(a.dispatchId);
-        if (send && send.msgId) waMessageIds[a.dispatchId] = send.msgId;
-      }
-    }
-
-    for (const [dupKey, ids] of extraDispatchIdsByKey) {
-      const msgId = keyToMsgId.get(dupKey);
-      if (!msgId) continue;
-      for (const dispatchId of ids) {
-        dispatchIds.push(dispatchId);
-        waMessageIds[dispatchId] = msgId;
-      }
-    }
-
-    if (dispatchIds.length) {
-      await routineClient.routineTickAck(dispatchIds, waMessageIds);
-    }
+    await processRoutineTickPayload(client, res);
   } catch (e) {
     logger.debug("[routineTick] skip or error:", e.message);
   }
@@ -388,4 +397,8 @@ function startRoutineTickLoop(client, intervalMs = 60000) {
   return t;
 }
 
-module.exports = { processRoutineTick, startRoutineTickLoop };
+module.exports = {
+  processRoutineTick,
+  processRoutineTickPayload,
+  startRoutineTickLoop,
+};
