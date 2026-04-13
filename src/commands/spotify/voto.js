@@ -583,6 +583,34 @@ async function addPassedTrackToPlaylist({
     return;
   }
 
+  // Verifica no instante da adição se a música já não foi adicionada à playlist
+  // (durante as horas ou minutos que a votação permaneceu em aberto).
+  if (group.playlistId) {
+    try {
+      const reCheck = await backendClient.sendToBackend(
+        `/api/groups/playlists/${encodeURIComponent(
+          group.playlistId,
+        )}/check-track?trackId=${encodeURIComponent(
+          vote.trackId,
+        )}&trackName=${encodeURIComponent(vote.trackName)}`,
+        null,
+        "GET",
+      );
+
+      if (reCheck && reCheck.existsExact) {
+        await client.sendMessage(
+          chatId,
+          `⚠️ Votação aprovada, mas a música *${vote.trackName}* já havia sido colocada na playlist nesse meio tempo!`,
+        );
+        return;
+      }
+    } catch (err) {
+      logger.warn(
+        `[Voto] Falha no cheque secundário ao adicionar música aprovada: ${err.message}`,
+      );
+    }
+  }
+
   const addRes = await backendClient.sendToBackend(
     `/api/spotify/playlists/${playlistSpotifyId}/tracks`,
     {
