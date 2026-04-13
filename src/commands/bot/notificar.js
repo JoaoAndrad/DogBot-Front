@@ -1,7 +1,18 @@
 const backendClient = require("../../services/backendClient");
+const polls = require("../../components/poll");
+
+/** Compara JIDs do mesmo utilizador (ex.: @c.us vs @lid resolvido). */
+function jidMatches(a, b) {
+  if (!a || !b) return false;
+  if (a === b) return true;
+  const na = String(a).split("@")[0];
+  const nb = String(b).split("@")[0];
+  return na.length > 0 && na === nb;
+}
 
 module.exports = {
   name: "notificar",
+  aliases: ["notify", "notificacao", "notificacoes"],
   description:
     "Enviar uma notificação em massa para todos os usuários registrados (apenas admin, privado apenas).",
   async execute(ctx) {
@@ -70,9 +81,11 @@ module.exports = {
     const raw = (info && info.body) || (message && message.body) || "";
     let text = raw;
 
-    // Remove leading command token (/notificar or notificar)
+    // Remove leading command token (/notificar, /notify, …)
     try {
-      const cmdMatch = raw.match(/^\s*\/?notificar\b[:\s]*/i);
+      const cmdMatch = raw.match(
+        /^\s*\/?(?:notificar|notify|notificacao|notificacoes)\b[:\s]*/i,
+      );
       text = cmdMatch ? raw.slice(cmdMatch[0].length) : raw;
     } catch (e) {
       text = raw;
@@ -89,11 +102,15 @@ module.exports = {
 
     if (!text || text.length === 0) {
       await reply(
-        "📢 *Uso do comando /notificar*\n\n" +
-          "• `/notificar <mensagem>` - Envia notificação para todos\n" +
-          "• `/notificar dryrun <mensagem>` - Preview sem enviar\n\n" +
-          "Exemplo:\n" +
-          "`/notificar dryrun O bot estará fora do ar`",
+        "📢 *Comando /notificar* (só administradores, só no privado com o bot)\n\n" +
+          "Envia a *mesma mensagem* a *todos os utilizadores registados* no sistema.\n\n" +
+          "*Como usar*\n" +
+          "• `/notificar <texto>` — será enviada uma *enquete* e, se confirmar, envia mensagem a todos.\n" +
+          "• `/notificar dryrun <texto>` — *ensaiar*: mostra quantos utilizadores receberiam e o texto, *sem enviar* nada.\n\n" +
+          "*Também pode usar:* `/notify`, `/notificacao` ou `/notificacoes` (com o mesmo significado).\n\n" +
+          "*Exemplos*\n" +
+          "`/notificar dryrun Vamos fazer manutenção amanhã de manhã.`\n" +
+          "`/notificar A partir de hoje há novidade no grupo X.`",
       );
       return;
     }
@@ -120,71 +137,149 @@ module.exports = {
       return;
     }
 
-    // Create broadcast
-    try {
-      await reply("⏳ Criando broadcast...");
-
-      const createResp = await backendClient.sendToBackend(
-        "/api/broadcasts",
-        {
-          message: text,
-          createdBy: senderNumber,
-        },
-        "POST",
+    if (!ctx.client) {
+      await reply(
+        "❌ Cliente indisponível para criar a enquete de confirmação. Tente de novo.",
       );
+      return;
+    }
 
-      if (createResp && createResp.id) {
-        const broadcastId = createResp.id;
-        const recipientCount = createResp.recipientCount || 0;
-        const recipients = createResp.recipients || [];
+    const chatId =
+      (message && message.from) ||
+      (info && info.from) ||
+      senderNumber;
 
-        await reply(
-          `✅ *Broadcast criado!*\n\n` +
-            `ID: ${broadcastId}\n` +
-            `Destinatários: ${recipientCount} usuários\n\n` +
-            `Enviando mensagens...`,
+    const runBroadcastAfterConfirm = async () => {
+      try {
+        await ctx.client.sendMessage(chatId, "⏳ Criando broadcast...");
+
+        const createResp = await backendClient.sendToBackend(
+          "/api/broadcasts",
+          {
+            message: text,
+            createdBy: senderNumber,
+          },
+          "POST",
         );
 
-        // Send messages to all recipients (temporary implementation until worker is ready)
-        let successCount = 0;
-        let errorCount = 0;
+        if (createResp && createResp.id) {
+          const broadcastId = createResp.id;
+          const recipientCount = createResp.recipientCount || 0;
+          const recipients = createResp.recipients || [];
 
-        for (let recipientId of recipients) {
+          await ctx.client.sendMessage(
+            chatId,
+            `✅ *Broadcast criado!*\n\n` +
+              `ID: ${broadcastId}\n` +
+              `Destinatários: ${recipientCount} usuários\n\n` +
+              `Enviando mensagens...`,
+          );
+
+          let successCount = 0;
+          let errorCount = 0;
+
+          for (let recipientId of recipients) {
+            try {
+              if (!recipientId.includes("@")) {
+                recipientId = `${recipientId}@c.us`;
+              }
+
+              await ctx.client.sendMessage(recipientId, text);
+              successCount++;
+
+              await new Promise((resolve) => setTimeout(resolve, 500));
+            } catch (err) {
+              console.error(
+                `[Broadcast] Erro ao enviar para ${recipientId}:`,
+                err?.message,
+              );
+              errorCount++;
+            }
+          }
+
+          await ctx.client.sendMessage(
+            chatId,
+            `✅ *Broadcast concluído!*\n\n` +
+              `Enviadas: ${successCount}\n` +
+              `Erros: ${errorCount}\n` +
+              `Total: ${recipientCount}`,
+          );
+        } else {
+          await ctx.client.sendMessage(
+            chatId,
+            "✅ Broadcast criado, mas sem detalhes de confirmação.",
+          );
+        }
+      } catch (err) {
+        console.error("Erro ao criar broadcast:", err?.message);
+        await ctx.client.sendMessage(
+          chatId,
+          "❌ Erro ao criar broadcast: " +
+            (err?.response?.data?.error || err?.message || "Erro desconhecido"),
+        );
+      }
+    };
+
+    await reply(
+      "📋 Responda a enquete abaixo para confirmar ou cancelar o envio da mensagem.",
+    );
+
+    let confirmationHandled = false;
+
+    const confirmRes = await polls.createPoll(
+      ctx.client,
+      chatId,
+      "Enviar esta notificação a todos os usuários registrados?",
+      ["✅ Sim, enviar", "❌ Não, cancelar"],
+      {
+        onVote: async (voteData) => {
           try {
-            // Ensure recipient ID has @c.us suffix for WhatsApp
-            if (!recipientId.includes("@")) {
-              recipientId = `${recipientId}@c.us`;
+            const voter = voteData.voter;
+            if (!jidMatches(voter, senderNumber)) {
+              return;
             }
 
-            await ctx.client.sendMessage(recipientId, text);
-            successCount++;
+            if (confirmationHandled) {
+              return;
+            }
 
-            // Add small delay to avoid rate limiting
-            await new Promise((resolve) => setTimeout(resolve, 500));
+            const selectedIndexRaw =
+              voteData.selectedIndexes && voteData.selectedIndexes[0];
+            const selectedIndex =
+              selectedIndexRaw != null ? Number(selectedIndexRaw) : null;
+
+            if (selectedIndex === 1) {
+              confirmationHandled = true;
+              await ctx.client.sendMessage(
+                chatId,
+                "❌ Envio em massa cancelado.",
+              );
+              return;
+            }
+
+            if (selectedIndex !== 0) {
+              return;
+            }
+
+            confirmationHandled = true;
+            await runBroadcastAfterConfirm();
           } catch (err) {
-            console.error(
-              `[Broadcast] Erro ao enviar para ${recipientId}:`,
-              err?.message,
-            );
-            errorCount++;
+            console.error("[notificar] onVote:", err?.message);
+            try {
+              await ctx.client.sendMessage(
+                chatId,
+                "❌ Erro ao processar o teu voto na enquete.",
+              );
+            } catch (_) {
+              /* ignore */
+            }
           }
-        }
+        },
+      },
+    );
 
-        await reply(
-          `✅ *Broadcast concluído!*\n\n` +
-            `Enviadas: ${successCount}\n` +
-            `Erros: ${errorCount}\n` +
-            `Total: ${recipientCount}`,
-        );
-      } else {
-        await reply("✅ Broadcast criado, mas sem detalhes de confirmação.");
-      }
-    } catch (err) {
-      console.error("Erro ao criar broadcast:", err?.message);
-      await reply(
-        "❌ Erro ao criar broadcast: " +
-          (err?.response?.data?.error || err?.message || "Erro desconhecido"),
-      );
+    if (!confirmRes || !confirmRes.msgId) {
+      await reply("❌ Não foi possível criar a enquete de confirmação.");
     }
   },
 };

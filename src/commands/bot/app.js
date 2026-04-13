@@ -2,8 +2,9 @@ const backendClient = require("../../services/backendClient");
 
 module.exports = {
   name: "app",
+  aliases: ["bubble", "dogbubble", "aplicativo"],
   description:
-    "Gera código de 6 dígitos para emparelhar a app DogBot (só no privado; apenas VIP)",
+    "Gera código de 6 dígitos para emparelhar a app DogBubble (só no privado; restrições VIP via painel)",
   async execute(ctx) {
     const msg = ctx.message;
     const reply = ctx.reply;
@@ -64,11 +65,6 @@ module.exports = {
       if (status === 404 || codeErr === "user_not_found") {
         return reply(
           "❌ Cadastro não encontrado. Envie /cadastro aqui no privado e volta a usar /app depois de registado.",
-        );
-      }
-      if (status === 403 || codeErr === "not_vip") {
-        return reply(
-          "❌ O código da app DogBot está disponível apenas para usuários VIP. Contate o administrador do bot.",
         );
       }
       console.error("[Command:app]", err && err.message, status, body);

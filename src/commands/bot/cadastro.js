@@ -4,7 +4,8 @@ const conversationState = require("../../services/conversationState");
 
 module.exports = {
   name: "cadastro",
-  description: "Registrar-se no sistema para usar comandos",
+  aliases: ["registro", "criar-conta  ", "criarconta", "criar"],
+  description: "Registra-se no sistema para usar comandos",
   async execute(ctx) {
     const msg = ctx.message;
     const info = ctx.info || {};
