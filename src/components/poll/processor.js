@@ -23,7 +23,9 @@ async function waDisplayName(client, waId) {
   try {
     const c = await client.getContactById(waId);
     if (c && (c.pushname || c.name))
-      return String(c.pushname || c.name).trim().slice(0, 80);
+      return String(c.pushname || c.name)
+        .trim()
+        .slice(0, 80);
   } catch (e) {
     /* ignore */
   }
@@ -119,9 +121,7 @@ async function resolveVoterIdForBackend(client, voterId) {
     const contact = await client.getContactById(voterId);
     const sid = contact && contact.id && contact.id._serialized;
     if (sid && (sid.endsWith("@c.us") || sid.endsWith("@g.us"))) {
-      logger.debug(
-        `[processor] LID → JID (process-vote): ${voterId} → ${sid}`,
-      );
+      logger.debug(`[processor] LID → JID (process-vote): ${voterId} → ${sid}`);
       return sid;
     }
   } catch (e) {
@@ -136,13 +136,11 @@ async function resolveVoterIdForBackend(client, voterId) {
  */
 function selectedIndexesFromVoteAndPoll(vote, storedPoll) {
   const selectedOptions =
-    vote.selectedOptions ||
-    vote.selected ||
-    vote.selectedOptionIndexes ||
-    [];
+    vote.selectedOptions || vote.selected || vote.selectedOptionIndexes || [];
   let rawSelected = selectedOptions;
   let selectedIndexes = [];
-  let rawOpts = storedPoll && (storedPoll.poll_options || storedPoll.pollOptions);
+  let rawOpts =
+    storedPoll && (storedPoll.poll_options || storedPoll.pollOptions);
   if (typeof rawOpts === "string") {
     try {
       rawOpts = JSON.parse(rawOpts);
@@ -173,7 +171,11 @@ function selectedIndexesFromVoteAndPoll(vote, storedPoll) {
     if (typeof rawSelected[0] === "object") {
       for (const s of rawSelected) {
         const lid =
-          s.localId != null ? s.localId : s.local_id != null ? s.local_id : null;
+          s.localId != null
+            ? s.localId
+            : s.local_id != null
+              ? s.local_id
+              : null;
         const name = s.name || s.option || null;
         if (lid != null) {
           selectedIndexes.push(Number(lid));
@@ -201,9 +203,7 @@ function selectedIndexesFromVoteAndPoll(vote, storedPoll) {
     selectedIndexes = [Number(vote.selectedIndex)];
   }
 
-  return (selectedIndexes || []).filter(
-    (n) => !Number.isNaN(n) && n >= 0,
-  );
+  return (selectedIndexes || []).filter((n) => !Number.isNaN(n) && n >= 0);
 }
 
 /**
@@ -353,10 +353,7 @@ async function executeAction(result, client) {
             );
           } catch (e) {
             logger.error("[processor] rotina_assign confirm", e);
-            await client.sendMessage(
-              poll.chatId,
-              `❌ Erro: ${e.message || e}`,
-            );
+            await client.sendMessage(poll.chatId, `❌ Erro: ${e.message || e}`);
           }
         }
         break;
@@ -379,9 +376,7 @@ async function executeAction(result, client) {
         if (!gr.ok && gr.results.length) {
           const summary = gr.results
             .map((r, i) =>
-              r.reason
-                ? `${r.idx != null ? r.idx : i}:${r.reason}`
-                : null,
+              r.reason ? `${r.idx != null ? r.idx : i}:${r.reason}` : null,
             )
             .filter(Boolean)
             .join("; ");
@@ -451,20 +446,20 @@ async function executeAction(result, client) {
             if (voterJid) {
               await client.sendMessage(
                 chatId,
-                `Certo @${num} — os lembretes de *hoje* ficam *desativados* para esta rotina (como com «Eu fiz»). Só voltamos a notificar no *próximo dia* em que ela calhar.`,
+                `Certo @${num}, esta rotina foi *adiada*: os lembretes de hoje foram cancelados.`,
                 { mentions: [String(voterJid)] },
               );
             } else {
               await client.sendMessage(
                 chatId,
-                "Certo — os lembretes de hoje ficam desativados; só voltamos a notificar no próximo dia em que a rotina calhar (como com «Eu fiz»).",
+                "Certo, a rotina foi adiada e os lembretes de hoje foram cancelados.",
               );
             }
           } catch (e) {
             logger.warn("[processor] routine_checkin postponed", e.message);
             await client.sendMessage(
               chatId,
-              "Certo — os lembretes de hoje ficam desativados; só voltamos a notificar no próximo dia em que a rotina calhar.",
+              "Certo, a rotina foi adiada e os lembretes de hoje foram cancelados.",
             );
           }
         } else if (rr && !rr.ok && rr.reason === "already_completed") {
