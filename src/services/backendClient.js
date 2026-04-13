@@ -15,7 +15,7 @@ function getBackendHeaders() {
  * @param {string} path
  * @param {object|null} body
  * @param {string} [method]
- * @param {{ silentHttpStatuses?: number[] }} [opts] - não logar console.error para estes códigos (ex.: 404 esperado no sync companion)
+ * @param {{ silentHttpStatuses?: number[], timeoutMs?: number }} [opts] - timeoutMs: node-fetch (ms); omitir = sem limite explícito
  */
 async function sendToBackend(path, body, method = "POST", opts = {}) {
   const silentHttpStatuses = Array.isArray(opts.silentHttpStatuses)
@@ -29,6 +29,11 @@ async function sendToBackend(path, body, method = "POST", opts = {}) {
 
   if (body && method !== "GET") {
     options.body = JSON.stringify(body);
+  }
+
+  const timeoutMs = opts.timeoutMs;
+  if (typeof timeoutMs === "number" && timeoutMs > 0) {
+    options.timeout = timeoutMs;
   }
 
   let res;

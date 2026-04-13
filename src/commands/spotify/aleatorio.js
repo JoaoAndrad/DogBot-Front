@@ -63,6 +63,10 @@ module.exports = {
         "⏳ Verificando a playlist do grupo e preparando músicas recomendadas...",
       );
 
+      const shuffleTimeoutMs = Math.max(
+        120000,
+        parseInt(process.env.BACKEND_SHUFFLE_TIMEOUT_MS || "600000", 10) || 600000,
+      );
       const shuffleRes = await backendClient.sendToBackend(
         `/api/groups/${encodeURIComponent(chatId)}/playlist/shuffle`,
         {
@@ -72,6 +76,7 @@ module.exports = {
           userId: userLookup.userId, // Pass user ID to create playlist in their account
         },
         "POST",
+        { timeoutMs: shuffleTimeoutMs },
       );
 
       if (!shuffleRes) return reply("❌ Falha ao comunicar com o servidor.");
