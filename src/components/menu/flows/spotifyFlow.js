@@ -19,6 +19,9 @@ const {
   musicLast12MonthsChoices,
   formatPlaybackInstant,
 } = require("../../../utils/datetime/musicTimezone");
+const {
+  renderPlaybackProgressBar,
+} = require("../../../utils/spotify/playbackProgressBar");
 
 /** Só para prévia de áudio (binário); o resto usa backendClient. */
 const BACKEND_URL = process.env.BACKEND_URL || "http://localhost:8000";
@@ -68,13 +71,6 @@ function msToTime(ms) {
   const min = Math.floor(s / 60);
   const sec = s % 60;
   return `${min}:${String(sec).padStart(2, "0")}`;
-}
-
-function renderProgressBar(percent, width = 16) {
-  const p = Math.max(0, Math.min(100, Math.round(percent)));
-  const filled = Math.round((p / 100) * width);
-  const empty = width - filled;
-  return "[" + "█".repeat(filled) + "-".repeat(empty) + "]";
 }
 
 const spotifyFlow = createFlow("spotify", {
@@ -345,7 +341,7 @@ const spotifyFlow = createFlow("spotify", {
             json.percentPlayed ||
               (durationMs ? (positionMs / durationMs) * 100 : 0),
           );
-          const bar = renderProgressBar(percent, 18);
+          const bar = renderPlaybackProgressBar(percent);
 
           let reply = `▶️ Tocando agora — ${t.name}\n`;
           reply += `${

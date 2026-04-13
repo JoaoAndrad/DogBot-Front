@@ -8,6 +8,9 @@ const {
 const { sendTrackSticker } = require("../../utils/media/stickerHelper");
 const { MessageMedia } = require("whatsapp-web.js");
 const { isFromApp } = require("./fromAppText");
+const {
+  renderPlaybackProgressBar,
+} = require("../../utils/spotify/playbackProgressBar");
 
 const BACKEND_BASE = (
   process.env.BACKEND_URL || "http://localhost:8000"
@@ -19,13 +22,6 @@ function msToTime(ms) {
   const min = Math.floor(s / 60);
   const sec = s % 60;
   return `${min}:${String(sec).padStart(2, "0")}`;
-}
-
-function renderProgressBar(percent, width = 16) {
-  const p = Math.max(0, Math.min(100, Math.round(percent)));
-  const filled = Math.round((p / 100) * width);
-  const empty = width - filled;
-  return "[" + "█".repeat(filled) + "-".repeat(empty) + "]";
 }
 
 module.exports = {
@@ -101,7 +97,7 @@ module.exports = {
           json.percentPlayed ||
             (durationMs ? (positionMs / durationMs) * 100 : 0),
         );
-        const bar = renderProgressBar(percent, 18);
+        const bar = renderPlaybackProgressBar(percent);
 
         const headLine =
           fromBubble && isGroup && mentionJid
