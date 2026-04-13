@@ -1,5 +1,6 @@
 const logger = require("../utils/logger");
 const { loadIgnoredChats } = require("../utils/chatCleaner");
+const { serializedParticipantId } = require("../utils/whatsappParticipantIds");
 const backendClient = require("./backendClient");
 
 /**
@@ -50,7 +51,7 @@ async function syncSharedChatsToBackend(client) {
         if (isGroup) {
           const parts = chat.participants || [];
           for (const p of parts) {
-            const jid = p.id && p.id._serialized;
+            const jid = serializedParticipantId(p);
             if (!jid || jid === botId || String(jid).endsWith("@g.us")) continue;
             if (!byUser.has(jid)) byUser.set(jid, new Map());
             byUser
