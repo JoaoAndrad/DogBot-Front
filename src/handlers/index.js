@@ -959,6 +959,10 @@ async function handle(context) {
     botMetricsReporter
       .reportEvent("command", {
         commandName: "/" + cmdName,
+        commandType:
+          typeof cmd.commandType === "string" && cmd.commandType.trim()
+            ? cmd.commandType.trim()
+            : "misc",
         chatId: from,
         fromId: actualNumber || author || from,
         chatName: context.chatName || undefined,

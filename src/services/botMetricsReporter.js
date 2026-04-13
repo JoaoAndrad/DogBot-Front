@@ -20,7 +20,7 @@ function getHeaders() {
  * Report a single event to the backend (command, message_received, message_processed, sticker_created, etc.).
  * Payload should include chatId and fromId when applicable for "per group" and "active users" stats.
  * @param {string} type - Event type
- * @param {object} [payload] - { commandName?, chatId?, fromId?, ... }
+ * @param {object} [payload] - { commandName?, commandType?, chatId?, fromId?, ... }
  */
 async function reportEvent(type, payload = {}) {
   try {
