@@ -14,7 +14,7 @@ async function syncRegisteredCommandsToBackend(commands) {
     "POST",
   );
   logger.info(
-    `[commandPolicySync] políticas: created=${res.created ?? 0} skipped=${res.skipped ?? 0} typesUpdated=${res.commandTypesUpdated ?? 0} invalid=${res.invalid ?? 0}`,
+    `[commandPolicySync] políticas: created=${res.created ?? 0} skipped=${res.skipped ?? 0} removed=${res.removed ?? 0} typesUpdated=${res.commandTypesUpdated ?? 0} invalid=${res.invalid ?? 0}`,
   );
   return res;
 }

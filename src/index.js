@@ -24,7 +24,7 @@ async function main() {
       bootLog.line("commandPolicySync", {
         ok: true,
         ms: Date.now() - tSync,
-        extra: `created=${sync.created ?? 0} skipped=${sync.skipped ?? 0}`,
+        extra: `created=${sync.created ?? 0} skipped=${sync.skipped ?? 0} removed=${sync.removed ?? 0}`,
       });
     } catch (err) {
       bootLog.line("commandPolicySync", {
