@@ -1,4 +1,6 @@
 const backendClient = require("../../services/backendClient");
+const logger = require("../../utils/logger");
+const { jidFromContact } = require("../../utils/whatsapp/getUserData");
 
 module.exports = {
   name: "app",
@@ -31,11 +33,10 @@ module.exports = {
     let waId = msg.from;
     try {
       const contact = await msg.getContact();
-      if (contact && contact.id && contact.id._serialized) {
-        waId = contact.id._serialized;
-      }
+      const j = jidFromContact(contact);
+      if (j) waId = j;
     } catch (err) {
-      console.log("[Command:app] getContact:", err && err.message);
+      logger.debug("[Command:app] getContact:", err && err.message);
     }
 
     try {
@@ -48,7 +49,7 @@ module.exports = {
       let expiresLine = "";
       if (expiresAt && !Number.isNaN(expiresAt.getTime())) {
         try {
-          expiresLine = `${expiresAt.toLocaleString("pt-PT")}`;
+          expiresLine = `${expiresAt.toLocaleString("pt-BR")}`;
         } catch (e) {
           expiresLine = `${expiresAt.toISOString()}`;
         }
@@ -67,9 +68,9 @@ module.exports = {
           "❌ Cadastro não encontrado. Envie /cadastro aqui no privado e volta a usar /app depois de registado.",
         );
       }
-      console.error("[Command:app]", err && err.message, status, body);
+      logger.error("[Command:app]", err && err.message, status, body);
       await reply(
-        "❌ Não foi possível gerar o código agora. Tenta de novo mais tarde.",
+        "❌ Não foi possível gerar o código agora. Tente de novo mais tarde.",
       );
     }
   },

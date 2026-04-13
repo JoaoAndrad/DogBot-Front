@@ -1,14 +1,10 @@
 const backendClient = require("../../services/backendClient");
 const polls = require("../../components/poll");
-
-/** Compara JIDs do mesmo usuário (ex.: @c.us vs @lid resolvido). */
-function jidMatches(a, b) {
-  if (!a || !b) return false;
-  if (a === b) return true;
-  const na = String(a).split("@")[0];
-  const nb = String(b).split("@")[0];
-  return na.length > 0 && na === nb;
-}
+const logger = require("../../utils/logger");
+const {
+  jidFromContact,
+  lookupParticipant,
+} = require("../../utils/whatsapp/getUserData");
 
 module.exports = {
   name: "notificar",
@@ -37,8 +33,8 @@ module.exports = {
     try {
       if (message && typeof message.getContact === "function") {
         const contact = await message.getContact();
-        if (contact && contact.id && contact.id._serialized)
-          senderNumber = contact.id._serialized;
+        const j = jidFromContact(contact);
+        if (j) senderNumber = j;
       }
     } catch (err) {
       // ignore
@@ -55,24 +51,24 @@ module.exports = {
       return;
     }
 
-    // Check if user is admin via backend
-    let isAdmin = false;
+    // Admin + userId (UUID) para validar o voto na enquete (igual padrão do voto.js)
+    let senderUserId = null;
     try {
       const userResp = await backendClient.sendToBackend(
         `/api/users/by-whatsapp/${encodeURIComponent(senderNumber)}`,
         null,
         "GET",
       );
-      if (userResp && userResp.isAdmin) {
-        isAdmin = true;
+      if (userResp && userResp.found && userResp.isAdmin && userResp.userId) {
+        senderUserId = userResp.userId;
       }
     } catch (err) {
-      console.error("Erro ao verificar admin status:", err?.message);
+      logger.error("Erro ao verificar admin status:", err?.message);
       await reply("❌ Erro ao verificar permissões de administrador.");
       return;
     }
 
-    if (!isAdmin) {
+    if (!senderUserId) {
       await reply("❌ Este comando é restrito a administradores.");
       return;
     }
@@ -131,7 +127,7 @@ module.exports = {
             `Corpo da mensagem:\n\n${text}`,
         );
       } catch (err) {
-        console.error("Erro ao obter contagem de usuários:", err?.message);
+        logger.error("Erro ao obter contagem de usuários:", err?.message);
         await reply("❌ Erro ao obter contagem de usuários para preview.");
       }
       return;
@@ -187,7 +183,7 @@ module.exports = {
 
               await new Promise((resolve) => setTimeout(resolve, 500));
             } catch (err) {
-              console.error(
+              logger.warn(
                 `[Broadcast] Erro ao enviar para ${recipientId}:`,
                 err?.message,
               );
@@ -209,7 +205,7 @@ module.exports = {
           );
         }
       } catch (err) {
-        console.error("Erro ao criar broadcast:", err?.message);
+        logger.error("Erro ao criar broadcast:", err?.message);
         await ctx.client.sendMessage(
           chatId,
           "❌ Erro ao criar broadcast: " +
@@ -233,7 +229,15 @@ module.exports = {
         onVote: async (voteData) => {
           try {
             const voter = voteData.voter;
-            if (!jidMatches(voter, senderNumber)) {
+            const { res: voterLookup } = await lookupParticipant(
+              ctx.client,
+              voter,
+            );
+            if (
+              !voterLookup ||
+              !voterLookup.found ||
+              voterLookup.userId !== senderUserId
+            ) {
               return;
             }
 
@@ -262,7 +266,7 @@ module.exports = {
             confirmationHandled = true;
             await runBroadcastAfterConfirm();
           } catch (err) {
-            console.error("[notificar] onVote:", err?.message);
+            logger.error("[notificar] onVote:", err?.message);
             try {
               await ctx.client.sendMessage(
                 chatId,

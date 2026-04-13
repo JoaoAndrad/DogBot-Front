@@ -1,5 +1,8 @@
-const backendClient = require("../../services/backendClient");
 const logger = require("../../utils/logger");
+const {
+  jidFromContact,
+  lookupByIdentifier,
+} = require("../../utils/whatsapp/getUserData");
 const conversationState = require("../../services/conversationState");
 
 module.exports = {
@@ -35,8 +38,9 @@ module.exports = {
     let actualNumber = null;
     try {
       const contact = await msg.getContact();
-      if (contact && contact.id && contact.id._serialized) {
-        actualNumber = contact.id._serialized;
+      const j = jidFromContact(contact);
+      if (j) {
+        actualNumber = j;
         logger.debug(`[Cadastro] Número do contato: ${actualNumber}`);
       }
     } catch (err) {
@@ -63,41 +67,31 @@ module.exports = {
       return reply("❌ Não consegui identificar seu número. Tente novamente.");
     }
 
-    // Check if user already exists
-    try {
-      logger.info(`[Cadastro] Verificando usuário existente: ${actualNumber}`);
-      const lookupRes = await backendClient.sendToBackend(
-        `/api/users/lookup?identifier=${encodeURIComponent(actualNumber)}`,
-        null,
-        "GET"
-      );
+    logger.info(`[Cadastro] Verificando usuário existente: ${actualNumber}`);
+    const lookupRes = await lookupByIdentifier(actualNumber);
 
-      logger.info(`[Cadastro] Resposta do lookup:`, lookupRes);
-
-      if (lookupRes && lookupRes.found) {
-        return reply(
-          `✅ Você já está cadastrado!\n\n` +
-            `${
-              pushName ? pushName + ", você" : "Você"
-            } pode usar os comandos normalmente.\n\n` +
-            `Digite /ajuda para ver os comandos disponíveis.`
-        );
-      }
-
-      logger.info(
-        `[Cadastro] Usuário não encontrado, iniciando cadastro para: ${actualNumber}`
-      );
-    } catch (err) {
-      logger.error("Error checking existing user:", err);
-      logger.error("Error details:", {
-        message: err.message,
-        stack: err.stack,
-        response: err.response,
-      });
+    if (lookupRes === null) {
+      logger.error("[Cadastro] lookupByIdentifier falhou (rede ou backend)");
       return reply(
         "❌ Erro ao verificar cadastro. Tente novamente em alguns instantes."
       );
     }
+
+    logger.info(`[Cadastro] Resposta do lookup:`, lookupRes);
+
+    if (lookupRes.found) {
+      return reply(
+        `✅ Você já está cadastrado!\n\n` +
+          `${
+            pushName ? pushName + ", você" : "Você"
+          } pode usar os comandos normalmente.\n\n` +
+          `Digite /ajuda para ver os comandos disponíveis.`
+      );
+    }
+
+    logger.info(
+      `[Cadastro] Usuário não encontrado, iniciando cadastro para: ${actualNumber}`
+    );
 
     // Start conversation flow for registration
     conversationState.startFlow(actualNumber, "cadastro", {

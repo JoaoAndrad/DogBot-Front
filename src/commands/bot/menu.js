@@ -32,6 +32,9 @@ flowManager.registerFlow(life360Flow);
 flowManager.registerFlow(vinculo360Flow);
 flowManager.registerFlow(ajudaFlow);
 
+const logger = require("../../utils/logger");
+const { jidFromContact } = require("../../utils/whatsapp/getUserData");
+
 const bootLog = require("../../lib/bootLog");
 bootLog.line("flows", {
   ok: true,
@@ -52,23 +55,22 @@ module.exports = {
     let userId = msg.author || msg.from;
     try {
       const contact = await msg.getContact();
-      if (contact && contact.id && contact.id._serialized) {
-        userId = contact.id._serialized;
-      }
+      const j = jidFromContact(contact);
+      if (j) userId = j;
     } catch (err) {
-      console.log("[Command:menu] Error getting contact:", err.message);
+      logger.debug("[Command:menu] Error getting contact:", err.message);
     }
 
-    console.log("[Command:menu] Starting flow for", { userId, chatId });
-    console.log("[Command:menu] FlowManager available?", !!flowManager);
-    console.log("[Command:menu] Client available?", !!client);
+    logger.debug("[Command:menu] Starting flow for", { userId, chatId });
+    logger.debug("[Command:menu] FlowManager available?", !!flowManager);
+    logger.debug("[Command:menu] Client available?", !!client);
 
     try {
       await flowManager.startFlow(client, chatId, userId, "test");
-      console.log("[Command:menu] Flow started successfully");
+      logger.debug("[Command:menu] Flow started successfully");
     } catch (err) {
-      console.log("[Command:menu] Error starting flow:", err);
-      console.log("[Command:menu] Error stack:", err.stack);
+      logger.error("[Command:menu] Error starting flow:", err);
+      logger.debug("[Command:menu] Error stack:", err.stack);
       await client.sendMessage(
         chatId,
         "❌ Erro ao iniciar menu: " + err.message,

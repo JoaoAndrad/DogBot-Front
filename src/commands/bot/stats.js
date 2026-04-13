@@ -1,5 +1,6 @@
 const flowManager = require("../../components/menu/flowManager");
 const logger = require("../../utils/logger");
+const { jidFromContact } = require("../../utils/whatsapp/getUserData");
 
 module.exports = {
   name: "stats",
@@ -14,11 +15,10 @@ module.exports = {
     let userId = message.author || message.from;
     try {
       const contact = await message.getContact();
-      if (contact && contact.id && contact.id._serialized) {
-        userId = contact.id._serialized;
-      }
+      const j = jidFromContact(contact);
+      if (j) userId = j;
     } catch (err) {
-      logger.error("[stats] Error getting contact:", err.message);
+      logger.debug("[stats] Error getting contact:", err.message);
     }
 
     try {

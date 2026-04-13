@@ -2,6 +2,10 @@
 
 const backendClient = require("../../services/backendClient");
 const logger = require("../../utils/logger");
+const {
+  jidFromContact,
+  lookupByIdentifier,
+} = require("../../utils/whatsapp/getUserData");
 
 module.exports = {
   name: "serverstatus",
@@ -23,26 +27,24 @@ module.exports = {
     let actualNumber = from;
     try {
       const contact = await msg.getContact();
-      if (contact && contact.id && contact.id._serialized) {
-        actualNumber = contact.id._serialized;
-      }
+      const j = jidFromContact(contact);
+      if (j) actualNumber = j;
     } catch (err) {
       actualNumber = from;
     }
 
     try {
-      const lookupRes = await backendClient.sendToBackend(
-        `/api/users/lookup?identifier=${encodeURIComponent(actualNumber)}`,
-        null,
-        "GET"
-      );
+      const lookupRes = await lookupByIdentifier(actualNumber);
 
-      if (!lookupRes || !lookupRes.found) {
-        await reply("Acesso restrito a administradores.");
+      if (lookupRes === null) {
+        logger.error("[serverstatus] lookupByIdentifier falhou");
+        await reply(
+          "Não foi possível verificar o acesso. Tente mais tarde.",
+        );
         return;
       }
 
-      if (!lookupRes.isAdmin) {
+      if (!lookupRes.found || !lookupRes.isAdmin) {
         await reply("Acesso restrito a administradores.");
         return;
       }

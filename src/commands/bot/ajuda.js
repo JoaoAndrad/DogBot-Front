@@ -1,4 +1,6 @@
 const flowManager = require("../../components/menu/flowManager");
+const logger = require("../../utils/logger");
+const { jidFromContact } = require("../../utils/whatsapp/getUserData");
 
 module.exports = {
   name: "ajuda",
@@ -20,11 +22,10 @@ module.exports = {
     let userId = msg.author || msg.from;
     try {
       const contact = await msg.getContact();
-      if (contact && contact.id && contact.id._serialized) {
-        userId = contact.id._serialized;
-      }
+      const j = jidFromContact(contact);
+      if (j) userId = j;
     } catch (err) {
-      console.log("[Command:ajuda] getContact:", err && err.message);
+      logger.debug("[Command:ajuda] getContact:", err && err.message);
     }
 
     const info = ctx.info || {};
@@ -42,7 +43,7 @@ module.exports = {
     try {
       await flowManager.startFlow(client, chatId, userId, "ajuda");
     } catch (err) {
-      console.log("[Command:ajuda] startFlow:", err);
+      logger.error("[Command:ajuda] startFlow:", err);
       await reply("❌ Erro ao abrir a ajuda: " + (err && err.message ? err.message : err));
     }
   },
