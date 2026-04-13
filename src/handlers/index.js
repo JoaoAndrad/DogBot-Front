@@ -931,9 +931,7 @@ async function handle(context) {
           lookupResult.found &&
           lookupResult.confessions_vip !== true
         ) {
-          await reply(
-            "Este comando é exclusivo para usuários VIP.",
-          );
+          await reply("Este comando é exclusivo para usuários VIP.");
           return;
         }
       } catch (err) {
