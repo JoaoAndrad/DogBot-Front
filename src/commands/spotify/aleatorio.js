@@ -66,7 +66,8 @@ module.exports = {
       // Pedido devolve 202 em segundos; o shuffle corre no servidor (vários minutos).
       const shufflePostTimeoutMs = Math.max(
         15000,
-        parseInt(process.env.BACKEND_SHUFFLE_TIMEOUT_MS || "60000", 10) || 60000,
+        parseInt(process.env.BACKEND_SHUFFLE_TIMEOUT_MS || "60000", 10) ||
+          60000,
       );
       const shuffleRes = await backendClient.sendToBackend(
         `/api/groups/${encodeURIComponent(chatId)}/playlist/shuffle`,
