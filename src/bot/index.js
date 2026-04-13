@@ -59,10 +59,6 @@ async function start() {
       if (process.env.ROUTINE_CLIENT_POLL === "true") {
         startRoutineTickLoop(client, 60000);
         logger.info("[routineTick] polling 60s (ROUTINE_CLIENT_POLL=true)");
-      } else {
-        logger.info(
-          "[routineTick] polling desligado; dispatches vêm do backend (ROUTINE_PUSH_INTERVAL_MS)",
-        );
       }
     } catch (err) {
       logger.warn("[routineTick] não iniciado:", err && err.message);
