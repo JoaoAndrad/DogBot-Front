@@ -1,5 +1,6 @@
 const fs = require("fs");
 const path = require("path");
+const { isFlowEntryCommand } = require("./flowEntryManifest");
 
 const commands = new Map();
 
@@ -25,6 +26,7 @@ function loadCommands(dir = __dirname) {
       if (mod && mod.name) {
         const commandType = getCommandTypeForDir(dir);
         mod.commandType = commandType;
+        mod.isFlowEntry = isFlowEntryCommand(mod.name);
         commands.set(mod.name, mod);
         if (Array.isArray(mod.aliases)) {
           for (const alias of mod.aliases) {
@@ -78,7 +80,8 @@ function listCommandsForPolicySync() {
       typeof mod.commandType === "string" && mod.commandType
         ? mod.commandType
         : "misc";
-    out.push({ commandKey: mod.name, commandType });
+    const isFlowEntry = !!mod.isFlowEntry;
+    out.push({ commandKey: mod.name, commandType, isFlowEntry });
   }
   out.sort((a, b) => a.commandKey.localeCompare(b.commandKey));
   return out;

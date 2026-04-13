@@ -171,11 +171,7 @@ module.exports = {
         // Then use backend proxy to fetch cached preview (avoids CORS and centralizes rate-limits)
         try {
           const proxyUrl = `${BACKEND_BASE}/api/spotify/preview?trackId=${encodeURIComponent(t.id)}`;
-          console.log(`[tocando] proxy preview url: ${proxyUrl}`);
           const pres = await fetch(proxyUrl);
-          console.log(
-            `[tocando] proxy preview fetch status: ${pres && pres.status}`,
-          );
 
           const contentType =
             (pres.headers && pres.headers.get
@@ -189,25 +185,9 @@ module.exports = {
             await client.sendMessage(msg.from, media, {
               caption: `▶️ Prévia — ${t.name}`,
             });
-          } else {
-            // When preview not available, backend returns JSON with error info
-            try {
-              const body = await pres.json().catch(() => null);
-              console.log(
-                "[tocando] proxy preview response not audio, body:",
-                body,
-              );
-            } catch (e) {
-              console.log(
-                "[tocando] proxy preview: non-audio response and failed to parse body",
-              );
-            }
           }
-        } catch (e) {
-          console.log(
-            "[tocando] failed to fetch/send preview via proxy:",
-            e && e.stack ? e.stack : e,
-          );
+        } catch (_e) {
+          // prévia opcional; falhas ignoradas
         }
       }
     } catch (err) {
