@@ -94,7 +94,7 @@ async function runCatchup(client, options = {}) {
     }
     if (firstRunTransient > 0) {
       logger.info(
-        `Catchup: ${firstRunTransient} chat(s) omitidos na marcação inicial (WA Web a sincronizar)`,
+        `Catchup: ${firstRunTransient} chat(s) omitidos na marcação inicial (WA Web Sincronizando)`,
       );
     }
     logger.info("Catchup: todos os chats marcados como atualizados");
