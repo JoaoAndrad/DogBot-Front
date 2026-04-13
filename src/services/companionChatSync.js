@@ -24,6 +24,50 @@ function resolveChatTitle(chat) {
 }
 
 /**
+ * Um mesmo contacto aparece como @lid nos participantes e como @c.us no privado.
+ * Sem isto, geram-se dois POSTs de sync para o mesmo User na BD — o segundo apaga
+ * os chats do primeiro (deleteMany por payload incompleto).
+ *
+ * @param {import("whatsapp-web.js").Client} client
+ * @param {string|null} jid
+ * @param {Map<string, string>} cache
+ */
+async function resolveCanonicalWaId(client, jid, cache) {
+  if (!jid || !client) return jid;
+  const s = String(jid).trim();
+  if (cache.has(s)) return cache.get(s);
+  if (s.endsWith("@c.us") || s.endsWith("@s.whatsapp.net")) {
+    cache.set(s, s);
+    return s;
+  }
+  if (!s.endsWith("@lid")) {
+    cache.set(s, s);
+    return s;
+  }
+  try {
+    const contact = await client.getContactById(s);
+    const ser =
+      contact &&
+      contact.id &&
+      (contact.id._serialized ||
+        (typeof contact.id === "string" ? contact.id : null));
+    const serStr = ser != null ? String(ser).trim() : "";
+    if (serStr.endsWith("@c.us") || serStr.endsWith("@s.whatsapp.net")) {
+      cache.set(s, serStr);
+      return serStr;
+    }
+  } catch (e) {
+    logger.debug(
+      "[companionChatSync] getContactById",
+      s,
+      e && e.message ? e.message : e,
+    );
+  }
+  cache.set(s, s);
+  return s;
+}
+
+/**
  * Envia para o backend a lista de chats em partilha user+bot (para GET /api/companion/chats).
  * Um POST por contacto WA conhecido; falhas 404 (user não existe na BD) ignoram-se.
  */
@@ -35,6 +79,8 @@ async function syncSharedChatsToBackend(client) {
     const ignoredChats = loadIgnoredChats();
     /** @type {Map<string, Map<string, { chatId: string, title: string|null, isGroup: boolean }>>} */
     const byUser = new Map();
+    /** @type {Map<string, string>} */
+    const lidToCanonical = new Map();
 
     for (const chat of chats) {
       try {
@@ -51,7 +97,9 @@ async function syncSharedChatsToBackend(client) {
         if (isGroup) {
           const parts = chat.participants || [];
           for (const p of parts) {
-            const jid = serializedParticipantId(p);
+            let jid = serializedParticipantId(p);
+            if (!jid || jid === botId || String(jid).endsWith("@g.us")) continue;
+            jid = await resolveCanonicalWaId(client, jid, lidToCanonical);
             if (!jid || jid === botId || String(jid).endsWith("@g.us")) continue;
             if (!byUser.has(jid)) byUser.set(jid, new Map());
             byUser
