@@ -444,6 +444,29 @@ async function executeAction(result, client) {
               "Certo — novos lembretes serão enviados ao longo do dia até que a rotina seja realizada.",
             );
           }
+        } else if (rr && rr.ok && rr.outcome === "postponed") {
+          const voterJid = result.voterId;
+          const num = String(voterJid || "").split("@")[0] || "";
+          try {
+            if (voterJid) {
+              await client.sendMessage(
+                chatId,
+                `Certo @${num} — os lembretes de *hoje* ficam *desativados* para esta rotina (como com «Eu fiz»). Só voltamos a notificar no *próximo dia* em que ela calhar.`,
+                { mentions: [String(voterJid)] },
+              );
+            } else {
+              await client.sendMessage(
+                chatId,
+                "Certo — os lembretes de hoje ficam desativados; só voltamos a notificar no próximo dia em que a rotina calhar (como com «Eu fiz»).",
+              );
+            }
+          } catch (e) {
+            logger.warn("[processor] routine_checkin postponed", e.message);
+            await client.sendMessage(
+              chatId,
+              "Certo — os lembretes de hoje ficam desativados; só voltamos a notificar no próximo dia em que a rotina calhar.",
+            );
+          }
         } else if (rr && !rr.ok && rr.reason === "already_completed") {
           break;
         } else {

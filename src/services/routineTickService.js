@@ -1,7 +1,7 @@
 const logger = require("../utils/logger");
 const routineClient = require("./routineClient");
 
-const DEFAULT_CHECKIN_OPTIONS = ["Eu fiz", "Ainda não"];
+const DEFAULT_CHECKIN_OPTIONS = ["Eu fiz", "Ainda não", "Adiar"];
 
 /** HH:mm a partir de minutos desde meia-noite (alinhado ao payload da rotina). */
 function minutesToClockLabel(minute) {
@@ -95,14 +95,12 @@ function logRoutineTickDispatchConsole({
 }) {
   console.log(
     [
-      "[routineTick] ——————————————————————————————",
       `  Hora de referência (servidor): ${serverTime || "—"}`,
       `  O quê: ${actionKind}`,
       `  Quando (rotina / slot): ${timingText}`,
       `  Para: «${chatDisplayName}» (${chatKind})`,
       `  Menções (@ número): ${mentionPhones}`,
       `  Modo: ${aggregationNote}`,
-      "[routineTick] ——————————————————————————————",
     ].join("\n"),
   );
 }
