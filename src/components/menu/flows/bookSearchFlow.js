@@ -5,16 +5,16 @@
 const { createFlow } = require("../flowBuilder");
 const bookClient = require("../../../services/bookClient");
 const flowManager = require("../flowManager");
-const { formatBookCardMessage } = require("../../../utils/bookCardFormatter");
+const { formatBookCardMessage } = require("../../../utils/formatters/bookCardFormatter");
 const {
   downloadImageToBuffer,
   sendBufferAsSticker,
-} = require("../../../utils/stickerHelper");
+} = require("../../../utils/media/stickerHelper");
 const logger = require("../../../utils/logger");
 const {
   normalizeBookTitleForList,
   truncateForPoll,
-} = require("../../../utils/titleNormalize");
+} = require("../../../utils/text/titleNormalize");
 
 function dedupeCandidatesByWorkId(list) {
   const seen = new Set();

@@ -1,7 +1,7 @@
 const backendClient = require("../../services/backendClient");
 const logger = require("../../utils/logger");
 const polls = require("../../components/poll");
-const { sendTrackSticker } = require("../../utils/stickerHelper");
+const { sendTrackSticker } = require("../../utils/media/stickerHelper");
 const { isFromApp, prefix } = require("./fromAppText");
 
 /** JID estável para menção (alinhado ao que se usa nos outros votantes). */

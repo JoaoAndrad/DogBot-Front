@@ -257,7 +257,7 @@ module.exports = {
       return;
     }
 
-    const chatCleaner = require("../../utils/chatCleaner");
+    const chatCleaner = require("../../utils/bot/chatCleaner");
     const candidateGroups = [];
     const botActiveGroupsList = []; // Lista de grupos onde o bot está ativo
 
@@ -424,8 +424,8 @@ module.exports = {
 
     // Helper: create a poll and await a single vote payload
     const polls = require("../../components/poll");
-    const mediaHelper = require("../../utils/mediaHelper");
-    const videoHelper = require("../../utils/videoHelper");
+    const mediaHelper = require("../../utils/media/mediaHelper");
+    const videoHelper = require("../../utils/media/videoHelper");
     const { MessageMedia } = require("whatsapp-web.js");
 
     const createPollPromise = (

@@ -85,7 +85,7 @@ module.exports = {
 
         // Then send playlist cover as sticker (best-effort)
         try {
-          const stickerHelper = require("../../utils/stickerHelper");
+          const stickerHelper = require("../../utils/media/stickerHelper");
           const trackLike = {
             image: playlist.coverUrl,
             trackName: playlist.name,

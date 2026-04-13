@@ -1,5 +1,5 @@
 const backend = require("../../services/backendClient");
-const { sendCompositeSticker } = require("../../utils/stickerHelper");
+const { sendCompositeSticker } = require("../../utils/media/stickerHelper");
 const logger = require("../../utils/logger");
 
 /**

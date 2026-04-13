@@ -1,7 +1,7 @@
 const express = require("express");
 const logger = require("../utils/logger");
 const bootLog = require("../lib/bootLog");
-const { loadIgnoredChats, addToIgnoredChats } = require("../utils/chatCleaner");
+const { loadIgnoredChats, addToIgnoredChats } = require("../utils/bot/chatCleaner");
 
 let server = null;
 

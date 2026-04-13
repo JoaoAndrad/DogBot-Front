@@ -1,10 +1,10 @@
 const backendClient = require("../../services/backendClient");
 const logger = require("../../utils/logger");
-const { formatLife360PlaceLine } = require("../../utils/life360PlaceFormat");
+const { formatLife360PlaceLine } = require("../../utils/formatters/life360PlaceFormat");
 const {
   sendTrackSticker,
   sendCompositeSticker,
-} = require("../../utils/stickerHelper");
+} = require("../../utils/media/stickerHelper");
 const { isFromApp } = require("./fromAppText");
 
 module.exports = {

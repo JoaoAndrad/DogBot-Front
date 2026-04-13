@@ -4,41 +4,22 @@ const { MessageMedia } = require("whatsapp-web.js");
 const backendClient = require("../../services/backendClient");
 const logger = require("../../utils/logger");
 const polls = require("../../components/poll");
-const { sendTrackSticker } = require("../../utils/stickerHelper");
+const { sendTrackSticker } = require("../../utils/media/stickerHelper");
 const { isFromApp, prefix } = require("./fromAppText");
+const {
+  createVotoUserContext,
+  lookupManyIdentifiers,
+  buildSpotifyEligibleMembers,
+  resolveDisplayLabel,
+  resolveVoterDisplayName,
+  jidForMentionInitiator,
+  atTextFromJid,
+  lookupParticipant,
+} = require("../../utils/whatsapp/getUserData");
 
 const BACKEND_BASE = (
   process.env.BACKEND_URL || "http://localhost:8000"
 ).replace(/\/$/, "");
-
-/**
- * Mesmo JID usado em spotifyMembers[].identifier — necessário para menção real no grupo
- * (comando simulado pelo *DogBubble* não tem getContact()).
- */
-function jidForMentionInitiator(
-  spotifyMembers,
-  initiatorUserId,
-  whatsappIdFallback,
-) {
-  const row = spotifyMembers.find((m) => m.userId === initiatorUserId);
-  if (row && row.identifier) return String(row.identifier).trim();
-  const raw = String(whatsappIdFallback || "").trim();
-  if (!raw) return null;
-  if (raw.includes("@")) return raw;
-  return `${raw}@c.us`;
-}
-
-function atTextFromJid(jid) {
-  if (!jid) return "?";
-  return `@${jid.split("@")[0]}`;
-}
-
-function displayNameForUserId(spotifyMembers, userId) {
-  if (!spotifyMembers || !userId) return null;
-  const m = spotifyMembers.find((x) => x.userId === userId);
-  if (!m) return null;
-  return m.displayName || (m.identifier && m.identifier.split("@")[0]) || null;
-}
 
 module.exports = {
   name: "voto",
@@ -63,25 +44,12 @@ module.exports = {
     }
 
     try {
-      // Get user WhatsApp identifier
-      let whatsappId = null;
-      try {
-        const contact = await msg.getContact();
-        if (contact && contact.id && contact.id._serialized) {
-          whatsappId = contact.id._serialized;
-        }
-      } catch (err) {
-        whatsappId = msg.author || msg.from;
-      }
+      const { whatsappId, initiatorLookup } = await createVotoUserContext({
+        message: msg,
+        client,
+      });
 
       logger.info(`[Voto] Iniciando votação para adicionar no grupo ${chatId}`);
-
-      // Get initiator user info first
-      const initiatorLookup = await backendClient.sendToBackend(
-        `/api/users/lookup?identifier=${encodeURIComponent(whatsappId)}`,
-        null,
-        "GET",
-      );
 
       if (!initiatorLookup || !initiatorLookup.found) {
         return reply(
@@ -97,17 +65,15 @@ module.exports = {
 
       const initiatorUserId = initiatorLookup.userId;
 
-      // Try to get display name from backend, then from WhatsApp contact, then fallback to phone number
-      let initiatorDisplayName = initiatorLookup.displayName;
-      if (!initiatorDisplayName) {
-        try {
-          const contact = await msg.getContact();
-          initiatorDisplayName =
-            contact?.pushname || contact?.name || whatsappId.split("@")[0];
-        } catch (err) {
-          initiatorDisplayName = whatsappId.split("@")[0];
-        }
-      }
+      let initiatorDisplayName = await resolveDisplayLabel({
+        client,
+        memberRow: {
+          displayName: initiatorLookup.displayName,
+          identifier: whatsappId,
+          userId: initiatorUserId,
+        },
+        userId: initiatorUserId,
+      });
 
       logger.info(
         `[Voto] Iniciador: ${initiatorDisplayName} (${initiatorUserId})`,
@@ -169,22 +135,7 @@ module.exports = {
       // Resolve all group members to user records and filter those with Spotify connected
       let spotifyMembers = [];
       try {
-        // Preserve original member id alongside lookup result to avoid index mismatch
-        const lookupResults = await Promise.all(
-          memberIds.map(async (id) => {
-            try {
-              const res = await backendClient.sendToBackend(
-                `/api/users/lookup?identifier=${encodeURIComponent(id)}`,
-                null,
-                "GET",
-              );
-              return { id, res };
-            } catch (err) {
-              logger.warn(`[Voto] Falha lookup usuario ${id}: ${err.message}`);
-              return { id, res: null };
-            }
-          }),
-        );
+        const lookupResults = await lookupManyIdentifiers(client, memberIds);
 
         // Helpful debug: log small sample of memberIds and listener identifiers
         try {
@@ -202,16 +153,7 @@ module.exports = {
           /* ignore logging errors */
         }
 
-        spotifyMembers = (lookupResults || [])
-          .filter(({ res }) => res && res.found && res.hasSpotify)
-          .map(({ id, res }) => {
-            const identifier = res.identifier || id;
-            return {
-              identifier,
-              userId: res.userId,
-              displayName: res.displayName || null,
-            };
-          });
+        spotifyMembers = buildSpotifyEligibleMembers(lookupResults);
       } catch (err) {
         logger.warn(
           `[Voto] Erro ao resolver membros com Spotify: ${err.message}`,
@@ -304,11 +246,9 @@ module.exports = {
             onVote: async (voteData) => {
               try {
                 const voter = voteData.voter;
-                // Lookup voter to get their userId
-                const voterLookup = await backendClient.sendToBackend(
-                  `/api/users/lookup?identifier=${encodeURIComponent(voter)}`,
-                  null,
-                  "GET",
+                const { res: voterLookup } = await lookupParticipant(
+                  client,
+                  voter,
                 );
 
                 // Only accept confirmation vote from initiator
@@ -650,9 +590,11 @@ async function addPassedTrackToPlaylist({
     if (Array.isArray(details) && details.length > 0) {
       body += "\n\n*Quem votou a favor:*";
       for (const row of details) {
-        const name =
-          displayNameForUserId(spotifyMembers, row.userId) ||
-          String(row.userId).slice(0, 8);
+        const name = await resolveVoterDisplayName(
+          spotifyMembers,
+          row.userId,
+          client,
+        );
         let line = `\n• ${name}`;
         if (row.votedAt) {
           try {
@@ -742,12 +684,7 @@ async function handleAddVote(
       `[Voto] Voto recebido: voter=${voter} isFor=${isFor} voteId=${collaborativeVoteId}`,
     );
 
-    // Get voter's userId by looking up in database
-    const userRes = await backendClient.sendToBackend(
-      `/api/users/lookup?identifier=${encodeURIComponent(voter)}`,
-      null,
-      "GET",
-    );
+    const { res: userRes } = await lookupParticipant(client, voter);
 
     if (!userRes || !userRes.found) {
       logger.warn(`[Voto] Voter ${voter} não encontrado no banco`);

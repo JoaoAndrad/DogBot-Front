@@ -3,7 +3,7 @@
  * Handles deletion of stale/inactive group chats where bot is no longer a member
  */
 
-const logger = require("./logger");
+const logger = require("../logger");
 const fs = require("fs");
 const path = require("path");
 

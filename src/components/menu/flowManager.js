@@ -2,7 +2,7 @@ const storage = require("./storage");
 const logger = require("../../utils/logger");
 const bootLog = require("../../lib/bootLog");
 const { validateFlow } = require("./flowBuilder");
-const resolveUserUuidForMenu = require("../../utils/resolveUserUuidForMenu");
+const resolveUserUuidForMenu = require("../../utils/whatsapp/resolveUserUuidForMenu");
 
 /**
  * FlowManager - Core engine for interactive menu navigation
@@ -412,7 +412,7 @@ class FlowManager {
       return false;
     }
 
-    const { parseViewingDatePtBr } = require("../../utils/parseViewingDatePtBr");
+    const { parseViewingDatePtBr } = require("../../utils/parses/parseViewingDatePtBr");
     const trimmed = String(textBody || "").trim();
     if (!trimmed) {
       await client.sendMessage(

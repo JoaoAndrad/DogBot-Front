@@ -6,11 +6,11 @@
 const { createFlow } = require("../flowBuilder");
 const movieClient = require("../../../services/movieClient");
 const flowManager = require("../flowManager");
-const { formatFilmCardMessage } = require("../../../utils/filmCardFormatter");
+const { formatFilmCardMessage } = require("../../../utils/formatters/filmCardFormatter");
 const {
   downloadImageToBuffer,
   sendBufferAsSticker,
-} = require("../../../utils/stickerHelper");
+} = require("../../../utils/media/stickerHelper");
 const logger = require("../../../utils/logger");
 
 const filmSearchFlow = createFlow("film-search", {

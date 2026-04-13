@@ -5,11 +5,11 @@
 
 const movieClient = require("../../services/movieClient");
 const flowManager = require("../../components/menu/flowManager");
-const { formatFilmCardMessage } = require("../../utils/filmCardFormatter");
+const { formatFilmCardMessage } = require("../../utils/formatters/filmCardFormatter");
 const {
   downloadImageToBuffer,
   sendBufferAsSticker,
-} = require("../../utils/stickerHelper");
+} = require("../../utils/media/stickerHelper");
 const logger = require("../../utils/logger");
 
 module.exports = {

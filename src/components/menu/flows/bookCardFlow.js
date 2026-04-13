@@ -9,9 +9,9 @@ const flowManager = require("../flowManager");
 const {
   downloadImageToBuffer,
   sendBufferAsSticker,
-} = require("../../../utils/stickerHelper");
+} = require("../../../utils/media/stickerHelper");
 const logger = require("../../../utils/logger");
-const { truncateForPoll } = require("../../../utils/titleNormalize");
+const { truncateForPoll } = require("../../../utils/text/titleNormalize");
 
 function bookWorkLabel(ctx, bookInfo) {
   const bt = ctx.state?.context?.bookTitle;

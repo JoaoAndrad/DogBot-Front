@@ -1,6 +1,6 @@
 const fetch = require("node-fetch");
 const backendClient = require("../../services/backendClient");
-const { sendTrackSticker } = require("../../utils/stickerHelper");
+const { sendTrackSticker } = require("../../utils/media/stickerHelper");
 const { MessageMedia } = require("whatsapp-web.js");
 const { isFromApp } = require("./fromAppText");
 

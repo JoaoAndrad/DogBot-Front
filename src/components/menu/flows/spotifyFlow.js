@@ -10,13 +10,13 @@ const {
 const {
   sendTrackSticker,
   sendCompositeSticker,
-} = require("../../../utils/stickerHelper");
+} = require("../../../utils/media/stickerHelper");
 const {
   musicCurrentMonthRangeToNowUtc,
   musicMonthRangeUtc,
   musicLast12MonthsChoices,
   formatPlaybackInstant,
-} = require("../../../utils/musicTimezone");
+} = require("../../../utils/datetime/musicTimezone");
 
 const BACKEND_URL = process.env.BACKEND_URL || "http://localhost:8000";
 

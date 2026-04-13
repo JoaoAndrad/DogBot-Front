@@ -5,13 +5,13 @@
 
 const bookClient = require("../../services/bookClient");
 const flowManager = require("../../components/menu/flowManager");
-const { formatBookCardMessage } = require("../../utils/bookCardFormatter");
+const { formatBookCardMessage } = require("../../utils/formatters/bookCardFormatter");
 const {
   downloadImageToBuffer,
   sendBufferAsSticker,
-} = require("../../utils/stickerHelper");
+} = require("../../utils/media/stickerHelper");
 const logger = require("../../utils/logger");
-const { truncateForPoll } = require("../../utils/titleNormalize");
+const { truncateForPoll } = require("../../utils/text/titleNormalize");
 
 /** Lista de enquete: título, ano e opcionalmente editora (metadados da API). */
 function formatBookPollLine(title, year, publisher) {

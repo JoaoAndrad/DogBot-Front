@@ -7,7 +7,7 @@ const path = require("path");
 const fetch = require("node-fetch");
 const sharp = require("sharp");
 const { MessageMedia } = require("whatsapp-web.js");
-const logger = require("./logger");
+const logger = require("../logger");
 
 // Attempt to ensure the browser page has MediaUploadQpl initialized.
 // Some whatsapp-web.js versions expose the Puppeteer page as `pupPage`, `page`, or `_page`.

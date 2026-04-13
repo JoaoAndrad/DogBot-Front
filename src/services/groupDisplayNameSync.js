@@ -4,7 +4,7 @@ const {
   archiveInactiveChat,
   addToIgnoredChats,
   loadIgnoredChats,
-} = require("../utils/chatCleaner");
+} = require("../utils/bot/chatCleaner");
 
 let lastFullSyncAt = 0;
 /** Entre e2e_notification repetidos, evita rajadas de getChats + POST. */

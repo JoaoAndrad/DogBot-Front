@@ -1,4 +1,4 @@
-require("./utils/loadEnv").loadEnv();
+require("./utils/bot/loadEnv").loadEnv();
 const bootLog = require("./lib/bootLog");
 const BotService = require("./bot");
 const commands = require("./commands");

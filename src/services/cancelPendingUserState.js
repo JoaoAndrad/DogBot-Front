@@ -6,7 +6,7 @@
 const conversationState = require("./conversationState");
 const flowManager = require("../components/menu/flowManager");
 const storage = require("../components/menu/storage");
-const resolveUserUuidForMenu = require("../utils/resolveUserUuidForMenu");
+const resolveUserUuidForMenu = require("../utils/whatsapp/resolveUserUuidForMenu");
 
 function normalizeCmdName(s) {
   if (!s) return "";

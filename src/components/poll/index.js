@@ -1,6 +1,6 @@
 const logger = require("../../utils/logger");
 const config = require("../../core/config");
-const { allow: rateLimitAllow } = require("../../utils/userRateLimiter");
+const { allow: rateLimitAllow } = require("../../utils/bot/userRateLimiter");
 const storage = require("./storage");
 const builder = require("./builder");
 const { createSender } = require("./sender");

@@ -1,7 +1,7 @@
 const logger = require("../utils/logger");
 const config = require("../core/config");
-const { isCommandMessage } = require("../utils/isCommandMessage");
-const { allow: rateLimitAllow } = require("../utils/userRateLimiter");
+const { isCommandMessage } = require("../utils/bot/isCommandMessage");
+const { allow: rateLimitAllow } = require("../utils/bot/userRateLimiter");
 const middleware = require("./middleware");
 const dedupe = require("./dedupe");
 const botMetricsReporter = require("../services/botMetricsReporter");

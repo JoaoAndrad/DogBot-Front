@@ -11,10 +11,10 @@ const flowManager = require("../flowManager");
 const {
   downloadImageToBuffer,
   sendBufferAsSticker,
-} = require("../../../utils/stickerHelper");
+} = require("../../../utils/media/stickerHelper");
 const logger = require("../../../utils/logger");
-const { truncateForPoll } = require("../../../utils/titleNormalize");
-const { formatDateDdMmYyyy } = require("../../../utils/parseViewingDatePtBr");
+const { truncateForPoll } = require("../../../utils/text/titleNormalize");
+const { formatDateDdMmYyyy } = require("../../../utils/parses/parseViewingDatePtBr");
 const conversationState = require("../../../services/conversationState");
 
 function clearViewingDateFlags(state) {

@@ -3,7 +3,7 @@
  */
 
 const UTC3 = "America/Sao_Paulo";
-const { normalizeBookTitleDisplay } = require("./titleNormalize");
+const { normalizeBookTitleDisplay } = require("../text/titleNormalize");
 
 function formatRatingValue(n) {
   if (n == null || Number.isNaN(n)) return "";

@@ -7,7 +7,7 @@ const movieClient = require("../../services/movieClient");
 const {
   downloadAndConvertToWebp,
   sendBufferAsSticker,
-} = require("../../utils/stickerHelper");
+} = require("../../utils/media/stickerHelper");
 const logger = require("../../utils/logger");
 
 module.exports = {

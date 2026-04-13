@@ -1,5 +1,5 @@
 const flowManager = require("../../components/menu/flowManager");
-const { resolveGroupMemberIds } = require("../../utils/whatsappParticipantIds");
+const { resolveGroupMemberIds } = require("../../utils/whatsapp/whatsappParticipantIds");
 
 module.exports = {
   name: "life360",

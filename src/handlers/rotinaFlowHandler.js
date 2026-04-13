@@ -1,7 +1,7 @@
 const conversationState = require("../services/conversationState");
 const routineClient = require("../services/routineClient");
-const { parseRoutineDatePtBr } = require("../utils/parseRoutineDatePtBr");
-const { parseRoutineTimePtBr } = require("../utils/parseRoutineTimePtBr");
+const { parseRoutineDatePtBr } = require("../utils/parses/parseRoutineDatePtBr");
+const { parseRoutineTimePtBr } = require("../utils/parses/parseRoutineTimePtBr");
 const logger = require("../utils/logger");
 const polls = require("../components/poll");
 const {
@@ -9,7 +9,7 @@ const {
   formatTimeMinutes,
   formatYmdToBr,
   formatRoutineSummaryFromApi,
-} = require("../utils/formatRoutineSummaryPt");
+} = require("../utils/formatters/formatRoutineSummaryPt");
 
 /** UUID padrão (8-4-4-4-12) — evita falsos positivos com JIDs longos. */
 const USER_UUID_RE =

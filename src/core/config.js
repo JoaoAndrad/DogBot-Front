@@ -1,4 +1,4 @@
-require("../utils/loadEnv").loadEnv();
+require("../utils/bot/loadEnv").loadEnv();
 
 function intEnv(name, defaultVal) {
   const n = parseInt(process.env[name] ?? String(defaultVal), 10);

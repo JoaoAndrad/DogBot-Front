@@ -1,7 +1,7 @@
 const fetch = require("node-fetch");
 const { MessageMedia } = require("whatsapp-web.js");
 const backendClient = require("../../services/backendClient");
-const { sendTrackSticker } = require("../../utils/stickerHelper");
+const { sendTrackSticker } = require("../../utils/media/stickerHelper");
 
 const BACKEND_BASE = (
   process.env.BACKEND_URL || "http://localhost:8000"

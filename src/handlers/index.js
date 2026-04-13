@@ -8,7 +8,7 @@ const {
   cancelPendingForUser,
 } = require("../services/cancelPendingUserState");
 const botMetricsReporter = require("../services/botMetricsReporter");
-const { loadIgnoredChats } = require("../utils/chatCleaner");
+const { loadIgnoredChats } = require("../utils/bot/chatCleaner");
 const { handleCadastroFlow } = require("./cadastroFlowHandler");
 const groupDisplayNameSync = require("../services/groupDisplayNameSync");
 
@@ -51,8 +51,8 @@ const { handleAddFilmFlow } = require("./addFilmFlowHandler");
 const {
   handleIncomingTextMessage,
 } = require("../components/menu/handleIncomingText");
-const mediaHelper = require("../utils/mediaHelper");
-const stickerHelper = require("../utils/stickerHelper");
+const mediaHelper = require("../utils/media/mediaHelper");
+const stickerHelper = require("../utils/media/stickerHelper");
 const commandPolicyService = require("../services/commandPolicyService");
 
 /**

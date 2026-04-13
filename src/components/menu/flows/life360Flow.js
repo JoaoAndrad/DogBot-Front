@@ -6,13 +6,13 @@ const { createFlow } = require("../flowBuilder");
 const life360Client = require("../../../services/life360Client");
 const {
   memberIdsFromGroupChat,
-} = require("../../../utils/whatsappParticipantIds");
+} = require("../../../utils/whatsapp/whatsappParticipantIds");
 const {
   sendBufferAsSticker,
   downloadImageToBuffer,
-} = require("../../../utils/stickerHelper");
+} = require("../../../utils/media/stickerHelper");
 const logger = require("../../../utils/logger");
-const { formatLife360PlaceLine } = require("../../../utils/life360PlaceFormat");
+const { formatLife360PlaceLine } = require("../../../utils/formatters/life360PlaceFormat");
 
 const MAX_MEMBERS = 10;
 

@@ -1,6 +1,6 @@
 const logger = require("../utils/logger");
-const { loadIgnoredChats } = require("../utils/chatCleaner");
-const { serializedParticipantId } = require("../utils/whatsappParticipantIds");
+const { loadIgnoredChats } = require("../utils/bot/chatCleaner");
+const { serializedParticipantId } = require("../utils/whatsapp/whatsappParticipantIds");
 const backendClient = require("./backendClient");
 
 /**
