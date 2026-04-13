@@ -932,7 +932,7 @@ async function handle(context) {
           lookupResult.confessions_vip !== true
         ) {
           await reply(
-            "Este comando é exclusivo para usuários VIP de confissões.",
+            "Este comando é exclusivo para usuários VIP.",
           );
           return;
         }
