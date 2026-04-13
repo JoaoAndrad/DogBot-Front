@@ -7,6 +7,8 @@ const { initSessionOptions } = require("./session");
 const qrHelper = require("./qr");
 
 let client = null;
+/** @type {ReturnType<typeof setInterval>|null} */
+let companionSyncInterval = null;
 
 async function start() {
   const auth = initSessionOptions();
@@ -103,6 +105,33 @@ async function start() {
         syncSharedChatsToBackend,
       } = require("../services/companionChatSync");
       await syncSharedChatsToBackend(client);
+      const syncMs = Number(
+        process.env.COMPANION_SYNC_INTERVAL_MS || 20 * 60 * 1000,
+      );
+      if (syncMs > 0) {
+        if (companionSyncInterval) clearInterval(companionSyncInterval);
+        companionSyncInterval = setInterval(() => {
+          try {
+            const {
+              syncSharedChatsToBackend: syncChats,
+            } = require("../services/companionChatSync");
+            syncChats(client).catch((err) =>
+              logger.debug(
+                "[companionChatSync] intervalo:",
+                err && err.message,
+              ),
+            );
+          } catch (err) {
+            logger.debug(
+              "[companionChatSync] intervalo require:",
+              err && err.message,
+            );
+          }
+        }, syncMs);
+        logger.info(
+          `[companionChatSync] sincronização periódica a cada ${syncMs}ms`,
+        );
+      }
     } catch (e) {
       logger.warn("[companionChatSync] não iniciado:", e && e.message);
     }
@@ -217,6 +246,10 @@ async function start() {
 
 async function stop() {
   try {
+    if (companionSyncInterval) {
+      clearInterval(companionSyncInterval);
+      companionSyncInterval = null;
+    }
     // stop internal API if running
     try {
       const { stopInternalApi } = require("./internal-api");

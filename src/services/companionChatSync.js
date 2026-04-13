@@ -106,9 +106,56 @@ async function resolvePrivateChatCanonicalId(chat, chatId, client, cache) {
   return resolveCanonicalWaId(client, cid, cache);
 }
 
+/** @param {Map<string, unknown>} chatMap */
+function groupChatIdsInMap(chatMap) {
+  return new Set(
+    [...chatMap.keys()].filter((id) => String(id).endsWith("@g.us")),
+  );
+}
+
+/**
+ * Junta entradas @lid com @c.us quando o mapa LID só tem grupos que já estão no mapa telefone
+ * (mesmo utilizador, duas chaves antes da resolução canónica).
+ *
+ * @param {Map<string, Map<string, { chatId: string, title: string|null, isGroup: boolean }>>} byUser
+ */
+function mergeDuplicateUserMaps(byUser) {
+  const out = new Map(byUser);
+  const keys = [...out.keys()];
+  for (const lidKey of keys) {
+    if (!String(lidKey).endsWith("@lid")) continue;
+    const lidMap = out.get(lidKey);
+    if (!lidMap) continue;
+    const lidGroups = groupChatIdsInMap(lidMap);
+    if (lidGroups.size === 0) continue;
+    for (const phoneKey of keys) {
+      if (phoneKey === lidKey) continue;
+      if (
+        !String(phoneKey).endsWith("@c.us") &&
+        !String(phoneKey).endsWith("@s.whatsapp.net")
+      ) {
+        continue;
+      }
+      const phoneMap = out.get(phoneKey);
+      if (!phoneMap) continue;
+      const phoneGroups = groupChatIdsInMap(phoneMap);
+      const subset = [...lidGroups].every((g) => phoneGroups.has(g));
+      if (!subset) continue;
+      if (phoneGroups.size < lidGroups.size) continue;
+      for (const [cid, obj] of lidMap) {
+        phoneMap.set(cid, obj);
+      }
+      out.delete(lidKey);
+      break;
+    }
+  }
+  return out;
+}
+
 /**
  * Envia para o backend a lista de chats em partilha user+bot (para GET /api/companion/chats).
  * Um POST por contacto WA conhecido; falhas 404 (user não existe na BD) ignoram-se.
+ * `replace: true` — snapshot completo por utilizador (merge de duplicados antes).
  */
 async function syncSharedChatsToBackend(client) {
   try {
@@ -181,9 +228,11 @@ async function syncSharedChatsToBackend(client) {
       }
     }
 
+    const mergedByUser = mergeDuplicateUserMaps(byUser);
+
     let ok = 0;
     let skipped = 0;
-    for (const [waId, chatMap] of byUser) {
+    for (const [waId, chatMap] of mergedByUser) {
       const chatsPayload = [...chatMap.values()];
       try {
         await backendClient.sendToBackend(
@@ -191,6 +240,7 @@ async function syncSharedChatsToBackend(client) {
           {
             waId,
             chats: chatsPayload,
+            replace: true,
           },
           "POST",
           { silentHttpStatuses: [404] },
@@ -208,7 +258,7 @@ async function syncSharedChatsToBackend(client) {
     }
 
     logger.info(
-      `[companionChatSync] contactos=${byUser.size} ok=${ok} skipped_404=${skipped}`,
+      `[companionChatSync] contactos=${mergedByUser.size} (raw=${byUser.size}) ok=${ok} skipped_404=${skipped}`,
     );
   } catch (e) {
     logger.warn(
