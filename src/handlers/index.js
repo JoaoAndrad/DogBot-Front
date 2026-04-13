@@ -22,11 +22,7 @@ function maybeSyncGroupDisplayName(chatId, name) {
   if (!n) return;
   const now = Date.now();
   const prev = groupDisplaySyncCache.get(chatId);
-  if (
-    prev &&
-    prev.name === n &&
-    now - prev.at < GROUP_DISPLAY_SYNC_TTL_MS
-  ) {
+  if (prev && prev.name === n && now - prev.at < GROUP_DISPLAY_SYNC_TTL_MS) {
     return;
   }
   groupDisplaySyncCache.set(chatId, { name: n, at: now });
@@ -52,7 +48,9 @@ function findActiveConversationState(flowUserId, actualNumber, author, from) {
 const { handleMetaFlow } = require("./metaFlowHandler");
 const { handleListFlow } = require("./listFlowHandler");
 const { handleAddFilmFlow } = require("./addFilmFlowHandler");
-const { handleIncomingTextMessage } = require("../components/menu/handleIncomingText");
+const {
+  handleIncomingTextMessage,
+} = require("../components/menu/handleIncomingText");
 const mediaHelper = require("../utils/mediaHelper");
 const stickerHelper = require("../utils/stickerHelper");
 const commandPolicyService = require("../services/commandPolicyService");
@@ -68,7 +66,9 @@ const USER_LOOKUP_CACHE_TTL_MS = 60 * 1000; // 1 minuto
 const userLookupCache = new Map(); // identifier -> { userId, confessions_vip?, ts }
 
 function getCachedLookup(identifier) {
-  const key = String(identifier || "").trim().toLowerCase();
+  const key = String(identifier || "")
+    .trim()
+    .toLowerCase();
   if (!key) return null;
   const entry = userLookupCache.get(key);
   if (!entry || Date.now() - entry.ts > USER_LOOKUP_CACHE_TTL_MS) return null;
@@ -81,7 +81,9 @@ function getCachedUserId(identifier) {
 }
 
 function setCachedUserId(identifier, userId, confessions_vip) {
-  const key = String(identifier || "").trim().toLowerCase();
+  const key = String(identifier || "")
+    .trim()
+    .toLowerCase();
   if (!key || !userId) return;
   userLookupCache.set(key, {
     userId,
@@ -98,7 +100,9 @@ async function handle(context) {
 
   const rawType = String(msg.type || info.type || "").toLowerCase();
   if (rawType === "e2e_notification" && context.client) {
-    groupDisplayNameSync.syncAllGroupDisplayNames(context.client).catch(() => {});
+    groupDisplayNameSync
+      .syncAllGroupDisplayNames(context.client)
+      .catch(() => {});
   }
 
   const body = String(
@@ -438,14 +442,8 @@ async function handle(context) {
   }
 
   // Film card: texto com data após "Sim" na enquete (conversationState + /api/menu/state)
-  if (
-    body &&
-    !isGroup &&
-    !(body.startsWith("/") || body.startsWith("!"))
-  ) {
-    const filmDateCandidates = [flowUserId, from, actualNumber].filter(
-      Boolean,
-    );
+  if (body && !isGroup && !(body.startsWith("/") || body.startsWith("!"))) {
+    const filmDateCandidates = [flowUserId, from, actualNumber].filter(Boolean);
     let filmViewingDateWait = false;
     for (const k of [...new Set(filmDateCandidates)]) {
       const s = conversationState.getState(k);
@@ -842,14 +840,10 @@ async function handle(context) {
           if (cmdActualNumber) {
             commandLookupIdentifier = cmdActualNumber;
             const cached = getCachedLookup(cmdActualNumber);
-            const needVipFlag = !!(
-              policyForCmd &&
-              policyForCmd.vipOnly
-            );
+            const needVipFlag = !!(policyForCmd && policyForCmd.vipOnly);
             const cacheUsable =
               cached &&
-              (!needVipFlag ||
-                typeof cached.confessions_vip === "boolean");
+              (!needVipFlag || typeof cached.confessions_vip === "boolean");
             if (cacheUsable) {
               lookupResult = {
                 found: true,
@@ -917,7 +911,7 @@ async function handle(context) {
             const isGroup = !!(msg && msg.isGroup) || !!info.is_group;
             if (isGroup) {
               await reply(
-                "hmmm parece que não te conheço... venha no meu privado e digite /cadastro",
+                "Hmmm, parece que não te conheço... venha no meu privado e digite /cadastro",
               );
             } else {
               await reply(
@@ -925,9 +919,7 @@ async function handle(context) {
               );
             }
           } else {
-            await reply(
-              "Este comando é exclusivo para utilizadores VIP de confissões.",
-            );
+            await reply("Este comando é exclusivo para usuários VIP.");
           }
           return;
         }
@@ -940,7 +932,7 @@ async function handle(context) {
           lookupResult.confessions_vip !== true
         ) {
           await reply(
-            "Este comando é exclusivo para utilizadores VIP de confissões.",
+            "Este comando é exclusivo para usuários VIP de confissões.",
           );
           return;
         }

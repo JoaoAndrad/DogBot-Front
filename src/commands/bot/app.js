@@ -68,7 +68,7 @@ module.exports = {
       }
       if (status === 403 || codeErr === "not_vip") {
         return reply(
-          "❌ O código da app DogBot está disponível apenas para utilizadores VIP. Contate o administrador do bot.",
+          "❌ O código da app DogBot está disponível apenas para usuários VIP. Contate o administrador do bot.",
         );
       }
       console.error("[Command:app]", err && err.message, status, body);
