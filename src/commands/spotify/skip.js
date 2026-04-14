@@ -242,29 +242,6 @@ module.exports = {
             return;
           }
 
-          // Get voter info for mention
-          const voterContact = await client.getContactById(voter);
-          const voterName =
-            voterContact?.pushname || voterContact?.name || voter.split("@")[0];
-
-          // Enviar atualização sobre o voto (se ainda não passou nem falhou)
-          if (updatedVote.status === "active") {
-            const votesNeeded = stats.needed - stats.votesFor;
-
-            await safeSend(
-              client,
-              chatId,
-              `@${voter.split("@")[0]} ${
-                isFor ? "também votou para pular" : "votou para continuar"
-              } ${updatedVote.trackName}, ainda ${
-                votesNeeded === 1
-                  ? "precisa de 1 voto"
-                  : `precisam de ${votesNeeded} votos`
-              }. Mais alguém?`,
-              { mentions: [voter] },
-            );
-          }
-
           // Check if resolved
           if (updatedVote.status === "passed" && !voteCastRes.alreadyResolved) {
             // Execute skip for this jam via backend
@@ -356,43 +333,6 @@ module.exports = {
         }
       };
 
-      // Create poll for voting
-      const pollResult = await polls.createPoll(
-        client,
-        chatId,
-        fromApp
-          ? `Pular (*DogBubble*) ${jam.currentTrackName || "música atual"}?`
-          : `Pular ${jam.currentTrackName || "música atual"}?`,
-        ["Sim", "Não"],
-        {
-          voteType: "skip",
-          voteId: collaborativeVoteId,
-          groupId: chatId,
-          onVote: handleSkipVote,
-        },
-      );
-
-      logger.info(`[Skip] Poll criado: ${pollResult?.msgId || pollResult}`);
-
-      // Register initiator's automatic YES vote
-      if (pollResult && pollResult.msgId) {
-        try {
-          await backendClient.sendToBackend(
-            `/api/groups/votes/${collaborativeVoteId}/cast`,
-            {
-              userId: creatorUserId,
-              isFor: true,
-              pollId: pollResult.msgId,
-            },
-            "POST",
-          );
-          logger.info(`[Skip] Voto automático do iniciador registrado`);
-        } catch (err) {
-          logger.warn(`[Skip] Erro ao registrar voto automático:`, err);
-        }
-      }
-
-      // Iniciador: @ + mentions[] (comando pelo *DogBubble* não tem getContact — nome só não gera ping)
       const creatorJid = normalizeUserJid(creatorWhatsAppId);
       const creatorBase = creatorJid ? creatorJid.split("@")[0] : "";
 
@@ -415,41 +355,67 @@ module.exports = {
         ? `@${creatorBase}`
         : `*${initiatorDisplayName}*`;
 
-      // Menções: iniciador + restantes (mesmo padrão)
-      const mentionsList = [];
-      if (creatorJid) mentionsList.push(creatorJid);
-
-      const otherVoters = eligibleWhatsAppIds.filter(
-        (num) =>
-          num !== creatorBase && num !== creatorWhatsAppId.replace("@c.us", ""),
-      );
-
-      let contextMessage = `${prefix(fromApp)}🎵 ${initiatorMentionText} iniciou votação para pular:\n*${jam.currentTrackName || "música atual"}*\n\n`;
-
-      if (otherVoters.length > 0) {
-        const mentions = otherVoters
-          .map((num) => {
-            const wid = `${num}@c.us`;
-            if (wid !== creatorJid) mentionsList.push(wid);
-            return `@${num}`;
-          })
-          .join(" ");
-        contextMessage += `${mentions}\n\n`;
+      const mentionJids = [];
+      const seenJid = new Set();
+      for (const raw of eligibleWhatsAppIds) {
+        const jid = normalizeUserJid(raw);
+        if (jid && !seenJid.has(jid)) {
+          seenJid.add(jid);
+          mentionJids.push(jid);
+        }
       }
 
+      const atEveryone = mentionJids
+        .map((j) => `@${j.split("@")[0]}`)
+        .join(" ");
+
+      let contextMessage = `${prefix(fromApp)}🎵 ${initiatorMentionText} iniciou votação para pular:\n*${jam.currentTrackName || "música atual"}*\n\n`;
+      contextMessage += `${atEveryone}\n\n`;
       contextMessage += `Votantes elegíveis: ${eligibleUserIds.length} (host + ouvintes)\n`;
-      // Se tem 2 pessoas, precisa dos 2 votos (100%)
-      // Se tem 3+, precisa de maioria estrita (50% + 1)
       const votesNeeded =
         eligibleUserIds.length === 2
           ? 2
           : Math.floor(eligibleUserIds.length / 2) + 1;
-      contextMessage += `Maioria necessária: ${votesNeeded} votos`;
+      contextMessage += `Maioria necessária: ${votesNeeded} votos\n\n`;
+      contextMessage += `👇 Responda à enquete abaixo.`;
 
-      // Send context message with mentions
       await safeSend(client, chatId, contextMessage, {
-        mentions: mentionsList,
+        mentions: mentionJids,
       });
+
+      const pollResult = await polls.createPoll(
+        client,
+        chatId,
+        fromApp
+          ? `Pular (*DogBubble*) ${jam.currentTrackName || "música atual"}?`
+          : `Pular ${jam.currentTrackName || "música atual"}?`,
+        ["Sim", "Não"],
+        {
+          voteType: "skip",
+          voteId: collaborativeVoteId,
+          groupId: chatId,
+          onVote: handleSkipVote,
+        },
+      );
+
+      logger.info(`[Skip] Poll criado: ${pollResult?.msgId || pollResult}`);
+
+      if (pollResult && pollResult.msgId) {
+        try {
+          await backendClient.sendToBackend(
+            `/api/groups/votes/${collaborativeVoteId}/cast`,
+            {
+              userId: creatorUserId,
+              isFor: true,
+              pollId: pollResult.msgId,
+            },
+            "POST",
+          );
+          logger.info(`[Skip] Voto automático do iniciador registrado`);
+        } catch (err) {
+          logger.warn(`[Skip] Erro ao registrar voto automático:`, err);
+        }
+      }
 
       // Send track sticker if available
       try {
