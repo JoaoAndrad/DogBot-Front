@@ -41,6 +41,47 @@ async function resolveHostName(jam, client) {
   return name || jam.host?.sender_number || "Anônimo";
 }
 
+/**
+ * Lista em texto de todas as jams ativas no bot (para /jam no privado).
+ */
+async function buildPrivateJamDirectoryMessage(activeJams, client) {
+  const hostNames = await Promise.all(
+    activeJams.map((j) => resolveHostName(j, client)),
+  );
+  const n = activeJams.length;
+  let msg =
+    n === 1
+      ? "🎵 *Há 1 jam ativa no bot.*\n\n"
+      : `🎵 *Há ${n} jams ativas no bot.*\n\n`;
+  msg +=
+    "Qualquer pessoa registrada pode entrar pela enquete abaixo.\n\n";
+
+  for (let i = 0; i < activeJams.length; i++) {
+    const jam = activeJams[i];
+    const hostName = hostNames[i];
+    const listenerCount =
+      (jam.listeners?.filter((l) => l.isActive)?.length || 0) + 1;
+
+    if (i > 0) msg += "━━━━━━━━━━━━━━━━━━\n";
+    msg += `*${i + 1}.* 🎙️ *${hostName}*\n`;
+    msg += `👥 ${listenerCount} ${listenerCount === 1 ? "pessoa na jam" : "pessoas na jam"}\n`;
+    if (jam.currentTrackName) {
+      msg += `🎶 ${jam.currentTrackName}\n`;
+      if (jam.currentArtists) msg += `👤 ${jam.currentArtists}\n`;
+    } else {
+      msg += `⏸️ Nada tocando no momento\n`;
+    }
+    msg += "\n";
+  }
+
+  if (activeJams.length > 10) {
+    msg +=
+      "\n💡 _A enquete seguinte traz até 10 opções de entrada + criar jam; acima estão listadas todas as jams ativas._\n";
+  }
+
+  return msg.trimEnd();
+}
+
 module.exports = {
   name: "jam",
   aliases: ["radio", "jam.criar"],
@@ -559,33 +600,52 @@ module.exports = {
       pollOptions.push("🎵 Criar minha própria jam");
       jamIdMap[pollOptions.length - 1] = "create";
 
-      // Build message with jam details
-      let pollMessage = `🎵 *${activeJams.length === 1 ? "Há uma jam ativa!" : `Há ${activeJams.length} jams ativas!`}*\n\n`;
+      // Texto da enquete: em grupo mantém o resumo; no privado a lista completa vai numa mensagem à parte
+      let pollMessage;
+      if (isGroup) {
+        pollMessage = `🎵 *${activeJams.length === 1 ? "Há uma jam ativa!" : `Há ${activeJams.length} jams ativas!`}*\n\n`;
 
-      for (let i = 0; i < maxJams; i++) {
-        const jam = activeJams[i];
-        const hostName = hostNames[i];
-        const listenerCount =
-          (jam.listeners?.filter((l) => l.isActive)?.length || 0) + 1;
+        for (let i = 0; i < maxJams; i++) {
+          const jam = activeJams[i];
+          const hostName = hostNames[i];
+          const listenerCount =
+            (jam.listeners?.filter((l) => l.isActive)?.length || 0) + 1;
 
-        pollMessage += `🎙️ *${hostName}*\n`;
-        pollMessage += `👥 ${listenerCount} ${listenerCount === 1 ? "ouvinte" : "ouvintes"}\n`;
-        if (jam.currentTrackName) {
-          pollMessage += `🎶 ${jam.currentTrackName}\n`;
-          if (jam.currentArtists) {
-            pollMessage += `👤 ${jam.currentArtists}\n`;
+          pollMessage += `🎙️ *${hostName}*\n`;
+          pollMessage += `👥 ${listenerCount} ${listenerCount === 1 ? "ouvinte" : "ouvintes"}\n`;
+          if (jam.currentTrackName) {
+            pollMessage += `🎶 ${jam.currentTrackName}\n`;
+            if (jam.currentArtists) {
+              pollMessage += `👤 ${jam.currentArtists}\n`;
+            }
+          } else {
+            pollMessage += `⏸️ Nada tocando no momento\n`;
           }
-        } else {
-          pollMessage += `⏸️ Nada tocando no momento\n`;
+          pollMessage += `\n`;
         }
-        pollMessage += `\n`;
+
+        if (activeJams.length > maxJams) {
+          pollMessage += `_...e mais ${activeJams.length - maxJams} ${activeJams.length - maxJams === 1 ? "jam" : "jams"}_\n\n`;
+        }
+
+        pollMessage += `*O que você quer fazer?*`;
+      } else {
+        pollMessage =
+          "🎵 *Entrar numa jam ou criar a sua*\n\n" +
+          "Responda à enquete abaixo. Os detalhes de cada jam estão na mensagem anterior.";
       }
 
-      if (activeJams.length > maxJams) {
-        pollMessage += `_...e mais ${activeJams.length - maxJams} ${activeJams.length - maxJams === 1 ? "jam" : "jams"}_\n\n`;
+      if (!isGroup) {
+        try {
+          const directoryMsg = await buildPrivateJamDirectoryMessage(
+            activeJams,
+            ctx.client,
+          );
+          await reply(directoryMsg);
+        } catch (dirErr) {
+          logger.warn("[jam] lista de jams (privado):", dirErr.message);
+        }
       }
-
-      pollMessage += `*O que você quer fazer?*`;
 
       // Create poll using helper and register onVote to handle join/create
       try {
