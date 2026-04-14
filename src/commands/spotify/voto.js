@@ -94,9 +94,19 @@ module.exports = {
 
       const group = groupRes.group;
 
-      // Get group members from WhatsApp
-      const chat = await msg.getChat();
-      const memberIds = chat.participants.map((p) => p.id._serialized);
+      let memberIds = [];
+      try {
+        const chat = await msg.getChat();
+        memberIds = (chat.participants || []).map((p) => p.id._serialized);
+      } catch (chatErr) {
+        logger.warn(`[Voto] getChat/participantes: ${chatErr.message}`);
+        return reply(
+          "⚠️ Não foi possível ler os participantes deste grupo. Abra o grupo no WhatsApp e tente novamente." +
+            (fromApp
+              ? "\n\nSe usou o *DogBubble*, envie */voto* diretamente no grupo."
+              : ""),
+        );
+      }
 
       logger.info(`[Voto] 👥 Membros do grupo: ${memberIds.length}`);
 
@@ -405,6 +415,7 @@ module.exports = {
                 whatsappId,
                 initiatorLookup.spotifyAccount?.id,
                 spotifyMembers,
+                fromApp,
               );
             },
           },
@@ -652,6 +663,7 @@ async function handleAddVote(
   creatorId,
   initiatorAccountId,
   spotifyMembers,
+  fromApp = false,
 ) {
   try {
     const voter = voteData.voter; // Já vem resolvido para @c.us pelo pollComponent
@@ -781,7 +793,7 @@ async function handleAddVote(
         client,
         chatId,
         initiatorAccountId,
-        fromApp: false,
+        fromApp,
         spotifyMembers,
       });
     } else if (updatedVote.status === "failed") {
