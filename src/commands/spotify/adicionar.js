@@ -197,6 +197,59 @@ module.exports = {
         return reply("❌ Erro ao verificar usuário.");
       }
 
+      // Verify the user is participating in the jam and that the jam belongs to this group
+      try {
+        const jamStatusRes = await backendClient.sendToBackend(
+          `/api/jam/user/${userId}/status`,
+          null,
+          "GET",
+        );
+
+        if (!jamStatusRes || !jamStatusRes.jam) {
+          return reply("❌ Você não está em nenhuma jam ativa.");
+        }
+
+        const userJam = jamStatusRes.jam;
+
+        if (!userJam || userJam.id !== jam.id) {
+          return reply(
+            "❌ Para usar este comando você precisa fazer parte da jam ativa neste grupo.",
+          );
+        }
+      } catch (err) {
+        logger.error(
+          "[AdicionarCommand] Erro ao verificar status da jam do usuário:",
+          err,
+        );
+        return reply("❌ Erro ao verificar status da jam.");
+      }
+
+      // Verify the user has an active Spotify device (playing) in this group
+      try {
+        const memberIds = [whatsappId];
+        const activeListenersRes = await backendClient.sendToBackend(
+          `/api/groups/${encodeURIComponent(chatId)}/active-listeners`,
+          { memberIds },
+          "POST",
+        );
+
+        if (
+          !activeListenersRes ||
+          !Array.isArray(activeListenersRes.listeners) ||
+          activeListenersRes.listeners.length === 0
+        ) {
+          return reply(
+            "❌ Você precisa ter um dispositivo Spotify ativo e tocando para usar este comando.",
+          );
+        }
+      } catch (err) {
+        logger.error(
+          "[AdicionarCommand] Erro ao verificar dispositivos ativos:",
+          err,
+        );
+        return reply("❌ Erro ao verificar dispositivos ativos.");
+      }
+
       // Check if user is the host
       const isHost = jam.hostUserId === userId;
 
