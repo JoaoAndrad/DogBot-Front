@@ -78,7 +78,12 @@ module.exports = {
         );
       } catch (e) {
         logger.error("[LimparFilaCommand] Erro ao limpar fila:", e);
-        return reply("❌ Erro ao limpar fila.");
+        // Prefer backend-provided message when available
+        const backendMsg =
+          (e && e.body && (e.body.message || e.body.error)) ||
+          e.message ||
+          "Erro ao limpar fila.";
+        return reply(`❌ ${backendMsg}`);
       }
 
       if (!data.success) {
