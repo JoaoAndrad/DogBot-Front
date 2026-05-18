@@ -53,8 +53,7 @@ async function buildPrivateJamDirectoryMessage(activeJams, client) {
     n === 1
       ? "🎵 *Há 1 jam ativa no bot.*\n\n"
       : `🎵 *Há ${n} jams ativas no bot.*\n\n`;
-  msg +=
-    "Qualquer pessoa registrada pode entrar pela enquete abaixo.\n\n";
+  msg += "Qualquer pessoa registrada pode entrar pela enquete abaixo.\n\n";
 
   for (let i = 0; i < activeJams.length; i++) {
     const jam = activeJams[i];
@@ -345,6 +344,103 @@ module.exports = {
             await ctx.client.sendMessage(chatId, announce, {
               mentions: hostJid ? [hostJid] : [],
             });
+
+            // Send poll to join or ignore jam (just like via bot)
+            try {
+              const pollMessage = `🎧 *Entrar na jam de ${hostAt || "DogBubble"}?*`;
+              const pollOptions = ["✅ Entrar na jam", "❌ Ignorar"];
+
+              const jamIdMap = { 0: jam.id, 1: "ignore" };
+
+              await polls.createPoll(
+                ctx.client,
+                chatId,
+                pollMessage,
+                pollOptions,
+                {
+                  onVote: async (voteData) => {
+                    try {
+                      const voter = voteData.voter;
+                      const selIdxRaw =
+                        voteData.selectedIndexes && voteData.selectedIndexes[0];
+                      const selIdx =
+                        selIdxRaw != null ? Number(selIdxRaw) : null;
+
+                      if (selIdx === null || selIdx === 1) {
+                        // User chose to ignore
+                        return;
+                      }
+
+                      // User chose to enter (selIdx === 0)
+                      const lookup = await lookupByIdentifier(voter);
+
+                      if (!lookup || !lookup.found || !lookup.userId) {
+                        await ctx.client.sendMessage(
+                          voter,
+                          "❌ Você precisa estar registrado no sistema para entrar em jams.",
+                        );
+                        return;
+                      }
+
+                      const voterUuid = lookup.userId;
+
+                      // Join jam
+                      const joinResult = await backend.sendToBackend(
+                        `/api/jam/${jam.id}/join`,
+                        { userId: voterUuid },
+                        "POST",
+                      );
+
+                      if (!joinResult.success) {
+                        if (joinResult.error === "NO_ACTIVE_DEVICE") {
+                          await ctx.client.sendMessage(
+                            chatId,
+                            `⚠️ @${voter.split("@")[0]}, você precisa ter o Spotify aberto com um dispositivo ativo.`,
+                            { mentions: [voter] },
+                          );
+                        } else {
+                          await ctx.client.sendMessage(
+                            chatId,
+                            `⚠️ @${voter.split("@")[0]}, erro ao entrar na jam: ${joinResult.message || joinResult.error}`,
+                            { mentions: [voter] },
+                          );
+                        }
+                        return;
+                      }
+
+                      const hostName = await resolveHostName(jam, ctx.client);
+                      let msg = `🎧 *@${voter.split("@")[0]} entrou na jam de ${hostName}!*\n\n`;
+
+                      if (joinResult.synced) {
+                        msg += `✅ Sua música foi sincronizada\n`;
+                        if (jam.currentTrackName) {
+                          msg += `🎶 ${jam.currentTrackName}\n`;
+                          if (jam.currentArtists)
+                            msg += `👤 ${jam.currentArtists}\n`;
+                        }
+                      } else {
+                        msg += `⚠️ Não foi possível sincronizar automaticamente.\n`;
+                        msg += `Certifique-se de que o Spotify está aberto.\n`;
+                      }
+
+                      await ctx.client.sendMessage(chatId, msg, {
+                        mentions: [voter],
+                      });
+                    } catch (err) {
+                      logger.error(
+                        "[jam] Erro no vote handler da enquete DogBubble:",
+                        err,
+                      );
+                    }
+                  },
+                },
+              );
+            } catch (pollErr) {
+              logger.error(
+                "[jam] Erro ao criar enquete de entrada:",
+                pollErr.message,
+              );
+            }
           } else {
             await reply(announce);
           }
