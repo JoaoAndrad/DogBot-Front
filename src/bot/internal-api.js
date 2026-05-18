@@ -390,12 +390,26 @@ function createApp(client) {
         return res.json({ ok: true, alreadyResolved: true, status: vote.status });
       }
 
+      // Verificação extra: mesmo que o backend não tenha resolvido,
+      // se for matematicamente impossível atingir o limiar, forçar "failed"
+      const totalVoted = (stats.votesFor || 0) + (stats.votesAgainst || 0);
+      const remaining = (stats.totalEligible || 0) - totalVoted;
+      const impossibleToPass = (stats.votesFor || 0) + remaining < (stats.needed || 1);
+
       // 2. Mensagem de atualização (enquanto activo)
-      if (vote.status === "active") {
-        const votesNeeded = stats.needed - stats.votesFor;
-        const voteWord = isFor ? "votou para adicionar" : "votou contra adicionar";
-        const needWord = votesNeeded === 1 ? "precisa de 1 voto" : `precisam de ${votesNeeded} votos`;
-        await client.sendMessage(chatId, `${displayName} ${voteWord} "${vote.trackName}" na playlist, ainda ${needWord}. Mais alguém?`);
+      if (vote.status === "active" && !impossibleToPass) {
+        if (isFor) {
+          const votesNeeded = stats.needed - stats.votesFor;
+          const needWord = votesNeeded === 1 ? "precisa de 1 voto" : `precisam de ${votesNeeded} votos`;
+          await client.sendMessage(chatId, `${displayName} votou para adicionar "${vote.trackName}" na playlist, ainda ${needWord}. Mais alguém?`);
+        } else {
+          await client.sendMessage(chatId, `${displayName} votou contra adicionar "${vote.trackName}" na playlist. (${stats.votesFor}/${stats.needed} a favor). Mais alguém?`);
+        }
+      }
+
+      // Se for matematicamente impossível aprovar, tratar como rejeitado
+      if (vote.status === "active" && impossibleToPass) {
+        vote.status = "failed";
       }
 
       // 3. Voto aprovado — adicionar à playlist
@@ -431,7 +445,7 @@ function createApp(client) {
         await client.sendMessage(chatId, `❌ Votação rejeitada. Música não foi adicionada. (${stats.votesFor}/${stats.needed})`);
       }
 
-      res.json({ ok: true, status: vote.status, alreadyResolved: false });
+      res.json({ ok: true, status: vote.status, alreadyResolved: false, impossibleToPass: impossibleToPass && vote.status === "failed" });
     } catch (err) {
       const errMsg = err && (err.message || String(err));
       logger.error("[v1/cast-vote]", errMsg);
