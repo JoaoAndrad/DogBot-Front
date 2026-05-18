@@ -403,7 +403,7 @@ function createApp(client) {
           const needWord = votesNeeded === 1 ? "precisa de 1 voto" : `precisam de ${votesNeeded} votos`;
           await client.sendMessage(chatId, `${displayName} votou para adicionar "${vote.trackName}" na playlist, ainda ${needWord}. Mais alguém?`);
         } else {
-          await client.sendMessage(chatId, `${displayName} votou contra adicionar "${vote.trackName}" na playlist. (${stats.votesFor}/${stats.needed} a favor). Mais alguém?`);
+          await client.sendMessage(chatId, `${displayName} votou contra adicionar "${vote.trackName}" na playlist. (${stats.votesFor}/${stats.needed} a favor).`);
         }
       }
 

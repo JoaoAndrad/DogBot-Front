@@ -771,17 +771,21 @@ async function handleAddVote(
     if (updatedVote.status === "active") {
       const votesNeeded = stats.needed - stats.votesFor;
 
-      await client.sendMessage(
-        chatId,
-        `@${voter.split("@")[0]} ${
-          isFor ? "também votou para adicionar" : "votou contra adicionar"
-        } ${updatedVote.trackName} na playlist, ainda ${
-          votesNeeded === 1
-            ? "precisa de 1 voto"
-            : `precisam de ${votesNeeded} votos`
-        }. Mais alguém?`,
-        { mentions: [voter] },
-      );
+      if (isFor) {
+        await client.sendMessage(
+          chatId,
+          `@${voter.split("@")[0]} também votou para adicionar ${updatedVote.trackName} na playlist, ainda ${
+            votesNeeded === 1 ? "precisa de 1 voto" : `precisam de ${votesNeeded} votos`
+          }. Mais alguém?`,
+          { mentions: [voter] },
+        );
+      } else {
+        await client.sendMessage(
+          chatId,
+          `@${voter.split("@")[0]} votou contra adicionar ${updatedVote.trackName} na playlist.`,
+          { mentions: [voter] },
+        );
+      }
     }
 
     // Check if resolved
