@@ -558,12 +558,17 @@ async function addPassedTrackToPlaylist({
   // (durante as horas ou minutos que a votação permaneceu em aberto).
   if (group.playlistId) {
     try {
+      const qs = new URLSearchParams({
+        trackId: vote.trackId,
+        trackName: vote.trackName,
+      });
+      if (initiatorAccountId) {
+        qs.set("accountId", initiatorAccountId);
+      }
       const reCheck = await backendClient.sendToBackend(
         `/api/groups/playlists/${encodeURIComponent(
           group.playlistId,
-        )}/check-track?trackId=${encodeURIComponent(
-          vote.trackId,
-        )}&trackName=${encodeURIComponent(vote.trackName)}`,
+        )}/check-track?${qs.toString()}`,
         null,
         "GET",
       );
@@ -775,7 +780,9 @@ async function handleAddVote(
         await client.sendMessage(
           chatId,
           `@${voter.split("@")[0]} também votou para adicionar ${updatedVote.trackName} na playlist, ainda ${
-            votesNeeded === 1 ? "precisa de 1 voto" : `precisam de ${votesNeeded} votos`
+            votesNeeded === 1
+              ? "precisa de 1 voto"
+              : `precisam de ${votesNeeded} votos`
           }. Mais alguém?`,
           { mentions: [voter] },
         );
