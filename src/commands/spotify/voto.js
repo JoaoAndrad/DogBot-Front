@@ -197,12 +197,17 @@ module.exports = {
       // Check playlist for exact or similar tracks first
       let checkRes = null;
       try {
+        const checkQs = new URLSearchParams({
+          trackId: currentTrack.trackId,
+          trackName: currentTrack.trackName,
+        });
+        if (initiatorLookup.spotifyAccount?.id) {
+          checkQs.set("accountId", initiatorLookup.spotifyAccount.id);
+        }
         checkRes = await backendClient.sendToBackend(
           `/api/groups/playlists/${encodeURIComponent(
             group.playlistId,
-          )}/check-track?trackId=${encodeURIComponent(
-            currentTrack.trackId,
-          )}&trackName=${encodeURIComponent(currentTrack.trackName)}`,
+          )}/check-track?${checkQs.toString()}`,
           null,
           "GET",
         );
