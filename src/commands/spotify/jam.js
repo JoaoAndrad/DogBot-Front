@@ -20,25 +20,27 @@ function normalizeWaJidForMention(raw) {
 }
 
 async function resolveHostName(jam, client) {
-  // Try database fields first
-  let name = jam.host?.push_name || jam.host?.display_name;
+  // Values that look like phone numbers or JIDs are not human names
+  const isUsableName = (s) => s && s.trim() && !/^@?[\d]+(@\S+)?$/.test(s.trim());
 
-  // If empty, try to fetch from WhatsApp
+  let name = isUsableName(jam.host?.push_name) ? jam.host.push_name.trim()
+    : isUsableName(jam.host?.display_name) ? jam.host.display_name.trim()
+    : null;
+
   if (!name && jam.host?.sender_number && client) {
     try {
       const whatsappId = jam.host.sender_number.includes("@")
         ? jam.host.sender_number
         : `${jam.host.sender_number}@c.us`;
-
       const contact = await client.getContactById(whatsappId);
-      name = contact?.pushname || contact?.name;
+      const fetched = contact?.pushname || contact?.name;
+      if (isUsableName(fetched)) name = fetched.trim();
     } catch (err) {
-      // Silently fail and use fallback
+      // ignore
     }
   }
 
-  // Final fallbacks: phone number or "Anônimo"
-  return name || jam.host?.sender_number || "Anônimo";
+  return name || "Anônimo";
 }
 
 /**
