@@ -137,7 +137,7 @@ module.exports = {
           trackArtists: jam.currentArtists || "",
           initiatorUserId: creatorUserId,
           targetUserIds: eligibleUserIds,
-          threshold: 0.5,
+          threshold: 0.51,
         },
         "POST",
       );
