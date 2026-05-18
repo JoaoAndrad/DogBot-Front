@@ -358,6 +358,87 @@ function createApp(client) {
     }
   });
 
+  /**
+   * POST /v1/cast-vote
+   * Companion app cast — replica do handleAddVote do /voto.
+   * Body: { voteId, userId, isFor, chatId, voterName? }
+   */
+  router.post("/v1/cast-vote", async (req, res) => {
+    const { voteId, userId, isFor, chatId, voterName } = req.body || {};
+    if (!voteId || !userId || typeof isFor !== "boolean" || !chatId) {
+      return res.status(400).json({ ok: false, error: "voteId, userId, isFor, chatId required" });
+    }
+
+    try {
+      const backendClient = require("../services/backendClient");
+      const displayName = voterName || "alguém via app";
+
+      // 1. Registar voto no backend (mesmo endpoint que handleAddVote usa)
+      const castRes = await backendClient.sendToBackend(
+        `/api/groups/votes/${voteId}/cast`,
+        { userId, isFor },
+      );
+
+      if (!castRes || !castRes.vote) {
+        return res.status(500).json({ ok: false, error: "cast_failed" });
+      }
+
+      const vote = castRes.vote;
+      const stats = castRes.stats;
+
+      if (castRes.alreadyResolved) {
+        return res.json({ ok: true, alreadyResolved: true, status: vote.status });
+      }
+
+      // 2. Mensagem de atualização (enquanto activo)
+      if (vote.status === "active") {
+        const votesNeeded = stats.needed - stats.votesFor;
+        const voteWord = isFor ? "votou para adicionar" : "votou contra adicionar";
+        const needWord = votesNeeded === 1 ? "precisa de 1 voto" : `precisam de ${votesNeeded} votos`;
+        await client.sendMessage(chatId, `${displayName} ${voteWord} "${vote.trackName}" na playlist, ainda ${needWord}. Mais alguém?`);
+      }
+
+      // 3. Voto aprovado — adicionar à playlist
+      if (vote.status === "passed") {
+        try {
+          const groupRes = await backendClient.sendToBackend(`/api/groups/${encodeURIComponent(chatId)}`, null, "GET");
+          const group = groupRes && groupRes.group;
+          const playlistSpotifyId = group && group.playlist && group.playlist.spotifyId;
+          const accountId = (group && group.playlist && group.playlist.accountId) || null;
+
+          if (playlistSpotifyId && accountId) {
+            const addRes = await backendClient.sendToBackend(
+              `/api/spotify/playlists/${playlistSpotifyId}/tracks`,
+              { trackUri: vote.trackId, accountId },
+            );
+            const playlistName = (group.playlist && group.playlist.name) || "playlist";
+            if (addRes && addRes.success) {
+              await client.sendMessage(chatId, `✅ Música adicionada à ${playlistName}! (${stats.votesFor}/${stats.needed} votos)\n\n🎵 ${vote.trackName}\n${vote.trackArtists || ""}`);
+            } else {
+              await client.sendMessage(chatId, `⚠️ Votação aprovada, mas erro ao adicionar à playlist.`);
+            }
+          } else {
+            await client.sendMessage(chatId, `✅ Votação aprovada! (${stats.votesFor}/${stats.needed})\n🎵 ${vote.trackName}`);
+          }
+        } catch (addErr) {
+          logger.error("[v1/cast-vote] erro ao adicionar playlist:", addErr && addErr.message);
+          await client.sendMessage(chatId, `✅ Votação aprovada! (${stats.votesFor}/${stats.needed})\n🎵 ${vote.trackName}`);
+        }
+      }
+
+      // 4. Voto rejeitado
+      if (vote.status === "failed") {
+        await client.sendMessage(chatId, `❌ Votação rejeitada. Música não foi adicionada. (${stats.votesFor}/${stats.needed})`);
+      }
+
+      res.json({ ok: true, status: vote.status, alreadyResolved: false });
+    } catch (err) {
+      const errMsg = err && (err.message || String(err));
+      logger.error("[v1/cast-vote]", errMsg);
+      res.status(500).json({ ok: false, error: errMsg });
+    }
+  });
+
   app.use(router);
 
   app.use((_req, res) => {
