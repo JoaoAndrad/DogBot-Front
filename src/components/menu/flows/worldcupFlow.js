@@ -60,6 +60,7 @@ const worldcupFlow = createFlow("copa", {
       { label: "📊 Tabela", action: "goto", target: "/tabela" },
       { label: "🏆 Ranking do grupo", action: "exec", handler: "showLeaderboard" },
       { label: "📋 Meus palpites", action: "exec", handler: "showMyPredictions" },
+      { label: "❓ Dúvidas", action: "goto", target: "/duvidas" },
       { label: "⚙️ Configurações", action: "exec", handler: "showSettings" },
       { label: "👋 Sair", action: "exec", handler: "leave" },
     ],
@@ -83,7 +84,100 @@ const worldcupFlow = createFlow("copa", {
     ],
   },
 
+  "/duvidas": {
+    title: "❓ *Dúvidas — Copa 2026*",
+    options: [
+      { label: "🔒 Privacidade dos palpites",    action: "exec", handler: "faqPrivacidade" },
+      { label: "🏅 Pontuação",                   action: "exec", handler: "faqPontuacao" },
+      { label: "⏰ Prazos para palpitar",        action: "exec", handler: "faqPrazos" },
+      { label: "📋 Comandos disponíveis",        action: "exec", handler: "faqComandos" },
+      { label: "🔔 Notificações do grupo",       action: "exec", handler: "faqNotificacoes" },
+      { label: "🔙 Voltar",                      action: "back" },
+    ],
+  },
+
   handlers: {
+    // ── FAQ ──────────────────────────────────────────────────────────────────
+    faqPrivacidade: async (ctx) => {
+      await ctx.reply([
+        "🔒 *Privacidade dos palpites*",
+        "",
+        "Seus palpites são *completamente privados* — apenas você tem acesso aos seus votos.",
+        "",
+        "Isso evita que outros usuários influenciem suas escolhas antes das partidas.",
+        "",
+        "Assim que o jogo começar e os palpites forem travados, o grupo verá o resultado de todos junto com as notificações de gol e placar final.",
+        "",
+        "🎯 Use */palpite* no privado para apostar.",
+      ].join("\n"));
+      return { noRender: true };
+    },
+
+    faqPontuacao: async (ctx) => {
+      await ctx.reply([
+        "🏅 *Sistema de Pontuação*",
+        "",
+        "⚽ *Palpite de Partida*",
+        "🥇 Placar exato → *3 pts*",
+        "✅ Vencedor/empate certo → *1 pt*",
+        "➕ Acertou quem avança nos pênaltis → *+1 pt bônus*",
+        "",
+        "🏆 *Campeão da Copa* → *20 pts*",
+        "🦓 *Zebra da Copa* → *10 pts*",
+        "⭐ *Craque da Copa* → *8 pts*",
+      ].join("\n"));
+      return { noRender: true };
+    },
+
+    faqPrazos: async (ctx) => {
+      await ctx.reply([
+        "⏰ *Prazos para palpitar*",
+        "",
+        "⚽ *Placar de partida*",
+        "Disponível até o apito inicial do jogo.",
+        "Após o início, os palpites são travados automaticamente.",
+        "",
+        "🏆 *Campeão · 🦓 Zebra · ⭐ Craque*",
+        "Disponíveis apenas antes ou durante a *fase de grupos*.",
+        "Encerram automaticamente quando a última partida da fase de grupos começar.",
+        "",
+        "_Aproveite para votar logo, depois não dá mais!_",
+      ].join("\n"));
+      return { noRender: true };
+    },
+
+    faqComandos: async (ctx) => {
+      await ctx.reply([
+        "📋 *Comandos disponíveis*",
+        "",
+        "*/copa* — Abre este menu",
+        "*/proxjogo* — Próximos 5 jogos",
+        "*/jogoshoje* — Jogos do dia",
+        "*/tabela grupo A* — Classificação (substitua A pela letra)",
+        "*/placar* — Ranking de palpites do grupo",
+        "*/palpite* — Fazer palpites _(no privado)_",
+      ].join("\n"));
+      return { noRender: true };
+    },
+
+    faqNotificacoes: async (ctx) => {
+      await ctx.reply([
+        "🔔 *Notificações do grupo*",
+        "",
+        "O grupo recebe automaticamente:",
+        "",
+        "⏰ *Lembrete 24h antes* do jogo",
+        "⏰ *Lembrete 1h antes* + aviso de último chamado para palpites",
+        "⚽ *Gol em tempo real* com nome do marcador",
+        "⏸ *Intervalo* com placar e status dos palpites",
+        "✅ *Resultado final* com pontuação dos palpiteiros",
+        "📊 *Resumo semanal* toda segunda-feira às 8h",
+        "",
+        "Para ativar/desativar notificações específicas, use ⚙️ Configurações.",
+      ].join("\n"));
+      return { noRender: true };
+    },
+
     showNextMatches: async (ctx) => {
       try {
         const { matches } = await worldcupClient.getNextMatches(5);

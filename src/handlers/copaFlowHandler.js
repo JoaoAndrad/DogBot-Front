@@ -290,11 +290,14 @@ async function _saveZebra(stateKey, userId, team, flag, reply) {
   try {
     await worldcupClient.submitZebraPrediction(userId, team);
     conversationState.clearState(stateKey);
-    await reply(`✅ *Zebra salva!*\n\n🦓 Sua zebra: *${flag} ${team}*\n\nPode alterar quando quiser.`);
+    await reply(`✅ *Zebra salva!*\n\n🦓 Sua zebra: *${flag} ${team}*\n\nPode alterar até o fim da fase de grupos.`);
     logger.info(`[copa-zebra] ${userId.split("@")[0]} → ${team}`);
   } catch (e) {
     conversationState.clearState(stateKey);
-    await reply(`❌ Erro ao salvar: ${e.message}`);
+    const msg = e.message === "group_stage_over"
+      ? "❌ A fase de grupos acabou. Não é mais possível votar na zebra."
+      : `❌ Erro ao salvar: ${e.message}`;
+    await reply(msg);
   }
 }
 
@@ -314,11 +317,14 @@ async function handleCopaMvpFlow(stateKey, body, state, reply) {
     const userId = data.userId || stateKey;
     await worldcupClient.submitMvpPrediction(userId, playerName);
     conversationState.clearState(stateKey);
-    await reply(`✅ *Craque salvo!*\n\n⭐ Seu craque: *${playerName}*\n\nPode alterar quando quiser.`);
+    await reply(`✅ *Craque salvo!*\n\n⭐ Seu craque: *${playerName}*\n\nPode alterar até o fim da fase de grupos.`);
     logger.info(`[copa-mvp] ${userId.split("@")[0]} → ${playerName}`);
   } catch (e) {
     conversationState.clearState(stateKey);
-    await reply(`❌ Erro ao salvar: ${e.message}`);
+    const msg = e.message === "group_stage_over"
+      ? "❌ A fase de grupos acabou. Não é mais possível votar no craque."
+      : `❌ Erro ao salvar: ${e.message}`;
+    await reply(msg);
   }
   return true;
 }
