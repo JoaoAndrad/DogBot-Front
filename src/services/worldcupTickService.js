@@ -277,7 +277,7 @@ async function handleWeeklySummary(client, action) {
 
   // Recap dos jogos da semana
   const matchLines = (recentMatches || []).map((m) =>
-    `• ${withFlag(m.home_team)} ${m.home_team} ${m.home_score}x${m.away_score} ${withFlag(m.away_team)} ${m.away_team}`,
+    `• ${matchup(m.home_team, m.away_team)} — ${m.home_score}x${m.away_score}`,
   );
 
   for (const gs of groupSummaries) {
