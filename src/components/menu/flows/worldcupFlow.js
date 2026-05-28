@@ -68,15 +68,28 @@ const worldcupFlow = createFlow("copa", {
   handlers: {
     showNextMatches: async (ctx) => {
       try {
-        const { match } = await worldcupClient.getNextMatch();
-        if (!match) {
+        const { matches } = await worldcupClient.getNextMatches(5);
+        if (!matches || !matches.length) {
           await ctx.reply("⚽ Nenhum jogo agendado.");
           return { noRender: true };
         }
-        await ctx.reply(formatMatchLine(match));
+        const lines = ["⚽ *Próximos jogos*", ""];
+        for (let i = 0; i < matches.length; i++) {
+          const m = matches[i];
+          const kickoff = new Date(m.kickoff_at);
+          const weekday = kickoff.toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo", weekday: "short" });
+          const date = kickoff.toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo", day: "2-digit", month: "2-digit" });
+          const time = kickoff.toLocaleTimeString("pt-BR", { timeZone: "America/Sao_Paulo", hour: "2-digit", minute: "2-digit" });
+          const stage = m.group_name ? `Grupo ${m.group_name.replace("GROUP_", "").replace("Group ", "")}` : m.stage;
+          if (i > 0) lines.push("");
+          lines.push(`*${i + 1}.* ${m.home_team} 🆚 ${m.away_team}`);
+          lines.push(`📅 ${weekday} ${date} ${time} · ${stage}`);
+          if (m.venue) lines.push(`🏟 ${m.venue}`);
+        }
+        await ctx.reply(lines.join("\n"));
       } catch (e) {
         logger.error("[worldcupFlow] showNextMatches:", e.message);
-        await ctx.reply("❌ Erro ao buscar jogo.");
+        await ctx.reply("❌ Erro ao buscar jogos.");
       }
       return { noRender: true };
     },

@@ -26,6 +26,10 @@ async function getNextMatch() {
   return backendClient.sendToBackend("/api/worldcup/matches/next", null, "GET");
 }
 
+async function getNextMatches(limit = 5) {
+  return backendClient.sendToBackend(`/api/worldcup/matches/upcoming?limit=${limit}`, null, "GET");
+}
+
 async function getMatchesToday() {
   return backendClient.sendToBackend("/api/worldcup/matches/today", null, "GET");
 }
@@ -76,6 +80,7 @@ async function syncData() {
 }
 
 module.exports = {
+  getNextMatches,
   activateGroup,
   deactivateGroup,
   getGroupSettings,
