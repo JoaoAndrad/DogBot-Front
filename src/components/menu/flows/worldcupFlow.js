@@ -278,6 +278,7 @@ async function showMatchPage(ctx, data) {
         awayTeam: m.away_team,
         kickoffAt: m.kickoff_at,
         venue: m.venue || null,
+        stage: m.stage || "group",
       },
     });
     // Override: selecting a match should go to selectMatch, not showMatchPage
@@ -381,7 +382,7 @@ const worldcupPalpiteFlow = createFlow("copa-palpite", {
         const { pt, flag } = localize(current.team);
         lines.push(`Seu palpite atual: *${flag} ${pt}*`);
         if (current.points != null) {
-          lines.push(current.points === 10 ? "🎉 Acertou! +10 pts" : "❌ Não acertou");
+          lines.push(current.points === 20 ? "🎉 Acertou! +20 pts" : "❌ Não acertou");
         } else {
           lines.push("_(pode alterar até o fim da fase de grupos)_");
         }
@@ -428,10 +429,19 @@ const worldcupPalpiteFlow = createFlow("copa-palpite", {
       const { localize } = require("../../../utils/teamLocale");
       let predictions;
       let championPrediction = null;
+      let zebraPrediction = null;
+      let mvpPrediction = null;
       try {
-        [{ predictions }, { prediction: championPrediction }] = await Promise.all([
+        [
+          { predictions },
+          { prediction: championPrediction },
+          { prediction: zebraPrediction },
+          { prediction: mvpPrediction },
+        ] = await Promise.all([
           worldcupClient.getUserPredictions(ctx.userId),
           worldcupClient.getChampionPrediction(ctx.userId),
+          worldcupClient.getZebraPrediction(ctx.userId),
+          worldcupClient.getMvpPrediction(ctx.userId),
         ]);
       } catch (e) {
         await ctx.reply("❌ Erro ao buscar palpites.");
@@ -445,7 +455,7 @@ const worldcupPalpiteFlow = createFlow("copa-palpite", {
       if (championPrediction) {
         const { pt, flag } = localize(championPrediction.team);
         const pts = championPrediction.points != null
-          ? ` — ${championPrediction.points === 10 ? "🎉 +10 pts" : "❌ 0 pts"}`
+          ? ` — ${championPrediction.points === 20 ? "🎉 +20 pts" : "❌ 0 pts"}`
           : " — aguardando";
         const label = `🏆 Campeão: ${flag} ${pt}${pts}`.slice(0, 100);
         optionLabels.push(label);
@@ -458,6 +468,25 @@ const worldcupPalpiteFlow = createFlow("copa-palpite", {
         optionsMeta.push({
           index: 0, label, action: "exec", handler: "showChampionMenu", data: {},
         });
+      }
+
+      // Zebra
+      if (zebraPrediction) {
+        const { pt: zPt, flag: zFlag } = localize(zebraPrediction.team);
+        const zPts = zebraPrediction.points != null
+          ? ` — ${zebraPrediction.points > 0 ? `🎉 +${zebraPrediction.points} pts` : "❌ 0 pts"}` : "";
+        const zLabel = `🐴 Zebra: ${zFlag} ${zPt}${zPts}`.slice(0, 100);
+        optionLabels.push(zLabel);
+        optionsMeta.push({ index: optionLabels.length - 1, label: zLabel, action: "exec", handler: "startZebraInput", data: {} });
+      }
+
+      // Craque
+      if (mvpPrediction) {
+        const mvpPts = mvpPrediction.points != null
+          ? ` — ${mvpPrediction.points > 0 ? `🎉 +${mvpPrediction.points} pts` : "❌ 0 pts"}` : "";
+        const mvpLabel = `⭐ Craque: ${mvpPrediction.player_name}${mvpPts}`.slice(0, 100);
+        optionLabels.push(mvpLabel);
+        optionsMeta.push({ index: optionLabels.length - 1, label: mvpLabel, action: "exec", handler: "startMvpInput", data: {} });
       }
 
       if (!predictions || !predictions.length) {
@@ -525,9 +554,100 @@ const worldcupPalpiteFlow = createFlow("copa-palpite", {
       return { end: true };
     },
 
-    // ── Novo palpite ────────────────────────────────────────────────────────
-    showNewPalpite: async (ctx) => showMatchPage(ctx, { page: 0 }),
-    showMatchPage:  async (ctx, data) => showMatchPage(ctx, data),
+    // ── Novo palpite — submenu ────────────────────────────────────────────────
+    showNewPalpite: async (ctx) => {
+      const options = ["🏆 Campeão da Copa", "⚽ Placar da Partida", "🐴 Zebra da Copa", "⭐ Craque da Copa", "🔙 Voltar"];
+      const meta = [
+        { index: 0, label: options[0], action: "exec", handler: "startChampionInput", data: {} },
+        { index: 1, label: options[1], action: "exec", handler: "startMatchPick",     data: {} },
+        { index: 2, label: options[2], action: "exec", handler: "startZebraInput",    data: {} },
+        { index: 3, label: options[3], action: "exec", handler: "startMvpInput",      data: {} },
+        { index: 4, label: options[4], action: "exec", handler: "backToRoot",         data: {} },
+      ];
+      await polls.createPoll(ctx.client, ctx.chatId, "🎯 O que quer palpitar?", options, {
+        metadata: { actionType: "menu", flowId: "copa-palpite", path: "/novo", userId: ctx.userId, options: meta },
+      });
+      return { end: true };
+    },
+
+    startMatchPick:  async (ctx) => showMatchPage(ctx, { page: 0 }),
+    showMatchPage:   async (ctx, data) => showMatchPage(ctx, data),
+
+    // ── Campeão / Zebra / MVP input launchers ────────────────────────────────
+    startChampionInput: async (ctx) => {
+      conversationState.startFlow(ctx.userId, "copa-champion-input", {
+        step: "await_champion_name", userId: ctx.userId,
+      });
+      await ctx.reply("🏆 *Campeão da Copa*\n\nDigite o nome da seleção:\n_(ou /cancelar para sair)_");
+      return { end: true };
+    },
+
+    startZebraInput: async (ctx) => {
+      conversationState.startFlow(ctx.userId, "copa-zebra-input", {
+        step: "await_zebra_name", userId: ctx.userId,
+      });
+      await ctx.reply("🐴 *Zebra da Copa*\n\nDigite o nome da seleção que vai surpreender:\n_(ou /cancelar para sair)_");
+      return { end: true };
+    },
+
+    startMvpInput: async (ctx) => {
+      conversationState.startFlow(ctx.userId, "copa-mvp-input", {
+        step: "await_mvp_name", userId: ctx.userId,
+      });
+      await ctx.reply("⭐ *Craque da Copa*\n\nDigite o nome do jogador que você acha que será o craque:\n_(ou /cancelar para sair)_");
+      return { end: true };
+    },
+
+    // ── Zebra poll callbacks ──────────────────────────────────────────────────
+    selectZebra: async (ctx, data) => {
+      const { _saveZebra } = require("../../../handlers/copaFlowHandler");
+      const userId = data.userId || ctx.userId;
+      await _saveZebra(userId, userId, data.team, data.flag || "", (msg) => ctx.reply(msg));
+      conversationState.clearState(userId);
+      return { end: true };
+    },
+
+    retryZebra: async (ctx, data) => {
+      const userId = data.userId || ctx.userId;
+      conversationState.startFlow(userId, "copa-zebra-input", {
+        step: "await_zebra_name", userId,
+      });
+      await ctx.reply("Digite novamente o nome da seleção:\n_(ou /cancelar para sair)_");
+      return { end: true };
+    },
+
+    // ── Advancing team poll callback ──────────────────────────────────────────
+    setAdvancingTeam: async (ctx, data) => {
+      const stateKey = data.stateKey || ctx.userId;
+      const current = conversationState.getState(stateKey);
+      if (!current || !current.data) { await ctx.reply("❌ Sessão expirada. Use /palpite novamente."); return { end: true }; }
+      const matchData = current.data;
+      conversationState.startFlow(stateKey, "copa-palpite-input", {
+        ...matchData,
+        step: "await_confirmation",
+        advancingTeam: data.team,
+      });
+      const kickoff = new Date(matchData.kickoffAt);
+      const date = kickoff.toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo", day: "2-digit", month: "2-digit" });
+      const time = kickoff.toLocaleTimeString("pt-BR", { timeZone: "America/Sao_Paulo", hour: "2-digit", minute: "2-digit" });
+      const title =
+        `🎯 Confirmar palpite?\n${matchup(matchData.homeTeam, matchData.awayTeam)}\n` +
+        `*${matchData.predictedHome} x ${matchData.predictedAway}* · ${date} ${time}\n` +
+        `🔮 Avança: *${withFlag(data.team)} ${data.team}*`;
+      const options = ["✅ Confirmar", "✏️ Corrigir placar", "❌ Cancelar"];
+      const pollMeta = {
+        actionType: "menu", flowId: "copa-palpite", path: "/confirm", userId: stateKey,
+        options: [
+          { index: 0, label: "✅ Confirmar",     action: "exec", handler: "confirmPrediction",
+            data: { ...matchData, predictedHome: matchData.predictedHome, predictedAway: matchData.predictedAway, advancingTeam: data.team, userId: stateKey } },
+          { index: 1, label: "✏️ Corrigir placar", action: "exec", handler: "correctPrediction",
+            data: { matchId: matchData.matchId, homeTeam: matchData.homeTeam, awayTeam: matchData.awayTeam, kickoffAt: matchData.kickoffAt, venue: matchData.venue, stage: matchData.stage, userId: stateKey } },
+          { index: 2, label: "❌ Cancelar", action: "exec", handler: "cancelPrediction", data: { userId: stateKey } },
+        ],
+      };
+      await polls.createPoll(ctx.client, ctx.chatId, title, options, { metadata: pollMeta });
+      return { end: true };
+    },
 
     confirmPrediction: async (ctx, data) => {
       const { _submitPrediction } = require("../../../handlers/copaFlowHandler");
@@ -573,6 +693,7 @@ const worldcupPalpiteFlow = createFlow("copa-palpite", {
       conversationState.startFlow(ctx.userId, "copa-palpite-input", {
         step: "await_score",
         matchId, homeTeam, awayTeam, kickoffAt, venue,
+        stage: data.stage || "group",
         userId: ctx.userId,
       });
 

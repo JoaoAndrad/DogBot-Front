@@ -10,7 +10,7 @@ const {
 const botMetricsReporter = require("../services/botMetricsReporter");
 const { loadIgnoredChats } = require("../utils/bot/chatCleaner");
 const { handleCadastroFlow } = require("./cadastroFlowHandler");
-const { handleCopaFlow, handleCopaChampionFlow } = require("./copaFlowHandler");
+const { handleCopaFlow, handleCopaChampionFlow, handleCopaZebraFlow, handleCopaMvpFlow } = require("./copaFlowHandler");
 const groupDisplayNameSync = require("../services/groupDisplayNameSync");
 
 /** Evita POST repetido: mesmo nome ~6h; sincroniza GroupChat.name no backend para admin UI. */
@@ -435,6 +435,17 @@ async function handle(context) {
         client: context.client,
         from,
       });
+    }
+
+    if (state.flowType === "copa-zebra-input") {
+      return await handleCopaZebraFlow(stateKey, body, state, reply, {
+        client: context.client,
+        from,
+      });
+    }
+
+    if (state.flowType === "copa-mvp-input") {
+      return await handleCopaMvpFlow(stateKey, body, state, reply);
     }
 
     if (state.flowType === "rotina" || state.flowType === "rotina_edit") {

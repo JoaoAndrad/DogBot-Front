@@ -48,8 +48,8 @@ async function getStandingsGrouped(group) {
 
 // ─── Predictions ─────────────────────────────────────────────────────────────
 
-async function submitPrediction(userId, matchId, predictedHome, predictedAway) {
-  return backendClient.sendToBackend("/api/worldcup/predictions", { userId, matchId, predictedHome, predictedAway }, "POST");
+async function submitPrediction(userId, matchId, predictedHome, predictedAway, advancingTeam) {
+  return backendClient.sendToBackend("/api/worldcup/predictions", { userId, matchId, predictedHome, predictedAway, advancingTeam: advancingTeam || null }, "POST");
 }
 
 async function getUserPredictions(userId) {
@@ -84,6 +84,23 @@ async function syncData() {
   return backendClient.sendToBackend("/api/internal/worldcup/sync", {}, "POST");
 }
 
+async function triggerWeeklySummary() {
+  return backendClient.sendToBackend("/api/internal/worldcup/weekly-summary", {}, "POST");
+}
+
+async function submitZebraPrediction(userId, team) {
+  return backendClient.sendToBackend("/api/worldcup/predictions/zebra", { userId, team }, "POST");
+}
+async function getZebraPrediction(userId) {
+  return backendClient.sendToBackend(`/api/worldcup/predictions/zebra/${encodeURIComponent(userId)}`, null, "GET");
+}
+async function submitMvpPrediction(userId, playerName) {
+  return backendClient.sendToBackend("/api/worldcup/predictions/mvp", { userId, playerName }, "POST");
+}
+async function getMvpPrediction(userId) {
+  return backendClient.sendToBackend(`/api/worldcup/predictions/mvp/${encodeURIComponent(userId)}`, null, "GET");
+}
+
 async function submitChampionPrediction(userId, team) {
   return backendClient.sendToBackend("/api/worldcup/predictions/champion", { userId, team }, "POST");
 }
@@ -97,6 +114,10 @@ module.exports = {
   getStandingsGrouped,
   submitChampionPrediction,
   getChampionPrediction,
+  submitZebraPrediction,
+  getZebraPrediction,
+  submitMvpPrediction,
+  getMvpPrediction,
   activateGroup,
   deactivateGroup,
   getGroupSettings,

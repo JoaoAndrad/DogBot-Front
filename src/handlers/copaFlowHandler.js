@@ -28,6 +28,40 @@ async function handleCopaFlow(stateKey, body, state, reply, opts) {
 
     const predictedHome = parseInt(m[1], 10);
     const predictedAway = parseInt(m[2], 10);
+    const isDraw = predictedHome === predictedAway;
+    const isKnockout = data.stage && data.stage !== "group";
+
+    // Empate em partida eliminatória → perguntar quem avança antes da confirmação
+    if (isDraw && isKnockout) {
+      conversationState.startFlow(stateKey, "copa-palpite-input", {
+        ...data,
+        step: "await_advancing",
+        predictedHome,
+        predictedAway,
+      });
+      const { withFlag: wf } = require("../utils/teamLocale");
+      const options = [
+        `${wf(data.homeTeam)} ${data.homeTeam} avança`,
+        `${wf(data.awayTeam)} ${data.awayTeam} avança`,
+      ];
+      const pollMeta = {
+        actionType: "menu",
+        flowId: "copa-palpite",
+        path: "/advancing",
+        userId: stateKey,
+        options: [
+          { index: 0, label: options[0], action: "exec", handler: "setAdvancingTeam", data: { team: data.homeTeam, stateKey } },
+          { index: 1, label: options[1], action: "exec", handler: "setAdvancingTeam", data: { team: data.awayTeam, stateKey } },
+        ],
+      };
+      await polls.createPoll(client || { sendPoll: async () => null }, from || data.userId || stateKey,
+        `🔮 Empate! ${matchup(data.homeTeam, data.awayTeam)}\nQuem avança nos pênaltis?`,
+        options, { metadata: pollMeta, sender: client });
+      if (!client || !from) {
+        await reply("⚽ Responda na enquete acima para indicar quem avança.");
+      }
+      return true;
+    }
 
     // Guarda o placar e aguarda confirmação
     conversationState.startFlow(stateKey, "copa-palpite-input", {
@@ -35,6 +69,7 @@ async function handleCopaFlow(stateKey, body, state, reply, opts) {
       step: "await_confirmation",
       predictedHome,
       predictedAway,
+      advancingTeam: null,
     });
 
     const kickoff = new Date(data.kickoffAt);
@@ -76,35 +111,20 @@ async function handleCopaFlow(stateKey, body, state, reply, opts) {
       ],
     };
 
-    if (client && from) {
-      await polls.createPoll(client, from, title, options, { metadata: pollMeta });
-    } else {
-      await reply(`${title}\n\nDigite *1* confirmar, *2* corrigir ou *3* cancelar.`);
-    }
+    await polls.createPoll(client, from, title, options, { metadata: pollMeta });
 
     return true;
   }
 
-  // ── Aguardando confirmação (fallback texto se não votou na enquete) ─────────
+  // ── Aguardando quem avança (usuário deve votar na enquete) ──────────────────
+  if (data.step === "await_advancing") {
+    await reply("⚽ Vote na enquete acima para indicar quem avança.\n_(ou /cancelar para sair)_");
+    return true;
+  }
+
+  // ── Aguardando confirmação (usuário deve votar na enquete) ───────────────────
   if (data.step === "await_confirmation") {
-    const t = body.trim();
-    if (t === "1" || /^confirmar?$/i.test(t)) {
-      await _submitPrediction(stateKey, data, reply);
-    } else if (t === "2" || /^corrigir?$/i.test(t)) {
-      conversationState.startFlow(stateKey, "copa-palpite-input", { ...data, step: "await_score" });
-      const kickoff = new Date(data.kickoffAt);
-      const date = kickoff.toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo", day: "2-digit", month: "2-digit" });
-      const time = kickoff.toLocaleTimeString("pt-BR", { timeZone: "America/Sao_Paulo", hour: "2-digit", minute: "2-digit" });
-      await reply(
-        `✏️ *${matchup(data.homeTeam, data.awayTeam)}*\n📅 ${date} às ${time}\n\n` +
-        "Qual o novo placar? (*H-A*)\n_(ou /cancelar para sair)_",
-      );
-    } else if (t === "3" || /^cancelar?$/i.test(t)) {
-      conversationState.clearState(stateKey);
-      await reply("❌ Palpite cancelado.");
-    } else {
-      await reply("Digite *1* para confirmar, *2* para corrigir ou *3* para cancelar.");
-    }
+    await reply("🎯 Vote na enquete acima para confirmar, corrigir ou cancelar.\n_(ou /cancelar para sair)_");
     return true;
   }
 
@@ -115,7 +135,7 @@ async function handleCopaFlow(stateKey, body, state, reply, opts) {
 async function _submitPrediction(stateKey, data, reply) {
   try {
     const userId = data.userId || stateKey;
-    await worldcupClient.submitPrediction(userId, data.matchId, data.predictedHome, data.predictedAway);
+    await worldcupClient.submitPrediction(userId, data.matchId, data.predictedHome, data.predictedAway, data.advancingTeam || null);
     conversationState.clearState(stateKey);
 
     const kickoff = new Date(data.kickoffAt);
@@ -228,4 +248,79 @@ async function _saveChampion(stateKey, userId, team, flag, reply) {
   }
 }
 
-module.exports = { handleCopaFlow, handleCopaChampionFlow, _submitPrediction, _saveChampion };
+// ─── Zebra handler (idêntico ao champion mas com worldcupClient.submitZebra) ──
+
+async function handleCopaZebraFlow(stateKey, body, state, reply, opts) {
+  const data = state.data || {};
+  const client = opts && opts.client;
+  const from = opts && opts.from;
+
+  if (data.step !== "await_zebra_name") { conversationState.clearState(stateKey); return false; }
+
+  const query = body.trim();
+  if (!query) { await reply("❌ Digite o nome da seleção. _(ou /cancelar)_"); return true; }
+
+  const matches = searchTeams(query, 5);
+  if (!matches.length) { await reply(`❌ Seleção não encontrada para "*${query}*". Tente outro nome.`); return true; }
+
+  if (matches.length === 1 || matches[0].score === 100) {
+    await _saveZebra(stateKey, data.userId || stateKey, matches[0].pt, matches[0].flag, reply);
+    return true;
+  }
+
+  const optionLabels = matches.map((m) => `${m.flag} ${m.pt}`);
+  optionLabels.push("🔍 Buscar novamente");
+  const optionsMeta = matches.map((m, i) => ({
+    index: i, label: optionLabels[i], action: "exec", handler: "selectZebra",
+    data: { team: m.pt, flag: m.flag, userId: data.userId || stateKey },
+  }));
+  optionsMeta.push({ index: optionLabels.length - 1, label: "🔍 Buscar novamente", action: "exec", handler: "retryZebra", data: { userId: data.userId || stateKey } });
+
+  if (client && from) {
+    await polls.createPoll(client, from, "🐴 Qual a Zebra?", optionLabels, {
+      metadata: { actionType: "menu", flowId: "copa-palpite", path: "/zebra", userId: data.userId || stateKey, options: optionsMeta },
+    });
+  } else {
+    await reply(["Selecione:", ...matches.map((m, i) => `*${i + 1}.* ${m.flag} ${m.pt}`)].join("\n"));
+  }
+  return true;
+}
+
+async function _saveZebra(stateKey, userId, team, flag, reply) {
+  try {
+    await worldcupClient.submitZebraPrediction(userId, team);
+    conversationState.clearState(stateKey);
+    await reply(`✅ *Zebra salva!*\n\n🐴 Sua zebra: *${flag} ${team}*\n\nPode alterar quando quiser.`);
+    logger.info(`[copa-zebra] ${userId.split("@")[0]} → ${team}`);
+  } catch (e) {
+    conversationState.clearState(stateKey);
+    await reply(`❌ Erro ao salvar: ${e.message}`);
+  }
+}
+
+// ─── MVP handler ──────────────────────────────────────────────────────────────
+
+async function handleCopaMvpFlow(stateKey, body, state, reply) {
+  const data = state.data || {};
+  if (data.step !== "await_mvp_name") { conversationState.clearState(stateKey); return false; }
+
+  const playerName = body.trim();
+  if (!playerName || playerName.length < 2) {
+    await reply("❌ Digite o nome do jogador. _(ou /cancelar)_");
+    return true;
+  }
+
+  try {
+    const userId = data.userId || stateKey;
+    await worldcupClient.submitMvpPrediction(userId, playerName);
+    conversationState.clearState(stateKey);
+    await reply(`✅ *Craque salvo!*\n\n⭐ Seu craque: *${playerName}*\n\nPode alterar quando quiser.`);
+    logger.info(`[copa-mvp] ${userId.split("@")[0]} → ${playerName}`);
+  } catch (e) {
+    conversationState.clearState(stateKey);
+    await reply(`❌ Erro ao salvar: ${e.message}`);
+  }
+  return true;
+}
+
+module.exports = { handleCopaFlow, handleCopaChampionFlow, handleCopaZebraFlow, handleCopaMvpFlow, _submitPrediction, _saveChampion, _saveZebra };

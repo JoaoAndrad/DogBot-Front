@@ -265,6 +265,62 @@ async function handleResultNotification(client, action) {
   }
 }
 
+// ─── Weekly summary ──────────────────────────────────────────────────────────
+
+async function handleWeeklySummary(client, action) {
+  const { groupSummaries, recentMatches, weekOf } = action;
+  if (!groupSummaries || !groupSummaries.length) return;
+
+  const weekStart = weekOf
+    ? new Date(weekOf).toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo", day: "2-digit", month: "2-digit" })
+    : "—";
+
+  // Recap dos jogos da semana
+  const matchLines = (recentMatches || []).map((m) =>
+    `• ${withFlag(m.home_team)} ${m.home_team} ${m.home_score}x${m.away_score} ${withFlag(m.away_team)} ${m.away_team}`,
+  );
+
+  for (const gs of groupSummaries) {
+    const { groupId, weeklyRanking } = gs;
+    if (!weeklyRanking || !weeklyRanking.length) continue;
+
+    try {
+      const chat = await client.getChatById(groupId);
+      const participants = chat.participants || [];
+
+      const medals = ["🥇", "🥈", "🥉"];
+      const rankingLines = weeklyRanking.map((e, i) => {
+        const p = participants.find(
+          (x) => (x.id._serialized || x.id.user + "@c.us") === e.userId,
+        );
+        const name = p ? (p.pushname || p.name || e.userId.split("@")[0]) : e.userId.split("@")[0];
+        return `${medals[i] || `${e.rank}.`} ${name} — *${e.weeklyPoints} pts*`;
+      });
+
+      const craqueLabel = rankingLines.length ? `🏅 *${weeklyRanking[0] ? "Craque da semana" : ""}*` : "";
+
+      const lines = [
+        `📊 *Resumo da semana — Copa 2026*`,
+        `_Semana de ${weekStart}_`,
+        ``,
+      ];
+
+      if (matchLines.length) {
+        lines.push(`⚽ *Jogos da semana:*`);
+        lines.push(...matchLines);
+        lines.push(``);
+      }
+
+      lines.push(`🏆 *Ranking da semana:*`);
+      lines.push(...rankingLines);
+
+      await client.sendMessage(groupId, lines.join("\n"));
+    } catch (e) {
+      logger.warn(`[worldcupTick] weekly_summary → ${groupId}:`, e.message);
+    }
+  }
+}
+
 // ─── Main processor ───────────────────────────────────────────────────────────
 
 async function processWorldCupTickPayload(client, payload) {
@@ -279,6 +335,7 @@ async function processWorldCupTickPayload(client, payload) {
         case "goal":               await handleGoal(client, action);              break;
         case "halftime":           await handleHalftime(client, action);          break;
         case "result_notification":await handleResultNotification(client, action);break;
+        case "weekly_summary":     await handleWeeklySummary(client, action);     break;
         default: logger.debug(`[worldcupTick] ação desconhecida: ${action.kind}`);
       }
     } catch (e) {
