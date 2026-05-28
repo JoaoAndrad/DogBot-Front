@@ -7,7 +7,8 @@ const logger = require("../../utils/logger");
 function formatStage(stage) {
   const map = {
     group: "Fase de Grupos",
-    round_of_16: "16 avos de final",
+    round_of_32: "16 avos de final",
+    round_of_16: "Oitavas de final",
     quarter_final: "Quartas de Final",
     semi_final: "Semifinal",
     third_place: "3º Lugar",

@@ -37,6 +37,19 @@ function formatStandingsBlock(standings) {
   return lines.join("\n");
 }
 
+function formatStage(stage) {
+  const map = {
+    group: "Fase de Grupos",
+    round_of_32: "16 avos de final",
+    round_of_16: "Oitavas de final",
+    quarter_final: "Quartas de Final",
+    semi_final: "Semifinal",
+    third_place: "3º Lugar",
+    final: "Final",
+  };
+  return map[stage] || stage;
+}
+
 // ─── Flow ─────────────────────────────────────────────────────────────────────
 
 const worldcupFlow = createFlow("copa", {
@@ -85,7 +98,7 @@ const worldcupFlow = createFlow("copa", {
           const weekday = kickoff.toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo", weekday: "short" });
           const date = kickoff.toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo", day: "2-digit", month: "2-digit" });
           const time = kickoff.toLocaleTimeString("pt-BR", { timeZone: "America/Sao_Paulo", hour: "2-digit", minute: "2-digit" });
-          const stage = m.group_name ? `Grupo ${m.group_name.replace("GROUP_", "").replace("Group ", "")}` : m.stage;
+          const stage = m.group_name ? `Grupo ${m.group_name.replace("GROUP_", "").replace("Group ", "")}` : formatStage(m.stage);
           if (i > 0) lines.push("");
           lines.push(`*${i + 1}.* ${matchup(m.home_team, m.away_team)}`);
           lines.push(`📅 ${weekday} ${date} ${time} · ${stage}`);
