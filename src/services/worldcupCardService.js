@@ -12,15 +12,23 @@ const templatePath = path.join(__dirname, "..", "..", "templates", "worldcup-sta
 const tplSrc = fs.readFileSync(templatePath, "utf8");
 const tpl = Handlebars.compile(tplSrc);
 
-// Logo embutido como base64 (evita dependência de arquivo em runtime)
 const logoPath = path.join(__dirname, "..", "..", "templates", "logo.png");
 const logoDataUri = "data:image/png;base64," + fs.readFileSync(logoPath).toString("base64");
 
-// Handlebars helpers
-Handlebars.registerHelper("ifCond", (a, op, b, opts) => {
-  const result = op === "===" ? a === b : op === ">" ? a > b : op === ">=" ? a >= b : false;
-  return result ? opts.fn(this) : opts.inverse(this);
-});
+// ─── Twemoji: converte emoji de bandeira → URL de imagem ─────────────────────
+// Flag emoji = dois Regional Indicator characters (ex: 🇧🇷 = U+1F1E7 U+1F1F7)
+
+function flagEmojiToTwemojiUrl(emoji) {
+  if (!emoji || emoji === "🏳️") return null;
+  try {
+    const codepoints = [...emoji]
+      .map((c) => c.codePointAt(0).toString(16))
+      .join("-");
+    return `https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/72x72/${codepoints}.png`;
+  } catch (e) {
+    return null;
+  }
+}
 
 // ─── Browser (reusa instância) ────────────────────────────────────────────────
 
@@ -44,17 +52,15 @@ function formatGd(gd) {
   return { gdDisplay: "0", gdClass: "sg-zero" };
 }
 
-/**
- * Normaliza um grupo de standings da API para o formato do template.
- * standings: [{ team, group_name, played, won, drawn, lost, gf, ga, gd, points, position }]
- */
 function buildGroupData(groupName, standings) {
   const teams = standings.map((s, i) => {
     const { pt, flag } = localize(s.team);
     const { gdDisplay, gdClass } = formatGd(s.gd);
+    const flagUrl = flagEmojiToTwemojiUrl(flag);
     return {
       position: s.position || i + 1,
       flag,
+      flagUrl,       // URL da imagem Twemoji (pode ser null se não resolver)
       name: pt,
       pts: s.points ?? 0,
       played: s.played ?? 0,
@@ -69,10 +75,6 @@ function buildGroupData(groupName, standings) {
 
 // ─── Render ───────────────────────────────────────────────────────────────────
 
-/**
- * Renderiza card(s) de classificação e retorna PNG Buffer.
- * @param {Array} groupsData - [{ group_name, standings[] }]
- */
 async function renderStandingsCard(groupsData) {
   const groups = groupsData.map((g) => buildGroupData(
     g.group_name.replace("GROUP_", "Grupo ").replace("Group ", "Grupo "),
@@ -85,9 +87,16 @@ async function renderStandingsCard(groupsData) {
   const page = await browser.newPage();
 
   try {
+    // Viewport largo o suficiente, altura provisória
     await page.setViewport({ width: 560, height: 800, deviceScaleFactor: 2 });
+    // networkidle0 garante que as imagens Twemoji (CDN) foram carregadas
     await page.setContent(html, { waitUntil: "networkidle0" });
-    const buffer = await page.screenshot({ type: "png", fullPage: true });
+
+    // Mede a altura real do conteúdo e ajusta o viewport
+    const contentHeight = await page.evaluate(() => document.body.scrollHeight);
+    await page.setViewport({ width: 560, height: contentHeight, deviceScaleFactor: 2 });
+
+    const buffer = await page.screenshot({ type: "png", fullPage: false });
     return buffer;
   } finally {
     await page.close();

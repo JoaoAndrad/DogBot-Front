@@ -116,6 +116,7 @@
     }
 
     .team-flag { font-size: 20px; line-height: 1; flex-shrink: 0; }
+    .team-flag img { width: 26px; height: 26px; object-fit: contain; vertical-align: middle; border-radius: 3px; }
 
     .team-name {
       font-size: 13px;
@@ -187,7 +188,9 @@
       {{else}}{{position}}{{/if}}
     </div>
     <div class="team">
-      <span class="team-flag">{{flag}}</span>
+      <span class="team-flag">
+        {{#if flagUrl}}<img src="{{flagUrl}}" alt="{{flag}}" />{{else}}{{flag}}{{/if}}
+      </span>
       <span class="team-name">{{name}}</span>
     </div>
     <div class="stat pts">{{pts}}</div>

@@ -64,7 +64,10 @@ const worldcupFlow = createFlow("copa", {
       { label: "Grupo F", action: "exec", handler: "showGroup", data: { group: "F" } },
       { label: "Grupo G", action: "exec", handler: "showGroup", data: { group: "G" } },
       { label: "Grupo H", action: "exec", handler: "showGroup", data: { group: "H" } },
-      { label: "🔙 Voltar", action: "back" },
+      { label: "Grupo I", action: "exec", handler: "showGroup", data: { group: "I" } },
+      { label: "Grupo J", action: "exec", handler: "showGroup", data: { group: "J" } },
+      { label: "Grupo K", action: "exec", handler: "showGroup", data: { group: "K" } },
+      { label: "Grupo L", action: "exec", handler: "showGroup", data: { group: "L" } },
     ],
   },
 
@@ -100,8 +103,7 @@ const worldcupFlow = createFlow("copa", {
     showGroup: async (ctx, data) => {
       try {
         const { renderStandingsCard } = require("../../../services/worldcupCardService");
-        const { getStandingsGrouped } = require("../../../services/worldcupClient");
-        const { groups } = await getStandingsGrouped(data.group);
+        const { groups } = await worldcupClient.getStandingsGrouped(data.group);
         if (!groups || !groups.length) {
           await ctx.reply(`⚽ Dados do Grupo ${data.group} ainda não disponíveis.`);
           return { noRender: true };
