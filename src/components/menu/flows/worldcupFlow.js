@@ -5,7 +5,6 @@ const worldcupClient = require("../../../services/worldcupClient");
 const conversationState = require("../../../services/conversationState");
 const polls = require("../../poll");
 const { withFlag, matchup } = require("../../../utils/teamLocale");
-const { MessageMedia } = require("whatsapp-web.js");
 const logger = require("../../../utils/logger");
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -103,14 +102,14 @@ const worldcupFlow = createFlow("copa", {
     showGroup: async (ctx, data) => {
       try {
         const { renderStandingsCard } = require("../../../services/worldcupCardService");
+        const { sendBufferAsSticker } = require("../../../utils/media/stickerHelper");
         const { groups } = await worldcupClient.getStandingsGrouped(data.group);
         if (!groups || !groups.length) {
           await ctx.reply(`⚽ Dados do Grupo ${data.group} ainda não disponíveis.`);
           return { noRender: true };
         }
         const buffer = await renderStandingsCard(groups);
-        const media = new MessageMedia("image/png", buffer.toString("base64"), "tabela.png");
-        await ctx.client.sendMessage(ctx.chatId, media, { caption: "" });
+        await sendBufferAsSticker(ctx.client, ctx.chatId, buffer, { fullOnly: true });
       } catch (e) {
         logger.error("[worldcupFlow] showGroup:", e.message);
         await ctx.reply("❌ Erro ao buscar tabela.");
