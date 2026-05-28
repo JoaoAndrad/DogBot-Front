@@ -129,6 +129,93 @@ function formatFinishedBlock(predictions, nameMap, finalHome, finalAway) {
   return lines.join("\n");
 }
 
+// ─── Goal context logic (13 combinations) ────────────────────────────────────
+
+function getGoalText({ prevHome = 0, prevAway = 0, newHome, newAway, homeTeam, awayTeam, scorer, minute, stage, allScorers = [] }) {
+  const homeScored = newHome > prevHome;
+  const scoringTeam    = homeScored ? homeTeam : awayTeam;
+  const scoringTeamPrev = homeScored ? prevHome : prevAway;
+  const otherTeamPrev   = homeScored ? prevAway : prevHome;
+
+  const isKnockout    = stage && stage !== "group";
+  const isExtraTime   = minute != null && minute > 90;
+  const isAddedTime   = minute != null && minute >= 88 && !isExtraTime;
+  const isHalfTimeEnd = minute != null && minute >= 43 && minute <= 45;
+  const isFirst       = prevHome === 0 && prevAway === 0;
+
+  // Hat-trick / brace detection
+  const scorerGoalCount = scorer
+    ? allScorers.filter((n) => n && n.toLowerCase() === scorer.toLowerCase()).length
+    : 0;
+
+  // Timing suffix
+  let timing = "";
+  if (isExtraTime)   timing = " na prorrogação";
+  else if (isAddedTime)   timing = " nos acréscimos";
+  else if (isHalfTimeEnd) timing = " no fim do primeiro tempo";
+
+  const name = scorer || "Gol";
+  const flag = withFlag(scoringTeam);
+
+  // Priority order ─────────────────────────────────
+
+  // 13. Hat-trick
+  if (scorerGoalCount >= 3) return `🎩 *HAT-TRICK de ${name}!*${timing}`;
+
+  // 12. Brace
+  if (scorerGoalCount === 2) return `🔁 *${name} marca de novo!*${timing}`;
+
+  // 10. Knockout + empate nos acréscimos
+  if (isKnockout && scoringTeamPrev === otherTeamPrev - 1 && isAddedTime)
+    return `🤯 *${name} empata nos acréscimos!* Caminho para os pênaltis...`;
+
+  // 9. Knockout + empate
+  if (isKnockout && scoringTeamPrev === otherTeamPrev - 1)
+    return `🔥 *${name} empata para ${flag} ${scoringTeam}!*${timing} Caminho para os pênaltis...`;
+
+  // 11. Knockout + toma a frente (virada)
+  if (isKnockout && scoringTeamPrev === otherTeamPrev)
+    return `🚨 *${name} vira o jogo!*${timing} ${flag} ${scoringTeam} na frente na ${formatStage(stage)}.`;
+
+  // 9 (alt). Knockout + abre
+  if (isKnockout && isFirst)
+    return `⚡ *${name} abre o placar!*${timing} Gol decisivo na ${formatStage(stage)}!`;
+
+  // 7. Abre o placar
+  if (isFirst) return `⚽ *${name} abre o placar!*${timing}`;
+
+  // 8 (acréscimos). Empate nos acréscimos
+  if (scoringTeamPrev === otherTeamPrev - 1 && isAddedTime)
+    return `🤯 *${name} empata nos acréscimos!*`;
+
+  // 8. Empata
+  if (scoringTeamPrev === otherTeamPrev - 1)
+    return `⚽ *${name} empata para ${flag} ${scoringTeam}!*${timing}`;
+
+  // 9 (alt). Toma a frente de empate
+  if (scoringTeamPrev === otherTeamPrev)
+    return `⚽ *${name} coloca ${flag} ${scoringTeam} na frente!*${timing}`;
+
+  // 4. Amplia
+  if (scoringTeamPrev > otherTeamPrev)
+    return `⚽ *${name} amplia!*${timing}`;
+
+  // 5. Desconta
+  if (scoringTeamPrev < otherTeamPrev - 1)
+    return `⚽ *${name} desconta para ${flag} ${scoringTeam}!*${timing}`;
+
+  return `⚽ *Gol de ${name}!*${timing}`;
+}
+
+function formatStage(stage) {
+  const map = {
+    round_of_16: "oitavas", round_of_32: "16 avos",
+    quarter_final: "quartas", semi_final: "semifinal",
+    third_place: "disputa de 3º", final: "final",
+  };
+  return map[stage] || stage;
+}
+
 // ─── Action handlers ──────────────────────────────────────────────────────────
 
 async function handleReminder24h(client, action) {
@@ -176,12 +263,26 @@ async function handleReminder1h(client, action) {
 }
 
 async function handleGoal(client, action) {
-  const { match, scorer, minute, predictions, groupIds } = action;
+  const { match, scorer, minute, predictions, groupIds, prevHome = 0, prevAway = 0, allScorers = [] } = action;
   if (!groupIds || !groupIds.length) return;
 
   const score = `${match.home_score} x ${match.away_score}`;
   const minuteTag = minute ? ` ${minute}'` : "";
-  const scorerTag = scorer ? `\n⚽ ${scorer}${minuteTag}` : "";
+
+  const goalText = getGoalText({
+    prevHome,
+    prevAway,
+    newHome: match.home_score,
+    newAway: match.away_score,
+    homeTeam: match.home_team,
+    awayTeam: match.away_team,
+    scorer,
+    minute,
+    stage: match.stage,
+    allScorers,
+  });
+
+  const scorerTag = scorer ? `\n${scorer}${minuteTag}` : "";
 
   for (const groupId of groupIds) {
     try {
@@ -192,7 +293,7 @@ async function handleGoal(client, action) {
         : null;
 
       const lines = [
-        `⚽ *GOL!*`,
+        goalText,
         ``,
         `*${withFlag(match.home_team)} ${score} ${withFlag(match.away_team)}*${scorerTag}`,
       ];
