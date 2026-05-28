@@ -249,7 +249,7 @@ async function showMatchPage(ctx, data) {
     const time = kickoff.toLocaleTimeString("pt-BR", { timeZone: "America/Sao_Paulo", hour: "2-digit", minute: "2-digit" });
     const pred = predByMatchId[m.id];
     const predTag = pred ? ` ✏️ ${pred.predicted_home}-${pred.predicted_away}` : "";
-    const label = `${withFlag(m.home_team)} ${m.home_team} x ${withFlag(m.away_team)} ${m.away_team} · ${date} ${time}${predTag}`.slice(0, 100);
+    const label = `${matchup(m.home_team, m.away_team)} · ${date} ${time}${predTag}`.slice(0, 100);
 
     optionLabels.push(label);
     optionsMeta.push({
