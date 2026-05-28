@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: #e8ecf0;
+      padding: 20px;
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+      width: 560px;
+    }
+
+    .card {
+      background: #ffffff;
+      border-radius: 20px;
+      box-shadow: 0 4px 24px rgba(0,0,0,.10), 0 1px 4px rgba(0,0,0,.06);
+      overflow: hidden;
+    }
+
+    .header {
+      background: linear-gradient(135deg, #1a4b8c 0%, #2563c4 100%);
+      padding: 16px 20px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .header-logo {
+      width: 34px;
+      height: 34px;
+      object-fit: contain;
+      border-radius: 50%;
+      flex-shrink: 0;
+      background: rgba(255,255,255,.15);
+      padding: 3px;
+    }
+
+    .header-title {
+      color: #fff;
+      font-size: 20px;
+      font-weight: 700;
+      letter-spacing: -0.3px;
+    }
+
+    .header-subtitle {
+      color: rgba(255,255,255,.6);
+      font-size: 11px;
+      font-weight: 500;
+      margin-top: 1px;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+    }
+
+    .col-headers {
+      display: grid;
+      grid-template-columns: 36px 1fr 44px 44px 44px;
+      padding: 8px 18px 6px;
+      background: #f8f9fb;
+      border-bottom: 1px solid #eaecef;
+    }
+
+    .col-headers span {
+      font-size: 10px;
+      font-weight: 700;
+      color: #8a93a2;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      text-align: center;
+    }
+
+    .col-headers .col-team { text-align: left; padding-left: 4px; }
+
+    .row {
+      display: grid;
+      grid-template-columns: 36px 1fr 44px 44px 44px;
+      padding: 10px 18px;
+      align-items: center;
+      border-bottom: 1px solid #f0f2f5;
+    }
+
+    .row:last-child { border-bottom: none; }
+
+    .row.leader { background: linear-gradient(90deg, #fffbeb 0%, #fff 100%); }
+
+    .pos {
+      font-size: 13px;
+      font-weight: 700;
+      color: #374151;
+      text-align: center;
+    }
+
+    .pos-badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      font-size: 11px;
+      font-weight: 800;
+    }
+
+    .pos-badge.qualify { background: #dcfce7; color: #15803d; }
+    .pos-badge.leader-b { background: #fef3c7; color: #d97706; }
+
+    .team {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding-left: 4px;
+    }
+
+    .team-flag { font-size: 20px; line-height: 1; flex-shrink: 0; }
+
+    .team-name {
+      font-size: 13px;
+      font-weight: 600;
+      color: #1f2937;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .stat {
+      font-size: 13px;
+      font-weight: 600;
+      color: #374151;
+      text-align: center;
+    }
+
+    .stat.pts { font-weight: 800; color: #1a4b8c; font-size: 14px; }
+    .stat.sg-pos { color: #16a34a; }
+    .stat.sg-neg { color: #dc2626; }
+    .stat.sg-zero { color: #6b7280; }
+
+    .footer {
+      background: #f8f9fb;
+      padding: 8px 18px;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      border-top: 1px solid #eaecef;
+    }
+
+    .legend {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 10px;
+      color: #8a93a2;
+    }
+
+    .legend-dot { width: 7px; height: 7px; border-radius: 50%; }
+    .legend-dot.qualify { background: #15803d; }
+  </style>
+</head>
+<body>
+
+{{#each groups}}
+<div class="card">
+  <div class="header">
+    <img class="header-logo" src="{{{../logoDataUri}}}" alt="DogBot" />
+    <div>
+      <div class="header-title">{{groupName}}</div>
+      <div class="header-subtitle">Copa do Mundo 2026</div>
+    </div>
+  </div>
+
+  <div class="col-headers">
+    <span>Pos</span>
+    <span class="col-team">Time</span>
+    <span>Pts</span>
+    <span>PJ</span>
+    <span>SG</span>
+  </div>
+
+  {{#each teams}}
+  <div class="row{{#if isLeader}} leader{{/if}}">
+    <div class="pos">
+      {{#if isLeader}}<span class="pos-badge leader-b">{{position}}</span>
+      {{else if isQualify}}<span class="pos-badge qualify">{{position}}</span>
+      {{else}}{{position}}{{/if}}
+    </div>
+    <div class="team">
+      <span class="team-flag">{{flag}}</span>
+      <span class="team-name">{{name}}</span>
+    </div>
+    <div class="stat pts">{{pts}}</div>
+    <div class="stat">{{played}}</div>
+    <div class="stat {{gdClass}}">{{gdDisplay}}</div>
+  </div>
+  {{/each}}
+
+  <div class="footer">
+    <div class="legend">
+      <div class="legend-dot qualify"></div>
+      <span>Classificado</span>
+    </div>
+  </div>
+</div>
+{{/each}}
+
+</body>
+</html>

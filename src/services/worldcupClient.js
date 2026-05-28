@@ -41,6 +41,11 @@ async function getStandings(group) {
   return backendClient.sendToBackend(`/api/worldcup/standings${q}`, null, "GET");
 }
 
+async function getStandingsGrouped(group) {
+  const q = group ? `?group=${encodeURIComponent(group)}` : "";
+  return backendClient.sendToBackend(`/api/worldcup/standings/grouped${q}`, null, "GET");
+}
+
 // ─── Predictions ─────────────────────────────────────────────────────────────
 
 async function submitPrediction(userId, matchId, predictedHome, predictedAway) {
@@ -81,6 +86,7 @@ async function syncData() {
 
 module.exports = {
   getNextMatches,
+  getStandingsGrouped,
   activateGroup,
   deactivateGroup,
   getGroupSettings,
