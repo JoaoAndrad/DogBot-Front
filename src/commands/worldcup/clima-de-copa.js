@@ -68,7 +68,7 @@ module.exports = {
         "*/proxjogo* — próximo jogo",
         "*/jogoshoje* — jogos de hoje",
         "*/tabela* — classificação",
-        "*/palpite* — fazer palpite da partida (no privado)",
+        "*/palpite* — fazer ou visualizar palpites (no privado)",
         "*/placar* — ranking do grupo",
       ];
       await client.sendMessage(chatId, lines.join("\n"));
