@@ -451,7 +451,7 @@ const worldcupPalpiteFlow = createFlow("copa-palpite", {
       const optionLabels = [];
       const optionsMeta = [];
 
-      // Campeão sempre no topo
+      // Campeão — só exibe se já foi preenchido
       if (championPrediction) {
         const { pt, flag } = localize(championPrediction.team);
         const pts = championPrediction.points != null
@@ -460,13 +460,7 @@ const worldcupPalpiteFlow = createFlow("copa-palpite", {
         const label = `🏆 Campeão: ${flag} ${pt}${pts}`.slice(0, 100);
         optionLabels.push(label);
         optionsMeta.push({
-          index: 0, label, action: "exec", handler: "showChampionMenu", data: {},
-        });
-      } else {
-        const label = "🏆 Votar no Campeão da Copa";
-        optionLabels.push(label);
-        optionsMeta.push({
-          index: 0, label, action: "exec", handler: "showChampionMenu", data: {},
+          index: optionLabels.length - 1, label, action: "exec", handler: "showChampionMenu", data: {},
         });
       }
 
