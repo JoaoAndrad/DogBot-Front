@@ -277,7 +277,7 @@ async function handleCopaZebraFlow(stateKey, body, state, reply, opts) {
   optionsMeta.push({ index: optionLabels.length - 1, label: "🔍 Buscar novamente", action: "exec", handler: "retryZebra", data: { userId: data.userId || stateKey } });
 
   if (client && from) {
-    await polls.createPoll(client, from, "🐴 Qual a Zebra?", optionLabels, {
+    await polls.createPoll(client, from, "🦓 Qual a Zebra?", optionLabels, {
       metadata: { actionType: "menu", flowId: "copa-palpite", path: "/zebra", userId: data.userId || stateKey, options: optionsMeta },
     });
   } else {
@@ -290,7 +290,7 @@ async function _saveZebra(stateKey, userId, team, flag, reply) {
   try {
     await worldcupClient.submitZebraPrediction(userId, team);
     conversationState.clearState(stateKey);
-    await reply(`✅ *Zebra salva!*\n\n🐴 Sua zebra: *${flag} ${team}*\n\nPode alterar quando quiser.`);
+    await reply(`✅ *Zebra salva!*\n\n🦓 Sua zebra: *${flag} ${team}*\n\nPode alterar quando quiser.`);
     logger.info(`[copa-zebra] ${userId.split("@")[0]} → ${team}`);
   } catch (e) {
     conversationState.clearState(stateKey);

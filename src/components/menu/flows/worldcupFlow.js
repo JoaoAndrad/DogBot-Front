@@ -469,7 +469,7 @@ const worldcupPalpiteFlow = createFlow("copa-palpite", {
         const { pt: zPt, flag: zFlag } = localize(zebraPrediction.team);
         const zPts = zebraPrediction.points != null
           ? ` — ${zebraPrediction.points > 0 ? `🎉 +${zebraPrediction.points} pts` : "❌ 0 pts"}` : "";
-        const zLabel = `🐴 Zebra: ${zFlag} ${zPt}${zPts}`.slice(0, 100);
+        const zLabel = `🦓 Zebra: ${zFlag} ${zPt}${zPts}`.slice(0, 100);
         optionLabels.push(zLabel);
         optionsMeta.push({ index: optionLabels.length - 1, label: zLabel, action: "exec", handler: "startZebraInput", data: {} });
       }
@@ -550,7 +550,7 @@ const worldcupPalpiteFlow = createFlow("copa-palpite", {
 
     // ── Novo palpite — submenu ────────────────────────────────────────────────
     showNewPalpite: async (ctx) => {
-      const options = ["🏆 Campeão da Copa", "⚽ Placar da Partida", "🐴 Zebra da Copa", "⭐ Craque da Copa", "🔙 Voltar"];
+      const options = ["🏆 Campeão da Copa", "⚽ Placar da Partida", "🦓 Zebra da Copa", "⭐ Craque da Copa", "🔙 Voltar"];
       const meta = [
         { index: 0, label: options[0], action: "exec", handler: "startChampionInput", data: {} },
         { index: 1, label: options[1], action: "exec", handler: "startMatchPick",     data: {} },
@@ -580,7 +580,7 @@ const worldcupPalpiteFlow = createFlow("copa-palpite", {
       conversationState.startFlow(ctx.userId, "copa-zebra-input", {
         step: "await_zebra_name", userId: ctx.userId,
       });
-      await ctx.reply("🐴 *Zebra da Copa*\n\nDigite o nome da seleção que vai surpreender:\n_(ou /cancelar para sair)_");
+      await ctx.reply("🦓 *Zebra da Copa*\n\nDigite o nome da seleção que vai surpreender:\n_(ou /cancelar para sair)_");
       return { end: true };
     },
 
