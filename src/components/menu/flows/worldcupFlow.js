@@ -429,6 +429,44 @@ const worldcupPalpiteFlow = createFlow("copa-palpite", {
     showNewPalpite: async (ctx) => showMatchPage(ctx, { page: 0 }),
     showMatchPage:  async (ctx, data) => showMatchPage(ctx, data),
 
+    confirmPrediction: async (ctx, data) => {
+      const { _submitPrediction } = require("../../../handlers/copaFlowHandler");
+      await _submitPrediction(
+        data.userId || ctx.userId,
+        { ...data, step: "await_confirmation" },
+        (msg) => ctx.reply(msg),
+      );
+      conversationState.clearState(data.userId || ctx.userId);
+      return { end: true };
+    },
+
+    correctPrediction: async (ctx, data) => {
+      const userId = data.userId || ctx.userId;
+      conversationState.startFlow(userId, "copa-palpite-input", {
+        step: "await_score",
+        matchId: data.matchId,
+        homeTeam: data.homeTeam,
+        awayTeam: data.awayTeam,
+        kickoffAt: data.kickoffAt,
+        venue: data.venue,
+        userId,
+      });
+      const kickoff = new Date(data.kickoffAt);
+      const date = kickoff.toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo", day: "2-digit", month: "2-digit" });
+      const time = kickoff.toLocaleTimeString("pt-BR", { timeZone: "America/Sao_Paulo", hour: "2-digit", minute: "2-digit" });
+      await ctx.reply(
+        `✏️ *${matchup(data.homeTeam, data.awayTeam)}*\n📅 ${date} às ${time}\n\n` +
+        "Qual o novo placar? (*H-A*)\n_(ou /cancelar para sair)_",
+      );
+      return { end: true };
+    },
+
+    cancelPrediction: async (ctx, data) => {
+      conversationState.clearState(data.userId || ctx.userId);
+      await ctx.reply("❌ Palpite cancelado.");
+      return { end: true };
+    },
+
     selectMatch: async (ctx, data) => {
       const { matchId, homeTeam, awayTeam, kickoffAt, venue } = data;
 
@@ -449,7 +487,7 @@ const worldcupPalpiteFlow = createFlow("copa-palpite", {
       if (venue) lines.push(`🏟 ${venue}`);
       lines.push("", "Qual o placar? Digite no formato *H-A*");
       lines.push(`Ex: *2-1* significa ${homeTeam} 2, ${awayTeam} 1`);
-      lines.push("_(ou /cancelar para voltar)_");
+      lines.push("_(ou /cancelar para cancelar o palpite)_");
 
       await ctx.reply(lines.join("\n"));
       return { end: true };

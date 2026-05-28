@@ -424,7 +424,10 @@ async function handle(context) {
     }
 
     if (state.flowType === "copa-palpite-input") {
-      return await handleCopaFlow(stateKey, body, state, reply);
+      return await handleCopaFlow(stateKey, body, state, reply, {
+        client: context.client,
+        from,
+      });
     }
 
     if (state.flowType === "rotina" || state.flowType === "rotina_edit") {
