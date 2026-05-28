@@ -730,10 +730,10 @@ async function executeAction(result, client) {
             };
 
             // Execute handler with context
-            const result = await flow.handlers[handler](ctx, data);
+            const handlerResult = await flow.handlers[handler](ctx, data);
 
             // Check if flow should end
-            if (result && result.end) {
+            if (handlerResult && handlerResult.end) {
               const storage = require("../menu/storage");
               try {
                 await storage.deleteState(stateUserId, data.flowId);
@@ -752,7 +752,7 @@ async function executeAction(result, client) {
                 try {
                   await storage.saveState(stateUserId, data.flowId, ctx.state);
 
-                  if (result && result.noRender) {
+                  if (handlerResult && handlerResult.noRender) {
                     break;
                   }
 
