@@ -358,6 +358,23 @@ function createApp(client) {
     }
   });
 
+  router.post("/internal/worldcup/dispatch", async (req, res) => {
+    try {
+      const body = req.body || {};
+      const actions = body.actions;
+      if (!Array.isArray(actions)) {
+        return res.status(400).json({ ok: false, error: "actions_must_be_array" });
+      }
+      const { processWorldCupTickPayload } = require("../services/worldcupTickService");
+      await processWorldCupTickPayload(client, { actions, serverTime: body.serverTime });
+      res.json({ ok: true });
+    } catch (err) {
+      const errMsg = err && (err.message || String(err));
+      logger.error("[internal/worldcup/dispatch]", errMsg);
+      res.status(500).json({ ok: false, error: errMsg });
+    }
+  });
+
   /**
    * POST /v1/cast-vote
    * Companion app cast — replica do handleAddVote do /voto.

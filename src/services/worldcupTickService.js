@@ -1,0 +1,290 @@
+"use strict";
+
+const logger = require("../utils/logger");
+const { withFlag, matchup } = require("../utils/teamLocale");
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+function fmtKickoff(kickoffAt) {
+  const d = new Date(kickoffAt);
+  const date = d.toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo", weekday: "long", day: "2-digit", month: "2-digit" });
+  const time = d.toLocaleTimeString("pt-BR", { timeZone: "America/Sao_Paulo", hour: "2-digit", minute: "2-digit" });
+  return { date, time };
+}
+
+function fmtStage(match) {
+  if (match.group_name) return `Grupo ${match.group_name.replace("GROUP_", "").replace("Group ", "")}`;
+  const map = { round_of_16: "16 avos", quarter_final: "Quartas", semi_final: "Semifinal", third_place: "3º Lugar", final: "Final" };
+  return map[match.stage] || match.stage || "";
+}
+
+/**
+ * Retorna { competing: [...], lost: [...] }
+ * Um palpite ainda é possível se nenhum time já marcou MAIS do que o apostado.
+ * Já perdeu se home > predictedHome OU away > predictedAway.
+ */
+function categorizePredictions(predictions, currentHome, currentAway) {
+  const competing = [];
+  const lost = [];
+  for (const p of predictions || []) {
+    if (currentHome > p.predictedHome || currentAway > p.predictedAway) {
+      lost.push(p);
+    } else {
+      competing.push(p);
+    }
+  }
+  return { competing, lost };
+}
+
+/**
+ * Categoriza palpites ao final do jogo em: exact (3pts), winner (1pt), wrong (0pts).
+ */
+function categorizeFinished(predictions, finalHome, finalAway) {
+  const exact = [];
+  const winner = [];
+  const wrong = [];
+  const actualWinner = Math.sign(finalHome - finalAway);
+  for (const p of predictions || []) {
+    if (p.predictedHome === finalHome && p.predictedAway === finalAway) {
+      exact.push(p);
+    } else if (Math.sign(p.predictedHome - p.predictedAway) === actualWinner) {
+      winner.push(p);
+    } else {
+      wrong.push(p);
+    }
+  }
+  return { exact, winner, wrong };
+}
+
+/**
+ * Tenta resolver nome de exibição de um userId a partir dos participantes do grupo.
+ * Fallback: número de telefone.
+ */
+async function resolveNames(client, groupId, userIds) {
+  const nameMap = {};
+  try {
+    const chat = await client.getChatById(groupId);
+    const participants = chat.participants || [];
+    for (const uid of userIds) {
+      const p = participants.find(
+        (x) => (x.id._serialized || `${x.id.user}@c.us`) === uid,
+      );
+      if (p) {
+        nameMap[uid] = p.pushname || p.name || uid.split("@")[0];
+      } else {
+        nameMap[uid] = uid.split("@")[0];
+      }
+    }
+  } catch (e) {
+    for (const uid of userIds) nameMap[uid] = uid.split("@")[0];
+  }
+  return nameMap;
+}
+
+function formatPredictionsBlock(predictions, nameMap, currentHome, currentAway) {
+  if (!predictions || !predictions.length) return null;
+
+  const { competing, lost } = categorizePredictions(predictions, currentHome, currentAway);
+
+  const lines = ["", "📊 *Palpites:*"];
+
+  if (competing.length) {
+    lines.push("✅ *Ainda concorrendo*");
+    for (const p of competing) {
+      lines.push(`  • ${nameMap[p.userId] || p.userId.split("@")[0]} — ${p.predictedHome}x${p.predictedAway}`);
+    }
+  }
+
+  if (lost.length) {
+    lines.push("❌ *Já perderam*");
+    for (const p of lost) {
+      lines.push(`  • ${nameMap[p.userId] || p.userId.split("@")[0]} — ${p.predictedHome}x${p.predictedAway}`);
+    }
+  }
+
+  return lines.join("\n");
+}
+
+function formatFinishedBlock(predictions, nameMap, finalHome, finalAway) {
+  if (!predictions || !predictions.length) return null;
+
+  const { exact, winner, wrong } = categorizeFinished(predictions, finalHome, finalAway);
+  const lines = ["", "🏆 *Palpites:*"];
+
+  if (exact.length) {
+    lines.push("🎯 *Placar exato — 3 pts*");
+    for (const p of exact) lines.push(`  • ${nameMap[p.userId] || p.userId.split("@")[0]} — ${p.predictedHome}x${p.predictedAway} ✓`);
+  }
+
+  if (winner.length) {
+    lines.push("✓ *Vencedor certo — 1 pt*");
+    for (const p of winner) lines.push(`  • ${nameMap[p.userId] || p.userId.split("@")[0]} — ${p.predictedHome}x${p.predictedAway}`);
+  }
+
+  if (wrong.length) {
+    lines.push("❌ *Sem pontos*");
+    for (const p of wrong) lines.push(`  • ${nameMap[p.userId] || p.userId.split("@")[0]} — ${p.predictedHome}x${p.predictedAway}`);
+  }
+
+  return lines.join("\n");
+}
+
+// ─── Action handlers ──────────────────────────────────────────────────────────
+
+async function handleReminder24h(client, action) {
+  const { match, groupIds } = action;
+  if (!groupIds || !groupIds.length) return;
+
+  const { date, time } = fmtKickoff(match.kickoff_at);
+  const stage = fmtStage(match);
+  const venue = match.venue ? `\n🏟 ${match.venue}` : "";
+
+  const msg = [
+    `⚽ *Amanhã tem jogo!*`,
+    ``,
+    matchup(match.home_team, match.away_team),
+    `📅 ${date} às ${time}`,
+    `📍 ${stage}${venue}`,
+    ``,
+    `Use */palpite* (no privado) para fazer seu palpite!`,
+  ].join("\n");
+
+  for (const groupId of groupIds) {
+    try { await client.sendMessage(groupId, msg); }
+    catch (e) { logger.warn(`[worldcupTick] reminder_24h → ${groupId}:`, e.message); }
+  }
+}
+
+async function handleReminder1h(client, action) {
+  const { match, groupIds } = action;
+  if (!groupIds || !groupIds.length) return;
+
+  const { time } = fmtKickoff(match.kickoff_at);
+  const stage = fmtStage(match);
+
+  const msg = [
+    `⏰ *Em 1 hora: ${matchup(match.home_team, match.away_team)}*`,
+    `🕐 Hoje às ${time} · ${stage}`,
+    ``,
+    `🎯 Último chamado para palpites! Envie */palpite* no privado.`,
+  ].join("\n");
+
+  for (const groupId of groupIds) {
+    try { await client.sendMessage(groupId, msg); }
+    catch (e) { logger.warn(`[worldcupTick] reminder_1h → ${groupId}:`, e.message); }
+  }
+}
+
+async function handleGoal(client, action) {
+  const { match, scorer, minute, predictions, groupIds } = action;
+  if (!groupIds || !groupIds.length) return;
+
+  const score = `${match.home_score} x ${match.away_score}`;
+  const minuteTag = minute ? ` ${minute}'` : "";
+  const scorerTag = scorer ? `\n⚽ ${scorer}${minuteTag}` : "";
+
+  for (const groupId of groupIds) {
+    try {
+      const allUserIds = (predictions || []).map((p) => p.userId);
+      const nameMap = allUserIds.length ? await resolveNames(client, groupId, allUserIds) : {};
+      const predBlock = predictions && predictions.length
+        ? formatPredictionsBlock(predictions, nameMap, match.home_score, match.away_score)
+        : null;
+
+      const lines = [
+        `⚽ *GOL!*`,
+        ``,
+        `*${withFlag(match.home_team)} ${score} ${withFlag(match.away_team)}*${scorerTag}`,
+      ];
+      if (predBlock) lines.push(predBlock);
+
+      await client.sendMessage(groupId, lines.join("\n"));
+    } catch (e) {
+      logger.warn(`[worldcupTick] goal → ${groupId}:`, e.message);
+    }
+  }
+}
+
+async function handleHalftime(client, action) {
+  const { match, predictions, groupIds } = action;
+  if (!groupIds || !groupIds.length) return;
+
+  const score = `${match.home_score ?? 0} x ${match.away_score ?? 0}`;
+
+  for (const groupId of groupIds) {
+    try {
+      const allUserIds = (predictions || []).map((p) => p.userId);
+      const nameMap = allUserIds.length ? await resolveNames(client, groupId, allUserIds) : {};
+      const predBlock = predictions && predictions.length
+        ? formatPredictionsBlock(predictions, nameMap, match.home_score ?? 0, match.away_score ?? 0)
+        : null;
+
+      const lines = [
+        `⏸ *Intervalo*`,
+        `${withFlag(match.home_team)} ${score} ${withFlag(match.away_team)}`,
+      ];
+      if (predBlock) lines.push(predBlock);
+
+      await client.sendMessage(groupId, lines.join("\n"));
+    } catch (e) {
+      logger.warn(`[worldcupTick] halftime → ${groupId}:`, e.message);
+    }
+  }
+}
+
+async function handleResultNotification(client, action) {
+  const { match, predictions, groupIds } = action;
+  if (!groupIds || !groupIds.length) return;
+
+  const finalHome = match.home_score ?? 0;
+  const finalAway = match.away_score ?? 0;
+  const score = `${finalHome} x ${finalAway}`;
+
+  for (const groupId of groupIds) {
+    try {
+      const allUserIds = (predictions || []).map((p) => p.userId);
+      const nameMap = allUserIds.length ? await resolveNames(client, groupId, allUserIds) : {};
+      const predBlock = predictions && predictions.length
+        ? formatFinishedBlock(predictions, nameMap, finalHome, finalAway)
+        : null;
+
+      const lines = [
+        `🏁 *Fim de jogo!*`,
+        ``,
+        `${matchup(match.home_team, match.away_team)} — *${score}*`,
+      ];
+      if (predBlock) lines.push(predBlock);
+      if (predictions && predictions.length) {
+        lines.push("", `Use */placar* para ver o ranking atualizado.`);
+      }
+
+      await client.sendMessage(groupId, lines.join("\n"));
+    } catch (e) {
+      logger.warn(`[worldcupTick] result_notification → ${groupId}:`, e.message);
+    }
+  }
+}
+
+// ─── Main processor ───────────────────────────────────────────────────────────
+
+async function processWorldCupTickPayload(client, payload) {
+  const actions = Array.isArray(payload.actions) ? payload.actions : [];
+  if (!actions.length) return;
+
+  for (const action of actions) {
+    try {
+      switch (action.kind) {
+        case "reminder_24h":       await handleReminder24h(client, action);       break;
+        case "reminder_1h":        await handleReminder1h(client, action);        break;
+        case "goal":               await handleGoal(client, action);              break;
+        case "halftime":           await handleHalftime(client, action);          break;
+        case "result_notification":await handleResultNotification(client, action);break;
+        default: logger.debug(`[worldcupTick] ação desconhecida: ${action.kind}`);
+      }
+    } catch (e) {
+      logger.error(`[worldcupTick] erro em ${action.kind}:`, e.message);
+    }
+  }
+}
+
+module.exports = { processWorldCupTickPayload };

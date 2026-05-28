@@ -1,6 +1,7 @@
 "use strict";
 
 const worldcupClient = require("../../services/worldcupClient");
+const { withFlag, matchup } = require("../../utils/teamLocale");
 const logger = require("../../utils/logger");
 
 function formatStage(stage) {
@@ -25,11 +26,11 @@ function formatMatch(m, index) {
 
   if (m.status === "live") {
     const score = m.home_score != null ? `${m.home_score} x ${m.away_score}` : "0 x 0";
-    return [`🔴 *${m.home_team} ${score} ${m.away_team}* — AO VIVO`, `📍 ${stage}${venue ? ` · ${m.venue}` : ""}`].join("\n");
+    return [`🔴 *${withFlag(m.home_team)} ${score} ${withFlag(m.away_team)}* — AO VIVO`, `📍 ${stage}${venue ? ` · ${m.venue}` : ""}`].join("\n");
   }
 
   const lines = [
-    `*${index + 1}.* ${m.home_team} 🆚 ${m.away_team}`,
+    `*${index + 1}.* ${matchup(m.home_team, m.away_team)}`,
     `📅 ${weekday}, ${date} às ${time}`,
     `🏟 ${stage}${venue ? ` · ${m.venue}` : ""}`,
   ];

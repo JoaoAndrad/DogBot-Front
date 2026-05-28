@@ -2,6 +2,7 @@
 
 const conversationState = require("../services/conversationState");
 const worldcupClient = require("../services/worldcupClient");
+const { matchup, withFlag } = require("../utils/teamLocale");
 const logger = require("../utils/logger");
 
 // Aceita "2-1", "2x1", "2 1", "2 - 1"
@@ -42,7 +43,8 @@ async function handleCopaFlow(stateKey, body, state, reply) {
     const lines = [
       "✅ *Palpite salvo!*",
       "",
-      `⚽ ${data.homeTeam} *${predictedHome} x ${predictedAway}* ${data.awayTeam}`,
+      `⚽ *${matchup(data.homeTeam, data.awayTeam)}*`,
+      `Placar: *${predictedHome} x ${predictedAway}*`,
       `📅 ${date} às ${time}`,
     ];
     if (data.venue) lines.push(`🏟 ${data.venue}`);
