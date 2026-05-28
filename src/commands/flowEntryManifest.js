@@ -12,6 +12,8 @@ const FLOW_ENTRY_COMMAND_NAMES = new Set([
   "ajuda",
   "life360",
   "vinculo360",
+  "copa",
+  "palpite",
 ]);
 
 function isFlowEntryCommand(canonicalName) {
