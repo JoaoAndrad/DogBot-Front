@@ -55,20 +55,20 @@ module.exports = {
       }
 
       const lines = [
-        "⚽ *Sistema Copa do Mundo ativado!* 🎉",
+        "⚽ *Clima Copa do Mundo ativado!* 🎉",
         "",
         "A partir de agora este grupo recebe:",
         "🔔 Notificações de gol em tempo real",
         "⏰ Lembretes antes dos jogos",
-        "📊 Resumo semanal às segundas",
+        "📊 Resumo semanal das partidas",
         "🎯 Bolão de palpites",
         "",
         "*Comandos disponíveis:*",
         "*/copa* — menu interativo",
         "*/proxjogo* — próximo jogo",
         "*/jogoshoje* — jogos de hoje",
-        "*/tabela grupo A* — classificação",
-        "*/palpite* — fazer palpite (no privado)",
+        "*/tabela* — classificação",
+        "*/palpite* — fazer palpite da partida (no privado)",
         "*/placar* — ranking do grupo",
       ];
       await client.sendMessage(chatId, lines.join("\n"));

@@ -29,7 +29,9 @@ module.exports = {
     }
 
     try {
-      const chat = await message.getChat();
+      const chat = client.getChatById
+        ? await client.getChatById(chatId)
+        : await message.getChat();
       const participants = chat.participants || [];
       const userIds = participants.map((p) => p.id._serialized || p.id.user + "@c.us");
 

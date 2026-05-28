@@ -56,7 +56,7 @@ const worldcupFlow = createFlow("copa", {
   root: {
     title: "⚽ *Copa do Mundo*",
     options: [
-      { label: "📅 Próximos jogos", action: "exec", handler: "showNextMatches" },
+      { label: "📅 Próximos jogos (5)", action: "exec", handler: "showNextMatches" },
       { label: "📊 Tabela", action: "goto", target: "/tabela" },
       { label: "🏆 Ranking do grupo", action: "exec", handler: "showLeaderboard" },
       { label: "📋 Meus palpites", action: "exec", handler: "showMyPredictions" },
@@ -137,7 +137,9 @@ const worldcupFlow = createFlow("copa", {
         return { noRender: true };
       }
       try {
-        const chat = await ctx.message.getChat();
+        const chat = ctx.client?.getChatById
+          ? await ctx.client.getChatById(ctx.chatId)
+          : await ctx.message.getChat();
         const participants = chat.participants || [];
         const userIds = participants.map((p) => p.id._serialized || p.id.user + "@c.us");
         const { leaderboard } = await worldcupClient.getLeaderboard(ctx.chatId, userIds);
