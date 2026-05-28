@@ -84,9 +84,19 @@ async function syncData() {
   return backendClient.sendToBackend("/api/internal/worldcup/sync", {}, "POST");
 }
 
+async function submitChampionPrediction(userId, team) {
+  return backendClient.sendToBackend("/api/worldcup/predictions/champion", { userId, team }, "POST");
+}
+
+async function getChampionPrediction(userId) {
+  return backendClient.sendToBackend(`/api/worldcup/predictions/champion/${encodeURIComponent(userId)}`, null, "GET");
+}
+
 module.exports = {
   getNextMatches,
   getStandingsGrouped,
+  submitChampionPrediction,
+  getChampionPrediction,
   activateGroup,
   deactivateGroup,
   getGroupSettings,

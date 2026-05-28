@@ -77,4 +77,33 @@ function matchup(home, away) {
   return `${withFlag(home)} x ${withFlag(away)}`;
 }
 
-module.exports = { localize, toPt, withFlag, matchup };
+/** Retorna os 5 times cujo nome PT-BR mais se aproxima da query. */
+function searchTeams(query, limit = 5) {
+  const q = query.trim().toLowerCase()
+    .normalize("NFD").replace(/[̀-ͯ]/g, "");
+  if (!q) return [];
+
+  const scored = Object.values(TEAM_LOCALE)
+    .filter((v) => v.pt !== "A definir")
+    .map((v) => {
+      const name = v.pt.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
+      let score = 0;
+      if (name === q) score = 100;
+      else if (name.startsWith(q)) score = 80;
+      else if (name.includes(q)) score = 60;
+      else if (q.length >= 3) {
+        // partial word match
+        const words = name.split(" ");
+        if (words.some((w) => w.startsWith(q))) score = 40;
+        else if (q.split(" ").some((qw) => qw.length >= 3 && name.includes(qw))) score = 20;
+      }
+      return { ...v, score };
+    })
+    .filter((v) => v.score > 0)
+    .sort((a, b) => b.score - a.score)
+    .slice(0, limit);
+
+  return scored;
+}
+
+module.exports = { localize, toPt, withFlag, matchup, searchTeams };

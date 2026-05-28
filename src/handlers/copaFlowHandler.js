@@ -3,7 +3,7 @@
 const conversationState = require("../services/conversationState");
 const worldcupClient = require("../services/worldcupClient");
 const polls = require("../components/poll");
-const { matchup } = require("../utils/teamLocale");
+const { matchup, searchTeams, withFlag } = require("../utils/teamLocale");
 const logger = require("../utils/logger");
 
 // Aceita: "2-1", "2 - 1", "2x1", "2 X 1", "2 a 1", "2a1", "2 1"
@@ -142,4 +142,90 @@ async function _submitPrediction(stateKey, data, reply) {
   }
 }
 
-module.exports = { handleCopaFlow, _submitPrediction };
+// ─── Champion handler ─────────────────────────────────────────────────────────
+
+async function handleCopaChampionFlow(stateKey, body, state, reply, opts) {
+  const data = state.data || {};
+  const client = opts && opts.client;
+  const from = opts && opts.from;
+
+  if (data.step !== "await_champion_name") {
+    conversationState.clearState(stateKey);
+    return false;
+  }
+
+  const query = body.trim();
+  if (!query) {
+    await reply("❌ Digite o nome da seleção. _(ou /cancelar para sair)_");
+    return true;
+  }
+
+  const matches = searchTeams(query, 5);
+
+  if (!matches.length) {
+    await reply(
+      `❌ Nenhuma seleção encontrada para "*${query}*".\nTente outro nome. _(ou /cancelar)_`,
+    );
+    return true;
+  }
+
+  // Uma correspondência exata → salva direto
+  if (matches.length === 1 || matches[0].score === 100) {
+    await _saveChampion(stateKey, data.userId || stateKey, matches[0].pt, matches[0].flag, reply);
+    return true;
+  }
+
+  // Múltiplos → mostra enquete
+  const optionLabels = matches.map((m) => `${m.flag} ${m.pt}`);
+  optionLabels.push("🔍 Buscar novamente");
+
+  const optionsMeta = matches.map((m, i) => ({
+    index: i,
+    label: optionLabels[i],
+    action: "exec",
+    handler: "selectChampion",
+    data: { team: m.pt, flag: m.flag, userId: data.userId || stateKey },
+  }));
+  optionsMeta.push({
+    index: optionLabels.length - 1,
+    label: "🔍 Buscar novamente",
+    action: "exec",
+    handler: "retryChampion",
+    data: { userId: data.userId || stateKey },
+  });
+
+  if (client && from) {
+    await polls.createPoll(client, from, "🏆 Qual seleção?", optionLabels, {
+      metadata: {
+        actionType: "menu",
+        flowId: "copa-palpite",
+        path: "/champion",
+        userId: data.userId || stateKey,
+        options: optionsMeta,
+      },
+    });
+  } else {
+    const lines = ["Selecione a seleção:"];
+    matches.forEach((m, i) => lines.push(`*${i + 1}.* ${m.flag} ${m.pt}`));
+    await reply(lines.join("\n"));
+  }
+
+  return true;
+}
+
+async function _saveChampion(stateKey, userId, team, flag, reply) {
+  try {
+    await worldcupClient.submitChampionPrediction(userId, team);
+    conversationState.clearState(stateKey);
+    await reply(`✅ *Palpite salvo!*\n\n🏆 Campeão: *${flag} ${team}*\n\nPode alterar até o fim da fase de grupos.`);
+    logger.info(`[copa-champion] ${userId.split("@")[0]} → ${team}`);
+  } catch (e) {
+    conversationState.clearState(stateKey);
+    const msg = e.message === "group_stage_over"
+      ? "❌ A fase de grupos acabou. Não é mais possível votar no campeão."
+      : `❌ Erro ao salvar: ${e.message}`;
+    await reply(msg);
+  }
+}
+
+module.exports = { handleCopaFlow, handleCopaChampionFlow, _submitPrediction, _saveChampion };

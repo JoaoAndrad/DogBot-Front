@@ -360,40 +360,125 @@ const worldcupPalpiteFlow = createFlow("copa-palpite", {
   root: {
     title: "🎯 *Palpites — Copa do Mundo*",
     options: [
-      { label: "📋 Meus palpites", action: "exec", handler: "showMyPredictions" },
-      { label: "🎯 Novo palpite",   action: "exec", handler: "showNewPalpite" },
-      { label: "❌ Sair",           action: "exec", handler: "leave" },
+      { label: "📋 Meus palpites",    action: "exec", handler: "showMyPredictions" },
+      { label: "🎯 Novo palpite",     action: "exec", handler: "showNewPalpite" },
+      { label: "❌ Sair",             action: "exec", handler: "leave" },
     ],
   },
 
   handlers: {
-    // ── Meus palpites ───────────────────────────────────────────────────────
-    showMyPredictions: async (ctx) => {
-      let predictions;
+    // ── Campeão da Copa ────────────────────────────────────────────────────
+    showChampionMenu: async (ctx) => {
+      const { localize } = require("../../../utils/teamLocale");
+      let current = null;
       try {
-        ({ predictions } = await worldcupClient.getUserPredictions(ctx.userId));
-      } catch (e) {
-        await ctx.reply("❌ Erro ao buscar palpites.");
-        return { end: true };
+        const r = await worldcupClient.getChampionPrediction(ctx.userId);
+        current = r && r.prediction ? r.prediction : null;
+      } catch (e) { /* sem palpite ainda */ }
+
+      const lines = ["🏆 *Campeão da Copa 2026*", ""];
+      if (current) {
+        const { pt, flag } = localize(current.team);
+        lines.push(`Seu palpite atual: *${flag} ${pt}*`);
+        if (current.points != null) {
+          lines.push(current.points === 10 ? "🎉 Acertou! +10 pts" : "❌ Não acertou");
+        } else {
+          lines.push("_(pode alterar até o fim da fase de grupos)_");
+        }
+      } else {
+        lines.push("Você ainda não votou no campeão!");
+        lines.push("_(disponível até o fim da fase de grupos)_");
       }
 
-      if (!predictions || !predictions.length) {
-        await ctx.reply("⚽ Você ainda não fez nenhum palpite.\nUse *Novo palpite* para começar!");
+      await ctx.reply(lines.join("\n"));
+
+      // Inicia input via conversationState
+      conversationState.startFlow(ctx.userId, "copa-champion-input", {
+        step: "await_champion_name",
+        userId: ctx.userId,
+      });
+      await ctx.reply(
+        current
+          ? "Digite o nome da nova seleção para alterar o palpite:\n_(ou /cancelar para sair)_"
+          : "Digite o nome da seleção campeã:\n_(ou /cancelar para sair)_",
+      );
+      return { end: true };
+    },
+
+    selectChampion: async (ctx, data) => {
+      const { _saveChampion } = require("../../../handlers/copaFlowHandler");
+      const userId = data.userId || ctx.userId;
+      await _saveChampion(userId, userId, data.team, data.flag || "", (msg) => ctx.reply(msg));
+      conversationState.clearState(userId);
+      return { end: true };
+    },
+
+    retryChampion: async (ctx, data) => {
+      const userId = data.userId || ctx.userId;
+      conversationState.startFlow(userId, "copa-champion-input", {
+        step: "await_champion_name",
+        userId,
+      });
+      await ctx.reply("Digite novamente o nome da seleção:\n_(ou /cancelar para sair)_");
+      return { end: true };
+    },
+
+    // ── Meus palpites ───────────────────────────────────────────────────────
+    showMyPredictions: async (ctx) => {
+      const { localize } = require("../../../utils/teamLocale");
+      let predictions;
+      let championPrediction = null;
+      try {
+        [{ predictions }, { prediction: championPrediction }] = await Promise.all([
+          worldcupClient.getUserPredictions(ctx.userId),
+          worldcupClient.getChampionPrediction(ctx.userId),
+        ]);
+      } catch (e) {
+        await ctx.reply("❌ Erro ao buscar palpites.");
         return { end: true };
       }
 
       const optionLabels = [];
       const optionsMeta = [];
 
+      // Campeão sempre no topo
+      if (championPrediction) {
+        const { pt, flag } = localize(championPrediction.team);
+        const pts = championPrediction.points != null
+          ? ` — ${championPrediction.points === 10 ? "🎉 +10 pts" : "❌ 0 pts"}`
+          : " — aguardando";
+        const label = `🏆 Campeão: ${flag} ${pt}${pts}`.slice(0, 100);
+        optionLabels.push(label);
+        optionsMeta.push({
+          index: 0, label, action: "exec", handler: "showChampionMenu", data: {},
+        });
+      } else {
+        const label = "🏆 Votar no Campeão da Copa";
+        optionLabels.push(label);
+        optionsMeta.push({
+          index: 0, label, action: "exec", handler: "showChampionMenu", data: {},
+        });
+      }
+
+      if (!predictions || !predictions.length) {
+        optionLabels.push("🔙 Voltar");
+        optionsMeta.push({ index: optionLabels.length - 1, label: "🔙 Voltar", action: "exec", handler: "backToRoot", data: {} });
+        await polls.createPoll(ctx.client, ctx.chatId, "📋 Meus palpites", optionLabels, {
+          metadata: { actionType: "menu", flowId: "copa-palpite", path: "/my", userId: ctx.userId, options: optionsMeta },
+        });
+        return { end: true };
+      }
+
       for (let i = 0; i < predictions.length; i++) {
         const p = predictions[i];
         const m = p.match;
         const label = predictionLabel(p);
         optionLabels.push(label);
+        const idx = optionLabels.length - 1;
 
         const isEditable = m.status === "scheduled";
         optionsMeta.push({
-          index: i,
+          index: idx,
           label,
           action: "exec",
           handler: isEditable ? "selectMatch" : "showPredictionDetail",
