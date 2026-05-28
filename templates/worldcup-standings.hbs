@@ -6,90 +6,98 @@
     * { box-sizing: border-box; margin: 0; padding: 0; }
 
     body {
-      background: #e8ecf0;
-      padding: 20px;
+      background: transparent;
+      padding: 0;
+      margin: 0;
       font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
       display: flex;
       flex-direction: column;
-      gap: 20px;
-      width: 560px;
+      gap: 0;
+      width: 512px;
     }
 
     .card {
       background: #ffffff;
-      border-radius: 20px;
-      box-shadow: 0 4px 24px rgba(0,0,0,.10), 0 1px 4px rgba(0,0,0,.06);
+      border-radius: 0;
       overflow: hidden;
+      width: 512px;
     }
 
+    /* ── Header ─────────────────────────────── */
     .header {
       background: linear-gradient(135deg, #1a4b8c 0%, #2563c4 100%);
-      padding: 16px 20px;
+      padding: 18px 22px;
       display: flex;
       align-items: center;
-      gap: 12px;
+      gap: 14px;
     }
 
     .header-logo {
-      width: 34px;
-      height: 34px;
+      width: 46px;
+      height: 46px;
       object-fit: contain;
       border-radius: 50%;
       flex-shrink: 0;
-      background: rgba(255,255,255,.15);
-      padding: 3px;
+      background: rgba(255,255,255,.18);
+      padding: 4px;
     }
 
     .header-title {
       color: #fff;
-      font-size: 20px;
-      font-weight: 700;
-      letter-spacing: -0.3px;
+      font-size: 26px;
+      font-weight: 800;
+      letter-spacing: -0.5px;
+      line-height: 1.1;
     }
 
     .header-subtitle {
-      color: rgba(255,255,255,.6);
-      font-size: 11px;
-      font-weight: 500;
-      margin-top: 1px;
+      color: rgba(255,255,255,.65);
+      font-size: 12px;
+      font-weight: 600;
+      margin-top: 2px;
       text-transform: uppercase;
-      letter-spacing: 0.8px;
+      letter-spacing: 1px;
     }
 
+    /* ── Column headers ─────────────────────── */
     .col-headers {
       display: grid;
-      grid-template-columns: 36px 1fr 44px 44px 44px;
-      padding: 8px 18px 6px;
-      background: #f8f9fb;
-      border-bottom: 1px solid #eaecef;
+      grid-template-columns: 48px 1fr 56px 52px 52px;
+      padding: 10px 22px 8px;
+      background: #f4f6f9;
+      border-bottom: 1px solid #e2e6ea;
     }
 
     .col-headers span {
-      font-size: 10px;
-      font-weight: 700;
-      color: #8a93a2;
+      font-size: 11px;
+      font-weight: 800;
+      color: #7b8597;
       text-transform: uppercase;
-      letter-spacing: 0.6px;
+      letter-spacing: 0.8px;
       text-align: center;
     }
 
-    .col-headers .col-team { text-align: left; padding-left: 4px; }
+    .col-headers .col-team { text-align: left; padding-left: 2px; }
 
+    /* ── Row ────────────────────────────────── */
     .row {
       display: grid;
-      grid-template-columns: 36px 1fr 44px 44px 44px;
-      padding: 10px 18px;
+      grid-template-columns: 48px 1fr 56px 52px 52px;
+      padding: 14px 22px;
       align-items: center;
       border-bottom: 1px solid #f0f2f5;
     }
 
     .row:last-child { border-bottom: none; }
 
-    .row.leader { background: linear-gradient(90deg, #fffbeb 0%, #fff 100%); }
+    .row.leader {
+      background: linear-gradient(90deg, #fffbeb 0%, #fefefe 100%);
+    }
 
+    /* ── Position ───────────────────────────── */
     .pos {
-      font-size: 13px;
-      font-weight: 700;
+      font-size: 15px;
+      font-weight: 800;
       color: #374151;
       text-align: center;
     }
@@ -98,65 +106,74 @@
       display: inline-flex;
       align-items: center;
       justify-content: center;
-      width: 20px;
-      height: 20px;
+      width: 26px;
+      height: 26px;
       border-radius: 50%;
-      font-size: 11px;
-      font-weight: 800;
+      font-size: 13px;
+      font-weight: 900;
     }
 
     .pos-badge.qualify { background: #dcfce7; color: #15803d; }
     .pos-badge.leader-b { background: #fef3c7; color: #d97706; }
 
+    /* ── Team ───────────────────────────────── */
     .team {
       display: flex;
       align-items: center;
-      gap: 8px;
-      padding-left: 4px;
+      gap: 10px;
+      padding-left: 2px;
     }
 
-    .team-flag { font-size: 20px; line-height: 1; flex-shrink: 0; }
-    .team-flag img { width: 26px; height: 26px; object-fit: contain; vertical-align: middle; border-radius: 3px; }
+    .team-flag { line-height: 1; flex-shrink: 0; }
+    .team-flag img { width: 32px; height: 32px; object-fit: contain; vertical-align: middle; border-radius: 3px; display: block; }
 
     .team-name {
-      font-size: 13px;
-      font-weight: 600;
+      font-size: 16px;
+      font-weight: 700;
       color: #1f2937;
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
     }
 
+    /* ── Stats ──────────────────────────────── */
     .stat {
-      font-size: 13px;
-      font-weight: 600;
+      font-size: 15px;
+      font-weight: 700;
       color: #374151;
       text-align: center;
     }
 
-    .stat.pts { font-weight: 800; color: #1a4b8c; font-size: 14px; }
+    .stat.pts {
+      font-weight: 900;
+      color: #1a4b8c;
+      font-size: 17px;
+    }
+
     .stat.sg-pos { color: #16a34a; }
     .stat.sg-neg { color: #dc2626; }
-    .stat.sg-zero { color: #6b7280; }
+    .stat.sg-zero { color: #9ca3af; }
 
+    /* ── Footer ─────────────────────────────── */
     .footer {
-      background: #f8f9fb;
-      padding: 8px 18px;
+      background: #f4f6f9;
+      padding: 9px 22px;
       display: flex;
       align-items: center;
-      gap: 14px;
-      border-top: 1px solid #eaecef;
+      gap: 16px;
+      border-top: 1px solid #e2e6ea;
     }
 
     .legend {
       display: flex;
       align-items: center;
-      gap: 5px;
-      font-size: 10px;
-      color: #8a93a2;
+      gap: 6px;
+      font-size: 11px;
+      font-weight: 600;
+      color: #7b8597;
     }
 
-    .legend-dot { width: 7px; height: 7px; border-radius: 50%; }
+    .legend-dot { width: 8px; height: 8px; border-radius: 50%; }
     .legend-dot.qualify { background: #15803d; }
   </style>
 </head>

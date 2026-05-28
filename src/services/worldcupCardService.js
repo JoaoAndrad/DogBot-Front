@@ -87,16 +87,18 @@ async function renderStandingsCard(groupsData) {
   const page = await browser.newPage();
 
   try {
-    // Viewport largo o suficiente, altura provisória
-    await page.setViewport({ width: 560, height: 800, deviceScaleFactor: 2 });
-    // networkidle0 garante que as imagens Twemoji (CDN) foram carregadas
+    await page.setViewport({ width: 512, height: 800, deviceScaleFactor: 2 });
     await page.setContent(html, { waitUntil: "networkidle0" });
 
-    // Mede a altura real do conteúdo e ajusta o viewport
+    // Ajusta viewport à altura exata do conteúdo (sem whitespace)
     const contentHeight = await page.evaluate(() => document.body.scrollHeight);
-    await page.setViewport({ width: 560, height: contentHeight, deviceScaleFactor: 2 });
+    await page.setViewport({ width: 512, height: contentHeight, deviceScaleFactor: 2 });
 
-    const buffer = await page.screenshot({ type: "png", fullPage: false });
+    const buffer = await page.screenshot({
+      type: "png",
+      fullPage: false,
+      omitBackground: true, // fundo transparente
+    });
     return buffer;
   } finally {
     await page.close();
