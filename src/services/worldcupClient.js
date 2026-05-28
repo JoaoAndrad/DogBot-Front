@@ -26,8 +26,8 @@ async function getNextMatch() {
   return backendClient.sendToBackend("/api/worldcup/matches/next", null, "GET");
 }
 
-async function getNextMatches(limit = 5) {
-  return backendClient.sendToBackend(`/api/worldcup/matches/upcoming?limit=${limit}`, null, "GET");
+async function getNextMatches(limit = 5, offset = 0) {
+  return backendClient.sendToBackend(`/api/worldcup/matches/upcoming?limit=${limit}&offset=${offset}`, null, "GET");
 }
 
 async function getMatchesToday() {

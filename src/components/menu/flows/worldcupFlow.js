@@ -3,6 +3,7 @@
 const { createFlow } = require("../flowBuilder");
 const worldcupClient = require("../../../services/worldcupClient");
 const conversationState = require("../../../services/conversationState");
+const polls = require("../../poll");
 const logger = require("../../../utils/logger");
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -203,68 +204,146 @@ const worldcupFlow = createFlow("copa", {
 
 // ─── Prediction flow (private chat) ──────────────────────────────────────────
 
+const PAGE_SIZE = 10;
+
+async function showMatchPage(ctx, data) {
+  const page = (data && data.page) || 0;
+  const offset = page * PAGE_SIZE;
+
+  let result;
+  try {
+    result = await worldcupClient.getNextMatches(PAGE_SIZE, offset);
+  } catch (e) {
+    logger.error("[copa-palpite] getNextMatches:", e.message);
+    await ctx.reply("❌ Erro ao carregar jogos.");
+    return { end: true };
+  }
+
+  const { matches, hasMore } = result;
+
+  if (!matches || !matches.length) {
+    await ctx.reply("⚽ Nenhum jogo disponível para palpite no momento.");
+    return { end: true };
+  }
+
+  let predByMatchId = {};
+  try {
+    const { predictions } = await worldcupClient.getUserPredictions(ctx.userId);
+    for (const p of predictions || []) predByMatchId[p.match_id] = p;
+  } catch (e) { /* optional */ }
+
+  const optionLabels = [];
+  const optionsMeta = [];
+
+  for (let i = 0; i < matches.length; i++) {
+    const m = matches[i];
+    const kickoff = new Date(m.kickoff_at);
+    const date = kickoff.toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo", day: "2-digit", month: "2-digit" });
+    const time = kickoff.toLocaleTimeString("pt-BR", { timeZone: "America/Sao_Paulo", hour: "2-digit", minute: "2-digit" });
+    const pred = predByMatchId[m.id];
+    const predTag = pred ? ` ✏️ ${pred.predicted_home}-${pred.predicted_away}` : "";
+    const label = `${m.home_team} x ${m.away_team} · ${date} ${time}${predTag}`.slice(0, 100);
+
+    optionLabels.push(label);
+    optionsMeta.push({
+      index: i,
+      label,
+      action: "exec",
+      handler: "showMatchPage",
+      data: {
+        matchId: m.id,
+        homeTeam: m.home_team,
+        awayTeam: m.away_team,
+        kickoffAt: m.kickoff_at,
+        venue: m.venue || null,
+      },
+    });
+    // Override: selecting a match should go to selectMatch, not showMatchPage
+    optionsMeta[i].handler = "selectMatch";
+  }
+
+  if (hasMore) {
+    const nextLabel = `➡️ Ver mais jogos (pág. ${page + 2})`;
+    optionLabels.push(nextLabel);
+    optionsMeta.push({
+      index: optionLabels.length - 1,
+      label: nextLabel,
+      action: "exec",
+      handler: "showMatchPage",
+      data: { page: page + 1 },
+    });
+  }
+
+  optionLabels.push("❌ Sair");
+  optionsMeta.push({
+    index: optionLabels.length - 1,
+    label: "❌ Sair",
+    action: "exec",
+    handler: "leave",
+    data: {},
+  });
+
+  const pageLabel = page > 0 ? ` — pág. ${page + 1}` : "";
+  await polls.createPoll(
+    ctx.client,
+    ctx.chatId,
+    `🎯 Palpites — Copa 2026${pageLabel}`,
+    optionLabels,
+    {
+      metadata: {
+        actionType: "menu",
+        flowId: "copa-palpite",
+        path: "/",
+        userId: ctx.userId,
+        options: optionsMeta,
+      },
+    },
+  );
+
+  return { end: true };
+}
+
 const worldcupPalpiteFlow = createFlow("copa-palpite", {
   root: {
     title: "🎯 *Palpites — Copa do Mundo*",
     dynamic: true,
     handler: async (ctx) => {
-      try {
-        const { match } = await worldcupClient.getNextMatch();
-        if (!match) {
-          return {
-            title: "⚽ Nenhum jogo disponível para palpite no momento.",
-            skipPoll: true,
-          };
-        }
-        const kickoff = new Date(match.kickoff_at);
-        const time = kickoff.toLocaleTimeString("pt-BR", { timeZone: "America/Sao_Paulo", hour: "2-digit", minute: "2-digit" });
-        const date = kickoff.toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo", day: "2-digit", month: "2-digit" });
-        return {
-          title: `🎯 *Palpite — ${match.home_team} 🆚 ${match.away_team}*\n📅 ${date} às ${time}\n\nQual o seu palpite?`,
-          options: [
-            { label: "Vitória do time da casa", action: "exec", handler: "startPrediction", data: { matchId: match.id, homeTeam: match.home_team, awayTeam: match.away_team } },
-            { label: "Empate", action: "exec", handler: "startPredictionDraw", data: { matchId: match.id, homeTeam: match.home_team, awayTeam: match.away_team } },
-            { label: "Vitória visitante", action: "exec", handler: "startPredictionAway", data: { matchId: match.id, homeTeam: match.home_team, awayTeam: match.away_team } },
-            { label: "👋 Sair", action: "exec", handler: "leave" },
-          ],
-        };
-      } catch (e) {
-        return { title: "❌ Erro ao carregar jogo.", skipPoll: true };
-      }
+      // Delegate to showMatchPage — root kicks off page 0
+      await showMatchPage(ctx, { page: 0 });
+      return { skipPoll: true };
     },
   },
 
   handlers: {
-    startPrediction: async (ctx, data) => {
-      conversationState.startFlow(ctx.userId, "copa-palpite-input", {
-        step: "await_home_score",
-        matchId: data.matchId,
-        homeTeam: data.homeTeam,
-        awayTeam: data.awayTeam,
-      });
-      await ctx.reply(`⚽ Quantos gols marca *${data.homeTeam}*? (só o número)`);
-      return { end: true };
-    },
+    showMatchPage: async (ctx, data) => showMatchPage(ctx, data),
 
-    startPredictionDraw: async (ctx, data) => {
-      conversationState.startFlow(ctx.userId, "copa-palpite-input", {
-        step: "await_home_score_draw",
-        matchId: data.matchId,
-        homeTeam: data.homeTeam,
-        awayTeam: data.awayTeam,
-      });
-      await ctx.reply(`⚽ Placar do empate? Quantos gols cada time?\nDigite os gols de *${data.homeTeam}* (só o número)`);
-      return { end: true };
-    },
+    selectMatch: async (ctx, data) => {
+      const { matchId, homeTeam, awayTeam, kickoffAt, venue } = data;
 
-    startPredictionAway: async (ctx, data) => {
       conversationState.startFlow(ctx.userId, "copa-palpite-input", {
-        step: "await_home_score_away",
-        matchId: data.matchId,
-        homeTeam: data.homeTeam,
-        awayTeam: data.awayTeam,
+        step: "await_score",
+        matchId,
+        homeTeam,
+        awayTeam,
+        kickoffAt,
+        venue,
+        userId: ctx.userId,
       });
-      await ctx.reply(`⚽ Quantos gols marca *${data.homeTeam}*? (só o número)`);
+
+      const kickoff = new Date(kickoffAt);
+      const date = kickoff.toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo", day: "2-digit", month: "2-digit" });
+      const time = kickoff.toLocaleTimeString("pt-BR", { timeZone: "America/Sao_Paulo", hour: "2-digit", minute: "2-digit" });
+
+      const lines = [
+        `🎯 *${homeTeam} x ${awayTeam}*`,
+        `📅 ${date} às ${time}`,
+      ];
+      if (venue) lines.push(`🏟 ${venue}`);
+      lines.push("", "Qual o placar? Digite no formato *H-A*");
+      lines.push(`Ex: *2-1* significa ${homeTeam} 2, ${awayTeam} 1`);
+      lines.push("_(ou /cancelar para voltar)_");
+
+      await ctx.reply(lines.join("\n"));
       return { end: true };
     },
 
