@@ -483,9 +483,23 @@ const worldcupPalpiteFlow = createFlow("copa-palpite", {
         optionsMeta.push({ index: optionLabels.length - 1, label: mvpLabel, action: "exec", handler: "startMvpInput", data: {} });
       }
 
+      // Se não há nenhum palpite ainda (nem partida nem torneio), mostra texto e volta
+      const hasAny = (predictions && predictions.length) || championPrediction || zebraPrediction || mvpPrediction;
+      if (!hasAny) {
+        await ctx.reply(
+          "📋 *Meus palpites*\n\nVocê ainda não realizou nenhum palpite.\nUse *Novo palpite* para começar! 🎯",
+        );
+        return { end: true };
+      }
+
       if (!predictions || !predictions.length) {
+        // Tem só palpites de torneio — adiciona "Voltar" e verifica mínimo de 2 opções
         optionLabels.push("🔙 Voltar");
         optionsMeta.push({ index: optionLabels.length - 1, label: "🔙 Voltar", action: "exec", handler: "backToRoot", data: {} });
+        if (optionLabels.length < 2) {
+          await ctx.reply("📋 *Meus palpites*\n\nNenhum palpite de partida ainda.\nUse *Novo palpite* para começar! 🎯");
+          return { end: true };
+        }
         await polls.createPoll(ctx.client, ctx.chatId, "📋 Meus palpites", optionLabels, {
           metadata: { actionType: "menu", flowId: "copa-palpite", path: "/my", userId: ctx.userId, options: optionsMeta },
         });
