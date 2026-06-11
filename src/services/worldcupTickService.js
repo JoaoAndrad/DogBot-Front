@@ -320,7 +320,7 @@ async function sendWithMentions(client, chatId, body, mentionJids) {
 }
 
 async function handleGoal(client, action) {
-  const { match, scorer, assist, minute, predictions, groupIds, prevHome = 0, prevAway = 0, allScorers = [] } = action;
+  const { match, scorer, assist, goalDetail, minute, predictions, groupIds, prevHome = 0, prevAway = 0, allScorers = [] } = action;
   if (!groupIds || !groupIds.length) return;
 
   const score = `${match.home_score} x ${match.away_score}`;
@@ -341,8 +341,11 @@ async function handleGoal(client, action) {
 
   let scorerLine = "";
   if (scorer) {
-    scorerLine = `\n⚽ ${scorer}${minuteTag}`;
-    if (assist) scorerLine += `\n🎯 Assistência: ${assist}`;
+    const detailTag = goalDetail === "Penalty" ? " *(pênalti)*"
+      : goalDetail === "Own Goal" ? " *(gol contra)*"
+      : "";
+    scorerLine = `\n⚽ ${scorer}${minuteTag}${detailTag}`;
+    if (assist && !detailTag) scorerLine += `\n🎯 Assistência: ${assist}`;
   }
 
   for (const groupId of groupIds) {
@@ -448,6 +451,46 @@ async function handleResume(client, action) {
   for (const groupId of groupIds) {
     try { await client.sendMessage(groupId, msg); }
     catch (e) { logger.warn(`[worldcupTick] resume → ${groupId}:`, e.message); }
+  }
+}
+
+const VAR_PT = {
+  "Goal cancelled":    "Gol cancelado",
+  "Penalty confirmed": "Pênalti confirmado",
+  "Penalty cancelled": "Pênalti cancelado",
+  "Card upgrade":      "Cartão revisado",
+  "Card cancelled":    "Cartão cancelado",
+};
+
+async function handleMiss(client, action) {
+  const { miss, groupIds } = action;
+  if (!groupIds || !groupIds.length) return;
+
+  const minuteTag = miss.minute ? ` ${miss.minute}'` : "";
+  const teamFlag = withFlag(miss.team) || miss.team || "";
+  const msg = `❌ *Pênalti perdido!*\n${miss.player}${minuteTag} — ${teamFlag}`;
+
+  for (const groupId of groupIds) {
+    try { await client.sendMessage(groupId, msg); }
+    catch (e) { logger.warn(`[worldcupTick] miss → ${groupId}:`, e.message); }
+  }
+}
+
+async function handleVar(client, action) {
+  const { varEvent, groupIds } = action;
+  if (!groupIds || !groupIds.length) return;
+
+  const label = VAR_PT[varEvent.detail] || varEvent.detail || "Decisão";
+  const minuteTag = varEvent.minute ? ` ${varEvent.minute}'` : "";
+  const teamFlag = varEvent.team ? withFlag(varEvent.team) || varEvent.team : "";
+  const playerLine = varEvent.player
+    ? `\n${varEvent.player}${minuteTag}${teamFlag ? ` — ${teamFlag}` : ""}`
+    : "";
+  const msg = `🖥️ *VAR* — ${label}${playerLine}`;
+
+  for (const groupId of groupIds) {
+    try { await client.sendMessage(groupId, msg); }
+    catch (e) { logger.warn(`[worldcupTick] var → ${groupId}:`, e.message); }
   }
 }
 
@@ -557,6 +600,8 @@ async function processWorldCupTickPayload(client, payload) {
         case "resume":             await handleResume(client, action);            break;
         case "card":               await handleCard(client, action);             break;
         case "sub":                await handleSub(client, action);              break;
+        case "miss":               await handleMiss(client, action);             break;
+        case "var":                await handleVar(client, action);              break;
         case "result_notification":await handleResultNotification(client, action);break;
         case "weekly_summary":     await handleWeeklySummary(client, action);     break;
         default: logger.debug(`[worldcupTick] ação desconhecida: ${action.kind}`);
