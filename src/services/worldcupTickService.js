@@ -82,16 +82,26 @@ async function resolveNames(client, groupId, userIds) {
 }
 
 function formatPredictionsBlock(predictions, nameMap, currentHome, currentAway) {
-  if (!predictions || !predictions.length) return null;
+  const { text } = formatPredictionsBlockWithMentions(predictions, nameMap, currentHome, currentAway);
+  return text;
+}
+
+/**
+ * Igual a formatPredictionsBlock mas também retorna os JIDs dos usuários
+ * ainda concorrendo, para que possam ser mencionados na mensagem.
+ */
+function formatPredictionsBlockWithMentions(predictions, nameMap, currentHome, currentAway) {
+  if (!predictions || !predictions.length) return { text: null, mentionIds: [] };
 
   const { competing, lost } = categorizePredictions(predictions, currentHome, currentAway);
-
+  const mentionIds = [];
   const lines = ["", "📊 *Palpites:*"];
 
   if (competing.length) {
     lines.push("✅ *Ainda concorrendo*");
     for (const p of competing) {
-      lines.push(`  • ${nameMap[p.userId] || p.userId.split("@")[0]} — ${p.predictedHome}x${p.predictedAway}`);
+      mentionIds.push(p.userId);
+      lines.push(`  • @${p.userId.split("@")[0]} — ${p.predictedHome}x${p.predictedAway}`);
     }
   }
 
@@ -102,7 +112,7 @@ function formatPredictionsBlock(predictions, nameMap, currentHome, currentAway) 
     }
   }
 
-  return lines.join("\n");
+  return { text: lines.join("\n"), mentionIds };
 }
 
 function formatFinishedBlock(predictions, nameMap, finalHome, finalAway) {
@@ -262,6 +272,21 @@ async function handleReminder1h(client, action) {
   }
 }
 
+async function sendWithMentions(client, chatId, body, mentionIds) {
+  const ids = (mentionIds || []).filter(Boolean);
+  if (ids.length) {
+    try {
+      return await client.sendMessage(chatId, body, { mentions: ids });
+    } catch (_) {}
+    try {
+      const contacts = await Promise.all(ids.map((jid) => client.getContactById(jid).catch(() => null)));
+      const valid = contacts.filter(Boolean);
+      if (valid.length) return await client.sendMessage(chatId, body, { mentions: valid });
+    } catch (_) {}
+  }
+  return client.sendMessage(chatId, body);
+}
+
 async function handleGoal(client, action) {
   const { match, scorer, minute, predictions, groupIds, prevHome = 0, prevAway = 0, allScorers = [] } = action;
   if (!groupIds || !groupIds.length) return;
@@ -288,9 +313,9 @@ async function handleGoal(client, action) {
     try {
       const allUserIds = (predictions || []).map((p) => p.userId);
       const nameMap = allUserIds.length ? await resolveNames(client, groupId, allUserIds) : {};
-      const predBlock = predictions && predictions.length
-        ? formatPredictionsBlock(predictions, nameMap, match.home_score, match.away_score)
-        : null;
+      const { text: predBlock, mentionIds } = predictions && predictions.length
+        ? formatPredictionsBlockWithMentions(predictions, nameMap, match.home_score, match.away_score)
+        : { text: null, mentionIds: [] };
 
       const lines = [
         goalText,
@@ -299,7 +324,7 @@ async function handleGoal(client, action) {
       ];
       if (predBlock) lines.push(predBlock);
 
-      await client.sendMessage(groupId, lines.join("\n"));
+      await sendWithMentions(client, groupId, lines.join("\n"), mentionIds);
     } catch (e) {
       logger.warn(`[worldcupTick] goal → ${groupId}:`, e.message);
     }
