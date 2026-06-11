@@ -340,16 +340,23 @@ async function handleGoal(client, action) {
   }
 }
 
+const CARD_PT = {
+  "Yellow Card": "Cartão Amarelo",
+  "Red Card": "Cartão Vermelho",
+  "Second Yellow card": "Segundo Amarelo",
+};
+
 async function handleCard(client, action) {
   const { match, card, groupIds } = action;
   if (!groupIds || !groupIds.length) return;
 
   const isRed = card.detail === "Red Card" || card.detail === "Second Yellow card";
   const icon = isRed ? "🟥" : "🟨";
+  const label = CARD_PT[card.detail] || card.detail;
   const minuteTag = card.minute ? ` ${card.minute}'` : "";
   const teamFlag = withFlag(card.team) || card.team;
 
-  const msg = `${icon} *${card.detail}*\n${card.player}${minuteTag} — ${teamFlag}`;
+  const msg = `${icon} *${label}*\n${card.player}${minuteTag} — ${teamFlag}`;
 
   for (const groupId of groupIds) {
     try { await client.sendMessage(groupId, msg); }
