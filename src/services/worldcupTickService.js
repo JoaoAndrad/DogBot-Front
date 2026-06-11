@@ -63,7 +63,8 @@ function categorizeFinished(predictions, finalHome, finalAway) {
 function buildNameMap(predictions) {
   const map = {};
   for (const p of predictions || []) {
-    map[p.userId] = p.pushName || p.displayName || p.senderNumber || p.userId.slice(0, 8);
+    const phone = p.senderNumber ? String(p.senderNumber).split("@")[0] : null;
+    map[p.userId] = p.pushName || p.displayName || phone || p.userId.slice(0, 8);
   }
   return map;
 }
@@ -273,17 +274,22 @@ async function handleReminder1h(client, action) {
   }
 }
 
-async function sendWithMentions(client, chatId, body, mentionIds) {
-  const ids = (mentionIds || []).filter(Boolean);
-  if (ids.length) {
+async function sendWithMentions(client, chatId, body, mentionJids) {
+  const jids = (mentionJids || []).filter(Boolean);
+  if (!jids.length) return client.sendMessage(chatId, body);
+
+  // Padrão do bot: resolver contactos via getContactById antes de mencionar
+  const contacts = await Promise.all(
+    jids.map((jid) => client.getContactById(jid).catch(() => null)),
+  );
+  const valid = contacts.filter(Boolean);
+
+  if (valid.length) {
     try {
-      return await client.sendMessage(chatId, body, { mentions: ids });
-    } catch (_) {}
-    try {
-      const contacts = await Promise.all(ids.map((jid) => client.getContactById(jid).catch(() => null)));
-      const valid = contacts.filter(Boolean);
-      if (valid.length) return await client.sendMessage(chatId, body, { mentions: valid });
-    } catch (_) {}
+      return await client.sendMessage(chatId, body, { mentions: valid });
+    } catch (e) {
+      logger.warn("[worldcupTick] mentions fallback:", e.message);
+    }
   }
   return client.sendMessage(chatId, body);
 }
