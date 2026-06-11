@@ -295,7 +295,7 @@ async function sendWithMentions(client, chatId, body, mentionJids) {
 }
 
 async function handleGoal(client, action) {
-  const { match, scorer, minute, predictions, groupIds, prevHome = 0, prevAway = 0, allScorers = [] } = action;
+  const { match, scorer, assist, minute, predictions, groupIds, prevHome = 0, prevAway = 0, allScorers = [] } = action;
   if (!groupIds || !groupIds.length) return;
 
   const score = `${match.home_score} x ${match.away_score}`;
@@ -314,7 +314,11 @@ async function handleGoal(client, action) {
     allScorers,
   });
 
-  const scorerTag = scorer ? `\n${scorer}${minuteTag}` : "";
+  let scorerLine = "";
+  if (scorer) {
+    scorerLine = `\n⚽ ${scorer}${minuteTag}`;
+    if (assist) scorerLine += `\n🎯 Assistência: ${assist}`;
+  }
 
   for (const groupId of groupIds) {
     try {
@@ -325,7 +329,7 @@ async function handleGoal(client, action) {
       const lines = [
         goalText,
         ``,
-        `*${withFlag(match.home_team)} ${score} ${withFlag(match.away_team)}*${scorerTag}`,
+        `*${withFlag(match.home_team)} ${score} ${withFlag(match.away_team)}*${scorerLine}`,
       ];
       if (predBlock) lines.push(predBlock);
 
@@ -333,6 +337,38 @@ async function handleGoal(client, action) {
     } catch (e) {
       logger.warn(`[worldcupTick] goal → ${groupId}:`, e.message);
     }
+  }
+}
+
+async function handleCard(client, action) {
+  const { match, card, groupIds } = action;
+  if (!groupIds || !groupIds.length) return;
+
+  const isRed = card.detail === "Red Card" || card.detail === "Second Yellow card";
+  const icon = isRed ? "🟥" : "🟨";
+  const minuteTag = card.minute ? ` ${card.minute}'` : "";
+  const teamFlag = withFlag(card.team) || card.team;
+
+  const msg = `${icon} *${card.detail}*\n${card.player}${minuteTag} — ${teamFlag}`;
+
+  for (const groupId of groupIds) {
+    try { await client.sendMessage(groupId, msg); }
+    catch (e) { logger.warn(`[worldcupTick] card → ${groupId}:`, e.message); }
+  }
+}
+
+async function handleSub(client, action) {
+  const { match, sub, groupIds } = action;
+  if (!groupIds || !groupIds.length) return;
+
+  const minuteTag = sub.minute ? ` ${sub.minute}'` : "";
+  const teamFlag = withFlag(sub.team) || sub.team;
+
+  const msg = `🔄 *Substituição* — ${teamFlag}${minuteTag}\n⬆️ ${sub.in}\n⬇️ ${sub.out}`;
+
+  for (const groupId of groupIds) {
+    try { await client.sendMessage(groupId, msg); }
+    catch (e) { logger.warn(`[worldcupTick] sub → ${groupId}:`, e.message); }
   }
 }
 
@@ -478,6 +514,8 @@ async function processWorldCupTickPayload(client, payload) {
         case "goal":               await handleGoal(client, action);              break;
         case "halftime":           await handleHalftime(client, action);          break;
         case "resume":             await handleResume(client, action);            break;
+        case "card":               await handleCard(client, action);             break;
+        case "sub":                await handleSub(client, action);              break;
         case "result_notification":await handleResultNotification(client, action);break;
         case "weekly_summary":     await handleWeeklySummary(client, action);     break;
         default: logger.debug(`[worldcupTick] ação desconhecida: ${action.kind}`);
