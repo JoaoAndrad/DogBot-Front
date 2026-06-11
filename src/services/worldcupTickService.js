@@ -228,6 +228,31 @@ function formatStage(stage) {
   return map[stage] || stage;
 }
 
+// ─── Group member filtering ───────────────────────────────────────────────────
+
+/**
+ * Retorna o Set de JIDs dos membros de um grupo.
+ * Retorna null se não conseguir obter (fallback: mostrar todos).
+ */
+async function getGroupMemberJids(client, groupId) {
+  try {
+    const chat = await client.getChatById(groupId);
+    if (!chat || !chat.isGroup) return null;
+    return new Set((chat.participants || []).map((p) => p.id._serialized));
+  } catch (_) {
+    return null;
+  }
+}
+
+/**
+ * Filtra predictions para exibir apenas usuários membros do grupo.
+ * Se memberJids for null (falha ao obter membros), retorna todos.
+ */
+function filterForGroup(predictions, memberJids) {
+  if (!memberJids || !predictions) return predictions || [];
+  return predictions.filter((p) => p.senderNumber && memberJids.has(toJid(p.senderNumber)));
+}
+
 // ─── Action handlers ──────────────────────────────────────────────────────────
 
 async function handleReminder24h(client, action) {
@@ -322,8 +347,11 @@ async function handleGoal(client, action) {
 
   for (const groupId of groupIds) {
     try {
-      const { text: predBlock, mentionIds } = predictions && predictions.length
-        ? formatPredictionsBlockWithMentions(predictions, match.home_score, match.away_score)
+      const memberJids = await getGroupMemberJids(client, groupId);
+      const groupPreds = filterForGroup(predictions, memberJids);
+
+      const { text: predBlock, mentionIds } = groupPreds.length
+        ? formatPredictionsBlockWithMentions(groupPreds, match.home_score, match.away_score)
         : { text: null, mentionIds: [] };
 
       const lines = [
@@ -387,8 +415,11 @@ async function handleHalftime(client, action) {
 
   for (const groupId of groupIds) {
     try {
-      const predBlock = predictions && predictions.length
-        ? formatPredictionsBlock(predictions, match.home_score ?? 0, match.away_score ?? 0)
+      const memberJids = await getGroupMemberJids(client, groupId);
+      const groupPreds = filterForGroup(predictions, memberJids);
+
+      const predBlock = groupPreds.length
+        ? formatPredictionsBlock(groupPreds, match.home_score ?? 0, match.away_score ?? 0)
         : null;
 
       const lines = [
@@ -430,8 +461,11 @@ async function handleResultNotification(client, action) {
 
   for (const groupId of groupIds) {
     try {
-      const predBlock = predictions && predictions.length
-        ? formatFinishedBlock(predictions, finalHome, finalAway)
+      const memberJids = await getGroupMemberJids(client, groupId);
+      const groupPreds = filterForGroup(predictions, memberJids);
+
+      const predBlock = groupPreds.length
+        ? formatFinishedBlock(groupPreds, finalHome, finalAway)
         : null;
 
       const lines = [
@@ -440,7 +474,7 @@ async function handleResultNotification(client, action) {
         `${matchup(match.home_team, match.away_team)} — *${score}*`,
       ];
       if (predBlock) lines.push(predBlock);
-      if (predictions && predictions.length) {
+      if (groupPreds.length) {
         lines.push("", `Use */placar* para ver o ranking atualizado.`);
       }
 
