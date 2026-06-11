@@ -54,9 +54,11 @@ module.exports = {
         const participant = jid
           ? participants.find((p) => (p.id._serialized || p.id.user + "@c.us") === jid)
           : null;
-        const name = participant
-          ? (participant.pushname || participant.name)
-          : (entry.pushName || entry.displayName || (jid ? jid.split("@")[0] : "?"));
+        const name =
+          (participant && (participant.pushname || participant.name)) ||
+          entry.pushName ||
+          entry.displayName ||
+          (jid ? jid.split("@")[0] : "?");
         lines.push(`${medal} ${name} — *${entry.totalPoints} pts* (${entry.predictionsScored} palpite(s))`);
       }
 
