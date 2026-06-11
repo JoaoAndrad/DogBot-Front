@@ -361,6 +361,22 @@ async function handleHalftime(client, action) {
   }
 }
 
+async function handleResume(client, action) {
+  const { match, groupIds } = action;
+  if (!groupIds || !groupIds.length) return;
+
+  const score = `${match.home_score ?? 0} x ${match.away_score ?? 0}`;
+  const msg = [
+    `▶️ *Segundo tempo!*`,
+    `${withFlag(match.home_team)} ${score} ${withFlag(match.away_team)}`,
+  ].join("\n");
+
+  for (const groupId of groupIds) {
+    try { await client.sendMessage(groupId, msg); }
+    catch (e) { logger.warn(`[worldcupTick] resume → ${groupId}:`, e.message); }
+  }
+}
+
 async function handleResultNotification(client, action) {
   const { match, predictions, groupIds } = action;
   if (!groupIds || !groupIds.length) return;
@@ -461,6 +477,7 @@ async function processWorldCupTickPayload(client, payload) {
         case "reminder_1h":        await handleReminder1h(client, action);        break;
         case "goal":               await handleGoal(client, action);              break;
         case "halftime":           await handleHalftime(client, action);          break;
+        case "resume":             await handleResume(client, action);            break;
         case "result_notification":await handleResultNotification(client, action);break;
         case "weekly_summary":     await handleWeeklySummary(client, action);     break;
         default: logger.debug(`[worldcupTick] ação desconhecida: ${action.kind}`);
