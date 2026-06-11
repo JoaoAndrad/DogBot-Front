@@ -57,42 +57,37 @@ function categorizeFinished(predictions, finalHome, finalAway) {
 }
 
 /**
- * Tenta resolver nome de exibição de um userId a partir dos participantes do grupo.
- * Fallback: número de telefone.
+ * Constrói mapa de nomes a partir dos dados já incluídos nas predictions (vindos do DB).
+ * Fallback: número de telefone ou fragmento do userId.
  */
-async function resolveNames(client, groupId, userIds) {
-  const nameMap = {};
-  try {
-    const chat = await client.getChatById(groupId);
-    const participants = chat.participants || [];
-    for (const uid of userIds) {
-      const p = participants.find(
-        (x) => (x.id._serialized || `${x.id.user}@c.us`) === uid,
-      );
-      if (p) {
-        nameMap[uid] = p.pushname || p.name || uid.split("@")[0];
-      } else {
-        nameMap[uid] = uid.split("@")[0];
-      }
-    }
-  } catch (e) {
-    for (const uid of userIds) nameMap[uid] = uid.split("@")[0];
+function buildNameMap(predictions) {
+  const map = {};
+  for (const p of predictions || []) {
+    map[p.userId] = p.pushName || p.displayName || p.senderNumber || p.userId.slice(0, 8);
   }
-  return nameMap;
+  return map;
 }
 
-function formatPredictionsBlock(predictions, nameMap, currentHome, currentAway) {
-  const { text } = formatPredictionsBlockWithMentions(predictions, nameMap, currentHome, currentAway);
+/** Constrói JID WhatsApp a partir do senderNumber. */
+function toJid(senderNumber) {
+  if (!senderNumber) return null;
+  const num = String(senderNumber).trim();
+  return num.includes("@") ? num : `${num}@c.us`;
+}
+
+function formatPredictionsBlock(predictions, currentHome, currentAway) {
+  const { text } = formatPredictionsBlockWithMentions(predictions, currentHome, currentAway);
   return text;
 }
 
 /**
- * Igual a formatPredictionsBlock mas também retorna os JIDs dos usuários
- * ainda concorrendo, para que possam ser mencionados na mensagem.
+ * Formata bloco de palpites e retorna JIDs dos usuários ainda concorrendo para mention.
+ * Competing: mencionados com @telefone. Lost: nome do DB, sem mention.
  */
-function formatPredictionsBlockWithMentions(predictions, nameMap, currentHome, currentAway) {
+function formatPredictionsBlockWithMentions(predictions, currentHome, currentAway) {
   if (!predictions || !predictions.length) return { text: null, mentionIds: [] };
 
+  const nameMap = buildNameMap(predictions);
   const { competing, lost } = categorizePredictions(predictions, currentHome, currentAway);
   const mentionIds = [];
   const lines = ["", "📊 *Palpites:*"];
@@ -100,40 +95,46 @@ function formatPredictionsBlockWithMentions(predictions, nameMap, currentHome, c
   if (competing.length) {
     lines.push("✅ *Ainda concorrendo*");
     for (const p of competing) {
-      mentionIds.push(p.userId);
-      lines.push(`  • @${p.userId.split("@")[0]} — ${p.predictedHome}x${p.predictedAway}`);
+      const jid = toJid(p.senderNumber);
+      if (jid) {
+        mentionIds.push(jid);
+        lines.push(`  • @${String(p.senderNumber).split("@")[0]} — ${p.predictedHome}x${p.predictedAway}`);
+      } else {
+        lines.push(`  • ${nameMap[p.userId]} — ${p.predictedHome}x${p.predictedAway}`);
+      }
     }
   }
 
   if (lost.length) {
     lines.push("❌ *Já perderam*");
     for (const p of lost) {
-      lines.push(`  • ${nameMap[p.userId] || p.userId.split("@")[0]} — ${p.predictedHome}x${p.predictedAway}`);
+      lines.push(`  • ${nameMap[p.userId]} — ${p.predictedHome}x${p.predictedAway}`);
     }
   }
 
   return { text: lines.join("\n"), mentionIds };
 }
 
-function formatFinishedBlock(predictions, nameMap, finalHome, finalAway) {
+function formatFinishedBlock(predictions, finalHome, finalAway) {
   if (!predictions || !predictions.length) return null;
 
+  const nameMap = buildNameMap(predictions);
   const { exact, winner, wrong } = categorizeFinished(predictions, finalHome, finalAway);
   const lines = ["", "🏆 *Palpites:*"];
 
   if (exact.length) {
     lines.push("🎯 *Placar exato — 3 pts*");
-    for (const p of exact) lines.push(`  • ${nameMap[p.userId] || p.userId.split("@")[0]} — ${p.predictedHome}x${p.predictedAway} ✓`);
+    for (const p of exact) lines.push(`  • ${nameMap[p.userId]} — ${p.predictedHome}x${p.predictedAway} ✓`);
   }
 
   if (winner.length) {
     lines.push("✓ *Vencedor certo — 1 pt*");
-    for (const p of winner) lines.push(`  • ${nameMap[p.userId] || p.userId.split("@")[0]} — ${p.predictedHome}x${p.predictedAway}`);
+    for (const p of winner) lines.push(`  • ${nameMap[p.userId]} — ${p.predictedHome}x${p.predictedAway}`);
   }
 
   if (wrong.length) {
     lines.push("❌ *Sem pontos*");
-    for (const p of wrong) lines.push(`  • ${nameMap[p.userId] || p.userId.split("@")[0]} — ${p.predictedHome}x${p.predictedAway}`);
+    for (const p of wrong) lines.push(`  • ${nameMap[p.userId]} — ${p.predictedHome}x${p.predictedAway}`);
   }
 
   return lines.join("\n");
@@ -311,10 +312,8 @@ async function handleGoal(client, action) {
 
   for (const groupId of groupIds) {
     try {
-      const allUserIds = (predictions || []).map((p) => p.userId);
-      const nameMap = allUserIds.length ? await resolveNames(client, groupId, allUserIds) : {};
       const { text: predBlock, mentionIds } = predictions && predictions.length
-        ? formatPredictionsBlockWithMentions(predictions, nameMap, match.home_score, match.away_score)
+        ? formatPredictionsBlockWithMentions(predictions, match.home_score, match.away_score)
         : { text: null, mentionIds: [] };
 
       const lines = [
@@ -339,10 +338,8 @@ async function handleHalftime(client, action) {
 
   for (const groupId of groupIds) {
     try {
-      const allUserIds = (predictions || []).map((p) => p.userId);
-      const nameMap = allUserIds.length ? await resolveNames(client, groupId, allUserIds) : {};
       const predBlock = predictions && predictions.length
-        ? formatPredictionsBlock(predictions, nameMap, match.home_score ?? 0, match.away_score ?? 0)
+        ? formatPredictionsBlock(predictions, match.home_score ?? 0, match.away_score ?? 0)
         : null;
 
       const lines = [
@@ -368,10 +365,8 @@ async function handleResultNotification(client, action) {
 
   for (const groupId of groupIds) {
     try {
-      const allUserIds = (predictions || []).map((p) => p.userId);
-      const nameMap = allUserIds.length ? await resolveNames(client, groupId, allUserIds) : {};
       const predBlock = predictions && predictions.length
-        ? formatFinishedBlock(predictions, nameMap, finalHome, finalAway)
+        ? formatFinishedBlock(predictions, finalHome, finalAway)
         : null;
 
       const lines = [
