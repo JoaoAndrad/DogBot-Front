@@ -92,6 +92,7 @@ const worldcupFlow = createFlow("copa", {
       { label: "⏰ Prazos para palpitar",        action: "exec", handler: "faqPrazos" },
       { label: "📋 Comandos disponíveis",        action: "exec", handler: "faqComandos" },
       { label: "🔔 Notificações do grupo",       action: "exec", handler: "faqNotificacoes" },
+      { label: "🎲 Bolão",                       action: "exec", handler: "faqBolao" },
       { label: "🔙 Voltar",                      action: "back" },
     ],
   },
@@ -174,6 +175,24 @@ const worldcupFlow = createFlow("copa", {
         "📊 *Resumo semanal* toda segunda-feira às 8h",
         "",
         "Para ativar/desativar notificações específicas, use ⚙️ Configurações.",
+      ].join("\n"));
+      return { noRender: true };
+    },
+
+    faqBolao: async (ctx) => {
+      await ctx.reply([
+        "🎲 *Bolão da Copa*",
+        "",
+        "O bolão é uma competição *dentro deste grupo*, separada do ranking geral.",
+        "",
+        "Quando um admin ativa o */bolao*, todos os participantes entram com a pontuação zerada — independente dos pontos que já tinham antes. Só contam os pontos conquistados *a partir daquele momento*.",
+        "",
+        "Isso niveala o jogo: quem entrou tarde no bolão de palpites tem a mesma chance de vencer que quem está desde o início.",
+        "",
+        "💰 *Sobre o prêmio:*",
+        "Uma parte do valor arrecadado cobre a assinatura da API que usamos para detectar gols e eventos em tempo real. O restante vai *inteiro para o vencedor do bolão* 🏆",
+        "",
+        "Use */placar* para ver o ranking atual do bolão.",
       ].join("\n"));
       return { noRender: true };
     },
