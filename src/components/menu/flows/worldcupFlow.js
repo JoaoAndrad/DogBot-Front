@@ -266,8 +266,7 @@ const worldcupFlow = createFlow("copa", {
         const lines = ["🏆 *Ranking — Copa do Mundo*", ""];
         for (let i = 0; i < leaderboard.length; i++) {
           const e = leaderboard[i];
-          const p = participants.find((x) => (x.id._serialized || x.id.user + "@c.us") === e.userId);
-          const name = p ? (p.pushname || p.name || e.userId.split("@")[0]) : e.userId.split("@")[0];
+          const name = e.pushName || e.displayName || (e.senderNumber ? e.senderNumber.split("@")[0] : "?");
           lines.push(`${medals[i] || `${i + 1}.`} ${name} — *${e.totalPoints} pts*`);
         }
         await ctx.reply(lines.join("\n"));
