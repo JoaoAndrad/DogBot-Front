@@ -462,9 +462,9 @@ function predictionLabel(p) {
 
   if (m.status === "finished" || m.status === "live" || m.status === "paused") {
     const realScore = m.home_score != null ? `${m.home_score}x${m.away_score}` : "?x?";
-    return `${icon} ${withFlag(m.home_team)} ${m.home_team} x ${withFlag(m.away_team)} ${m.away_team} · ${realScore} — meu: ${myScore}`.slice(0, 100);
+    return `${icon} ${withFlag(m.home_team)} x ${withFlag(m.away_team)} · ${realScore} — meu: ${myScore}`.slice(0, 100);
   }
-  return `${icon} ${withFlag(m.home_team)} ${m.home_team} x ${withFlag(m.away_team)} ${m.away_team} · ${date} ${time} — ${myScore}`.slice(0, 100);
+  return `${icon} ${withFlag(m.home_team)} x ${withFlag(m.away_team)} · ${date} ${time} — ${myScore}`.slice(0, 100);
 }
 
 // ─── Prediction flow ──────────────────────────────────────────────────────────
@@ -753,7 +753,7 @@ const worldcupPalpiteFlow = createFlow("copa-palpite", {
       const title =
         `🎯 Confirmar palpite?\n${matchup(matchData.homeTeam, matchData.awayTeam)}\n` +
         `*${matchData.predictedHome} x ${matchData.predictedAway}* · ${date} ${time}\n` +
-        `🔮 Avança: *${withFlag(data.team)} ${data.team}*`;
+        `🔮 Avança: *${withFlag(data.team)}*`;
       const options = ["✅ Confirmar", "✏️ Corrigir placar", "❌ Cancelar"];
       const pollMeta = {
         actionType: "menu", flowId: "copa-palpite", path: "/confirm", userId: stateKey,
