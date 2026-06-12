@@ -101,15 +101,7 @@ async function sendPollAbuseBanNotice(chatId, voterJid, banMs) {
     } catch (e) {
       logger.warn("[PollComponent] aviso ban enquetes (mentions JID)", e.message);
       try {
-        const contacts = await Promise.all([
-          whatsappClient.getContactById(voterJid).catch(() => null),
-        ]);
-        const valid = contacts.filter(Boolean);
-        if (valid.length) {
-          await whatsappClient.sendMessage(chatId, body, { mentions: valid });
-        } else {
-          await whatsappClient.sendMessage(chatId, body);
-        }
+        await whatsappClient.sendMessage(chatId, body);
       } catch (e2) {
         logger.warn("[PollComponent] aviso ban enquetes fallback", e2.message);
       }

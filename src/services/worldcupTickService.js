@@ -337,21 +337,12 @@ async function handleReminder1h(client, action) {
 async function sendWithMentions(client, chatId, body, mentionJids) {
   const jids = (mentionJids || []).filter(Boolean);
   if (!jids.length) return client.sendMessage(chatId, body);
-
-  // Padrão do bot: resolver contactos via getContactById antes de mencionar
-  const contacts = await Promise.all(
-    jids.map((jid) => client.getContactById(jid).catch(() => null)),
-  );
-  const valid = contacts.filter(Boolean);
-
-  if (valid.length) {
-    try {
-      return await client.sendMessage(chatId, body, { mentions: valid });
-    } catch (e) {
-      logger.warn("[worldcupTick] mentions fallback:", e.message);
-    }
+  try {
+    return await client.sendMessage(chatId, body, { mentions: jids });
+  } catch (e) {
+    logger.warn("[worldcupTick] mentions fallback:", e.message);
+    return client.sendMessage(chatId, body);
   }
-  return client.sendMessage(chatId, body);
 }
 
 async function handleGoal(client, action) {

@@ -122,15 +122,9 @@ async function sendBodyWithOptionalMentions(client, chatId, bodyText, mentionWaI
       logger.warn("[routineTick] mentions (JID)", e.message);
     }
     try {
-      const contacts = await Promise.all(
-        ids.map((jid) => client.getContactById(jid).catch(() => null)),
-      );
-      const valid = contacts.filter(Boolean);
-      if (valid.length) {
-        return client.sendMessage(chatId, bodyText, { mentions: valid });
-      }
+      return client.sendMessage(chatId, bodyText);
     } catch (e2) {
-      logger.warn("[routineTick] mentions (Contact)", e2.message);
+      logger.warn("[routineTick] mentions fallback", e2.message);
     }
   }
   return client.sendMessage(chatId, bodyText);
