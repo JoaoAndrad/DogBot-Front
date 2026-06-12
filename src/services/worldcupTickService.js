@@ -276,12 +276,14 @@ async function handleKickoff(client, action) {
         `🔒 Palpites encerrados — boa sorte! 🍀`,
       ];
 
+      let mentionIds = [];
       if (groupPreds.length) {
-        const predBlock = formatPredictionsBlock(groupPreds, 0, 0);
+        const { text: predBlock, mentionIds: ids } = formatPredictionsBlockWithMentions(groupPreds, 0, 0);
         if (predBlock) lines.push(``, predBlock);
+        mentionIds = ids;
       }
 
-      await client.sendMessage(groupId, lines.join("\n"));
+      await sendWithMentions(client, groupId, lines.join("\n"), mentionIds);
     } catch (e) {
       logger.warn(`[worldcupTick] kickoff → ${groupId}:`, e.message);
     }
