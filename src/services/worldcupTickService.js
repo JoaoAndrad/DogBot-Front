@@ -255,6 +255,39 @@ function filterForGroup(predictions, memberJids) {
 
 // ─── Action handlers ──────────────────────────────────────────────────────────
 
+async function handleKickoff(client, action) {
+  const { match, predictions, groupIds } = action;
+  if (!groupIds || !groupIds.length) return;
+
+  const { time } = fmtKickoff(match.kickoff_at);
+  const stage = fmtStage(match);
+
+  for (const groupId of groupIds) {
+    try {
+      const memberJids = await getGroupMemberJids(client, groupId);
+      const groupPreds = filterForGroup(predictions, memberJids);
+
+      const lines = [
+        `⚽ *Jogo começou!*`,
+        ``,
+        `${matchup(match.home_team, match.away_team)}`,
+        `🕐 ${time} · ${stage}`,
+        ``,
+        `🔒 Palpites encerrados — boa sorte! 🍀`,
+      ];
+
+      if (groupPreds.length) {
+        const predBlock = formatPredictionsBlock(groupPreds, 0, 0);
+        if (predBlock) lines.push(``, predBlock);
+      }
+
+      await client.sendMessage(groupId, lines.join("\n"));
+    } catch (e) {
+      logger.warn(`[worldcupTick] kickoff → ${groupId}:`, e.message);
+    }
+  }
+}
+
 async function handleReminder24h(client, action) {
   const { match, groupIds } = action;
   if (!groupIds || !groupIds.length) return;
@@ -593,6 +626,7 @@ async function processWorldCupTickPayload(client, payload) {
   for (const action of actions) {
     try {
       switch (action.kind) {
+        case "kickoff":            await handleKickoff(client, action);           break;
         case "reminder_24h":       await handleReminder24h(client, action);       break;
         case "reminder_1h":        await handleReminder1h(client, action);        break;
         case "goal":               await handleGoal(client, action);              break;

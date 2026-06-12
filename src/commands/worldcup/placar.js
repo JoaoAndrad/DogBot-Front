@@ -59,7 +59,9 @@ module.exports = {
           entry.pushName ||
           entry.displayName ||
           (jid ? jid.split("@")[0] : "?");
-        lines.push(`${medal} ${name} — *${entry.totalPoints} pts* (${entry.predictionsScored} palpite(s))`);
+        const pts = entry.totalPoints === 1 ? "pt" : "pts";
+        const palpites = entry.predictionsScored === 1 ? "palpite" : "palpites";
+        lines.push(`${medal} ${name} — *${entry.totalPoints} ${pts}* (${entry.predictionsScored} ${palpites})`);
       }
 
       await client.sendMessage(chatId, lines.join("\n"));
