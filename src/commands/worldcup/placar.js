@@ -35,6 +35,33 @@ module.exports = {
       const participants = chat.participants || [];
       const userIds = participants.map((p) => p.id._serialized || p.id.user + "@c.us");
 
+      // Verifica se há bolão ativo — se sim, usa pontuação do bolão
+      let bolaoData = null;
+      try {
+        bolaoData = await worldcupClient.getBolao(chatId);
+      } catch (_) {}
+
+      const hasBolao = bolaoData && bolaoData.bolao && bolaoData.leaderboard && bolaoData.leaderboard.length > 0;
+
+      if (hasBolao) {
+        const { leaderboard } = bolaoData;
+        const lines = ["🎲 *Bolão da Copa — Ranking*", ""];
+        const medals = ["🥇", "🥈", "🥉"];
+
+        for (let i = 0; i < leaderboard.length; i++) {
+          const entry = leaderboard[i];
+          const medal = medals[i] || `${i + 1}.`;
+          const name = entry.pushName || entry.displayName || (entry.senderNumber ? entry.senderNumber.split("@")[0] : "?");
+          const pts = entry.bolaoPoints === 1 ? "pt" : "pts";
+          lines.push(`${medal} ${name} — *${entry.bolaoPoints} ${pts}*`);
+        }
+
+        lines.push("", "_Pontuação contada a partir da criação do bolão_");
+        await client.sendMessage(chatId, lines.join("\n"));
+        return;
+      }
+
+      // Ranking geral
       const { leaderboard } = await worldcupClient.getLeaderboard(chatId, userIds);
 
       if (!leaderboard || !leaderboard.length) {
@@ -48,20 +75,14 @@ module.exports = {
       for (let i = 0; i < leaderboard.length; i++) {
         const entry = leaderboard[i];
         const medal = medals[i] || `${i + 1}.`;
-        const jid = entry.senderNumber
-          ? (String(entry.senderNumber).includes("@") ? entry.senderNumber : `${entry.senderNumber}@c.us`)
-          : null;
-        const participant = jid
-          ? participants.find((p) => (p.id._serialized || p.id.user + "@c.us") === jid)
-          : null;
         const name =
-          (participant && (participant.pushname || participant.name)) ||
           entry.pushName ||
           entry.displayName ||
-          (jid ? jid.split("@")[0] : "?");
+          (entry.senderNumber ? entry.senderNumber.split("@")[0] : "?");
         const pts = entry.totalPoints === 1 ? "pt" : "pts";
-        const palpites = entry.predictionsScored === 1 ? "palpite" : "palpites";
-        lines.push(`${medal} ${name} — *${entry.totalPoints} ${pts}* (${entry.predictionsScored} ${palpites})`);
+        const palpites = entry._count && entry._count.points === 1 ? "palpite" : "palpites";
+        const count = entry._count ? entry._count.points : 0;
+        lines.push(`${medal} ${name} — *${entry.totalPoints} ${pts}* (${count} ${palpites})`);
       }
 
       await client.sendMessage(chatId, lines.join("\n"));

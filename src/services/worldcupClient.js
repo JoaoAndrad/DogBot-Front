@@ -70,6 +70,16 @@ async function getWeeklyLeaderboard(groupId, userIds) {
   return backendClient.sendToBackend("/api/worldcup/leaderboard/weekly", { groupId, userIds }, "POST");
 }
 
+// ─── Bolão ────────────────────────────────────────────────────────────────────
+
+async function getBolao(groupId) {
+  return backendClient.sendToBackend(`/api/worldcup/bolao/${encodeURIComponent(groupId)}`, null, "GET");
+}
+
+async function createBolao(groupId, senderNumbers, { name, createdBy } = {}) {
+  return backendClient.sendToBackend("/api/worldcup/bolao", { groupId, senderNumbers, name, createdBy }, "POST");
+}
+
 // ─── Internal tick ───────────────────────────────────────────────────────────
 
 async function worldCupTick(nowIso) {
@@ -133,4 +143,6 @@ module.exports = {
   worldCupTick,
   goalPoll,
   syncData,
+  getBolao,
+  createBolao,
 };

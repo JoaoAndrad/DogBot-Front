@@ -638,12 +638,20 @@ async function processWorldCupTickPayload(client, payload) {
         case "var":                await handleVar(client, action);              break;
         case "result_notification":await handleResultNotification(client, action);break;
         case "weekly_summary":     await handleWeeklySummary(client, action);     break;
+        case "bolao_member_removed": await handleBolaoMemberRemoved(client, action); break;
         default: logger.debug(`[worldcupTick] ação desconhecida: ${action.kind}`);
       }
     } catch (e) {
       logger.error(`[worldcupTick] erro em ${action.kind}:`, e.message);
     }
   }
+}
+
+// action: { kind, groupId, removedName }
+async function handleBolaoMemberRemoved(client, action) {
+  const { groupId, removedName } = action;
+  const text = `🎲 *${removedName || "Participante"}* foi removido do bolão pelos administradores.`;
+  await client.sendMessage(groupId, text);
 }
 
 module.exports = { processWorldCupTickPayload };
