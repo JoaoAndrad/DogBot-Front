@@ -57,6 +57,22 @@ module.exports = {
         }
 
         lines.push("", "_Pontuação contada a partir da criação do bolão_");
+
+        // Ranking geral do grupo (pontuação total, todos os participantes)
+        try {
+          const { leaderboard: general } = await worldcupClient.getLeaderboard(chatId, userIds);
+          if (general && general.length) {
+            lines.push("", "──────────────────", "🏆 *Ranking Geral do Grupo*", "");
+            for (let i = 0; i < general.length; i++) {
+              const entry = general[i];
+              const medal = medals[i] || `${i + 1}.`;
+              const name = entry.pushName || entry.displayName || (entry.senderNumber ? entry.senderNumber.split("@")[0] : "?");
+              const pts = entry.totalPoints === 1 ? "pt" : "pts";
+              lines.push(`${medal} ${name} — *${entry.totalPoints} ${pts}*`);
+            }
+          }
+        } catch (_) {}
+
         await client.sendMessage(chatId, lines.join("\n"));
         return;
       }
