@@ -57,6 +57,18 @@ module.exports = {
       return;
     }
 
+    // Verifica se já existe bolão ativo
+    try {
+      const existing = await worldcupClient.getBolao(chatId);
+      if (existing && existing.bolao) {
+        await client.sendMessage(
+          chatId,
+          "🎲 Este grupo já tem um bolão ativo.\n\nPara substituí-lo, desative o atual pelo painel de administração e depois use */bolao* novamente.",
+        );
+        return;
+      }
+    } catch (_) {}
+
     // Coleta JIDs de todos os participantes
     const senderNumbers = participants.map((p) => p.id._serialized || `${p.id.user}@c.us`);
 
