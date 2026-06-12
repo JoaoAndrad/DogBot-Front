@@ -161,6 +161,7 @@ function formatFinishedBlock(predictions, finalHome, finalAway) {
     finalHome,
     finalAway,
   );
+  const isDraw = finalHome === finalAway;
   const lines = ["", "🏆 *Palpites:*"];
 
   if (exact.length) {
@@ -172,7 +173,7 @@ function formatFinishedBlock(predictions, finalHome, finalAway) {
   }
 
   if (winner.length) {
-    lines.push("✓ *Vencedor certo — 1 pt*");
+    lines.push(isDraw ? "✓ *Acertou o empate — 1 pt*" : "✓ *Vencedor certo — 1 pt*");
     for (const p of winner)
       lines.push(
         `  • ${nameMap[p.userId]} — ${p.predictedHome}x${p.predictedAway}`,
@@ -655,6 +656,8 @@ async function handleResultNotification(client, action) {
   const finalHome = match.home_score ?? 0;
   const finalAway = match.away_score ?? 0;
   const score = `${finalHome} x ${finalAway}`;
+  const worldcupClient = require("./worldcupClient");
+  const medals = ["🥇", "🥈", "🥉"];
 
   for (const groupId of groupIds) {
     try {
@@ -671,11 +674,60 @@ async function handleResultNotification(client, action) {
         `${matchup(match.home_team, match.away_team)} — *${score}*`,
       ];
       if (predBlock) lines.push(predBlock);
-      if (groupPreds.length) {
-        lines.push("", `Use */placar* para ver o ranking atualizado.`);
-      }
 
       await client.sendMessage(groupId, lines.join("\n"));
+
+      // Segunda mensagem: placar (bolão ou geral), fixada por 24h
+      try {
+        const memberJidsList = memberJids ? [...memberJids] : [];
+        let rankingLines = null;
+
+        const bolaoData = await worldcupClient.getBolao(groupId).catch(() => null);
+        if (bolaoData && bolaoData.bolao && bolaoData.leaderboard && bolaoData.leaderboard.length) {
+          rankingLines = ["🎲 *Bolão da Copa — Ranking*", ""];
+          for (let i = 0; i < bolaoData.leaderboard.length; i++) {
+            const e = bolaoData.leaderboard[i];
+            const name = e.pushName || e.displayName || (e.senderNumber ? e.senderNumber.split("@")[0] : "?");
+            const pts = e.bolaoPoints === 1 ? "pt" : "pts";
+            rankingLines.push(`${medals[i] || `${i + 1}.`} ${name} — *${e.bolaoPoints} ${pts}*`);
+          }
+          rankingLines.push("", "_Pontuação desde a criação do bolão_");
+
+          // Ranking geral abaixo do bolão
+          if (memberJidsList.length) {
+            const { leaderboard: general } = await worldcupClient.getLeaderboard(groupId, memberJidsList).catch(() => ({ leaderboard: [] }));
+            if (general && general.length) {
+              rankingLines.push("", "──────────────────", "🏆 *Ranking Geral do Grupo*", "");
+              for (let i = 0; i < general.length; i++) {
+                const e = general[i];
+                const name = e.pushName || e.displayName || (e.senderNumber ? e.senderNumber.split("@")[0] : "?");
+                const pts = e.totalPoints === 1 ? "pt" : "pts";
+                rankingLines.push(`${medals[i] || `${i + 1}.`} ${name} — *${e.totalPoints} ${pts}*`);
+              }
+            }
+          }
+        } else if (memberJidsList.length) {
+          const { leaderboard } = await worldcupClient.getLeaderboard(groupId, memberJidsList).catch(() => ({ leaderboard: [] }));
+          if (leaderboard && leaderboard.length) {
+            rankingLines = ["🏆 *Ranking — Copa do Mundo*", ""];
+            for (let i = 0; i < leaderboard.length; i++) {
+              const e = leaderboard[i];
+              const name = e.pushName || e.displayName || (e.senderNumber ? e.senderNumber.split("@")[0] : "?");
+              const pts = e.totalPoints === 1 ? "pt" : "pts";
+              rankingLines.push(`${medals[i] || `${i + 1}.`} ${name} — *${e.totalPoints} ${pts}*`);
+            }
+          }
+        }
+
+        if (rankingLines) {
+          const rankMsg = await client.sendMessage(groupId, rankingLines.join("\n"));
+          if (rankMsg && typeof rankMsg.pin === "function") {
+            await rankMsg.pin(86400).catch(() => {});
+          }
+        }
+      } catch (rankErr) {
+        logger.warn(`[worldcupTick] ranking após resultado → ${groupId}:`, rankErr.message);
+      }
     } catch (e) {
       logger.warn(
         `[worldcupTick] result_notification → ${groupId}:`,
