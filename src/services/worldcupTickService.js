@@ -166,57 +166,61 @@ function getGoalText({ prevHome = 0, prevAway = 0, newHome, newAway, homeTeam, a
   else if (isAddedTime)   timing = " nos acréscimos";
   else if (isHalfTimeEnd) timing = " no fim do primeiro tempo";
 
-  const name = scorer || "Gol";
+  const name = scorer || null;
   const flag = withFlag(scoringTeam);
+
+  // Prefixo: com ou sem autor
+  const by   = (text) => name ? `*${name} ${text}` : `*${text}`;
+  const gol  = (text) => name ? `⚽ *${name} ${text}` : `⚽ *${text}`;
 
   // Priority order ─────────────────────────────────
 
   // 13. Hat-trick
-  if (scorerGoalCount >= 3) return `🎩 *HAT-TRICK de ${name}!*${timing}`;
+  if (name && scorerGoalCount >= 3) return `🎩 *HAT-TRICK de ${name}!*${timing}`;
 
   // 12. Brace
-  if (scorerGoalCount === 2) return `🔁 *${name} marca de novo!*${timing}`;
+  if (name && scorerGoalCount === 2) return `🔁 *${name} marca de novo!*${timing}`;
 
   // 10. Knockout + empate nos acréscimos
   if (isKnockout && scoringTeamPrev === otherTeamPrev - 1 && isAddedTime)
-    return `🤯 *${name} empata nos acréscimos!* Caminho para os pênaltis...`;
+    return `🤯 ${by(`empata nos acréscimos!*`)} Caminho para os pênaltis...`;
 
   // 9. Knockout + empate
   if (isKnockout && scoringTeamPrev === otherTeamPrev - 1)
-    return `🔥 *${name} empata para ${flag} ${scoringTeam}!*${timing} Caminho para os pênaltis...`;
+    return `🔥 ${by(`empata para ${flag}!*${timing}`)} Caminho para os pênaltis...`;
 
   // 11. Knockout + toma a frente (virada)
   if (isKnockout && scoringTeamPrev === otherTeamPrev)
-    return `🚨 *${name} vira o jogo!*${timing} ${flag} ${scoringTeam} na frente na ${formatStage(stage)}.`;
+    return `🚨 ${by(`vira o jogo!*${timing}`)} ${flag} na frente na ${formatStage(stage)}.`;
 
   // 9 (alt). Knockout + abre
   if (isKnockout && isFirst)
-    return `⚡ *${name} abre o placar!*${timing} Gol decisivo na ${formatStage(stage)}!`;
+    return `⚡ ${by(`abre o placar!*${timing}`)} Gol decisivo na ${formatStage(stage)}!`;
 
   // 7. Abre o placar
-  if (isFirst) return `⚽ *${name} abre o placar!*${timing}`;
+  if (isFirst) return `${gol(`abre o placar!*${timing}`)}`;
 
   // 8 (acréscimos). Empate nos acréscimos
   if (scoringTeamPrev === otherTeamPrev - 1 && isAddedTime)
-    return `🤯 *${name} empata nos acréscimos!*`;
+    return `🤯 ${by(`empata nos acréscimos!*`)}`;
 
   // 8. Empata
   if (scoringTeamPrev === otherTeamPrev - 1)
-    return `⚽ *${name} empata para ${flag} ${scoringTeam}!*${timing}`;
+    return `${gol(`empata para ${flag}!*${timing}`)}`;
 
   // 9 (alt). Toma a frente de empate
   if (scoringTeamPrev === otherTeamPrev)
-    return `⚽ *${name} coloca ${flag} ${scoringTeam} na frente!*${timing}`;
+    return `${gol(`coloca ${flag} na frente!*${timing}`)}`;
 
   // 4. Amplia
   if (scoringTeamPrev > otherTeamPrev)
-    return `⚽ *${name} amplia!*${timing}`;
+    return `${gol(`amplia!*${timing}`)}`;
 
   // 5. Desconta
   if (scoringTeamPrev < otherTeamPrev - 1)
-    return `⚽ *${name} desconta para ${flag} ${scoringTeam}!*${timing}`;
+    return `${gol(`desconta para ${flag}!*${timing}`)}`;
 
-  return `⚽ *Gol de ${name}!*${timing}`;
+  return name ? `⚽ *Gol de ${name}!*${timing}` : `⚽ *Goooool de ${flag}!*${timing}`;
 }
 
 function formatStage(stage) {

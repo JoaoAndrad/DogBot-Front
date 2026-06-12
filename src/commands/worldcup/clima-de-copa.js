@@ -26,6 +26,11 @@ module.exports = {
       logger.debug("[clima-de-copa] getContact error:", e.message);
     }
 
+    if (!context.lookupResult || context.lookupResult.confessions_vip !== true) {
+      await client.sendMessage(chatId, "🚫 O comando */clima-de-copa* é exclusivo para membros VIP do DogBot.");
+      return;
+    }
+
     const body = (message.body || "").trim().toLowerCase();
     const isOff = body.endsWith("off");
 
