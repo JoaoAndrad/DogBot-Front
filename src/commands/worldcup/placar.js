@@ -96,8 +96,8 @@ module.exports = {
           entry.displayName ||
           (entry.senderNumber ? entry.senderNumber.split("@")[0] : "?");
         const pts = entry.totalPoints === 1 ? "pt" : "pts";
-        const palpites = entry._count && entry._count.points === 1 ? "palpite" : "palpites";
-        const count = entry._count ? entry._count.points : 0;
+        const count = entry.predictionsScored || 0;
+        const palpites = count === 1 ? "palpite" : "palpites";
         lines.push(`${medal} ${name} — *${entry.totalPoints} ${pts}* (${count} ${palpites})`);
       }
 
