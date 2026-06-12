@@ -7,14 +7,30 @@ const { withFlag, matchup } = require("../utils/teamLocale");
 
 function fmtKickoff(kickoffAt) {
   const d = new Date(kickoffAt);
-  const date = d.toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo", weekday: "long", day: "2-digit", month: "2-digit" });
-  const time = d.toLocaleTimeString("pt-BR", { timeZone: "America/Sao_Paulo", hour: "2-digit", minute: "2-digit" });
+  const date = d.toLocaleDateString("pt-BR", {
+    timeZone: "America/Sao_Paulo",
+    weekday: "long",
+    day: "2-digit",
+    month: "2-digit",
+  });
+  const time = d.toLocaleTimeString("pt-BR", {
+    timeZone: "America/Sao_Paulo",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
   return { date, time };
 }
 
 function fmtStage(match) {
-  if (match.group_name) return `Grupo ${match.group_name.replace("GROUP_", "").replace("Group ", "")}`;
-  const map = { round_of_16: "16 avos", quarter_final: "Quartas", semi_final: "Semifinal", third_place: "3º Lugar", final: "Final" };
+  if (match.group_name)
+    return `Grupo ${match.group_name.replace("GROUP_", "").replace("Group ", "")}`;
+  const map = {
+    round_of_16: "16 avos",
+    quarter_final: "Quartas",
+    semi_final: "Semifinal",
+    third_place: "3º Lugar",
+    final: "Final",
+  };
   return map[match.stage] || match.stage || "";
 }
 
@@ -64,7 +80,8 @@ function buildNameMap(predictions) {
   const map = {};
   for (const p of predictions || []) {
     const phone = p.senderNumber ? String(p.senderNumber).split("@")[0] : null;
-    map[p.userId] = p.pushName || p.displayName || phone || p.userId.slice(0, 8);
+    map[p.userId] =
+      p.pushName || p.displayName || phone || p.userId.slice(0, 8);
   }
   return map;
 }
@@ -77,7 +94,11 @@ function toJid(senderNumber) {
 }
 
 function formatPredictionsBlock(predictions, currentHome, currentAway) {
-  const { text } = formatPredictionsBlockWithMentions(predictions, currentHome, currentAway);
+  const { text } = formatPredictionsBlockWithMentions(
+    predictions,
+    currentHome,
+    currentAway,
+  );
   return text;
 }
 
@@ -85,31 +106,46 @@ function formatPredictionsBlock(predictions, currentHome, currentAway) {
  * Formata bloco de palpites e retorna JIDs dos usuários ainda concorrendo para mention.
  * Competing: mencionados com @telefone. Lost: nome do DB, sem mention.
  */
-function formatPredictionsBlockWithMentions(predictions, currentHome, currentAway) {
-  if (!predictions || !predictions.length) return { text: null, mentionIds: [] };
+function formatPredictionsBlockWithMentions(
+  predictions,
+  currentHome,
+  currentAway,
+) {
+  if (!predictions || !predictions.length)
+    return { text: null, mentionIds: [] };
 
   const nameMap = buildNameMap(predictions);
-  const { competing, lost } = categorizePredictions(predictions, currentHome, currentAway);
+  const { competing, lost } = categorizePredictions(
+    predictions,
+    currentHome,
+    currentAway,
+  );
   const mentionIds = [];
   const lines = ["", "📊 *Palpites:*"];
 
   if (competing.length) {
-    lines.push("✅ *Ainda concorrendo*");
+    lines.push("\n✅ *Ainda concorrendo:*\n");
     for (const p of competing) {
       const jid = toJid(p.senderNumber);
       if (jid) {
         mentionIds.push(jid);
-        lines.push(`  • @${String(p.senderNumber).split("@")[0]} — ${p.predictedHome}x${p.predictedAway}`);
+        lines.push(
+          `  • @${String(p.senderNumber).split("@")[0]} — ${p.predictedHome}x${p.predictedAway}`,
+        );
       } else {
-        lines.push(`  • ${nameMap[p.userId]} — ${p.predictedHome}x${p.predictedAway}`);
+        lines.push(
+          `  • ${nameMap[p.userId]} — ${p.predictedHome}x${p.predictedAway}`,
+        );
       }
     }
   }
 
   if (lost.length) {
-    lines.push("❌ *Já perderam*");
+    lines.push("\n❌ *Já perderam 🤣:*\n");
     for (const p of lost) {
-      lines.push(`  • ${nameMap[p.userId]} — ${p.predictedHome}x${p.predictedAway}`);
+      lines.push(
+        `  • ${nameMap[p.userId]} — ${p.predictedHome}x${p.predictedAway}`,
+      );
     }
   }
 
@@ -120,22 +156,35 @@ function formatFinishedBlock(predictions, finalHome, finalAway) {
   if (!predictions || !predictions.length) return null;
 
   const nameMap = buildNameMap(predictions);
-  const { exact, winner, wrong } = categorizeFinished(predictions, finalHome, finalAway);
+  const { exact, winner, wrong } = categorizeFinished(
+    predictions,
+    finalHome,
+    finalAway,
+  );
   const lines = ["", "🏆 *Palpites:*"];
 
   if (exact.length) {
     lines.push("🎯 *Placar exato — 3 pts*");
-    for (const p of exact) lines.push(`  • ${nameMap[p.userId]} — ${p.predictedHome}x${p.predictedAway} ✓`);
+    for (const p of exact)
+      lines.push(
+        `  • ${nameMap[p.userId]} — ${p.predictedHome}x${p.predictedAway} ✓`,
+      );
   }
 
   if (winner.length) {
     lines.push("✓ *Vencedor certo — 1 pt*");
-    for (const p of winner) lines.push(`  • ${nameMap[p.userId]} — ${p.predictedHome}x${p.predictedAway}`);
+    for (const p of winner)
+      lines.push(
+        `  • ${nameMap[p.userId]} — ${p.predictedHome}x${p.predictedAway}`,
+      );
   }
 
   if (wrong.length) {
     lines.push("❌ *Sem pontos*");
-    for (const p of wrong) lines.push(`  • ${nameMap[p.userId]} — ${p.predictedHome}x${p.predictedAway}`);
+    for (const p of wrong)
+      lines.push(
+        `  • ${nameMap[p.userId]} — ${p.predictedHome}x${p.predictedAway}`,
+      );
   }
 
   return lines.join("\n");
@@ -143,43 +192,57 @@ function formatFinishedBlock(predictions, finalHome, finalAway) {
 
 // ─── Goal context logic (13 combinations) ────────────────────────────────────
 
-function getGoalText({ prevHome = 0, prevAway = 0, newHome, newAway, homeTeam, awayTeam, scorer, minute, stage, allScorers = [] }) {
+function getGoalText({
+  prevHome = 0,
+  prevAway = 0,
+  newHome,
+  newAway,
+  homeTeam,
+  awayTeam,
+  scorer,
+  minute,
+  stage,
+  allScorers = [],
+}) {
   const homeScored = newHome > prevHome;
-  const scoringTeam    = homeScored ? homeTeam : awayTeam;
+  const scoringTeam = homeScored ? homeTeam : awayTeam;
   const scoringTeamPrev = homeScored ? prevHome : prevAway;
-  const otherTeamPrev   = homeScored ? prevAway : prevHome;
+  const otherTeamPrev = homeScored ? prevAway : prevHome;
 
-  const isKnockout    = stage && stage !== "group";
-  const isExtraTime   = minute != null && minute > 90;
-  const isAddedTime   = minute != null && minute >= 88 && !isExtraTime;
+  const isKnockout = stage && stage !== "group";
+  const isExtraTime = minute != null && minute > 90;
+  const isAddedTime = minute != null && minute >= 88 && !isExtraTime;
   const isHalfTimeEnd = minute != null && minute >= 43 && minute <= 45;
-  const isFirst       = prevHome === 0 && prevAway === 0;
+  const isFirst = prevHome === 0 && prevAway === 0;
 
   // Hat-trick / brace detection
   const scorerGoalCount = scorer
-    ? allScorers.filter((n) => n && n.toLowerCase() === scorer.toLowerCase()).length
+    ? allScorers.filter((n) => n && n.toLowerCase() === scorer.toLowerCase())
+        .length
     : 0;
 
   // Timing suffix
   let timing = "";
-  if (isExtraTime)   timing = " na prorrogação";
-  else if (isAddedTime)   timing = " nos acréscimos";
+  if (isExtraTime) timing = " na prorrogação";
+  else if (isAddedTime) timing = " nos acréscimos";
   else if (isHalfTimeEnd) timing = " no fim do primeiro tempo";
 
   const name = scorer || null;
   const flag = withFlag(scoringTeam);
 
   // Prefixo: com ou sem autor
-  const by   = (text) => name ? `*${name} ${text}` : `*${text}`;
-  const gol  = (text) => name ? `⚽ *${name} ${text}` : `⚽ *${text}`;
+  const by = (text) => (name ? `*${name} ${text}` : `*${text}`);
+  const gol = (text) => (name ? `⚽ *${name} ${text}` : `⚽ *${text}`);
 
   // Priority order ─────────────────────────────────
 
   // 13. Hat-trick
-  if (name && scorerGoalCount >= 3) return `🎩 *HAT-TRICK de ${name}!*${timing}`;
+  if (name && scorerGoalCount >= 3)
+    return `🎩 *HAT-TRICK de ${name}!*${timing}`;
 
   // 12. Brace
-  if (name && scorerGoalCount === 2) return `🔁 *${name} marca de novo!*${timing}`;
+  if (name && scorerGoalCount === 2)
+    return `🔁 *${name} marca de novo!*${timing}`;
 
   // 10. Knockout + empate nos acréscimos
   if (isKnockout && scoringTeamPrev === otherTeamPrev - 1 && isAddedTime)
@@ -213,21 +276,25 @@ function getGoalText({ prevHome = 0, prevAway = 0, newHome, newAway, homeTeam, a
     return `${gol(`coloca ${flag} na frente!*${timing}`)}`;
 
   // 4. Amplia
-  if (scoringTeamPrev > otherTeamPrev)
-    return `${gol(`amplia!*${timing}`)}`;
+  if (scoringTeamPrev > otherTeamPrev) return `${gol(`amplia!*${timing}`)}`;
 
   // 5. Desconta
   if (scoringTeamPrev < otherTeamPrev - 1)
     return `${gol(`desconta para ${flag}!*${timing}`)}`;
 
-  return name ? `⚽ *Gol de ${name}!*${timing}` : `⚽ *Goooool de ${flag}!*${timing}`;
+  return name
+    ? `⚽ *Gol de ${name}!*${timing}`
+    : `⚽ *Goooool de ${flag}!*${timing}`;
 }
 
 function formatStage(stage) {
   const map = {
-    round_of_16: "oitavas", round_of_32: "16 avos",
-    quarter_final: "quartas", semi_final: "semifinal",
-    third_place: "disputa de 3º", final: "final",
+    round_of_16: "oitavas",
+    round_of_32: "16 avos",
+    quarter_final: "quartas",
+    semi_final: "semifinal",
+    third_place: "disputa de 3º",
+    final: "final",
   };
   return map[stage] || stage;
 }
@@ -254,7 +321,9 @@ async function getGroupMemberJids(client, groupId) {
  */
 function filterForGroup(predictions, memberJids) {
   if (!memberJids || !predictions) return predictions || [];
-  return predictions.filter((p) => p.senderNumber && memberJids.has(toJid(p.senderNumber)));
+  return predictions.filter(
+    (p) => p.senderNumber && memberJids.has(toJid(p.senderNumber)),
+  );
 }
 
 // ─── Action handlers ──────────────────────────────────────────────────────────
@@ -282,7 +351,8 @@ async function handleKickoff(client, action) {
 
       let mentionIds = [];
       if (groupPreds.length) {
-        const { text: predBlock, mentionIds: ids } = formatPredictionsBlockWithMentions(groupPreds, 0, 0);
+        const { text: predBlock, mentionIds: ids } =
+          formatPredictionsBlockWithMentions(groupPreds, 0, 0);
         if (predBlock) lines.push(``, predBlock);
         mentionIds = ids;
       }
@@ -313,8 +383,11 @@ async function handleReminder24h(client, action) {
   ].join("\n");
 
   for (const groupId of groupIds) {
-    try { await client.sendMessage(groupId, msg); }
-    catch (e) { logger.warn(`[worldcupTick] reminder_24h → ${groupId}:`, e.message); }
+    try {
+      await client.sendMessage(groupId, msg);
+    } catch (e) {
+      logger.warn(`[worldcupTick] reminder_24h → ${groupId}:`, e.message);
+    }
   }
 }
 
@@ -333,8 +406,11 @@ async function handleReminder1h(client, action) {
   ].join("\n");
 
   for (const groupId of groupIds) {
-    try { await client.sendMessage(groupId, msg); }
-    catch (e) { logger.warn(`[worldcupTick] reminder_1h → ${groupId}:`, e.message); }
+    try {
+      await client.sendMessage(groupId, msg);
+    } catch (e) {
+      logger.warn(`[worldcupTick] reminder_1h → ${groupId}:`, e.message);
+    }
   }
 }
 
@@ -358,7 +434,18 @@ async function sendWithMentions(client, chatId, body, mentionJids) {
 }
 
 async function handleGoal(client, action) {
-  const { match, scorer, assist, goalDetail, minute, predictions, groupIds, prevHome = 0, prevAway = 0, allScorers = [] } = action;
+  const {
+    match,
+    scorer,
+    assist,
+    goalDetail,
+    minute,
+    predictions,
+    groupIds,
+    prevHome = 0,
+    prevAway = 0,
+    allScorers = [],
+  } = action;
   if (!groupIds || !groupIds.length) return;
 
   const score = `${match.home_score} x ${match.away_score}`;
@@ -379,9 +466,12 @@ async function handleGoal(client, action) {
 
   let scorerLine = "";
   if (scorer) {
-    const detailTag = goalDetail === "Penalty" ? " *(pênalti)*"
-      : goalDetail === "Own Goal" ? " *(gol contra)*"
-      : "";
+    const detailTag =
+      goalDetail === "Penalty"
+        ? " *(pênalti)*"
+        : goalDetail === "Own Goal"
+          ? " *(gol contra)*"
+          : "";
     scorerLine = `\n⚽ ${scorer}${minuteTag}${detailTag}`;
     if (assist && !detailTag) scorerLine += `\n🎯 Assistência: ${assist}`;
   }
@@ -392,7 +482,11 @@ async function handleGoal(client, action) {
       const groupPreds = filterForGroup(predictions, memberJids);
 
       const { text: predBlock, mentionIds } = groupPreds.length
-        ? formatPredictionsBlockWithMentions(groupPreds, match.home_score, match.away_score)
+        ? formatPredictionsBlockWithMentions(
+            groupPreds,
+            match.home_score,
+            match.away_score,
+          )
         : { text: null, mentionIds: [] };
 
       const lines = [
@@ -419,7 +513,8 @@ async function handleCard(client, action) {
   const { match, card, groupIds } = action;
   if (!groupIds || !groupIds.length) return;
 
-  const isRed = card.detail === "Red Card" || card.detail === "Second Yellow card";
+  const isRed =
+    card.detail === "Red Card" || card.detail === "Second Yellow card";
   const icon = isRed ? "🟥" : "🟨";
   const label = CARD_PT[card.detail] || card.detail;
   const minuteTag = card.minute ? ` ${card.minute}'` : "";
@@ -428,8 +523,11 @@ async function handleCard(client, action) {
   const msg = `${icon} *${label}*\n${card.player}${minuteTag} — ${teamFlag}`;
 
   for (const groupId of groupIds) {
-    try { await client.sendMessage(groupId, msg); }
-    catch (e) { logger.warn(`[worldcupTick] card → ${groupId}:`, e.message); }
+    try {
+      await client.sendMessage(groupId, msg);
+    } catch (e) {
+      logger.warn(`[worldcupTick] card → ${groupId}:`, e.message);
+    }
   }
 }
 
@@ -443,8 +541,11 @@ async function handleSub(client, action) {
   const msg = `🔄 *Substituição* — ${teamFlag}${minuteTag}\n⬆️ ${sub.in}\n⬇️ ${sub.out}`;
 
   for (const groupId of groupIds) {
-    try { await client.sendMessage(groupId, msg); }
-    catch (e) { logger.warn(`[worldcupTick] sub → ${groupId}:`, e.message); }
+    try {
+      await client.sendMessage(groupId, msg);
+    } catch (e) {
+      logger.warn(`[worldcupTick] sub → ${groupId}:`, e.message);
+    }
   }
 }
 
@@ -460,7 +561,11 @@ async function handleHalftime(client, action) {
       const groupPreds = filterForGroup(predictions, memberJids);
 
       const predBlock = groupPreds.length
-        ? formatPredictionsBlock(groupPreds, match.home_score ?? 0, match.away_score ?? 0)
+        ? formatPredictionsBlock(
+            groupPreds,
+            match.home_score ?? 0,
+            match.away_score ?? 0,
+          )
         : null;
 
       const lines = [
@@ -487,17 +592,20 @@ async function handleResume(client, action) {
   ].join("\n");
 
   for (const groupId of groupIds) {
-    try { await client.sendMessage(groupId, msg); }
-    catch (e) { logger.warn(`[worldcupTick] resume → ${groupId}:`, e.message); }
+    try {
+      await client.sendMessage(groupId, msg);
+    } catch (e) {
+      logger.warn(`[worldcupTick] resume → ${groupId}:`, e.message);
+    }
   }
 }
 
 const VAR_PT = {
-  "Goal cancelled":    "Gol cancelado",
+  "Goal cancelled": "Gol cancelado",
   "Penalty confirmed": "Pênalti confirmado",
   "Penalty cancelled": "Pênalti cancelado",
-  "Card upgrade":      "Cartão revisado",
-  "Card cancelled":    "Cartão cancelado",
+  "Card upgrade": "Cartão revisado",
+  "Card cancelled": "Cartão cancelado",
 };
 
 async function handleMiss(client, action) {
@@ -509,8 +617,11 @@ async function handleMiss(client, action) {
   const msg = `❌ *Pênalti perdido!*\n${miss.player}${minuteTag} — ${teamFlag}`;
 
   for (const groupId of groupIds) {
-    try { await client.sendMessage(groupId, msg); }
-    catch (e) { logger.warn(`[worldcupTick] miss → ${groupId}:`, e.message); }
+    try {
+      await client.sendMessage(groupId, msg);
+    } catch (e) {
+      logger.warn(`[worldcupTick] miss → ${groupId}:`, e.message);
+    }
   }
 }
 
@@ -520,15 +631,20 @@ async function handleVar(client, action) {
 
   const label = VAR_PT[varEvent.detail] || varEvent.detail || "Decisão";
   const minuteTag = varEvent.minute ? ` ${varEvent.minute}'` : "";
-  const teamFlag = varEvent.team ? withFlag(varEvent.team) || varEvent.team : "";
+  const teamFlag = varEvent.team
+    ? withFlag(varEvent.team) || varEvent.team
+    : "";
   const playerLine = varEvent.player
     ? `\n${varEvent.player}${minuteTag}${teamFlag ? ` — ${teamFlag}` : ""}`
     : "";
   const msg = `🖥️ *VAR* — ${label}${playerLine}`;
 
   for (const groupId of groupIds) {
-    try { await client.sendMessage(groupId, msg); }
-    catch (e) { logger.warn(`[worldcupTick] var → ${groupId}:`, e.message); }
+    try {
+      await client.sendMessage(groupId, msg);
+    } catch (e) {
+      logger.warn(`[worldcupTick] var → ${groupId}:`, e.message);
+    }
   }
 }
 
@@ -561,7 +677,10 @@ async function handleResultNotification(client, action) {
 
       await client.sendMessage(groupId, lines.join("\n"));
     } catch (e) {
-      logger.warn(`[worldcupTick] result_notification → ${groupId}:`, e.message);
+      logger.warn(
+        `[worldcupTick] result_notification → ${groupId}:`,
+        e.message,
+      );
     }
   }
 }
@@ -573,12 +692,17 @@ async function handleWeeklySummary(client, action) {
   if (!groupSummaries || !groupSummaries.length) return;
 
   const weekStart = weekOf
-    ? new Date(weekOf).toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo", day: "2-digit", month: "2-digit" })
+    ? new Date(weekOf).toLocaleDateString("pt-BR", {
+        timeZone: "America/Sao_Paulo",
+        day: "2-digit",
+        month: "2-digit",
+      })
     : "—";
 
   // Recap dos jogos da semana
-  const matchLines = (recentMatches || []).map((m) =>
-    `• ${matchup(m.home_team, m.away_team)} — ${m.home_score}x${m.away_score}`,
+  const matchLines = (recentMatches || []).map(
+    (m) =>
+      `• ${matchup(m.home_team, m.away_team)} — ${m.home_score}x${m.away_score}`,
   );
 
   for (const gs of groupSummaries) {
@@ -594,11 +718,15 @@ async function handleWeeklySummary(client, action) {
         const p = participants.find(
           (x) => (x.id._serialized || x.id.user + "@c.us") === e.userId,
         );
-        const name = p ? (p.pushname || p.name || e.userId.split("@")[0]) : e.userId.split("@")[0];
+        const name = p
+          ? p.pushname || p.name || e.userId.split("@")[0]
+          : e.userId.split("@")[0];
         return `${medals[i] || `${e.rank}.`} ${name} — *${e.weeklyPoints} pts*`;
       });
 
-      const craqueLabel = rankingLines.length ? `🏅 *${weeklyRanking[0] ? "Craque da semana" : ""}*` : "";
+      const craqueLabel = rankingLines.length
+        ? `🏅 *${weeklyRanking[0] ? "Craque da semana" : ""}*`
+        : "";
 
       const lines = [
         `📊 *Resumo da semana — Copa 2026*`,
@@ -631,20 +759,47 @@ async function processWorldCupTickPayload(client, payload) {
   for (const action of actions) {
     try {
       switch (action.kind) {
-        case "kickoff":            await handleKickoff(client, action);           break;
-        case "reminder_24h":       await handleReminder24h(client, action);       break;
-        case "reminder_1h":        await handleReminder1h(client, action);        break;
-        case "goal":               await handleGoal(client, action);              break;
-        case "halftime":           await handleHalftime(client, action);          break;
-        case "resume":             await handleResume(client, action);            break;
-        case "card":               await handleCard(client, action);             break;
-        case "sub":                await handleSub(client, action);              break;
-        case "miss":               await handleMiss(client, action);             break;
-        case "var":                await handleVar(client, action);              break;
-        case "result_notification":await handleResultNotification(client, action);break;
-        case "weekly_summary":     await handleWeeklySummary(client, action);     break;
-        case "bolao_member_removed": await handleBolaoMemberRemoved(client, action); break;
-        default: logger.debug(`[worldcupTick] ação desconhecida: ${action.kind}`);
+        case "kickoff":
+          await handleKickoff(client, action);
+          break;
+        case "reminder_24h":
+          await handleReminder24h(client, action);
+          break;
+        case "reminder_1h":
+          await handleReminder1h(client, action);
+          break;
+        case "goal":
+          await handleGoal(client, action);
+          break;
+        case "halftime":
+          await handleHalftime(client, action);
+          break;
+        case "resume":
+          await handleResume(client, action);
+          break;
+        case "card":
+          await handleCard(client, action);
+          break;
+        case "sub":
+          await handleSub(client, action);
+          break;
+        case "miss":
+          await handleMiss(client, action);
+          break;
+        case "var":
+          await handleVar(client, action);
+          break;
+        case "result_notification":
+          await handleResultNotification(client, action);
+          break;
+        case "weekly_summary":
+          await handleWeeklySummary(client, action);
+          break;
+        case "bolao_member_removed":
+          await handleBolaoMemberRemoved(client, action);
+          break;
+        default:
+          logger.debug(`[worldcupTick] ação desconhecida: ${action.kind}`);
       }
     } catch (e) {
       logger.error(`[worldcupTick] erro em ${action.kind}:`, e.message);
