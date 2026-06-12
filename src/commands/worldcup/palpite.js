@@ -6,7 +6,15 @@ const logger = require("../../utils/logger");
 
 module.exports = {
   name: "palpite",
-  aliases: [],
+  aliases: [
+    "palpites",
+    "apostar",
+    "apostas",
+    "bet",
+    "bets",
+    "predict",
+    "prediction",
+  ],
   description: "Abre o flow de palpites da Copa (somente no privado)",
 
   async execute(context) {
@@ -15,14 +23,18 @@ module.exports = {
     const isGroup = String(chatId).endsWith("@g.us");
 
     if (isGroup) {
-      await client.sendMessage(chatId, "⚽ Os palpites são feitos no privado!\nEnvie */palpite* diretamente para mim no privado.");
+      await client.sendMessage(
+        chatId,
+        "⚽ Os palpites são feitos no privado!\nEnvie */palpite* diretamente para mim no privado.",
+      );
       return;
     }
 
     let userId = message.from;
     try {
       const contact = await message.getContact();
-      if (contact && contact.id && contact.id._serialized) userId = contact.id._serialized;
+      if (contact && contact.id && contact.id._serialized)
+        userId = contact.id._serialized;
     } catch (e) {
       logger.debug("[palpite] getContact error:", e.message);
     }
@@ -34,7 +46,10 @@ module.exports = {
         .filter((c) => c.isGroup)
         .map((c) => c.id._serialized || c.id.user + "@g.us");
 
-      const { hasGroup } = await worldcupClient.userHasActiveGroup(userId, groupIds);
+      const { hasGroup } = await worldcupClient.userHasActiveGroup(
+        userId,
+        groupIds,
+      );
 
       if (!hasGroup) {
         await client.sendMessage(
@@ -50,7 +65,10 @@ module.exports = {
     try {
       await flowManager.startFlow(client, chatId, userId, "copa-palpite");
     } catch (e) {
-      await client.sendMessage(chatId, "❌ Erro ao abrir palpite: " + e.message);
+      await client.sendMessage(
+        chatId,
+        "❌ Erro ao abrir palpite: " + e.message,
+      );
     }
   },
 };
