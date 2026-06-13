@@ -602,7 +602,11 @@ async function handleResume(client, action) {
 }
 
 const VAR_PT = {
-  "Goal cancelled": "Gol cancelado",
+  "Goal cancelled": "Gol anulado",
+  "Goal Disallowed": "Gol anulado",
+  "Goal Disallowed - offside": "Gol anulado · impedimento",
+  "Goal Disallowed - handball": "Gol anulado · mão na bola",
+  "Goal Disallowed - foul": "Gol anulado · falta",
   "Penalty confirmed": "Pênalti confirmado",
   "Penalty cancelled": "Pênalti cancelado",
   "Card upgrade": "Cartão revisado",
@@ -630,15 +634,15 @@ async function handleVar(client, action) {
   const { varEvent, groupIds } = action;
   if (!groupIds || !groupIds.length) return;
 
+  const isGoalCancel = varEvent.detail && varEvent.detail.toLowerCase().includes("goal");
   const label = VAR_PT[varEvent.detail] || varEvent.detail || "Decisão";
+  const icon = isGoalCancel ? "🚫" : "📺";
   const minuteTag = varEvent.minute ? ` ${varEvent.minute}'` : "";
-  const teamFlag = varEvent.team
-    ? withFlag(varEvent.team) || varEvent.team
-    : "";
+  const teamFlag = varEvent.team ? withFlag(varEvent.team) : "";
   const playerLine = varEvent.player
     ? `\n${varEvent.player}${minuteTag}${teamFlag ? ` — ${teamFlag}` : ""}`
-    : "";
-  const msg = `🖥️ *VAR* — ${label}${playerLine}`;
+    : (teamFlag ? `\n${teamFlag}` : "");
+  const msg = `${icon} *VAR — ${label}*${playerLine}`;
 
   for (const groupId of groupIds) {
     try {
