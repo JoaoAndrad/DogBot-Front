@@ -561,13 +561,13 @@ async function handleHalftime(client, action) {
       const memberJids = await getGroupMemberJids(client, groupId);
       const groupPreds = filterForGroup(predictions, memberJids);
 
-      const predBlock = groupPreds.length
-        ? formatPredictionsBlock(
+      const { text: predBlock, mentionIds } = groupPreds.length
+        ? formatPredictionsBlockWithMentions(
             groupPreds,
             match.home_score ?? 0,
             match.away_score ?? 0,
           )
-        : null;
+        : { text: null, mentionIds: [] };
 
       const lines = [
         `⏸ *Intervalo*`,
@@ -575,7 +575,7 @@ async function handleHalftime(client, action) {
       ];
       if (predBlock) lines.push(predBlock);
 
-      await client.sendMessage(groupId, lines.join("\n"));
+      await sendWithMentions(client, groupId, lines.join("\n"), mentionIds);
     } catch (e) {
       logger.warn(`[worldcupTick] halftime → ${groupId}:`, e.message);
     }
