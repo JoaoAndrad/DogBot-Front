@@ -163,7 +163,7 @@ function formatPredictionsBlockWithMentions(predictions, currentHome, currentAwa
       lines.push(...renderOutcomeGroups(competing, true));
     }
     if (lost.length) {
-      lines.push("\n❌ *Já perderam 🤣:*");
+      lines.push(`\n❌ *${lost.length === 1 ? "Já perdeu" : "Já perderam"} 🤣:*`);
       lines.push(...renderOutcomeGroups(lost, false));
     }
   }
