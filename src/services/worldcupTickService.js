@@ -422,6 +422,11 @@ async function handleReminder1h(client, action) {
     predictions.map((p) => toJid(p.senderNumber)).filter(Boolean),
   );
 
+  const botJid =
+    (client.info && client.info.wid && client.info.wid._serialized) ||
+    (client.info && client.info.me && client.info.me._serialized) ||
+    null;
+
   const allUnpredictedJids = new Set();
 
   for (const groupId of groupIds) {
@@ -429,7 +434,9 @@ async function handleReminder1h(client, action) {
       const memberJids = await getGroupMemberJids(client, groupId);
 
       const unpredicted = memberJids
-        ? [...memberJids].filter((jid) => jid.endsWith("@c.us") && !predictedJids.has(jid))
+        ? [...memberJids].filter(
+            (jid) => jid.endsWith("@c.us") && !predictedJids.has(jid) && jid !== botJid,
+          )
         : [];
 
       const lines = [
