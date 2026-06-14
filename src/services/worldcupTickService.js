@@ -422,6 +422,8 @@ async function handleReminder1h(client, action) {
     predictions.map((p) => toJid(p.senderNumber)).filter(Boolean),
   );
 
+  const allUnpredictedJids = new Set();
+
   for (const groupId of groupIds) {
     try {
       const memberJids = await getGroupMemberJids(client, groupId);
@@ -446,23 +448,25 @@ async function handleReminder1h(client, action) {
 
       await sendWithMentions(client, groupId, lines.join("\n"), unpredicted);
 
-      // DM para cada membro que ainda não palpitou
-      const dmText = [
-        `⏰ *Falta 1 hora para: ${matchup(match.home_team, match.away_team)}!*`,
-        ``,
-        `Você ainda não fez seu palpite para este jogo.`,
-        `Envie */palpite* agora para participar! 🎯`,
-      ].join("\n");
-
-      for (const jid of unpredicted) {
-        try {
-          await client.sendMessage(jid, dmText);
-        } catch (e) {
-          logger.warn(`[worldcupTick] reminder_1h DM → ${jid}:`, e.message);
-        }
-      }
+      for (const jid of unpredicted) allUnpredictedJids.add(jid);
     } catch (e) {
       logger.warn(`[worldcupTick] reminder_1h → ${groupId}:`, e.message);
+    }
+  }
+
+  // DM único por usuário — deduplicado entre todos os grupos Copa
+  const dmText = [
+    `⏰ *Falta 1 hora para: ${matchup(match.home_team, match.away_team)}!*`,
+    ``,
+    `Você ainda não fez seu palpite para este jogo.`,
+    `Envie */palpite* agora para participar! 🎯`,
+  ].join("\n");
+
+  for (const jid of allUnpredictedJids) {
+    try {
+      await client.sendMessage(jid, dmText);
+    } catch (e) {
+      logger.warn(`[worldcupTick] reminder_1h DM → ${jid}:`, e.message);
     }
   }
 }
