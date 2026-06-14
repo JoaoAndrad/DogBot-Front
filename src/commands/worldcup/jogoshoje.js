@@ -7,7 +7,8 @@ const logger = require("../../utils/logger");
 function formatMatch(m) {
   const kickoff = new Date(m.kickoff_at);
   const time = kickoff.toLocaleTimeString("pt-BR", { timeZone: "America/Sao_Paulo", hour: "2-digit", minute: "2-digit" });
-  const stage = m.group_name ? `Grupo ${m.group_name.replace("Group ", "")}` : "";
+  const groupLetter = m.group_name ? m.group_name.replace(/^GROUP_?/i, "").replace(/^Group\s*/i, "").trim() : "";
+  const stage = groupLetter ? `Grupo ${groupLetter}` : "";
 
   if (m.status === "live") {
     const score = m.home_score != null ? `${m.home_score} x ${m.away_score}` : "0 x 0";
