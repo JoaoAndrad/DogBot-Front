@@ -931,7 +931,11 @@ async function processWorldCupTickPayload(client, payload) {
 // action: { kind, groupId, removedName }
 async function handleBolaoMemberRemoved(client, action) {
   const { groupId, removedName } = action;
-  const text = `🎲 *${removedName || "Participante"}* foi removido do bolão pelos administradores.`;
+  const text = [
+    `🎲 *${removedName || "Participante"}* foi removido do bolão automaticamente por inadimplência.`,
+    ``,
+    `Caso seja re-adicionado futuramente, os pontos conquistados desde o início do bolão serão contabilizados normalmente.`,
+  ].join("\n");
   await client.sendMessage(groupId, text);
 }
 
