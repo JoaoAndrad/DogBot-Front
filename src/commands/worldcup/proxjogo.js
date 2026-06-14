@@ -40,7 +40,7 @@ function formatMatch(m, index) {
 
 module.exports = {
   name: "proxjogo",
-  aliases: [],
+  aliases: ["proxjogos", "proximojogo", "proximosjogos", "nextmatch", "nextmatches", "jogos"],
   description: "Mostra os próximos 5 jogos da Copa do Mundo",
 
   async execute(context) {
