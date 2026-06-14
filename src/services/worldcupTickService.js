@@ -393,22 +393,55 @@ async function handleReminder24h(client, action) {
 }
 
 async function handleReminder1h(client, action) {
-  const { match, groupIds } = action;
+  const { match, groupIds, predictions = [] } = action;
   if (!groupIds || !groupIds.length) return;
 
   const { time } = fmtKickoff(match.kickoff_at);
   const stage = fmtStage(match);
 
-  const msg = [
-    `⏰ *Em 1 hora: ${matchup(match.home_team, match.away_team)}*`,
-    `🕐 Hoje às ${time} · ${stage}`,
-    ``,
-    `🎯 Último chamado para palpites! Envie */palpite* no privado.`,
-  ].join("\n");
+  const predictedJids = new Set(
+    predictions.map((p) => toJid(p.senderNumber)).filter(Boolean),
+  );
 
   for (const groupId of groupIds) {
     try {
-      await client.sendMessage(groupId, msg);
+      const memberJids = await getGroupMemberJids(client, groupId);
+
+      const unpredicted = memberJids
+        ? [...memberJids].filter((jid) => jid.endsWith("@c.us") && !predictedJids.has(jid))
+        : [];
+
+      const lines = [
+        `⏰ *Em 1 hora: ${matchup(match.home_team, match.away_team)}*`,
+        `🕐 Hoje às ${time} · ${stage}`,
+        ``,
+        `🎯 Último chamado para palpites! Envie */palpite* no privado.`,
+      ];
+
+      if (unpredicted.length) {
+        lines.push(``, `Ainda não palpitaram:`);
+        for (const jid of unpredicted) {
+          lines.push(`  • @${jid.split("@")[0]}`);
+        }
+      }
+
+      await sendWithMentions(client, groupId, lines.join("\n"), unpredicted);
+
+      // DM para cada membro que ainda não palpitou
+      const dmText = [
+        `⏰ *Falta 1 hora para: ${matchup(match.home_team, match.away_team)}!*`,
+        ``,
+        `Você ainda não fez seu palpite para este jogo.`,
+        `Envie */palpite* agora para participar! 🎯`,
+      ].join("\n");
+
+      for (const jid of unpredicted) {
+        try {
+          await client.sendMessage(jid, dmText);
+        } catch (e) {
+          logger.warn(`[worldcupTick] reminder_1h DM → ${jid}:`, e.message);
+        }
+      }
     } catch (e) {
       logger.warn(`[worldcupTick] reminder_1h → ${groupId}:`, e.message);
     }
