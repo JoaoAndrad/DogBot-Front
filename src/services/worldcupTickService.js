@@ -93,59 +93,78 @@ function toJid(senderNumber) {
   return num.includes("@") ? num : `${num}@c.us`;
 }
 
-function formatPredictionsBlock(predictions, currentHome, currentAway) {
-  const { text } = formatPredictionsBlockWithMentions(
-    predictions,
-    currentHome,
-    currentAway,
-  );
+function formatPredictionsBlock(predictions, currentHome, currentAway, opts) {
+  const { text } = formatPredictionsBlockWithMentions(predictions, currentHome, currentAway, opts);
   return text;
 }
 
 /**
- * Formata bloco de palpites e retorna JIDs dos usuários ainda concorrendo para mention.
- * Competing: mencionados com @telefone. Lost: nome do DB, sem mention.
+ * Formata bloco de palpites agrupado por resultado apostado (vitória casa / empate / vitória visitante).
+ * Quando todos ainda concorrem (início do jogo): sem cabeçalho de seção, apenas os três grupos.
+ * Quando há perdedores: seções "Ainda concorrendo" e "Já perderam", cada uma com os três sub-grupos.
+ * opts: { homeTeam, awayTeam } para labels das categorias.
  */
-function formatPredictionsBlockWithMentions(
-  predictions,
-  currentHome,
-  currentAway,
-) {
-  if (!predictions || !predictions.length)
-    return { text: null, mentionIds: [] };
+function formatPredictionsBlockWithMentions(predictions, currentHome, currentAway, opts = {}) {
+  if (!predictions || !predictions.length) return { text: null, mentionIds: [] };
 
+  const { homeTeam, awayTeam } = opts;
   const nameMap = buildNameMap(predictions);
-  const { competing, lost } = categorizePredictions(
-    predictions,
-    currentHome,
-    currentAway,
-  );
+  const { competing, lost } = categorizePredictions(predictions, currentHome, currentAway);
   const mentionIds = [];
-  const lines = ["", "📊 *Palpites:*"];
 
-  if (competing.length) {
-    lines.push("\n✅ *Ainda concorrendo:*\n");
-    for (const p of competing) {
+  const homeLabel = homeTeam ? `Vitória ${withFlag(homeTeam)}` : "Vitória (casa)";
+  const awayLabel = awayTeam ? `Vitória ${withFlag(awayTeam)}` : "Vitória (visitante)";
+
+  function byOutcome(preds) {
+    return {
+      homeWin: preds.filter((p) => p.predictedHome > p.predictedAway),
+      draw:    preds.filter((p) => p.predictedHome === p.predictedAway),
+      awayWin: preds.filter((p) => p.predictedHome < p.predictedAway),
+    };
+  }
+
+  function renderPred(p, asMention) {
+    if (asMention) {
       const jid = toJid(p.senderNumber);
       if (jid) {
         mentionIds.push(jid);
-        lines.push(
-          `  • @${String(p.senderNumber).split("@")[0]} — ${p.predictedHome}x${p.predictedAway}`,
-        );
-      } else {
-        lines.push(
-          `  • ${nameMap[p.userId]} — ${p.predictedHome}x${p.predictedAway}`,
-        );
+        return `  • @${String(p.senderNumber).split("@")[0]} — ${p.predictedHome}x${p.predictedAway}`;
       }
     }
+    return `  • ${nameMap[p.userId]} — ${p.predictedHome}x${p.predictedAway}`;
   }
 
-  if (lost.length) {
-    lines.push("\n❌ *Já perderam 🤣:*\n");
-    for (const p of lost) {
-      lines.push(
-        `  • ${nameMap[p.userId]} — ${p.predictedHome}x${p.predictedAway}`,
-      );
+  function renderOutcomeGroups(preds, asMention) {
+    const lines = [];
+    const { homeWin, draw, awayWin } = byOutcome(preds);
+    if (homeWin.length) {
+      lines.push(`\n*${homeLabel}:*`);
+      homeWin.forEach((p) => lines.push(renderPred(p, asMention)));
+    }
+    if (draw.length) {
+      lines.push(`\n*Empate:*`);
+      draw.forEach((p) => lines.push(renderPred(p, asMention)));
+    }
+    if (awayWin.length) {
+      lines.push(`\n*${awayLabel}:*`);
+      awayWin.forEach((p) => lines.push(renderPred(p, asMention)));
+    }
+    return lines;
+  }
+
+  const lines = ["", "📊 *Palpites:*"];
+
+  if (!lost.length) {
+    // Todos ainda concorrem (início do jogo): sem cabeçalho de seção
+    lines.push(...renderOutcomeGroups(competing, true));
+  } else {
+    if (competing.length) {
+      lines.push("\n✅ *Ainda concorrendo:*");
+      lines.push(...renderOutcomeGroups(competing, true));
+    }
+    if (lost.length) {
+      lines.push("\n❌ *Já perderam 🤣:*");
+      lines.push(...renderOutcomeGroups(lost, false));
     }
   }
 
@@ -353,7 +372,7 @@ async function handleKickoff(client, action) {
       let mentionIds = [];
       if (groupPreds.length) {
         const { text: predBlock, mentionIds: ids } =
-          formatPredictionsBlockWithMentions(groupPreds, 0, 0);
+          formatPredictionsBlockWithMentions(groupPreds, 0, 0, { homeTeam: match.home_team, awayTeam: match.away_team });
         if (predBlock) lines.push(``, predBlock);
         mentionIds = ids;
       }
@@ -520,6 +539,7 @@ async function handleGoal(client, action) {
             groupPreds,
             match.home_score,
             match.away_score,
+            { homeTeam: match.home_team, awayTeam: match.away_team },
           )
         : { text: null, mentionIds: [] };
 
@@ -599,6 +619,7 @@ async function handleHalftime(client, action) {
             groupPreds,
             match.home_score ?? 0,
             match.away_score ?? 0,
+            { homeTeam: match.home_team, awayTeam: match.away_team },
           )
         : { text: null, mentionIds: [] };
 
