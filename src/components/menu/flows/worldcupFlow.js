@@ -446,8 +446,8 @@ function predictionIcon(prediction) {
   if (status === "live") return "🔴";
   if (status === "paused") return "⏸";
   // finished
-  if (prediction.points === 3) return "🏆";
-  if (prediction.points === 1) return "✅";
+  if (prediction.points === 3) return "✅";
+  if (prediction.points === 1) return "🔸";
   if (prediction.points === 0) return "❌";
   return "⏳"; // pending scoring
 }
@@ -537,7 +537,9 @@ const worldcupPalpiteFlow = createFlow("copa-palpite", {
     },
 
     // ── Meus palpites ───────────────────────────────────────────────────────
-    showMyPredictions: async (ctx) => {
+    showMyPredictions: async (ctx, data = {}) => {
+      const PAGE_SIZE = 8;
+      const page = (data && data.page) || 0;
       const { localize } = require("../../../utils/teamLocale");
       let predictions;
       let championPrediction = null;
@@ -560,42 +562,6 @@ const worldcupPalpiteFlow = createFlow("copa-palpite", {
         return { end: true };
       }
 
-      const optionLabels = [];
-      const optionsMeta = [];
-
-      // Campeão — só exibe se já foi preenchido
-      if (championPrediction) {
-        const { pt, flag } = localize(championPrediction.team);
-        const pts = championPrediction.points != null
-          ? ` — ${championPrediction.points === 20 ? "🎉 +20 pts" : "❌ 0 pts"}`
-          : " — aguardando";
-        const label = `🏆 Campeão: ${flag} ${pt}${pts}`.slice(0, 100);
-        optionLabels.push(label);
-        optionsMeta.push({
-          index: optionLabels.length - 1, label, action: "exec", handler: "showChampionMenu", data: {},
-        });
-      }
-
-      // Zebra
-      if (zebraPrediction) {
-        const { pt: zPt, flag: zFlag } = localize(zebraPrediction.team);
-        const zPts = zebraPrediction.points != null
-          ? ` — ${zebraPrediction.points > 0 ? `🎉 +${zebraPrediction.points} pts` : "❌ 0 pts"}` : "";
-        const zLabel = `🦓 Zebra: ${zFlag} ${zPt}${zPts}`.slice(0, 100);
-        optionLabels.push(zLabel);
-        optionsMeta.push({ index: optionLabels.length - 1, label: zLabel, action: "exec", handler: "startZebraInput", data: {} });
-      }
-
-      // Craque
-      if (mvpPrediction) {
-        const mvpPts = mvpPrediction.points != null
-          ? ` — ${mvpPrediction.points > 0 ? `🎉 +${mvpPrediction.points} pts` : "❌ 0 pts"}` : "";
-        const mvpLabel = `⭐ Craque: ${mvpPrediction.player_name}${mvpPts}`.slice(0, 100);
-        optionLabels.push(mvpLabel);
-        optionsMeta.push({ index: optionLabels.length - 1, label: mvpLabel, action: "exec", handler: "startMvpInput", data: {} });
-      }
-
-      // Se não há nenhum palpite ainda (nem partida nem torneio), mostra texto e volta
       const hasAny = (predictions && predictions.length) || championPrediction || zebraPrediction || mvpPrediction;
       if (!hasAny) {
         await ctx.reply(
@@ -604,27 +570,50 @@ const worldcupPalpiteFlow = createFlow("copa-palpite", {
         return { end: true };
       }
 
-      if (!predictions || !predictions.length) {
-        // Tem só palpites de torneio — adiciona "Voltar" e verifica mínimo de 2 opções
-        optionLabels.push("🔙 Voltar");
-        optionsMeta.push({ index: optionLabels.length - 1, label: "🔙 Voltar", action: "exec", handler: "backToRoot", data: {} });
-        if (optionLabels.length < 2) {
-          await ctx.reply("📋 *Meus palpites*\n\nNenhum palpite de partida ainda.\nUse *Novo palpite* para começar! 🎯");
-          return { end: true };
+      const matchPredictions = predictions || [];
+      const totalPages = Math.max(1, Math.ceil(matchPredictions.length / PAGE_SIZE));
+      const safePage = Math.min(page, totalPages - 1);
+      const pageItems = matchPredictions.slice(safePage * PAGE_SIZE, (safePage + 1) * PAGE_SIZE);
+
+      const optionLabels = [];
+      const optionsMeta = [];
+
+      // Palpites de torneio — só na primeira página
+      if (safePage === 0) {
+        if (championPrediction) {
+          const { pt, flag } = localize(championPrediction.team);
+          const pts = championPrediction.points != null
+            ? ` — ${championPrediction.points === 20 ? "🎉 +20 pts" : "❌ 0 pts"}`
+            : " — aguardando";
+          const label = `🏆 Campeão: ${flag} ${pt}${pts}`.slice(0, 100);
+          optionLabels.push(label);
+          optionsMeta.push({ index: optionLabels.length - 1, label, action: "exec", handler: "showChampionMenu", data: {} });
         }
-        await polls.createPoll(ctx.client, ctx.chatId, "📋 Meus palpites", optionLabels, {
-          metadata: { actionType: "menu", flowId: "copa-palpite", path: "/my", userId: ctx.userId, options: optionsMeta },
-        });
-        return { end: true };
+
+        if (zebraPrediction) {
+          const { pt: zPt, flag: zFlag } = localize(zebraPrediction.team);
+          const zPts = zebraPrediction.points != null
+            ? ` — ${zebraPrediction.points > 0 ? `🎉 +${zebraPrediction.points} pts` : "❌ 0 pts"}` : "";
+          const zLabel = `🦓 Zebra: ${zFlag} ${zPt}${zPts}`.slice(0, 100);
+          optionLabels.push(zLabel);
+          optionsMeta.push({ index: optionLabels.length - 1, label: zLabel, action: "exec", handler: "startZebraInput", data: {} });
+        }
+
+        if (mvpPrediction) {
+          const mvpPts = mvpPrediction.points != null
+            ? ` — ${mvpPrediction.points > 0 ? `🎉 +${mvpPrediction.points} pts` : "❌ 0 pts"}` : "";
+          const mvpLabel = `⭐ Craque: ${mvpPrediction.player_name}${mvpPts}`.slice(0, 100);
+          optionLabels.push(mvpLabel);
+          optionsMeta.push({ index: optionLabels.length - 1, label: mvpLabel, action: "exec", handler: "startMvpInput", data: {} });
+        }
       }
 
-      for (let i = 0; i < predictions.length; i++) {
-        const p = predictions[i];
+      // Palpites de partida desta página
+      for (const p of pageItems) {
         const m = p.match;
         const label = predictionLabel(p);
         optionLabels.push(label);
         const idx = optionLabels.length - 1;
-
         const isEditable = m.status === "scheduled";
         optionsMeta.push({
           index: idx,
@@ -637,13 +626,33 @@ const worldcupPalpiteFlow = createFlow("copa-palpite", {
         });
       }
 
+      // Navegação de páginas
+      if (safePage > 0) {
+        const label = "◀️ Página anterior";
+        optionLabels.push(label);
+        optionsMeta.push({ index: optionLabels.length - 1, label, action: "exec", handler: "showMyPredictionsPage", data: { page: safePage - 1 } });
+      }
+      if (safePage < totalPages - 1) {
+        const label = `▶️ Próxima página (${safePage + 1}/${totalPages})`;
+        optionLabels.push(label);
+        optionsMeta.push({ index: optionLabels.length - 1, label, action: "exec", handler: "showMyPredictionsPage", data: { page: safePage + 1 } });
+      }
+
       optionLabels.push("🔙 Voltar");
       optionsMeta.push({ index: optionLabels.length - 1, label: "🔙 Voltar", action: "exec", handler: "backToRoot", data: {} });
 
-      await polls.createPoll(ctx.client, ctx.chatId, "📋 Meus palpites", optionLabels, {
+      const title = totalPages > 1
+        ? `📋 Meus palpites (${safePage + 1}/${totalPages})`
+        : "📋 Meus palpites";
+
+      await polls.createPoll(ctx.client, ctx.chatId, title, optionLabels, {
         metadata: { actionType: "menu", flowId: "copa-palpite", path: "/my", userId: ctx.userId, options: optionsMeta },
       });
       return { end: true };
+    },
+
+    showMyPredictionsPage: async (ctx, data) => {
+      return worldcupPalpiteFlow.showMyPredictions(ctx, data);
     },
 
     showPredictionDetail: async (ctx, data) => {
@@ -651,8 +660,8 @@ const worldcupPalpiteFlow = createFlow("copa-palpite", {
       const realScore = finalHome != null ? `${finalHome} x ${finalAway}` : "a definir";
       const myScore = `${predictedHome} x ${predictedAway}`;
 
-      const ptLabel = points === 3 ? "🏆 Placar exato — 3 pts"
-        : points === 1 ? "✅ Vencedor certo — 1 pt"
+      const ptLabel = points === 3 ? "✅ Placar exato — 3 pts"
+        : points === 1 ? "🔸 Vencedor certo — 1 pt"
         : points === 0 ? "❌ Sem pontos"
         : status === "live" ? "🔴 Jogo em andamento"
         : status === "paused" ? "⏸ Intervalo"
