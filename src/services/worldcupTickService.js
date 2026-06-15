@@ -916,6 +916,9 @@ async function processWorldCupTickPayload(client, payload) {
         case "weekly_summary":
           await handleWeeklySummary(client, action);
           break;
+        case "match_reactivated":
+          await handleMatchReactivated(client, action);
+          break;
         case "bolao_member_added":
           await handleBolaoMemberAdded(client, action);
           break;
@@ -929,6 +932,19 @@ async function processWorldCupTickPayload(client, payload) {
       logger.error(`[worldcupTick] erro em ${action.kind}:`, e.message);
     }
   }
+}
+
+// action: { kind, groupId, homeTeam, awayTeam }
+async function handleMatchReactivated(client, action) {
+  const { groupId, homeTeam, awayTeam } = action;
+  const text = [
+    `⚠️ *Atenção — erro na API*`,
+    ``,
+    `O jogo *${matchup(homeTeam, awayTeam)}* foi dado como encerrado incorretamente por uma falha no retorno da API, que devolveu dados de outra partida.`,
+    ``,
+    `O jogo foi *reativado* e as pontuações atribuídas foram *canceladas*. Os palpites continuam válidos normalmente. 🙏`,
+  ].join("\n");
+  await client.sendMessage(groupId, text);
 }
 
 // action: { kind, groupId, addedName, bolaoPoints }
