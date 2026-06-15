@@ -916,6 +916,9 @@ async function processWorldCupTickPayload(client, payload) {
         case "weekly_summary":
           await handleWeeklySummary(client, action);
           break;
+        case "bolao_member_added":
+          await handleBolaoMemberAdded(client, action);
+          break;
         case "bolao_member_removed":
           await handleBolaoMemberRemoved(client, action);
           break;
@@ -926,6 +929,19 @@ async function processWorldCupTickPayload(client, payload) {
       logger.error(`[worldcupTick] erro em ${action.kind}:`, e.message);
     }
   }
+}
+
+// action: { kind, groupId, addedName, bolaoPoints }
+async function handleBolaoMemberAdded(client, action) {
+  const { groupId, addedName, bolaoPoints } = action;
+  const pts = bolaoPoints != null ? bolaoPoints : 0;
+  const ptsLabel = pts === 1 ? "1 pt" : `${pts} pts`;
+  const text = [
+    `🎲 *${addedName || "Participante"}* foi adicionado ao bolão!`,
+    ``,
+    `📊 Pontuação atual no bolão: *${ptsLabel}*`,
+  ].join("\n");
+  await client.sendMessage(groupId, text);
 }
 
 // action: { kind, groupId, removedName }
