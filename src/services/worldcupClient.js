@@ -82,6 +82,10 @@ async function createBolao(groupId, senderNumbers, { name, createdBy } = {}) {
 
 // ─── Internal tick ───────────────────────────────────────────────────────────
 
+async function setDmAlerts(userId, enabled) {
+  return backendClient.sendToBackend(`/api/worldcup/users/${encodeURIComponent(userId)}/dm-alerts`, { enabled }, "PATCH");
+}
+
 async function worldCupTick(nowIso) {
   return backendClient.sendToBackend("/api/internal/worldcup/tick", nowIso ? { now: nowIso } : {}, "POST");
 }
@@ -145,4 +149,5 @@ module.exports = {
   syncData,
   getBolao,
   createBolao,
+  setDmAlerts,
 };

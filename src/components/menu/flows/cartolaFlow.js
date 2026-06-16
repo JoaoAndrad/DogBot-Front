@@ -8,6 +8,8 @@ const logger = require("../../../utils/logger");
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
+const POSICAO = { 1: "GOL", 2: "LAT", 3: "ZAG", 4: "MEI", 5: "ATA", 6: "TEC" };
+
 function formatPontuacao(pontos) {
   if (pontos == null) return "–";
   return Number(pontos).toFixed(2).replace(".", ",");
@@ -97,9 +99,8 @@ const cartolaFlow = createFlow("cartola", {
     handler: async (ctx) => {
       const isGroup = String(ctx.chatId).endsWith("@g.us");
       const options = [
+        { label: "🔗 Vincular meu time",    action: "exec", handler: "startTeamLink" },
         ...(isGroup ? [{ label: "🏆 Vincular liga (grupo)", action: "exec", handler: "startLeagueLink" }] : []),
-        { label: "🔓 Conectar conta Globo", action: "exec", handler: "startGloboAuth" },
-        { label: "🔌 Desconectar conta",    action: "exec", handler: "disconnectGlobo" },
         { label: "🔙 Voltar",              action: "back" },
       ];
       return { title: "⚙️ *Configurações — Cartola FC*", options };
@@ -109,44 +110,6 @@ const cartolaFlow = createFlow("cartola", {
   handlers: {
     // ── Meu time ─────────────────────────────────────────────────────────────
     showMyTeam: async (ctx) => {
-      // Prioridade: conta Globo autenticada
-      try {
-        const authResponse = await cartolaClient.getAuthTimeData(ctx.userId);
-        const data = authResponse?.data;
-        const time = data?.time || data;
-        const atletas = data?.atletas || [];
-
-        const lines = [
-          `🏠 *${time?.nome || "Meu time"}*`,
-          `👤 ${time?.nome_cartola || "–"}`,
-          "",
-        ];
-
-        if (atletas.length) {
-          lines.push("*Escalação:*");
-          for (const a of atletas.slice(0, 11)) {
-            const pts = a.pontuacao != null ? ` — *${formatPontuacao(a.pontuacao)} pts*` : "";
-            lines.push(`• ${a.apelido || a.nome}${pts}`);
-          }
-        } else {
-          lines.push("_Escalação não disponível (mercado fechado ou rodada não iniciada)_");
-        }
-
-        const pontosTotais = data?.pontos || data?.pontuacao;
-        if (pontosTotais != null) {
-          lines.push("", `📊 Total: *${formatPontuacao(pontosTotais)} pts*`);
-        }
-
-        await ctx.reply(lines.join("\n"));
-        return { noRender: true };
-      } catch (authErr) {
-        // 401 = sem auth ou token expirado — cai no fallback de time salvo
-        if (authErr.status !== 401) {
-          logger.warn("[cartolaFlow] getAuthTimeData:", authErr.message);
-        }
-      }
-
-      // Fallback: time vinculado manualmente
       let saved;
       try {
         const { team } = await cartolaClient.getUserTeam(ctx.userId);
@@ -159,46 +122,67 @@ const cartolaFlow = createFlow("cartola", {
 
       if (!saved) {
         await ctx.reply(
-          "⚽ *Meu time*\n\nConecte sua conta Globo para ver os dados do seu time.\n\n" +
-          "Use ⚙️ *Configurações → Conectar conta Globo* para começar.",
+          "⚽ *Meu time*\n\n" +
+          "Você ainda não vinculou seu time.\n\n" +
+          "Use ⚙️ *Configurações → Vincular meu time* para começar.\n\n" +
+          "_Você vai precisar do ID numérico do seu time — encontra na URL do Cartola:\n" +
+          "cartola.globo.com/#!/time/*19513040*_",
         );
         return { noRender: true };
       }
 
-      // Time salvo — tenta buscar dados ao vivo
       try {
         const { data } = await cartolaClient.getMyTeamData(ctx.userId);
-        const time = data?.time || data;
+        const time = data?.time || {};
         const atletas = data?.atletas || [];
+        const capitaoId = data?.capitao_id;
+        const pontosTotais = data?.pontos;
 
         const lines = [
-          `🏠 *${time?.nome || saved.team_name || saved.slug}*`,
-          `👤 ${time?.nome_cartola || "–"}`,
+          `🏠 *${time.nome || saved.team_name || saved.slug}*`,
+          `👤 ${time.nome_cartola || "–"}`,
           "",
         ];
 
         if (atletas.length) {
+          const titulares = atletas.slice(0, 11);
+          const reservas = atletas.slice(11);
+
           lines.push("*Escalação:*");
-          for (const a of atletas.slice(0, 11)) {
-            const pts = a.pontuacao != null ? ` — *${formatPontuacao(a.pontuacao)} pts*` : "";
-            lines.push(`• ${a.apelido || a.nome}${pts}`);
+          for (const a of titulares) {
+            const isCap = a.atleta_id === capitaoId;
+            const pos = POSICAO[a.posicao_id] || "?";
+            const rawPts = a.pontos_num;
+            const pts = rawPts != null
+              ? ` — ${formatPontuacao(isCap ? rawPts * 2 : rawPts)} pts`
+              : "";
+            const capMark = isCap ? " ⭐" : "";
+            lines.push(`• [${pos}] ${a.apelido || a.nome}${capMark}${pts}`);
+          }
+
+          if (reservas.length) {
+            lines.push("", "*Banco:*");
+            for (const a of reservas) {
+              const pos = POSICAO[a.posicao_id] || "?";
+              const pts = a.pontos_num != null ? ` — ${formatPontuacao(a.pontos_num)} pts` : "";
+              lines.push(`• [${pos}] ${a.apelido || a.nome}${pts}`);
+            }
           }
         } else {
-          lines.push("_Escalação não disponível (mercado fechado ou rodada não iniciada)_");
+          lines.push("_Escalação não disponível_");
         }
 
-        const pontosTotais = data?.pontos || data?.pontuacao;
         if (pontosTotais != null) {
-          lines.push("", `📊 Total: *${formatPontuacao(pontosTotais)} pts*`);
+          lines.push("", `📊 *Total: ${formatPontuacao(pontosTotais)} pts*`);
         }
 
         await ctx.reply(lines.join("\n"));
       } catch (e) {
-        if (e.message === "team_not_found") {
-          await ctx.reply(`⚽ *${saved.team_name || saved.slug}*\n\nTime não encontrado na API. Use ⚙️ Configurações para re-vincular.`);
+        if (e.message === "team_not_found" || e.message === "no_team_saved") {
+          await ctx.reply(`⚽ *${saved.team_name || saved.slug}*\n\nTime não encontrado. Use ⚙️ Configurações para re-vincular.`);
         } else {
-          await ctx.reply(`⚽ *${saved.team_name || saved.slug}*\n\n_Dados ao vivo indisponíveis no momento._`);
           logger.error("[cartolaFlow] getMyTeamData:", e.message);
+          await ctx.reply(`⚽ *${saved.team_name || saved.slug}*\n\n_Dados indisponíveis no momento._`);
         }
       }
 

@@ -462,14 +462,21 @@ async function handleReminder1h(client, action) {
   }
 
   // DM único por usuário — deduplicado entre todos os grupos Copa
+  const dmOptedOut = new Set(
+    (action.dmOptedOutNumbers || []).map((n) => `${n}@c.us`),
+  );
+
   const dmText = [
     `⏰ *Falta 1 hora para: ${matchup(match.home_team, match.away_team)}!*`,
     ``,
     `Você ainda não fez seu palpite para este jogo.`,
     `Envie */palpite* agora para participar! 🎯`,
+    ``,
+    `Ou */alertaoff* para parar de receber esse tipo de notificação`,
   ].join("\n");
 
   for (const jid of allUnpredictedJids) {
+    if (dmOptedOut.has(jid)) continue;
     try {
       await client.sendMessage(jid, dmText);
     } catch (e) {
