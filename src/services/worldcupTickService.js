@@ -971,4 +971,4 @@ async function handleBolaoMemberRemoved(client, action) {
   await client.sendMessage(groupId, text);
 }
 
-module.exports = { processWorldCupTickPayload };
+module.exports = { processWorldCupTickPayload }; 

@@ -652,7 +652,7 @@ const worldcupPalpiteFlow = createFlow("copa-palpite", {
     },
 
     showMyPredictionsPage: async (ctx, data) => {
-      return worldcupPalpiteFlow.showMyPredictions(ctx, data);
+      return worldcupPalpiteFlow.handlers.showMyPredictions(ctx, data);
     },
 
     showPredictionDetail: async (ctx, data) => {
