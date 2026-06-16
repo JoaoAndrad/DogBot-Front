@@ -190,7 +190,7 @@ const cartolaFlow = createFlow("cartola", {
         "🔗 *Vincular meu time*\n\n" +
         "Me manda o número ou slug do seu time.\n\n" +
         "Você encontra na URL do Cartola FC:\n" +
-        "_cartola.globo.com/#!/time/*3884457*_ → manda o número\n" +
+        "_cartola.globo.com/#!/time/*123456*_ → manda o número\n" +
         "_cartola.globo.com/time/*meu-time*_ → manda o slug\n\n" +
         "_(ou /cancelar para sair)_",
       );
