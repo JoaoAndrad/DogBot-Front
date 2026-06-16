@@ -43,7 +43,9 @@ async function getLeagueRanking(groupId) {
 // ─── Auth ─────────────────────────────────────────────────────────────────────
 
 async function getAuthLink(userId) {
-  return backendClient.sendToBackend("/api/cartola/auth/link", { userId }, "POST");
+  const { sessionUuid } = await backendClient.sendToBackend("/api/cartola/auth/link", { userId }, "POST");
+  const backendUrl = process.env.BACKEND_URL || "http://localhost:8000";
+  return { link: `${backendUrl}/cartola/login?session=${sessionUuid}` };
 }
 
 async function getAuthStatus(userId) {
