@@ -131,7 +131,9 @@ async function handleCartolaLeagueFlow(stateKey, body, state, reply) {
     conversationState.clearState(stateKey);
     const msg = e.message?.includes("league_not_found")
       ? `❌ Liga não encontrada para *${slug}*.\n\nVerifique a URL no Cartola FC e tente novamente:\n_cartola.globo.com/#!/competicoes/pontoscorridos/*slug*_`
-      : `❌ Erro ao vincular liga. Tente novamente mais tarde.`;
+      : e.message?.includes("401")
+        ? `🔒 Esta liga é privada e requer autenticação.\n\nO bot precisa de credenciais configuradas para acessá-la. Fale com o admin.`
+        : `❌ Erro ao vincular liga. Tente novamente mais tarde.`;
     await reply(msg);
     logger.error("[cartola-league] saveGroupLeague:", e.message);
   }
