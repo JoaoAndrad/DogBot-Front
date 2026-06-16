@@ -45,7 +45,10 @@ async function getLeagueRanking(groupId) {
 async function getAuthLink(userId) {
   const { sessionUuid } = await backendClient.sendToBackend("/api/cartola/auth/link", { userId }, "POST");
   const backendUrl = process.env.BACKEND_URL || "http://localhost:8000";
-  return { link: `${backendUrl}/cartola/login?session=${sessionUuid}` };
+  const callbackUrl = `${backendUrl}/cartola/callback?session=${sessionUuid}`;
+  // OAuth browser redirect — o GLBID de sessão do browser é aceito pelo Cartola FC
+  const oauthUrl = `https://login.globo.com/auth/login/globo.com?redirectUrl=${encodeURIComponent(callbackUrl)}&serviceId=4610`;
+  return { link: oauthUrl };
 }
 
 async function getAuthStatus(userId) {
