@@ -138,9 +138,9 @@ const cartolaFlow = createFlow("cartola", {
         await ctx.reply(
           "⚽ *Meu time*\n\n" +
           "Você ainda não vinculou seu time.\n\n" +
-          "Use ⚙️ *Configurações → Vincular meu time* para começar.\n\n" +
+          "No privado, use ⚙️ *Configurações → Vincular meu time* para começar.\n\n" +
           "_Você vai precisar do ID numérico do seu time — encontra na URL do Cartola:\n" +
-          "cartola.globo.com/#!/time/*19513040*_",
+          "cartola.globo.com/#!/time/*123456*_",
         );
         return { noRender: true };
       }
@@ -218,7 +218,7 @@ const cartolaFlow = createFlow("cartola", {
         await ctx.reply(
           "🔍 *Scouts do meu time*\n\n" +
           "Você ainda não vinculou seu time.\n\n" +
-          "Use ⚙️ *Configurações → Vincular meu time*.",
+          "No privado, use ⚙️ *Configurações → Vincular meu time*.",
         );
         return { noRender: true };
       }

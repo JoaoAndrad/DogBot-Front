@@ -18,7 +18,8 @@ function parseTeamInput(raw) {
   // URL do Cartola FC — captura o segmento após /time/
   const m = s.match(/cartola\.globo\.com\/(?:#!\/)?time\/([^/?&#\s]+)/i);
   if (m) return m[1];
-  return s.toLowerCase();
+  // Slugs usam hífens — normaliza espaços
+  return s.toLowerCase().replace(/\s+/g, "-");
 }
 
 /**
