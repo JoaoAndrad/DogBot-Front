@@ -503,8 +503,9 @@ const cartolaFlow = createFlow("cartola", {
       });
       await ctx.reply(
         "🏆 *Vincular liga ao grupo*\n\n" +
-        "Me manda o slug da liga. Você encontra na URL do Cartola FC:\n" +
-        "_cartola.globo.com/ligas/*slug-da-liga*_\n\n" +
+        "Me manda o link ou o slug da sua liga no Cartola FC.\n\n" +
+        "Você encontra na URL da liga:\n" +
+        "_cartola.globo.com/#!/competicoes/pontoscorridos/*slug*_\n\n" +
         "_(ou /cancelar para sair)_",
       );
       return { end: true };

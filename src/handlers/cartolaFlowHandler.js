@@ -4,7 +4,40 @@ const conversationState = require("../services/conversationState");
 const cartolaClient = require("../services/cartolaClient");
 const logger = require("../utils/logger");
 
-// ─── Vincular time (slug input) ───────────────────────────────────────────────
+// ─── Parsers de input ────────────────────────────────────────────────────────
+
+/**
+ * Extrai ID/slug de qualquer formato que o usuário possa mandar:
+ *   - URL completa: https://cartola.globo.com/#!/time/19513040
+ *   - URL sem hash:  https://cartola.globo.com/time/meu-time
+ *   - Só o ID:       19513040
+ *   - Só o slug:     meu-time
+ */
+function parseTeamInput(raw) {
+  const s = raw.trim();
+  // URL do Cartola FC — captura o segmento após /time/
+  const m = s.match(/cartola\.globo\.com\/(?:#!\/)?time\/([^/?&#\s]+)/i);
+  if (m) return m[1];
+  return s.toLowerCase();
+}
+
+/**
+ * Extrai slug de liga de URL ou retorna o texto como slug.
+ *   - https://cartola.globo.com/#!/competicoes/pontoscorridos/d5uku6ak58ms73dfplg0
+ *   - https://cartola.globo.com/ligas/minha-liga  (formato alternativo)
+ *   - d5uku6ak58ms73dfplg0  (só o slug)
+ */
+function parseLeagueInput(raw) {
+  const s = raw.trim();
+  // /#!/competicoes/{tipo}/{slug} ou /ligas/{slug}
+  const m = s.match(
+    /cartola\.globo\.com\/(?:#!\/)?(?:competicoes\/[^/?&#\s/]+|ligas)\/([^/?&#\s]+)/i,
+  );
+  if (m) return m[1].toLowerCase();
+  return s.toLowerCase();
+}
+
+// ─── Vincular time ────────────────────────────────────────────────────────────
 
 async function handleCartolaTeamFlow(stateKey, body, state, reply) {
   const data = state.data || {};
@@ -14,9 +47,9 @@ async function handleCartolaTeamFlow(stateKey, body, state, reply) {
     return false;
   }
 
-  const slug = body.trim().toLowerCase();
+  const slug = parseTeamInput(body);
   if (!slug || slug.length < 2) {
-    await reply("❌ Slug inválido. Tente novamente.\n_(ou /cancelar para sair)_");
+    await reply("❌ Entrada inválida. Tente novamente.\n_(ou /cancelar para sair)_");
     return true;
   }
 
@@ -33,7 +66,7 @@ async function handleCartolaTeamFlow(stateKey, body, state, reply) {
   } catch (e) {
     conversationState.clearState(stateKey);
     const msg = e.message === "team_not_found"
-      ? `❌ Time não encontrado para o slug *${slug}*.\nVerifique a URL no Cartola FC e tente novamente.`
+      ? `❌ Time não encontrado para *${slug}*.\n\nAceito ID numérico, slug ou URL completa do Cartola FC:\n_cartola.globo.com/#!/time/*19513040*_`
       : `❌ Erro ao vincular time: ${e.message}`;
     await reply(msg);
     logger.error("[cartola-team] saveUserTeam:", e.message);
@@ -52,9 +85,9 @@ async function handleCartolaLeagueFlow(stateKey, body, state, reply) {
     return false;
   }
 
-  const slug = body.trim().toLowerCase();
+  const slug = parseLeagueInput(body);
   if (!slug || slug.length < 2) {
-    await reply("❌ Slug inválido. Tente novamente.\n_(ou /cancelar para sair)_");
+    await reply("❌ Entrada inválida. Tente novamente.\n_(ou /cancelar para sair)_");
     return true;
   }
 
