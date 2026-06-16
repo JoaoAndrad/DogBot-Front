@@ -1,9 +1,24 @@
 "use strict";
 
+const fetch = require("node-fetch");
 const { createFlow } = require("../flowBuilder");
 const cartolaClient = require("../../../services/cartolaClient");
 const conversationState = require("../../../services/conversationState");
 const logger = require("../../../utils/logger");
+
+async function _sendShield(client, chatId, url, caption) {
+  try {
+    const res = await fetch(url, { timeout: 8000 });
+    if (!res.ok) return false;
+    const buf = await res.buffer();
+    const { MessageMedia } = require("whatsapp-web.js");
+    const media = new MessageMedia("image/png", buf.toString("base64"));
+    await client.sendMessage(chatId, media, { caption });
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -190,7 +205,13 @@ const cartolaFlow = createFlow("cartola", {
           lines.push("", `📊 *Total: ${formatPontuacao(pontosTotais)} pts*`);
         }
 
-        await ctx.reply(lines.join("\n"));
+        const shieldUrl = time.url_escudo_png;
+        if (shieldUrl && ctx.client) {
+          const sent = await _sendShield(ctx.client, ctx.chatId, shieldUrl, lines.join("\n"));
+          if (!sent) await ctx.reply(lines.join("\n"));
+        } else {
+          await ctx.reply(lines.join("\n"));
+        }
       } catch (e) {
         if (e.message === "team_not_found" || e.message === "no_team_saved") {
           await ctx.reply(`⚽ *${saved.team_name || saved.slug}*\n\nTime não encontrado. Use ⚙️ Configurações para re-vincular.`);
@@ -270,7 +291,13 @@ const cartolaFlow = createFlow("cartola", {
           lines.push("", `📊 *Total: ${formatPontuacao(data.pontos)} pts*`);
         }
 
-        await ctx.reply(lines.join("\n"));
+        const shieldUrl = time.url_escudo_png;
+        if (shieldUrl && ctx.client) {
+          const sent = await _sendShield(ctx.client, ctx.chatId, shieldUrl, lines.join("\n"));
+          if (!sent) await ctx.reply(lines.join("\n"));
+        } else {
+          await ctx.reply(lines.join("\n"));
+        }
       } catch (e) {
         logger.error("[cartolaFlow] showScout:", e.message);
         await ctx.reply("❌ Dados de scouts indisponíveis no momento.");

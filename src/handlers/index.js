@@ -457,7 +457,7 @@ async function handle(context) {
 
     if (state.flowType === "cartola-team-input") {
       if (isGroup) return;
-      return await handleCartolaTeamFlow(stateKey, body, state, reply);
+      return await handleCartolaTeamFlow(stateKey, body, state, reply, { client: context.client, chatId: from });
     }
 
     if (state.flowType === "cartola-league-input") {
