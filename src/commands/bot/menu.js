@@ -15,6 +15,7 @@ const life360Flow = require("../../components/menu/flows/life360Flow");
 const vinculo360Flow = require("../../components/menu/flows/vinculo360Flow");
 const ajudaFlow = require("../../components/menu/flows/ajudaFlow");
 const { worldcupFlow, worldcupPalpiteFlow } = require("../../components/menu/flows/worldcupFlow");
+const { cartolaFlow } = require("../../components/menu/flows/cartolaFlow");
 
 // Register flows on load
 flowManager.registerFlow(testFlow);
@@ -34,6 +35,7 @@ flowManager.registerFlow(vinculo360Flow);
 flowManager.registerFlow(ajudaFlow);
 flowManager.registerFlow(worldcupFlow);
 flowManager.registerFlow(worldcupPalpiteFlow);
+flowManager.registerFlow(cartolaFlow);
 
 const logger = require("../../utils/logger");
 const { jidFromContact } = require("../../utils/whatsapp/getUserData");
