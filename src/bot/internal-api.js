@@ -358,6 +358,29 @@ function createApp(client) {
     }
   });
 
+  router.post("/internal/cartola-puppeteer-auth", async (req, res) => {
+    const { email, password } = req.body || {};
+    if (!email || !password) {
+      return res.status(400).json({ ok: false, error: "email and password required" });
+    }
+    try {
+      const { loginGloboWithPuppeteer } = require("../services/cartolaGloboAuth");
+      const result = await loginGloboWithPuppeteer(email, password);
+      res.json({ ok: true, glbId: result.glbId, cookies: result.cookies });
+    } catch (err) {
+      const msg = err && err.message;
+      const status = (err && err.status) || 500;
+      logger.warn("[internal/cartola-puppeteer-auth]", msg);
+      if (status === 401 || msg === "auth_failed" || msg === "invalid_credentials") {
+        return res.status(401).json({ ok: false, error: "invalid_credentials" });
+      }
+      if (status === 406 || msg === "captcha_required") {
+        return res.status(406).json({ ok: false, error: "captcha_required" });
+      }
+      res.status(500).json({ ok: false, error: msg || String(err) });
+    }
+  });
+
   router.post("/internal/worldcup/dispatch", async (req, res) => {
     try {
       const body = req.body || {};
