@@ -28,8 +28,8 @@ async function getGroupLeague(groupId) {
   return backendClient.sendToBackend(`/api/cartola/league/${encodeURIComponent(groupId)}`, null, "GET");
 }
 
-async function saveGroupLeague(groupId, slug, linkedBy) {
-  return backendClient.sendToBackend("/api/cartola/league", { groupId, slug, linkedBy }, "POST");
+async function saveGroupLeague(groupId, slug, linkedBy, tipo) {
+  return backendClient.sendToBackend("/api/cartola/league", { groupId, slug, linkedBy, tipo }, "POST");
 }
 
 async function removeGroupLeague(groupId) {

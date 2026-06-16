@@ -46,12 +46,16 @@ function parseTeamInput(raw) {
  */
 function parseLeagueInput(raw) {
   const s = raw.trim();
-  // /#!/competicoes/{tipo}/{slug} ou /ligas/{slug}
-  const m = s.match(
-    /cartola\.globo\.com\/(?:#!\/)?(?:competicoes\/[^/?&#\s/]+|ligas)\/([^/?&#\s]+)/i,
+  // /#!/competicoes/{tipo}/{slug}
+  const mComp = s.match(
+    /cartola\.globo\.com\/(?:#!\/)?competicoes\/([^/?&#\s/]+)\/([^/?&#\s]+)/i,
   );
-  if (m) return m[1].toLowerCase();
-  return s.toLowerCase();
+  if (mComp) return { slug: mComp[2].toLowerCase(), tipo: mComp[1].toLowerCase() };
+  // /ligas/{slug} ou /#!/ligas/{slug}
+  const mLiga = s.match(/cartola\.globo\.com\/(?:#!\/)?ligas\/([^/?&#\s]+)/i);
+  if (mLiga) return { slug: mLiga[1].toLowerCase(), tipo: "liga" };
+  // texto puro — slug ou ID
+  return { slug: s.toLowerCase(), tipo: null };
 }
 
 // ─── Vincular time ────────────────────────────────────────────────────────────
@@ -104,7 +108,8 @@ async function handleCartolaLeagueFlow(stateKey, body, state, reply) {
     return false;
   }
 
-  const slug = parseLeagueInput(body);
+  const parsed = parseLeagueInput(body);
+  const { slug, tipo } = parsed;
   if (!slug || slug.length < 2) {
     await reply("❌ Entrada inválida. Tente novamente.\n_(ou /cancelar para sair)_");
     return true;
@@ -119,14 +124,14 @@ async function handleCartolaLeagueFlow(stateKey, body, state, reply) {
 
   try {
     const userId = data.userId || stateKey;
-    const result = await cartolaClient.saveGroupLeague(groupId, slug, userId);
+    const result = await cartolaClient.saveGroupLeague(groupId, slug, userId, tipo);
     conversationState.clearState(stateKey);
 
     const nome = result.name || slug;
     await reply(
       `✅ *Liga vinculada ao grupo!*\n\n🏆 *${nome}*\n\nUse */cartola → Ranking da liga* para ver a classificação.`,
     );
-    logger.info(`[cartola-league] ${groupId} → ${slug}`);
+    logger.info(`[cartola-league] ${groupId} → ${slug} (${tipo || "auto"})`);
   } catch (e) {
     conversationState.clearState(stateKey);
     const msg = e.message?.includes("league_not_found")
