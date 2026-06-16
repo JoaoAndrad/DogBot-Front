@@ -343,10 +343,10 @@ const cartolaFlow = createFlow("cartola", {
       const SCOUT_LABEL = {
         G: "⚽ Gol",         A: "🎯 Assist",     FT: "🥅 Trave",
         FD: "🧤 Def.Difícil", FF: "💨 Fora",       DS: "🛡️ Desarme",
-        FS: "🎯 F.Sofrida",   SG: "🔒 S/Gol",     DE: "🧤 Defesa",
-        V:  "✅ Vitória",     CA: "🟨 Amarelo",    CV: "🟥 Vermelho",
-        I:  "🚑 Impedimento", PP: "❌ Pên.Perdido", PC: "⚡ Pên.Comet.",
-        GC: "🚫 G.Contra",
+        FS: "⚠️ F.Sofrida",   SG: "🔒 S/Gol",     DE: "🧤 Defesa",
+        FC: "🦵 Falta",        V:  "✅ Vitória",    CA: "🟨 Amarelo",
+        CV: "🟥 Vermelho",     I:  "🚑 Impedimento", PP: "❌ Pên.Perdido",
+        PC: "⚡ Pên.Comet.",   GC: "🚫 G.Contra",
       };
 
       try {
@@ -372,6 +372,7 @@ const cartolaFlow = createFlow("cartola", {
             const capMark = isCap ? " ⭐" : "";
             const pts = formatPontuacao(isCap ? (a.pontos_num ?? 0) * 2 : (a.pontos_num ?? 0));
             const pos = POSICAO[a.posicao_id] || "?";
+            lines.push("");
             lines.push(`*[${pos}] ${a.apelido || a.nome}${capMark}* — ${pts} pts`);
             const entries = Object.entries(a.scout || {}).filter(([, v]) => v > 0);
             if (entries.length) {
@@ -456,7 +457,7 @@ const cartolaFlow = createFlow("cartola", {
           lines.push("");
         }
 
-        lines.push("*📊 Ranking do grupo:*");
+        lines.push("", "─────────────────", "", "*📊 Ranking do grupo:*");
         for (let i = 0; i < ranking.length; i++) {
           const r = ranking[i];
           lines.push(`${medals[i] || `${i + 1}.`} ${r.displayName} — *${formatPontuacao(r.pontos)} pts*`);

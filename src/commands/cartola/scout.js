@@ -10,10 +10,10 @@ const POSICAO = { 1: "GOL", 2: "LAT", 3: "ZAG", 4: "MEI", 5: "ATA", 6: "TEC" };
 const SCOUT_LABEL = {
   G:  "⚽ Gol",          A:  "🎯 Assist",       FT: "🥅 Trave",
   FD: "🧤 Def.Difícil",  FF: "💨 Fora",          DS: "🛡️ Desarme",
-  FS: "🎯 F.Sofrida",    SG: "🔒 S/Gol",        DE: "🧤 Defesa",
-  V:  "✅ Vitória",       CA: "🟨 Amarelo",       CV: "🟥 Vermelho",
-  I:  "🚑 Impedimento",  PP: "❌ Pên.Perdido",   PC: "⚡ Pên.Comet.",
-  GC: "🚫 G.Contra",
+  FS: "⚠️ F.Sofrida",   SG: "🔒 S/Gol",        DE: "🧤 Defesa",
+  FC: "🦵 Falta",        V:  "✅ Vitória",        CA: "🟨 Amarelo",
+  CV: "🟥 Vermelho",     I:  "🚑 Impedimento",   PP: "❌ Pên.Perdido",
+  PC: "⚡ Pên.Comet.",   GC: "🚫 G.Contra",
 };
 
 function fmt(n) {
@@ -122,6 +122,7 @@ module.exports = {
         const isCap = a.atleta_id === capitaoId;
         const pts = fmt(isCap ? (a.pontos_num ?? 0) * 2 : (a.pontos_num ?? 0));
         const pos = POSICAO[a.posicao_id] || "?";
+        lines.push("");
         lines.push(`*[${pos}] ${a.apelido || a.nome}${isCap ? " ⭐" : ""}* — ${pts} pts`);
         const entries = Object.entries(a.scout || {}).filter(([, v]) => v > 0);
         if (entries.length) {
