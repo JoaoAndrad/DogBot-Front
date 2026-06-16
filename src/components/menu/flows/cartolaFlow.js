@@ -109,6 +109,44 @@ const cartolaFlow = createFlow("cartola", {
   handlers: {
     // ── Meu time ─────────────────────────────────────────────────────────────
     showMyTeam: async (ctx) => {
+      // Prioridade: conta Globo autenticada
+      try {
+        const authResponse = await cartolaClient.getAuthTimeData(ctx.userId);
+        const data = authResponse?.data;
+        const time = data?.time || data;
+        const atletas = data?.atletas || [];
+
+        const lines = [
+          `🏠 *${time?.nome || "Meu time"}*`,
+          `👤 ${time?.nome_cartola || "–"}`,
+          "",
+        ];
+
+        if (atletas.length) {
+          lines.push("*Escalação:*");
+          for (const a of atletas.slice(0, 11)) {
+            const pts = a.pontuacao != null ? ` — *${formatPontuacao(a.pontuacao)} pts*` : "";
+            lines.push(`• ${a.apelido || a.nome}${pts}`);
+          }
+        } else {
+          lines.push("_Escalação não disponível (mercado fechado ou rodada não iniciada)_");
+        }
+
+        const pontosTotais = data?.pontos || data?.pontuacao;
+        if (pontosTotais != null) {
+          lines.push("", `📊 Total: *${formatPontuacao(pontosTotais)} pts*`);
+        }
+
+        await ctx.reply(lines.join("\n"));
+        return { noRender: true };
+      } catch (authErr) {
+        // 401 = sem auth ou token expirado — cai no fallback de time salvo
+        if (authErr.status !== 401) {
+          logger.warn("[cartolaFlow] getAuthTimeData:", authErr.message);
+        }
+      }
+
+      // Fallback: time vinculado manualmente
       let saved;
       try {
         const { team } = await cartolaClient.getUserTeam(ctx.userId);
@@ -121,13 +159,13 @@ const cartolaFlow = createFlow("cartola", {
 
       if (!saved) {
         await ctx.reply(
-          "⚽ *Meu time*\n\nVocê ainda não vinculou seu time do Cartola FC.\n\n" +
-          "Use ⚙️ *Configurações → Vincular meu time* para começar.",
+          "⚽ *Meu time*\n\nConecte sua conta Globo para ver os dados do seu time.\n\n" +
+          "Use ⚙️ *Configurações → Conectar conta Globo* para começar.",
         );
         return { noRender: true };
       }
 
-      // Tenta buscar dados ao vivo
+      // Time salvo — tenta buscar dados ao vivo
       try {
         const { data } = await cartolaClient.getMyTeamData(ctx.userId);
         const time = data?.time || data;
@@ -157,7 +195,7 @@ const cartolaFlow = createFlow("cartola", {
         await ctx.reply(lines.join("\n"));
       } catch (e) {
         if (e.message === "team_not_found") {
-          await ctx.reply(`⚽ *${saved.team_name || saved.slug}*\n\nSlug salvo mas time não encontrado na API. Use ⚙️ Configurações para re-vincular.`);
+          await ctx.reply(`⚽ *${saved.team_name || saved.slug}*\n\nTime não encontrado na API. Use ⚙️ Configurações para re-vincular.`);
         } else {
           await ctx.reply(`⚽ *${saved.team_name || saved.slug}*\n\n_Dados ao vivo indisponíveis no momento._`);
           logger.error("[cartolaFlow] getMyTeamData:", e.message);
