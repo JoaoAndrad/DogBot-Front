@@ -85,8 +85,10 @@ const cartolaFlow = createFlow("cartola", {
   root: {
     title: "⚽ *Cartola FC*",
     options: [
-      { label: "🏠 Meu time",           action: "exec", handler: "showMyTeam" },
+      { label: "🏠 Meu time",             action: "exec", handler: "showMyTeam" },
+      { label: "🔍 Scouts do meu time",  action: "exec", handler: "showScout" },
       { label: "📊 Parcial do grupo",    action: "exec", handler: "showGroupParcial" },
+      { label: "⭐ Destaques do grupo",  action: "exec", handler: "showDestaques" },
       { label: "🏆 Ranking da liga",     action: "exec", handler: "showLeagueRanking" },
       { label: "📊 Rodada atual",        action: "exec", handler: "showRodada" },
       { label: "⚙️ Configurações",       action: "goto", target: "/config" },
@@ -241,6 +243,154 @@ const cartolaFlow = createFlow("cartola", {
           logger.error("[cartolaFlow] getMyTeamData:", e.message);
           await ctx.reply(`⚽ *${saved.team_name || saved.slug}*\n\n_Dados indisponíveis no momento._`);
         }
+      }
+
+      return { noRender: true };
+    },
+
+    // ── Scouts do meu time ───────────────────────────────────────────────────
+    showScout: async (ctx) => {
+      let saved;
+      try {
+        const { team } = await cartolaClient.getUserTeam(ctx.userId);
+        saved = team;
+      } catch (e) {
+        await ctx.reply("❌ Erro ao buscar seu time. Tente novamente.");
+        return { noRender: true };
+      }
+
+      if (!saved) {
+        await ctx.reply(
+          "🔍 *Scouts do meu time*\n\n" +
+          "Você ainda não vinculou seu time.\n\n" +
+          "Use ⚙️ *Configurações → Vincular meu time*.",
+        );
+        return { noRender: true };
+      }
+
+      const SCOUT_LABEL = {
+        G: "⚽ Gol",         A: "🎯 Assist",     FT: "🥅 Trave",
+        FD: "🧤 Def.Difícil", FF: "💨 Fora",       DS: "🛡️ Desarme",
+        FS: "🎯 F.Sofrida",   SG: "🔒 S/Gol",     DE: "🧤 Defesa",
+        V:  "✅ Vitória",     CA: "🟨 Amarelo",    CV: "🟥 Vermelho",
+        I:  "🚑 Impedimento", PP: "❌ Pên.Perdido", PC: "⚡ Pên.Comet.",
+        GC: "🚫 G.Contra",
+      };
+
+      try {
+        const { data } = await cartolaClient.getMyTeamData(ctx.userId);
+        const atletas = data?.atletas || [];
+        const capitaoId = data?.capitao_id;
+        const time = data?.time || {};
+
+        const comMovimento = atletas.filter(
+          (a) => Object.values(a.scout || {}).some((v) => v > 0) || (a.pontos_num ?? 0) !== 0,
+        );
+
+        const lines = [
+          `🔍 *Scouts — ${time.nome || saved.team_name || saved.slug}*`,
+          "",
+        ];
+
+        if (!comMovimento.length) {
+          lines.push("_Nenhum atleta pontuou ainda nesta rodada._");
+        } else {
+          for (const a of comMovimento) {
+            const isCap = a.atleta_id === capitaoId;
+            const capMark = isCap ? " ⭐" : "";
+            const pts = formatPontuacao(isCap ? (a.pontos_num ?? 0) * 2 : (a.pontos_num ?? 0));
+            const pos = POSICAO[a.posicao_id] || "?";
+            lines.push(`*[${pos}] ${a.apelido || a.nome}${capMark}* — ${pts} pts`);
+            const entries = Object.entries(a.scout || {}).filter(([, v]) => v > 0);
+            if (entries.length) {
+              const str = entries
+                .map(([k, v]) => `${SCOUT_LABEL[k] || k}${v > 1 ? ` ×${v}` : ""}`)
+                .join(", ");
+              lines.push(`  └ ${str}`);
+            }
+          }
+        }
+
+        if (data?.pontos != null) {
+          lines.push("", `📊 *Total: ${formatPontuacao(data.pontos)} pts*`);
+        }
+
+        await ctx.reply(lines.join("\n"));
+      } catch (e) {
+        logger.error("[cartolaFlow] showScout:", e.message);
+        await ctx.reply("❌ Dados de scouts indisponíveis no momento.");
+      }
+
+      return { noRender: true };
+    },
+
+    // ── Destaques do grupo ────────────────────────────────────────────────────
+    showDestaques: async (ctx) => {
+      const isGroup = String(ctx.chatId).endsWith("@g.us");
+      if (!isGroup) {
+        await ctx.reply("⭐ Os destaques só estão disponíveis em grupos.");
+        return { noRender: true };
+      }
+
+      const SCOUT_ICON = {
+        G: "⚽", A: "🎯", FT: "🥅", FD: "🧤", DS: "🛡️",
+        SG: "🔒", CA: "🟨", CV: "🟥", PP: "❌", GC: "🚫",
+      };
+      const medals = ["🥇", "🥈", "🥉"];
+
+      try {
+        const { ranking } = await cartolaClient.getGroupParcial(ctx.chatId);
+
+        if (!ranking || !ranking.length) {
+          await ctx.reply(
+            "⭐ *Destaques do grupo*\n\n" +
+            "Nenhum membro vinculou seu time ainda.\n\n" +
+            "Use ⚙️ *Configurações → Vincular meu time*.",
+          );
+          return { noRender: true };
+        }
+
+        // Flatten todos os atletas com dono e pontos exibidos (capitão 2x)
+        const allAtletas = ranking.flatMap((r) =>
+          (r.atletas || []).map((a) => ({
+            ...a,
+            owner: r.displayName,
+            pts_exibido: a.is_capitao ? (a.pontos_num ?? 0) * 2 : (a.pontos_num ?? 0),
+          })),
+        );
+
+        const topAtletas = allAtletas
+          .filter((a) => (a.pontos_num ?? 0) > 0)
+          .sort((a, b) => b.pts_exibido - a.pts_exibido)
+          .slice(0, 3);
+
+        const lines = ["⭐ *Destaques do grupo*", ""];
+
+        if (topAtletas.length) {
+          lines.push("*🏅 Melhores atletas:*");
+          for (let i = 0; i < topAtletas.length; i++) {
+            const a = topAtletas[i];
+            const capMark = a.is_capitao ? " ⭐" : "";
+            const scoutStr = Object.entries(a.scout || {})
+              .filter(([k, v]) => v > 0 && SCOUT_ICON[k])
+              .map(([k, v]) => `${SCOUT_ICON[k]}${v > 1 ? `×${v}` : ""}`)
+              .join(" ");
+            lines.push(`${medals[i] || `${i + 1}.`} *${a.apelido}${capMark}* — ${formatPontuacao(a.pts_exibido)} pts`);
+            lines.push(`    👤 ${a.owner}${scoutStr ? `  ${scoutStr}` : ""}`);
+          }
+          lines.push("");
+        }
+
+        lines.push("*📊 Ranking do grupo:*");
+        for (let i = 0; i < ranking.length; i++) {
+          const r = ranking[i];
+          lines.push(`${medals[i] || `${i + 1}.`} ${r.displayName} — *${formatPontuacao(r.pontos)} pts*`);
+        }
+
+        await ctx.reply(lines.join("\n"));
+      } catch (e) {
+        logger.error("[cartolaFlow] showDestaques:", e.message);
+        await ctx.reply("❌ Erro ao buscar destaques. Tente novamente.");
       }
 
       return { noRender: true };
@@ -438,11 +588,6 @@ const cartolaFlow = createFlow("cartola", {
         await ctx.reply("❌ Erro ao desconectar. Tente novamente.");
       }
       return { noRender: true };
-    },
-
-    // ── Notificações: helpers internos ───────────────────────────────────────
-    async _saveNotSetting(ctx, patch) {
-      await cartolaClient.saveGroupSettings(ctx.chatId, patch);
     },
 
     // ── Notificações: ligar/desligar sistema ──────────────────────────────────
