@@ -66,9 +66,9 @@ async function handleCartolaTeamFlow(stateKey, body, state, reply) {
     logger.info(`[cartola-team] ${stateKey.split("@")[0]} → ${slug}`);
   } catch (e) {
     conversationState.clearState(stateKey);
-    const msg = e.message === "team_not_found"
-      ? `❌ Time não encontrado para *${slug}*.\n\nAceito ID numérico, slug ou URL completa do Cartola FC:\n_cartola.globo.com/#!/time/*19513040*_`
-      : `❌ Erro ao vincular time: ${e.message}`;
+    const msg = e.message?.includes("team_not_found")
+      ? `❌ Time não encontrado para *${slug}*.\n\nTente com o ID numérico ou URL completa:\n_cartola.globo.com/#!/time/*19513040*_`
+      : `❌ Erro ao vincular time. Tente novamente mais tarde.`;
     await reply(msg);
     logger.error("[cartola-team] saveUserTeam:", e.message);
   }
@@ -111,9 +111,9 @@ async function handleCartolaLeagueFlow(stateKey, body, state, reply) {
     logger.info(`[cartola-league] ${groupId} → ${slug}`);
   } catch (e) {
     conversationState.clearState(stateKey);
-    const msg = e.message === "league_not_found"
-      ? `❌ Liga não encontrada para o slug *${slug}*.\nVerifique a URL no Cartola FC e tente novamente.`
-      : `❌ Erro ao vincular liga: ${e.message}`;
+    const msg = e.message?.includes("league_not_found")
+      ? `❌ Liga não encontrada para *${slug}*.\n\nVerifique a URL no Cartola FC e tente novamente:\n_cartola.globo.com/#!/competicoes/pontoscorridos/*slug*_`
+      : `❌ Erro ao vincular liga. Tente novamente mais tarde.`;
     await reply(msg);
     logger.error("[cartola-league] saveGroupLeague:", e.message);
   }
