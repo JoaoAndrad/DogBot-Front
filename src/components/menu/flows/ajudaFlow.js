@@ -114,6 +114,33 @@ Envie /meta também no privado para definir sua meta.
 
 Nos grupos, poderão ser exibidos ranking e troféus conforme configuração.`,
 
+  copa: `O bot integra com a Copa do Mundo 2026 para palpites, resultados e ranking.
+
+*Principais funções:*
+• Palpitar no placar de cada jogo _(no privado)_
+• Ver próximos jogos e tabela de grupos
+• Ranking de palpites do grupo
+• Bolão interno do grupo
+• Notificações de gols e resultados em tempo real
+
+*Para começar:*
+Envie */copa* no grupo para ver o menu completo.
+Palpites são feitos no privado com */palpite*.`,
+
+  cartola: `O Cartola FC é um fantasy de futebol da Globo. O bot integra com a API oficial para trazer dados da sua equipe durante as rodadas.
+
+*Principais funções:*
+• Ver escalação e pontuação do seu time
+• Ver scouts (eventos) dos seus atletas em tempo real
+• Parcial e ranking do grupo
+• Ranking da liga vinculada ao grupo
+• Notificações automáticas de gols, assistências, cartões e mais
+
+*Para começar:*
+1. Envie */cartola* no privado
+2. Vá em ⚙️ Configurações → 🔗 Vincular meu time
+3. Cole o ID ou URL do seu time no Cartola FC`,
+
   exitMsg: "Se precisar, envie /ajuda novamente.",
 };
 
@@ -146,6 +173,8 @@ const ajudaFlow = createFlow("ajuda", {
             target: "/primeiros-passos",
           },
           { label: "Spotify", action: "goto", target: "/spotify" },
+          { label: "⚽ Cartola FC", action: "goto", target: "/cartola" },
+          { label: "🏆 Copa do Mundo", action: "goto", target: "/copa" },
           { label: "Rotinas", action: "goto", target: "/rotinas" },
           { label: "Listas e filmes/livros", action: "goto", target: "/listas" },
           { label: "Fitness (treinos)", action: "goto", target: "/fitness" },
@@ -209,6 +238,146 @@ const ajudaFlow = createFlow("ajuda", {
     handler: async (ctx) => {
       await replyLong(ctx, COPY.spotifyMenu);
       return { title: "Continuar?", options: navSpotifyLeaf() };
+    },
+  },
+
+  "/copa": {
+    dynamic: true,
+    options: [],
+    handler: async (ctx) => {
+      await replyLong(ctx, COPY.copa);
+      return {
+        title: "🏆 Copa do Mundo — o que quer ver?",
+        options: [
+          { label: "🎯 Palpites e pontuação", action: "goto", target: "/copa/palpites" },
+          { label: "📋 Comandos", action: "goto", target: "/copa/comandos" },
+          { label: "Voltar", action: "goto", target: "/" },
+        ],
+      };
+    },
+  },
+
+  "/copa/palpites": {
+    dynamic: true,
+    options: [],
+    handler: async (ctx) => {
+      await replyLong(ctx, [
+        "🎯 *Palpites e pontuação*",
+        "",
+        "Envie */palpite* no privado para apostar no placar de cada jogo.",
+        "",
+        "🥇 Placar exato → *3 pts*",
+        "✅ Vencedor/empate certo → *1 pt*",
+        "➕ Acertou quem avança nos pênaltis → *+1 pt bônus*",
+        "",
+        "🏆 *Campeão da Copa* → *20 pts*",
+        "🦓 *Zebra da Copa* → *10 pts*",
+        "⭐ *Craque da Copa* → *8 pts*",
+        "",
+        "Os palpites são *privados* — o grupo só vê após o jogo começar.",
+        "Prazo: até o apito inicial de cada partida.",
+      ].join("\n"));
+      return {
+        title: "Continuar?",
+        options: [
+          { label: "Voltar à Copa", action: "goto", target: "/copa" },
+          { label: "Voltar ao menu da ajuda", action: "goto", target: "/" },
+          { label: "Fechar ajuda", action: "exec", handler: "exitHelp" },
+        ],
+      };
+    },
+  },
+
+  "/copa/comandos": {
+    dynamic: true,
+    options: [],
+    handler: async (ctx) => {
+      await replyLong(ctx, [
+        "📋 *Comandos da Copa do Mundo*",
+        "",
+        "*/copa* — Abre o menu principal",
+        "*/palpite* — Fazer palpites _(no privado)_",
+        "*/proxjogo* — Próximos 5 jogos",
+        "*/jogoshoje* — Jogos do dia",
+        "*/tabela grupo A* — Classificação do grupo (A–L)",
+        "*/placar* — Ranking de palpites do grupo",
+        "*/bolao* — Gerenciar bolão do grupo _(admin)_",
+      ].join("\n"));
+      return {
+        title: "Continuar?",
+        options: [
+          { label: "Voltar à Copa", action: "goto", target: "/copa" },
+          { label: "Voltar ao menu da ajuda", action: "goto", target: "/" },
+          { label: "Fechar ajuda", action: "exec", handler: "exitHelp" },
+        ],
+      };
+    },
+  },
+
+  "/cartola": {
+    dynamic: true,
+    options: [],
+    handler: async (ctx) => {
+      await replyLong(ctx, COPY.cartola);
+      return {
+        title: "⚽ Cartola FC — o que quer ver?",
+        options: [
+          { label: "🔗 Vincular time", action: "goto", target: "/cartola/vincular" },
+          { label: "📋 Comandos", action: "goto", target: "/cartola/comandos" },
+          { label: "Voltar", action: "goto", target: "/" },
+        ],
+      };
+    },
+  },
+
+  "/cartola/vincular": {
+    dynamic: true,
+    options: [],
+    handler: async (ctx) => {
+      await replyLong(ctx, [
+        "🔗 *Como vincular o time*",
+        "",
+        "1. Abra o Cartola FC e veja a URL do seu time:",
+        "   _cartola.globo.com/#!/time/*19513040*_",
+        "2. Envie */cartola* aqui no privado",
+        "3. Vá em ⚙️ Configurações → 🔗 Vincular meu time",
+        "4. Cole o número (ou slug) do time",
+        "",
+        "Após vincular, use */cartola → 🏠 Meu time* para ver sua escalação.",
+        "",
+        "_Para vincular uma liga ao grupo, faça o mesmo dentro do grupo:_",
+        "_*/cartola* → ⚙️ Configurações → 🏆 Vincular liga_",
+      ].join("\n"));
+      return {
+        title: "Continuar?",
+        options: [
+          { label: "Voltar ao Cartola FC", action: "goto", target: "/cartola" },
+          { label: "Voltar ao menu da ajuda", action: "goto", target: "/" },
+          { label: "Fechar ajuda", action: "exec", handler: "exitHelp" },
+        ],
+      };
+    },
+  },
+
+  "/cartola/comandos": {
+    dynamic: true,
+    options: [],
+    handler: async (ctx) => {
+      await replyLong(ctx, [
+        "📋 *Comandos do Cartola FC*",
+        "",
+        "*/cartola* — Abre o menu principal",
+        "*/scout* — Scouts do seu próprio time",
+        "*/scout @usuario* — Scouts do time de alguém do grupo",
+      ].join("\n"));
+      return {
+        title: "Continuar?",
+        options: [
+          { label: "Voltar ao Cartola FC", action: "goto", target: "/cartola" },
+          { label: "Voltar ao menu da ajuda", action: "goto", target: "/" },
+          { label: "Fechar ajuda", action: "exec", handler: "exitHelp" },
+        ],
+      };
     },
   },
 
