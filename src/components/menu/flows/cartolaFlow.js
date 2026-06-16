@@ -159,12 +159,17 @@ const cartolaFlow = createFlow("cartola", {
         ];
 
         if (rodada.fechamentoMercado) {
-          const dt = new Date(rodada.fechamentoMercado.toString().includes("T")
-            ? rodada.fechamentoMercado
-            : rodada.fechamentoMercado * 1000);
-          const dateFmt = dt.toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo", day: "2-digit", month: "2-digit" });
-          const timeFmt = dt.toLocaleTimeString("pt-BR", { timeZone: "America/Sao_Paulo", hour: "2-digit", minute: "2-digit" });
-          lines.push(`⏰ Fechamento: ${dateFmt} às ${timeFmt}`);
+          let dtInput = rodada.fechamentoMercado;
+          // "2024-11-01 12:00:00" → "2024-11-01T12:00:00" para o construtor Date()
+          if (typeof dtInput === "string" && /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}/.test(dtInput)) {
+            dtInput = dtInput.replace(" ", "T");
+          }
+          const dt = new Date(typeof dtInput === "number" ? dtInput : dtInput);
+          if (!isNaN(dt.getTime())) {
+            const dateFmt = dt.toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo", day: "2-digit", month: "2-digit" });
+            const timeFmt = dt.toLocaleTimeString("pt-BR", { timeZone: "America/Sao_Paulo", hour: "2-digit", minute: "2-digit" });
+            lines.push(`⏰ Fechamento: ${dateFmt} às ${timeFmt}`);
+          }
         }
 
         await ctx.reply(lines.join("\n"));
@@ -183,8 +188,10 @@ const cartolaFlow = createFlow("cartola", {
       });
       await ctx.reply(
         "🔗 *Vincular meu time*\n\n" +
-        "Me manda o slug do seu time. Você encontra na URL do Cartola FC:\n" +
-        "_cartola.globo.com/time/*seu-slug-aqui*_\n\n" +
+        "Me manda o número ou slug do seu time.\n\n" +
+        "Você encontra na URL do Cartola FC:\n" +
+        "_cartola.globo.com/#!/time/*3884457*_ → manda o número\n" +
+        "_cartola.globo.com/time/*meu-time*_ → manda o slug\n\n" +
         "_(ou /cancelar para sair)_",
       );
       return { end: true };
