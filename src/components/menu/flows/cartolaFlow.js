@@ -93,13 +93,17 @@ const cartolaFlow = createFlow("cartola", {
 
   "/config": {
     title: "⚙️ *Configurações — Cartola FC*",
-    options: [
-      { label: "🔗 Vincular meu time",   action: "exec", handler: "startTeamLink" },
-      { label: "🏆 Vincular liga (grupo)",action: "exec", handler: "startLeagueLink" },
-      { label: "🔓 Conectar conta Globo", action: "exec", handler: "startGloboAuth" },
-      { label: "🔌 Desconectar conta",   action: "exec", handler: "disconnectGlobo" },
-      { label: "🔙 Voltar",             action: "back" },
-    ],
+    dynamic: true,
+    handler: async (ctx) => {
+      const isGroup = String(ctx.chatId).endsWith("@g.us");
+      const options = [
+        ...(isGroup ? [{ label: "🏆 Vincular liga (grupo)", action: "exec", handler: "startLeagueLink" }] : []),
+        { label: "🔓 Conectar conta Globo", action: "exec", handler: "startGloboAuth" },
+        { label: "🔌 Desconectar conta",    action: "exec", handler: "disconnectGlobo" },
+        { label: "🔙 Voltar",              action: "back" },
+      ];
+      return { title: "⚙️ *Configurações — Cartola FC*", options };
+    },
   },
 
   handlers: {

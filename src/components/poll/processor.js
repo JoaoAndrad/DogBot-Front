@@ -623,6 +623,18 @@ async function executeAction(result, client) {
               }
             }
 
+            // Cartola: apenas quem invocou o comando pode interagir com os polls
+            if (data.flowId === "cartola") {
+              const ownerNum = String(data.userId || "").split("@")[0].replace(/\D/g, "");
+              const voterNum = String(result.voterId || "").split("@")[0].replace(/\D/g, "");
+              if (ownerNum && voterNum && ownerNum !== voterNum) {
+                logger.debug(
+                  `[processor] Cartola: voto ignorado de ${result.voterId} (dono: ${data.userId})`,
+                );
+                break;
+              }
+            }
+
             // Evitar "dados do filme ou nota não encontrados" / "Sessão expirada": se o fluxo
             // é de filme e o contexto necessário está vazio, avisar e não executar o handler.
             if (data.flowId === "film-card") {
