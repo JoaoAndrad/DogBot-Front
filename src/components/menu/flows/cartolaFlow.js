@@ -281,6 +281,10 @@ const cartolaFlow = createFlow("cartola", {
 
     // ── Config: conectar Globo ────────────────────────────────────────────────
     startGloboAuth: async (ctx) => {
+      if (String(ctx.chatId).endsWith("@g.us")) {
+        await ctx.reply("🔒 Alterações de conta são feitas apenas no privado.\n\nEnvie */cartola* aqui no meu privado.");
+        return { noRender: true };
+      }
       try {
         const { link } = await cartolaClient.getAuthLink(ctx.userId);
         await ctx.reply(
@@ -299,6 +303,10 @@ const cartolaFlow = createFlow("cartola", {
 
     // ── Config: desconectar ───────────────────────────────────────────────────
     disconnectGlobo: async (ctx) => {
+      if (String(ctx.chatId).endsWith("@g.us")) {
+        await ctx.reply("🔒 Alterações de conta são feitas apenas no privado.\n\nEnvie */cartola* aqui no meu privado.");
+        return { noRender: true };
+      }
       try {
         const { connected } = await cartolaClient.getAuthStatus(ctx.userId);
         if (!connected) {
