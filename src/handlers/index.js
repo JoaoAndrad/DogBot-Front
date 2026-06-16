@@ -461,7 +461,6 @@ async function handle(context) {
     }
 
     if (state.flowType === "cartola-league-input") {
-      if (isGroup) return;
       return await handleCartolaLeagueFlow(stateKey, body, state, reply);
     }
 
