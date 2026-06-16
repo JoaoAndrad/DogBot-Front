@@ -5,7 +5,7 @@ const logger = require("../../utils/logger");
 
 module.exports = {
   name: "placar",
-  aliases: [],
+  aliases: ["ranking", "classificação", "classificacao", "rank", "leaderboard"],
   description: "Ranking de palpites do grupo na Copa do Mundo",
 
   async execute(context) {
@@ -14,14 +14,20 @@ module.exports = {
     const isGroup = String(chatId).endsWith("@g.us");
 
     if (!isGroup) {
-      await client.sendMessage(chatId, "⚽ Use */placar* em um grupo para ver o ranking daquele grupo.");
+      await client.sendMessage(
+        chatId,
+        "⚽ Use */placar* em um grupo para ver o ranking daquele grupo.",
+      );
       return;
     }
 
     try {
       const settings = await worldcupClient.getGroupSettings(chatId);
       if (!settings || !settings.active) {
-        await client.sendMessage(chatId, "⚽ O sistema Copa não está ativo neste grupo. Use */clima-de-copa* para ativar.");
+        await client.sendMessage(
+          chatId,
+          "⚽ O sistema Copa não está ativo neste grupo. Use */clima-de-copa* para ativar.",
+        );
         return;
       }
     } catch (e) {
@@ -33,7 +39,9 @@ module.exports = {
         ? await client.getChatById(chatId)
         : await message.getChat();
       const participants = chat.participants || [];
-      const userIds = participants.map((p) => p.id._serialized || p.id.user + "@c.us");
+      const userIds = participants.map(
+        (p) => p.id._serialized || p.id.user + "@c.us",
+      );
 
       // Verifica se há bolão ativo — se sim, usa pontuação do bolão
       let bolaoData = null;
@@ -41,7 +49,11 @@ module.exports = {
         bolaoData = await worldcupClient.getBolao(chatId);
       } catch (_) {}
 
-      const hasBolao = bolaoData && bolaoData.bolao && bolaoData.leaderboard && bolaoData.leaderboard.length > 0;
+      const hasBolao =
+        bolaoData &&
+        bolaoData.bolao &&
+        bolaoData.leaderboard &&
+        bolaoData.leaderboard.length > 0;
 
       if (hasBolao) {
         const { leaderboard } = bolaoData;
@@ -51,7 +63,10 @@ module.exports = {
         for (let i = 0; i < leaderboard.length; i++) {
           const entry = leaderboard[i];
           const medal = medals[i] || `${i + 1}.`;
-          const name = entry.pushName || entry.displayName || (entry.senderNumber ? entry.senderNumber.split("@")[0] : "?");
+          const name =
+            entry.pushName ||
+            entry.displayName ||
+            (entry.senderNumber ? entry.senderNumber.split("@")[0] : "?");
           const pts = entry.bolaoPoints === 1 ? "pt" : "pts";
           lines.push(`${medal} ${name} — *${entry.bolaoPoints} ${pts}*`);
         }
@@ -60,13 +75,24 @@ module.exports = {
 
         // Ranking geral do grupo (pontuação total, todos os participantes)
         try {
-          const { leaderboard: general } = await worldcupClient.getLeaderboard(chatId, userIds);
+          const { leaderboard: general } = await worldcupClient.getLeaderboard(
+            chatId,
+            userIds,
+          );
           if (general && general.length) {
-            lines.push("", "──────────────────", "🏆 *Ranking Geral do Grupo*", "");
+            lines.push(
+              "",
+              "──────────────────",
+              "🏆 *Ranking Geral do Grupo*",
+              "",
+            );
             for (let i = 0; i < general.length; i++) {
               const entry = general[i];
               const medal = medals[i] || `${i + 1}.`;
-              const name = entry.pushName || entry.displayName || (entry.senderNumber ? entry.senderNumber.split("@")[0] : "?");
+              const name =
+                entry.pushName ||
+                entry.displayName ||
+                (entry.senderNumber ? entry.senderNumber.split("@")[0] : "?");
               const pts = entry.totalPoints === 1 ? "pt" : "pts";
               lines.push(`${medal} ${name} — *${entry.totalPoints} ${pts}*`);
             }
@@ -78,10 +104,16 @@ module.exports = {
       }
 
       // Ranking geral
-      const { leaderboard } = await worldcupClient.getLeaderboard(chatId, userIds);
+      const { leaderboard } = await worldcupClient.getLeaderboard(
+        chatId,
+        userIds,
+      );
 
       if (!leaderboard || !leaderboard.length) {
-        await client.sendMessage(chatId, "⚽ Nenhum palpite pontuado ainda. Use */palpite* (no privado) para participar!");
+        await client.sendMessage(
+          chatId,
+          "⚽ Nenhum palpite pontuado ainda. Use */palpite* (no privado) para participar!",
+        );
         return;
       }
 
@@ -98,7 +130,9 @@ module.exports = {
         const pts = entry.totalPoints === 1 ? "pt" : "pts";
         const count = entry.predictionsScored || 0;
         const palpites = count === 1 ? "palpite" : "palpites";
-        lines.push(`${medal} ${name} — *${entry.totalPoints} ${pts}* (${count} ${palpites})`);
+        lines.push(
+          `${medal} ${name} — *${entry.totalPoints} ${pts}* (${count} ${palpites})`,
+        );
       }
 
       await client.sendMessage(chatId, lines.join("\n"));
