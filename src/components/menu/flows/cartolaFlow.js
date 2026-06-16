@@ -3,7 +3,6 @@
 const { createFlow } = require("../flowBuilder");
 const cartolaClient = require("../../../services/cartolaClient");
 const conversationState = require("../../../services/conversationState");
-const polls = require("../../poll");
 const logger = require("../../../utils/logger");
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -22,78 +21,34 @@ function formatMercadoStatus(rodada) {
   return [rodadaNum, status].filter(Boolean).join(" — ");
 }
 
-// ─── Polling pós-auth ────────────────────────────────────────────────────────
-
-function _pollGloboAuth(userId, reply) {
-  const INTERVAL = 5000;
-  const TIMEOUT  = 10 * 60 * 1000;
-  const started  = Date.now();
-
-  const timer = setInterval(async () => {
-    try {
-      if (Date.now() - started > TIMEOUT) {
-        clearInterval(timer);
-        return;
-      }
-
-      const { connected } = await cartolaClient.getAuthStatus(userId);
-      if (!connected) return;
-
-      clearInterval(timer);
-
-      // Busca dados autenticados do time e ligas
-      const lines = ["✅ *Conta Globo conectada com sucesso!*", ""];
-
-      try {
-        const timeData = await cartolaClient.getAuthTimeData(userId);
-        const time = timeData?.data?.time || timeData?.data;
-        if (time?.nome) {
-          lines.push(`🏠 *Time:* ${time.nome}`);
-          if (time.nome_cartola) lines.push(`👤 ${time.nome_cartola}`);
-          if (timeData?.data?.pontos != null) {
-            lines.push(`📊 Pontuação: *${Number(timeData.data.pontos).toFixed(2).replace(".", ",")} pts*`);
-          }
-          lines.push("");
-        }
-      } catch (e) {
-        logger.warn("[cartolaFlow] poll getAuthTimeData:", e.message);
-      }
-
-      try {
-        const ligasData = await cartolaClient.getAuthLigas(userId);
-        const ligas = ligasData?.data?.ligas || ligasData?.data || [];
-        if (Array.isArray(ligas) && ligas.length) {
-          lines.push("🏆 *Suas ligas:*");
-          for (const l of ligas.slice(0, 5)) {
-            lines.push(`• ${l.nome || l.name || l.slug}`);
-          }
-        }
-      } catch (e) {
-        logger.warn("[cartolaFlow] poll getAuthLigas:", e.message);
-      }
-
-      await reply(lines.join("\n"));
-    } catch (e) {
-      logger.warn("[cartolaFlow] pollGloboAuth:", e.message);
-    }
-  }, INTERVAL);
-}
-
 // ─── Flow principal ───────────────────────────────────────────────────────────
 
 const cartolaFlow = createFlow("cartola", {
   root: {
     title: "⚽ *Cartola FC*",
-    options: [
-      { label: "🏠 Meu time",             action: "exec", handler: "showMyTeam" },
-      { label: "🔍 Scouts do meu time",  action: "exec", handler: "showScout" },
-      { label: "📊 Parcial do grupo",    action: "exec", handler: "showGroupParcial" },
-      { label: "⭐ Destaques do grupo",  action: "exec", handler: "showDestaques" },
-      { label: "🏆 Ranking da liga",     action: "exec", handler: "showLeagueRanking" },
-      { label: "📊 Rodada atual",        action: "exec", handler: "showRodada" },
-      { label: "⚙️ Configurações",       action: "goto", target: "/config" },
-      { label: "👋 Sair",               action: "exec", handler: "leave" },
-    ],
+    dynamic: true,
+    handler: async (ctx) => {
+      const isGroup = String(ctx.chatId).endsWith("@g.us");
+      const options = isGroup
+        ? [
+            { label: "🏠 Meu time",           action: "exec", handler: "showMyTeam" },
+            { label: "🔍 Scouts do meu time",  action: "exec", handler: "showScout" },
+            { label: "📊 Parcial do grupo",    action: "exec", handler: "showGroupParcial" },
+            { label: "⭐ Destaques do grupo",  action: "exec", handler: "showDestaques" },
+            { label: "🏆 Ranking da liga",     action: "exec", handler: "showLeagueRanking" },
+            { label: "📊 Rodada atual",        action: "exec", handler: "showRodada" },
+            { label: "⚙️ Configurações",       action: "goto", target: "/config" },
+            { label: "👋 Sair",               action: "exec", handler: "leave" },
+          ]
+        : [
+            { label: "🏠 Meu time",           action: "exec", handler: "showMyTeam" },
+            { label: "🔍 Scouts do meu time",  action: "exec", handler: "showScout" },
+            { label: "📊 Rodada atual",        action: "exec", handler: "showRodada" },
+            { label: "⚙️ Configurações",       action: "goto", target: "/config" },
+            { label: "👋 Sair",               action: "exec", handler: "leave" },
+          ];
+      return { title: "⚽ *Cartola FC*", options };
+    },
   },
 
   "/config": {
@@ -511,6 +466,14 @@ const cartolaFlow = createFlow("cartola", {
 
     // ── Config: vincular time ─────────────────────────────────────────────────
     startTeamLink: async (ctx) => {
+      if (String(ctx.chatId).endsWith("@g.us")) {
+        await ctx.reply(
+          "🔗 *Vincular meu time*\n\n" +
+          "A vinculação de time é feita apenas no privado.\n\n" +
+          "Manda */cartola* pra mim no privado para configurar.",
+        );
+        return { noRender: true };
+      }
       conversationState.startFlow(ctx.userId, "cartola-team-input", {
         step: "await_slug",
         userId: ctx.userId,
@@ -545,49 +508,6 @@ const cartolaFlow = createFlow("cartola", {
         "_(ou /cancelar para sair)_",
       );
       return { end: true };
-    },
-
-    // ── Config: conectar Globo ────────────────────────────────────────────────
-    startGloboAuth: async (ctx) => {
-      if (String(ctx.chatId).endsWith("@g.us")) {
-        await ctx.reply("🔒 Alterações de conta são feitas apenas no privado.\n\nEnvie */cartola* aqui no meu privado.");
-        return { noRender: true };
-      }
-      try {
-        const { link } = await cartolaClient.getAuthLink(ctx.userId);
-        await ctx.reply(
-          "🔓 *Conectar conta Globo*\n\n" +
-          "Acesse o link abaixo e faça login com sua conta Globo.\n" +
-          "O link expira em *10 minutos*.\n\n" +
-          `🔗 ${link}`,
-        );
-        _pollGloboAuth(ctx.userId, ctx.reply);
-      } catch (e) {
-        logger.error("[cartolaFlow] getAuthLink:", e.message);
-        await ctx.reply("❌ Erro ao gerar link de login. Tente novamente.");
-      }
-      return { end: true };
-    },
-
-    // ── Config: desconectar ───────────────────────────────────────────────────
-    disconnectGlobo: async (ctx) => {
-      if (String(ctx.chatId).endsWith("@g.us")) {
-        await ctx.reply("🔒 Alterações de conta são feitas apenas no privado.\n\nEnvie */cartola* aqui no meu privado.");
-        return { noRender: true };
-      }
-      try {
-        const { connected } = await cartolaClient.getAuthStatus(ctx.userId);
-        if (!connected) {
-          await ctx.reply("🔌 Sua conta Globo não está conectada.");
-          return { noRender: true };
-        }
-        await cartolaClient.disconnectAuth(ctx.userId);
-        await ctx.reply("✅ Conta Globo desconectada.");
-      } catch (e) {
-        logger.error("[cartolaFlow] disconnectGlobo:", e.message);
-        await ctx.reply("❌ Erro ao desconectar. Tente novamente.");
-      }
-      return { noRender: true };
     },
 
     // ── Notificações: ligar/desligar sistema ──────────────────────────────────
