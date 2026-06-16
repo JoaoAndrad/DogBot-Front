@@ -86,6 +86,7 @@ const cartolaFlow = createFlow("cartola", {
     title: "⚽ *Cartola FC*",
     options: [
       { label: "🏠 Meu time",           action: "exec", handler: "showMyTeam" },
+      { label: "📊 Parcial do grupo",    action: "exec", handler: "showGroupParcial" },
       { label: "🏆 Ranking da liga",     action: "exec", handler: "showLeagueRanking" },
       { label: "📊 Rodada atual",        action: "exec", handler: "showRodada" },
       { label: "⚙️ Configurações",       action: "goto", target: "/config" },
@@ -184,6 +185,45 @@ const cartolaFlow = createFlow("cartola", {
           logger.error("[cartolaFlow] getMyTeamData:", e.message);
           await ctx.reply(`⚽ *${saved.team_name || saved.slug}*\n\n_Dados indisponíveis no momento._`);
         }
+      }
+
+      return { noRender: true };
+    },
+
+    // ── Parcial do grupo ──────────────────────────────────────────────────────
+    showGroupParcial: async (ctx) => {
+      const isGroup = String(ctx.chatId).endsWith("@g.us");
+      if (!isGroup) {
+        await ctx.reply("📊 A parcial do grupo só está disponível em grupos.");
+        return { noRender: true };
+      }
+
+      try {
+        const { ranking } = await cartolaClient.getGroupParcial(ctx.chatId);
+
+        if (!ranking || !ranking.length) {
+          await ctx.reply(
+            "📊 *Parcial do grupo*\n\n" +
+            "Nenhum membro do grupo vinculou seu time ainda.\n\n" +
+            "Cada pessoa deve usar ⚙️ *Configurações → Vincular meu time*.",
+          );
+          return { noRender: true };
+        }
+
+        const medals = ["🥇", "🥈", "🥉"];
+        const lines = ["📊 *Parcial do grupo*", ""];
+
+        for (let i = 0; i < ranking.length; i++) {
+          const r = ranking[i];
+          const pos = medals[i] || `${i + 1}.`;
+          lines.push(`${pos} ${r.displayName} — *${formatPontuacao(r.pontos)} pts*`);
+          lines.push(`    🏠 ${r.teamName}`);
+        }
+
+        await ctx.reply(lines.join("\n"));
+      } catch (e) {
+        logger.error("[cartolaFlow] showGroupParcial:", e.message);
+        await ctx.reply("❌ Erro ao buscar parcial. Tente novamente.");
       }
 
       return { noRender: true };

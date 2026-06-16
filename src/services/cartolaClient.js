@@ -64,6 +64,18 @@ async function getAuthLigas(userId) {
   return backendClient.sendToBackend(`/api/cartola/auth/ligas/${encodeURIComponent(userId)}`, null, "GET");
 }
 
+async function getGroupParcial(groupId) {
+  return backendClient.sendToBackend(`/api/cartola/group/${encodeURIComponent(groupId)}/parcial`, null, "GET");
+}
+
+async function getGroupSettings(groupId) {
+  return backendClient.sendToBackend(`/api/cartola/group/${encodeURIComponent(groupId)}/settings`, null, "GET");
+}
+
+async function saveGroupSettings(groupId, data) {
+  return backendClient.sendToBackend(`/api/cartola/group/${encodeURIComponent(groupId)}/settings`, data, "POST");
+}
+
 module.exports = {
   getRodada,
   getUserTeam,
@@ -78,4 +90,7 @@ module.exports = {
   disconnectAuth,
   getAuthTimeData,
   getAuthLigas,
+  getGroupParcial,
+  getGroupSettings,
+  saveGroupSettings,
 };
