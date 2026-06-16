@@ -8,12 +8,12 @@ const { jidFromContact } = require("../../utils/whatsapp/getUserData");
 const POSICAO = { 1: "GOL", 2: "LAT", 3: "ZAG", 4: "MEI", 5: "ATA", 6: "TEC" };
 
 const SCOUT_LABEL = {
-  G:  "⚽ Gol",          A:  "🎯 Assist",       FT: "🥅 Trave",
-  FD: "🧤 Def.Difícil",  FF: "💨 Fora",          DS: "🛡️ Desarme",
-  FS: "⚠️ F.Sofrida",   SG: "🔒 S/Gol",        DE: "🧤 Defesa",
-  FC: "🦵 Falta",        V:  "✅ Vitória",        CA: "🟨 Amarelo",
-  CV: "🟥 Vermelho",     I:  "🚑 Impedimento",   PP: "❌ Pên.Perdido",
-  PC: "⚡ Pên.Comet.",   GC: "🚫 G.Contra",
+  G:  "⚽ Gol",           A:  "🎯 Assist",       FT: "🥅 Trave",
+  FD: "🥅 Fin.Defendida", FF: "💨 Fora",          DS: "🛡️ Desarme",
+  FS: "⚠️ F.Sofrida",    SG: "🔒 S/Gol",        DE: "🧤 Defesa",
+  DD: "🧤 Def.Difícil",  FC: "🦵 Falta",         V:  "✅ Vitória",
+  CA: "🟨 Amarelo",      CV: "🟥 Vermelho",      I:  "🚑 Impedimento",
+  PP: "❌ Pên.Perdido",  PC: "⚡ Pên.Comet.",    GC: "🚫 G.Contra",
 };
 
 function fmt(n) {

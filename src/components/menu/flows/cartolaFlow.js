@@ -341,12 +341,12 @@ const cartolaFlow = createFlow("cartola", {
       }
 
       const SCOUT_LABEL = {
-        G: "⚽ Gol",         A: "🎯 Assist",     FT: "🥅 Trave",
-        FD: "🧤 Def.Difícil", FF: "💨 Fora",       DS: "🛡️ Desarme",
-        FS: "⚠️ F.Sofrida",   SG: "🔒 S/Gol",     DE: "🧤 Defesa",
-        FC: "🦵 Falta",        V:  "✅ Vitória",    CA: "🟨 Amarelo",
-        CV: "🟥 Vermelho",     I:  "🚑 Impedimento", PP: "❌ Pên.Perdido",
-        PC: "⚡ Pên.Comet.",   GC: "🚫 G.Contra",
+        G: "⚽ Gol",          A:  "🎯 Assist",      FT: "🥅 Trave",
+        FD: "🥅 Fin.Defendida", FF: "💨 Fora",        DS: "🛡️ Desarme",
+        FS: "⚠️ F.Sofrida",    SG: "🔒 S/Gol",      DE: "🧤 Defesa",
+        DD: "🧤 Def.Difícil",  FC: "🦵 Falta",       V:  "✅ Vitória",
+        CA: "🟨 Amarelo",      CV: "🟥 Vermelho",    I:  "🚑 Impedimento",
+        PP: "❌ Pên.Perdido",  PC: "⚡ Pên.Comet.",  GC: "🚫 G.Contra",
       };
 
       try {
@@ -409,7 +409,7 @@ const cartolaFlow = createFlow("cartola", {
       }
 
       const SCOUT_ICON = {
-        G: "⚽", A: "🎯", FT: "🥅", FD: "🧤", DS: "🛡️",
+        G: "⚽", A: "🎯", FT: "🥅", FD: "🥅", DD: "🧤", DS: "🛡️",
         SG: "🔒", CA: "🟨", CV: "🟥", PP: "❌", GC: "🚫",
       };
       const medals = ["🥇", "🥈", "🥉"];
