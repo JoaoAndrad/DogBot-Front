@@ -423,29 +423,35 @@ async function handle(context) {
       });
     }
 
-    if (state.flowType === "copa-palpite-input") {
-      return await handleCopaFlow(stateKey, body, state, reply, {
-        client: context.client,
-        from,
-      });
-    }
+    if (
+      state.flowType === "copa-palpite-input" ||
+      state.flowType === "copa-champion-input" ||
+      state.flowType === "copa-zebra-input" ||
+      state.flowType === "copa-mvp-input"
+    ) {
+      if (isGroup) return; // flows copa são exclusivos do privado — ignora mensagens de grupo
 
-    if (state.flowType === "copa-champion-input") {
-      return await handleCopaChampionFlow(stateKey, body, state, reply, {
-        client: context.client,
-        from,
-      });
-    }
-
-    if (state.flowType === "copa-zebra-input") {
-      return await handleCopaZebraFlow(stateKey, body, state, reply, {
-        client: context.client,
-        from,
-      });
-    }
-
-    if (state.flowType === "copa-mvp-input") {
-      return await handleCopaMvpFlow(stateKey, body, state, reply);
+      if (state.flowType === "copa-palpite-input") {
+        return await handleCopaFlow(stateKey, body, state, reply, {
+          client: context.client,
+          from,
+        });
+      }
+      if (state.flowType === "copa-champion-input") {
+        return await handleCopaChampionFlow(stateKey, body, state, reply, {
+          client: context.client,
+          from,
+        });
+      }
+      if (state.flowType === "copa-zebra-input") {
+        return await handleCopaZebraFlow(stateKey, body, state, reply, {
+          client: context.client,
+          from,
+        });
+      }
+      if (state.flowType === "copa-mvp-input") {
+        return await handleCopaMvpFlow(stateKey, body, state, reply);
+      }
     }
 
     if (state.flowType === "rotina" || state.flowType === "rotina_edit") {
