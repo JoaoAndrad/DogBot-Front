@@ -185,8 +185,8 @@ async function handleCadastroVote(userId, voteData, reply) {
         return reply(
           `🎉 *Cadastro realizado com sucesso!*\n\n` +
             `Bem-vindo, *${finalData.userName}*!\n\n` +
-            `Agora você pode usar todos os comandos:\n` +
-            `• /spotify - Conectar sua conta do Spotify\n\n` +
+            `Utilize o comando:\n` +
+            `• /ajuda - Para ficar por dentro de tudo que posso fazer\n\n` +
             `Divirta-se! 🚀`,
         );
       }

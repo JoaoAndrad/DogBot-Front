@@ -53,6 +53,7 @@ const cartolaFlow = createFlow("cartola", {
             { label: "⭐ Destaques do grupo",  action: "exec", handler: "showDestaques" },
             { label: "🏆 Ranking da liga",     action: "exec", handler: "showLeagueRanking" },
             { label: "📊 Rodada atual",        action: "exec", handler: "showRodada" },
+            { label: "❓ Dúvidas",             action: "goto",  target: "/duvidas" },
             { label: "⚙️ Configurações",       action: "goto", target: "/config" },
             { label: "👋 Sair",               action: "exec", handler: "leave" },
           ]
@@ -60,6 +61,7 @@ const cartolaFlow = createFlow("cartola", {
             { label: "🏠 Meu time",           action: "exec", handler: "showMyTeam" },
             { label: "🔍 Scouts do meu time",  action: "exec", handler: "showScout" },
             { label: "📊 Rodada atual",        action: "exec", handler: "showRodada" },
+            { label: "❓ Dúvidas",             action: "goto",  target: "/duvidas" },
             { label: "⚙️ Configurações",       action: "goto", target: "/config" },
             { label: "👋 Sair",               action: "exec", handler: "leave" },
           ];
@@ -137,7 +139,103 @@ const cartolaFlow = createFlow("cartola", {
     ],
   },
 
+  "/duvidas": {
+    title: "❓ *Dúvidas — Cartola FC*",
+    options: [
+      { label: "🔗 Como vincular meu time",   action: "exec", handler: "faqVincular" },
+      { label: "🔍 Scouts e pontuação",        action: "exec", handler: "faqScouts" },
+      { label: "🏆 Liga do grupo",             action: "exec", handler: "faqLiga" },
+      { label: "📋 Comandos disponíveis",      action: "exec", handler: "faqComandos" },
+      { label: "🔔 Notificações do grupo",     action: "exec", handler: "faqNotificacoes" },
+      { label: "🔙 Voltar",                    action: "back" },
+    ],
+  },
+
   handlers: {
+    // ── FAQ ──────────────────────────────────────────────────────────────────
+    faqVincular: async (ctx) => {
+      await ctx.reply([
+        "🔗 *Como vincular meu time*",
+        "",
+        "1. Abra o Cartola FC no celular ou navegador",
+        "2. Acesse seu time e veja a URL:",
+        "   _cartola.globo.com/#!/time/*19513040*_",
+        "3. Copie o número (ou o slug) e envie no privado",
+        "",
+        "Para vincular, use */cartola* → ⚙️ Configurações → 🔗 Vincular meu time",
+        "",
+        "_A vinculação é feita apenas no privado — em grupos o bot ignora a entrada._",
+      ].join("\n"));
+      return { noRender: true };
+    },
+
+    faqScouts: async (ctx) => {
+      await ctx.reply([
+        "🔍 *Scouts e pontuação*",
+        "",
+        "Os scouts são os eventos individuais de cada atleta durante a rodada.",
+        "",
+        "⚽ Gol • 🎯 Assistência • 🔒 Sem gol sofrido • 🛡️ Desarme",
+        "🧤 Defesa difícil • 🟨 Cartão amarelo • 🟥 Vermelho • ❌ Pênalti perdido",
+        "",
+        "O *capitão* tem seus pontos dobrados — indicado com ⭐.",
+        "",
+        "Para ver os scouts:",
+        "• */cartola → 🔍 Scouts do meu time* — seus atletas",
+        "• */scout @usuario* — scouts do time de alguém do grupo",
+      ].join("\n"));
+      return { noRender: true };
+    },
+
+    faqLiga: async (ctx) => {
+      await ctx.reply([
+        "🏆 *Liga do grupo*",
+        "",
+        "O bot suporta ligas públicas e privadas (competições do tipo Pontos Corridos).",
+        "",
+        "Para vincular:",
+        "Use */cartola* → ⚙️ Configurações → 🏆 Vincular liga (grupo)",
+        "",
+        "Copie o slug ou URL da liga no Cartola FC:",
+        "_cartola.globo.com/#!/competicoes/pontoscorridos/*slug*_",
+        "",
+        "Após vinculada, use *🏆 Ranking da liga* para ver a classificação.",
+        "",
+        "_A vinculação de liga só pode ser feita dentro do grupo._",
+      ].join("\n"));
+      return { noRender: true };
+    },
+
+    faqComandos: async (ctx) => {
+      await ctx.reply([
+        "📋 *Comandos disponíveis*",
+        "",
+        "*/cartola* — Abre este menu",
+        "*/scout* — Scouts do seu próprio time",
+        "*/scout @usuario* — Scouts do time de alguém do grupo",
+      ].join("\n"));
+      return { noRender: true };
+    },
+
+    faqNotificacoes: async (ctx) => {
+      await ctx.reply([
+        "🔔 *Notificações do grupo*",
+        "",
+        "O bot pode avisar o grupo automaticamente durante a rodada:",
+        "",
+        "⚽ *Gol* de um atleta escalado por alguém do grupo",
+        "🎯 *Assistência*",
+        "🟥 *Cartão vermelho*",
+        "🟨 *Cartão amarelo* _(opcional, desligado por padrão)_",
+        "📊 *Parcial automática* — a cada 30, 60 ou 90 min",
+        "🏆 *Virada de liderança* no ranking do grupo",
+        "✅ *Resultado final* da rodada",
+        "",
+        "Configure em */cartola* → ⚙️ Configurações → 🔔 Notificações do grupo.",
+      ].join("\n"));
+      return { noRender: true };
+    },
+
     // ── Meu time ─────────────────────────────────────────────────────────────
     showMyTeam: async (ctx) => {
       let saved;
