@@ -5,16 +5,17 @@ const conversationState = require("../services/conversationState");
 const cartolaClient = require("../services/cartolaClient");
 const logger = require("../utils/logger");
 
-async function _sendShield(client, chatId, url, caption) {
+async function _sendShieldSticker(client, chatId, svgUrl) {
   try {
-    const res = await fetch(url, { timeout: 8000 });
+    const res = await fetch(svgUrl, { timeout: 8000 });
     if (!res.ok) return false;
     const buf = await res.buffer();
-    const { MessageMedia } = require("whatsapp-web.js");
-    const media = new MessageMedia("image/png", buf.toString("base64"));
-    await client.sendMessage(chatId, media, { caption });
-    return true;
+    const sharp = require("sharp");
+    const pngBuf = await sharp(buf).png().toBuffer();
+    const stickerHelper = require("../utils/media/stickerHelper");
+    return await stickerHelper.sendBufferAsSticker(client, chatId, pngBuf, { fullOnly: true });
   } catch (e) {
+    logger.debug("[cartola-shield] sticker error:", e.message);
     return false;
   }
 }
@@ -75,13 +76,10 @@ async function handleCartolaTeamFlow(stateKey, body, state, reply, opts = {}) {
     conversationState.clearState(stateKey);
 
     const nome = result.team_name || slug;
-    const caption = `✅ *Time vinculado!*\n\n⚽ *${nome}*\n\nUse */cartola → Meu time* para ver sua pontuação.`;
+    await reply(`✅ *Time vinculado!*\n\n⚽ *${nome}*\n\nUse */cartola → Meu time* para ver sua pontuação.`);
     const { client, chatId } = opts;
     if (result.shield_url && client && chatId) {
-      const sent = await _sendShield(client, chatId, result.shield_url, caption);
-      if (!sent) await reply(caption);
-    } else {
-      await reply(caption);
+      await _sendShieldSticker(client, chatId, result.shield_url);
     }
     logger.info(`[cartola-team] ${stateKey.split("@")[0]} → ${slug}`);
   } catch (e) {

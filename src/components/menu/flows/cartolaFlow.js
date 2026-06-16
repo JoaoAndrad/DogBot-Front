@@ -6,16 +6,17 @@ const cartolaClient = require("../../../services/cartolaClient");
 const conversationState = require("../../../services/conversationState");
 const logger = require("../../../utils/logger");
 
-async function _sendShield(client, chatId, url, caption) {
+async function _sendShieldSticker(client, chatId, svgUrl) {
   try {
-    const res = await fetch(url, { timeout: 8000 });
+    const res = await fetch(svgUrl, { timeout: 8000 });
     if (!res.ok) return false;
     const buf = await res.buffer();
-    const { MessageMedia } = require("whatsapp-web.js");
-    const media = new MessageMedia("image/png", buf.toString("base64"));
-    await client.sendMessage(chatId, media, { caption });
-    return true;
+    const sharp = require("sharp");
+    const pngBuf = await sharp(buf).png().toBuffer();
+    const stickerHelper = require("../../../utils/media/stickerHelper");
+    return await stickerHelper.sendBufferAsSticker(client, chatId, pngBuf, { fullOnly: true });
   } catch (e) {
+    logger.debug("[cartola-shield] sticker error:", e.message);
     return false;
   }
 }
@@ -205,12 +206,9 @@ const cartolaFlow = createFlow("cartola", {
           lines.push("", `📊 *Total: ${formatPontuacao(pontosTotais)} pts*`);
         }
 
-        const shieldUrl = time.url_escudo_png;
-        if (shieldUrl && ctx.client) {
-          const sent = await _sendShield(ctx.client, ctx.chatId, shieldUrl, lines.join("\n"));
-          if (!sent) await ctx.reply(lines.join("\n"));
-        } else {
-          await ctx.reply(lines.join("\n"));
+        await ctx.reply(lines.join("\n"));
+        if (time.url_escudo_svg && ctx.client) {
+          await _sendShieldSticker(ctx.client, ctx.chatId, time.url_escudo_svg);
         }
       } catch (e) {
         if (e.message === "team_not_found" || e.message === "no_team_saved") {
@@ -291,12 +289,9 @@ const cartolaFlow = createFlow("cartola", {
           lines.push("", `📊 *Total: ${formatPontuacao(data.pontos)} pts*`);
         }
 
-        const shieldUrl = time.url_escudo_png;
-        if (shieldUrl && ctx.client) {
-          const sent = await _sendShield(ctx.client, ctx.chatId, shieldUrl, lines.join("\n"));
-          if (!sent) await ctx.reply(lines.join("\n"));
-        } else {
-          await ctx.reply(lines.join("\n"));
+        await ctx.reply(lines.join("\n"));
+        if (time.url_escudo_svg && ctx.client) {
+          await _sendShieldSticker(ctx.client, ctx.chatId, time.url_escudo_svg);
         }
       } catch (e) {
         logger.error("[cartolaFlow] showScout:", e.message);
