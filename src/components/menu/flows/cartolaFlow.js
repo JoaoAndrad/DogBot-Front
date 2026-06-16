@@ -101,11 +101,67 @@ const cartolaFlow = createFlow("cartola", {
       const isGroup = String(ctx.chatId).endsWith("@g.us");
       const options = [
         { label: "🔗 Vincular meu time",    action: "exec", handler: "startTeamLink" },
-        ...(isGroup ? [{ label: "🏆 Vincular liga (grupo)", action: "exec", handler: "startLeagueLink" }] : []),
-        { label: "🔙 Voltar",              action: "back" },
+        ...(isGroup ? [
+          { label: "🏆 Vincular liga (grupo)",   action: "exec", handler: "startLeagueLink" },
+          { label: "🔔 Notificações do grupo",   action: "goto", target: "/config/notificacoes" },
+        ] : []),
+        { label: "🔙 Voltar", action: "back" },
       ];
       return { title: "⚙️ *Configurações — Cartola FC*", options };
     },
+  },
+
+  "/config/notificacoes": {
+    title: "🔔 *Notificações do grupo*",
+    dynamic: true,
+    handler: async (ctx) => {
+      const isGroup = String(ctx.chatId).endsWith("@g.us");
+      if (!isGroup) {
+        await ctx.reply("🔔 Configurações de notificações são exclusivas para grupos.");
+        return { redirect: "/config" };
+      }
+
+      let s = {};
+      try {
+        const res = await cartolaClient.getGroupSettings(ctx.chatId);
+        s = res?.settings || res || {};
+      } catch (e) {
+        logger.warn("[cartolaFlow] getGroupSettings:", e.message);
+      }
+
+      const on  = (v, def = true) => (v === undefined ? def : v) !== false ? "✅" : "⬜";
+      const parcialLabel = s.notify_parcial_interval
+        ? `✅ Parcial automática — a cada ${s.notify_parcial_interval} min`
+        : "⬜ Parcial automática — desligada";
+
+      const statusLine = s.active ? "🟢 *Ativo*" : "🔴 *Inativo*";
+      const toggleLabel = s.active ? "🔴 Desligar notificações" : "🟢 Ligar notificações";
+
+      const options = [
+        { label: toggleLabel,                                       action: "exec", handler: "toggleNotAtivo" },
+        { label: `${on(s.notify_gol)} Gol`,                        action: "exec", handler: "toggleNotGol" },
+        { label: `${on(s.notify_assist)} Assistência`,              action: "exec", handler: "toggleNotAssist" },
+        { label: `${on(s.notify_cartao_vermelho)} Cartão vermelho`, action: "exec", handler: "toggleNotCV" },
+        { label: `${on(s.notify_cartao_amarelo, false)} Cartão amarelo`, action: "exec", handler: "toggleNotCA" },
+        { label: parcialLabel,                                      action: "goto", target: "/config/notificacoes/parcial" },
+        { label: `${on(s.notify_virada)} Virada de liderança`,      action: "exec", handler: "toggleNotVirada" },
+        { label: `${on(s.notify_resultado)} Resultado final`,       action: "exec", handler: "toggleNotResultado" },
+        { label: "🔙 Voltar",                                       action: "back" },
+      ];
+
+      return { title: `🔔 *Notificações do grupo — ${statusLine}*`, options };
+    },
+  },
+
+  "/config/notificacoes/parcial": {
+    title: "📊 *Parcial automática*",
+    options: [
+      { label: "🔕 Desligar parcial automática",  action: "exec", handler: "setParcial0" },
+      { label: "⏱ A cada 30 min",                action: "exec", handler: "setParcial30" },
+      { label: "⏱ A cada 60 min (1h)",            action: "exec", handler: "setParcial60" },
+      { label: "⏱ A cada 90 min",                action: "exec", handler: "setParcial90" },
+      { label: "🔙 Voltar",                       action: "back" },
+    ],
   },
 
   handlers: {
@@ -381,6 +437,106 @@ const cartolaFlow = createFlow("cartola", {
         logger.error("[cartolaFlow] disconnectGlobo:", e.message);
         await ctx.reply("❌ Erro ao desconectar. Tente novamente.");
       }
+      return { noRender: true };
+    },
+
+    // ── Notificações: helpers internos ───────────────────────────────────────
+    async _saveNotSetting(ctx, patch) {
+      await cartolaClient.saveGroupSettings(ctx.chatId, patch);
+    },
+
+    // ── Notificações: ligar/desligar sistema ──────────────────────────────────
+    toggleNotAtivo: async (ctx) => {
+      let s = {};
+      try { const r = await cartolaClient.getGroupSettings(ctx.chatId); s = r?.settings || r || {}; } catch (e) { /* ignore */ }
+      const newVal = !s.active;
+      await cartolaClient.saveGroupSettings(ctx.chatId, { active: newVal });
+      const msg = newVal
+        ? "✅ *Notificações ativadas!*\n\nO bot vai avisar o grupo sobre gols, assistências e mais durante a rodada."
+        : "🔕 *Notificações desativadas.*";
+      await ctx.reply(msg);
+      return { noRender: true };
+    },
+
+    // ── Notificações: gol ─────────────────────────────────────────────────────
+    toggleNotGol: async (ctx) => {
+      let s = {};
+      try { const r = await cartolaClient.getGroupSettings(ctx.chatId); s = r?.settings || r || {}; } catch (e) { /* ignore */ }
+      const newVal = s.notify_gol === false ? true : false;
+      await cartolaClient.saveGroupSettings(ctx.chatId, { notify_gol: newVal });
+      await ctx.reply(newVal ? "✅ Notificação de *gol* ligada." : "⬜ Notificação de *gol* desligada.");
+      return { noRender: true };
+    },
+
+    // ── Notificações: assistência ─────────────────────────────────────────────
+    toggleNotAssist: async (ctx) => {
+      let s = {};
+      try { const r = await cartolaClient.getGroupSettings(ctx.chatId); s = r?.settings || r || {}; } catch (e) { /* ignore */ }
+      const newVal = s.notify_assist === false ? true : false;
+      await cartolaClient.saveGroupSettings(ctx.chatId, { notify_assist: newVal });
+      await ctx.reply(newVal ? "✅ Notificação de *assistência* ligada." : "⬜ Notificação de *assistência* desligada.");
+      return { noRender: true };
+    },
+
+    // ── Notificações: cartão vermelho ─────────────────────────────────────────
+    toggleNotCV: async (ctx) => {
+      let s = {};
+      try { const r = await cartolaClient.getGroupSettings(ctx.chatId); s = r?.settings || r || {}; } catch (e) { /* ignore */ }
+      const newVal = s.notify_cartao_vermelho === false ? true : false;
+      await cartolaClient.saveGroupSettings(ctx.chatId, { notify_cartao_vermelho: newVal });
+      await ctx.reply(newVal ? "✅ Notificação de *cartão vermelho* ligada." : "⬜ Notificação de *cartão vermelho* desligada.");
+      return { noRender: true };
+    },
+
+    // ── Notificações: cartão amarelo ──────────────────────────────────────────
+    toggleNotCA: async (ctx) => {
+      let s = {};
+      try { const r = await cartolaClient.getGroupSettings(ctx.chatId); s = r?.settings || r || {}; } catch (e) { /* ignore */ }
+      const newVal = !(s.notify_cartao_amarelo === true);
+      await cartolaClient.saveGroupSettings(ctx.chatId, { notify_cartao_amarelo: newVal });
+      await ctx.reply(newVal ? "✅ Notificação de *cartão amarelo* ligada." : "⬜ Notificação de *cartão amarelo* desligada.");
+      return { noRender: true };
+    },
+
+    // ── Notificações: parcial ─────────────────────────────────────────────────
+    setParcial0: async (ctx) => {
+      await cartolaClient.saveGroupSettings(ctx.chatId, { notify_parcial_interval: null });
+      await ctx.reply("🔕 Parcial automática *desligada*.");
+      return { noRender: true };
+    },
+    setParcial30: async (ctx) => {
+      await cartolaClient.saveGroupSettings(ctx.chatId, { notify_parcial_interval: 30 });
+      await ctx.reply("✅ Parcial automática a cada *30 min*.");
+      return { noRender: true };
+    },
+    setParcial60: async (ctx) => {
+      await cartolaClient.saveGroupSettings(ctx.chatId, { notify_parcial_interval: 60 });
+      await ctx.reply("✅ Parcial automática a cada *60 min*.");
+      return { noRender: true };
+    },
+    setParcial90: async (ctx) => {
+      await cartolaClient.saveGroupSettings(ctx.chatId, { notify_parcial_interval: 90 });
+      await ctx.reply("✅ Parcial automática a cada *90 min*.");
+      return { noRender: true };
+    },
+
+    // ── Notificações: virada ──────────────────────────────────────────────────
+    toggleNotVirada: async (ctx) => {
+      let s = {};
+      try { const r = await cartolaClient.getGroupSettings(ctx.chatId); s = r?.settings || r || {}; } catch (e) { /* ignore */ }
+      const newVal = s.notify_virada === false ? true : false;
+      await cartolaClient.saveGroupSettings(ctx.chatId, { notify_virada: newVal });
+      await ctx.reply(newVal ? "✅ Notificação de *virada de liderança* ligada." : "⬜ Notificação de *virada de liderança* desligada.");
+      return { noRender: true };
+    },
+
+    // ── Notificações: resultado final ─────────────────────────────────────────
+    toggleNotResultado: async (ctx) => {
+      let s = {};
+      try { const r = await cartolaClient.getGroupSettings(ctx.chatId); s = r?.settings || r || {}; } catch (e) { /* ignore */ }
+      const newVal = s.notify_resultado === false ? true : false;
+      await cartolaClient.saveGroupSettings(ctx.chatId, { notify_resultado: newVal });
+      await ctx.reply(newVal ? "✅ Notificação de *resultado final* ligada." : "⬜ Notificação de *resultado final* desligada.");
       return { noRender: true };
     },
 
