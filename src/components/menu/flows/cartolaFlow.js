@@ -20,6 +20,63 @@ function formatMercadoStatus(rodada) {
   return [rodadaNum, status].filter(Boolean).join(" — ");
 }
 
+// ─── Polling pós-auth ────────────────────────────────────────────────────────
+
+function _pollGloboAuth(userId, reply) {
+  const INTERVAL = 5000;
+  const TIMEOUT  = 10 * 60 * 1000;
+  const started  = Date.now();
+
+  const timer = setInterval(async () => {
+    try {
+      if (Date.now() - started > TIMEOUT) {
+        clearInterval(timer);
+        return;
+      }
+
+      const { connected } = await cartolaClient.getAuthStatus(userId);
+      if (!connected) return;
+
+      clearInterval(timer);
+
+      // Busca dados autenticados do time e ligas
+      const lines = ["✅ *Conta Globo conectada com sucesso!*", ""];
+
+      try {
+        const timeData = await cartolaClient.getAuthTimeData(userId);
+        const time = timeData?.data?.time || timeData?.data;
+        if (time?.nome) {
+          lines.push(`🏠 *Time:* ${time.nome}`);
+          if (time.nome_cartola) lines.push(`👤 ${time.nome_cartola}`);
+          if (timeData?.data?.pontos != null) {
+            lines.push(`📊 Pontuação: *${Number(timeData.data.pontos).toFixed(2).replace(".", ",")} pts*`);
+          }
+          lines.push("");
+        }
+      } catch (e) {
+        logger.warn("[cartolaFlow] poll getAuthTimeData:", e.message);
+      }
+
+      try {
+        const ligasData = await cartolaClient.getAuthLigas(userId);
+        const ligas = ligasData?.data?.ligas || ligasData?.data || [];
+        if (Array.isArray(ligas) && ligas.length) {
+          lines.push("🏆 *Suas ligas:*");
+          for (const l of ligas.slice(0, 5)) {
+            lines.push(`• ${l.nome || l.name || l.slug}`);
+          }
+        }
+      } catch (e) {
+        logger.warn("[cartolaFlow] poll getAuthLigas:", e.message);
+      }
+
+      await reply(lines.join("\n"));
+    } catch (e) {
+      logger.warn("[cartolaFlow] pollGloboAuth:", e.message);
+    }
+  }, INTERVAL);
+}
+
 // ─── Flow principal ───────────────────────────────────────────────────────────
 
 const cartolaFlow = createFlow("cartola", {
@@ -224,11 +281,11 @@ const cartolaFlow = createFlow("cartola", {
         const { link } = await cartolaClient.getAuthLink(ctx.userId);
         await ctx.reply(
           "🔓 *Conectar conta Globo*\n\n" +
-          "Acesse o link abaixo para fazer login com sua conta Globo.\n" +
+          "Acesse o link abaixo e faça login com sua conta Globo.\n" +
           "O link expira em *10 minutos*.\n\n" +
-          `🔗 ${link}\n\n` +
-          "_Suas credenciais vão diretamente para a API do Cartola FC. Não armazenamos sua senha._",
+          `🔗 ${link}`,
         );
+        _pollGloboAuth(ctx.userId, ctx.reply);
       } catch (e) {
         logger.error("[cartolaFlow] getAuthLink:", e.message);
         await ctx.reply("❌ Erro ao gerar link de login. Tente novamente.");

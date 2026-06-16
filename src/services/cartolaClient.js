@@ -60,6 +60,10 @@ async function getAuthTimeData(userId) {
   return backendClient.sendToBackend(`/api/cartola/auth/time/${encodeURIComponent(userId)}`, null, "GET");
 }
 
+async function getAuthLigas(userId) {
+  return backendClient.sendToBackend(`/api/cartola/auth/ligas/${encodeURIComponent(userId)}`, null, "GET");
+}
+
 module.exports = {
   getRodada,
   getUserTeam,
@@ -73,4 +77,5 @@ module.exports = {
   getAuthStatus,
   disconnectAuth,
   getAuthTimeData,
+  getAuthLigas,
 };
