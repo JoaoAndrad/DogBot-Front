@@ -258,8 +258,8 @@ const cartolaFlow = createFlow("cartola", {
 
       const statusLine = s.active ? "🟢 *Ativo*" : "🔴 *Inativo*";
       const toggleLabel = s.active
-        ? "🔴 Desligar notificações"
-        : "🟢 Ligar notificações";
+        ? "🔴 Desativar cartola no grupo"
+        : "🟢 Ativar cartola no grupo";
 
       const options = [
         { label: toggleLabel, action: "exec", handler: "toggleNotAtivo" },
@@ -1074,8 +1074,22 @@ const cartolaFlow = createFlow("cartola", {
       const newVal = !s.active;
       await cartolaClient.saveGroupSettings(ctx.chatId, { active: newVal });
       const msg = newVal
-        ? "✅ *Notificações ativadas!*\n\nO bot vai avisar o grupo sobre gols, assistências e mais durante a rodada."
-        : "🔕 *Notificações desativadas.*";
+        ? [
+            "✅ *Cartola FC ativado no grupo!* 🎉",
+            "",
+            "A partir de agora este grupo recebe:",
+            "⚽ Notificações de gol em tempo real",
+            "🎯 Assistências",
+            "🟥 Cartões",
+            "📊 Parcial automática de pontuação",
+            "🔄 Virada de liderança",
+            "🏁 Resultado final da rodada",
+            "",
+            "*Comandos disponíveis:*",
+            "*/cartola* — menu interativo",
+            "*/scout* — scouts do seu time (ou */scout @alguém*)",
+          ].join("\n")
+        : "🔕 *Cartola desativado no grupo.*";
       await ctx.reply(msg);
       return { noRender: true };
     },
