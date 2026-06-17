@@ -18,7 +18,42 @@ function buildScoutSummary(scout) {
 }
 
 async function processActions(client, actions) {
-  for (const action of actions || []) {
+  const list = actions || [];
+
+  // Agrupa time_completo do mesmo groupId numa única mensagem
+  const grouped = new Map(); // key: `${groupId}|${isCopa}` → [action, ...]
+  const remaining = [];
+  for (const action of list) {
+    if (action.kind === "time_completo") {
+      const key = `${action.groupId}|${!!action.isCopa}`;
+      if (!grouped.has(key)) grouped.set(key, []);
+      grouped.get(key).push(action);
+    } else {
+      remaining.push(action);
+    }
+  }
+
+  for (const [, batch] of grouped) {
+    try {
+      if (batch.length === 1) {
+        await processOne(client, batch[0]);
+      } else {
+        const copa = batch[0].isCopa;
+        const prefix = copa ? "🏆 " : "";
+        const lines = [
+          `${prefix}✅ *Times completos em campo*`,
+          "",
+          `Todos os atletas já jogaram nesta rodada:`,
+          ...batch.map((a) => `• *${a.owner.displayName}* (${a.teamName || a.owner.displayName})`),
+        ];
+        await client.sendMessage(batch[0].groupId, lines.join("\n"));
+      }
+    } catch (e) {
+      logger.warn("[cartolaBroadcast] time_completo falhou:", e.message);
+    }
+  }
+
+  for (const action of remaining) {
     try {
       await processOne(client, action);
     } catch (e) {
