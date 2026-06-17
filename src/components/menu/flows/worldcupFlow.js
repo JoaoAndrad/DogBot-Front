@@ -204,7 +204,7 @@ const worldcupFlow = createFlow("copa", {
           await ctx.reply("⚽ Nenhum jogo agendado.");
           return { noRender: true };
         }
-        const lines = ["⚽ *Próximos jogos*", ""];
+        const lines = ["⚽ *Próximos 5 jogos*", ""];
         for (let i = 0; i < matches.length; i++) {
           const m = matches[i];
           const kickoff = new Date(m.kickoff_at);

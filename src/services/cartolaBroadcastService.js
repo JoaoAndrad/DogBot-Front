@@ -21,20 +21,24 @@ function buildScoutSummary(scout) {
 async function processActions(client, actions) {
   const list = actions || [];
 
-  // Agrupa time_completo do mesmo groupId numa única mensagem
-  const grouped = new Map(); // key: `${groupId}|${isCopa}` → [action, ...]
+  // Agrupa time_completo e atleta_nao_jogou do mesmo groupId numa única mensagem
+  const groupedCompleto = new Map(); // key: `${groupId}|${isCopa}` → [action, ...]
+  const groupedNaoJogou = new Map();
   const remaining = [];
   for (const action of list) {
+    const key = `${action.groupId}|${!!action.isCopa}`;
     if (action.kind === "time_completo") {
-      const key = `${action.groupId}|${!!action.isCopa}`;
-      if (!grouped.has(key)) grouped.set(key, []);
-      grouped.get(key).push(action);
+      if (!groupedCompleto.has(key)) groupedCompleto.set(key, []);
+      groupedCompleto.get(key).push(action);
+    } else if (action.kind === "atleta_nao_jogou") {
+      if (!groupedNaoJogou.has(key)) groupedNaoJogou.set(key, []);
+      groupedNaoJogou.get(key).push(action);
     } else {
       remaining.push(action);
     }
   }
 
-  for (const [, batch] of grouped) {
+  for (const [, batch] of groupedCompleto) {
     try {
       if (batch.length === 1) {
         await processOne(client, batch[0]);
@@ -51,6 +55,32 @@ async function processActions(client, actions) {
       }
     } catch (e) {
       logger.warn("[cartolaBroadcast] time_completo falhou:", e.message);
+    }
+  }
+
+  for (const [, batch] of groupedNaoJogou) {
+    try {
+      if (batch.length === 1) {
+        await processOne(client, batch[0]);
+      } else {
+        const copa = batch[0].isCopa;
+        const prefix = copa ? "🏆 " : "";
+        // Agrupa por atleta → lista de donos
+        const byAtleta = new Map(); // atletaNome → [displayName, ...]
+        for (const a of batch) {
+          for (const nome of (a.atletas || [])) {
+            if (!byAtleta.has(nome)) byAtleta.set(nome, []);
+            byAtleta.get(nome).push(a.owner.displayName);
+          }
+        }
+        const lines = [`${prefix}🚨 *Atletas que não jogaram*`, ""];
+        for (const [nome, donos] of byAtleta) {
+          lines.push(`• *${nome}* — ${donos.join(", ")}`);
+        }
+        await client.sendMessage(batch[0].groupId, lines.join("\n"));
+      }
+    } catch (e) {
+      logger.warn("[cartolaBroadcast] atleta_nao_jogou falhou:", e.message);
     }
   }
 

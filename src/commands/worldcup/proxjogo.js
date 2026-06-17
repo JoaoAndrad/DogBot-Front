@@ -55,7 +55,7 @@ module.exports = {
         return;
       }
 
-      const lines = ["⚽ *Próximos jogos — Copa do Mundo 2026*", ""];
+      const lines = ["⚽ *Próximos 5 jogos — Copa do Mundo 2026*", ""];
       for (let i = 0; i < matches.length; i++) {
         if (i > 0) lines.push("");
         lines.push(formatMatch(matches[i], i));
@@ -64,7 +64,7 @@ module.exports = {
       await client.sendMessage(chatId, lines.join("\n"));
     } catch (e) {
       logger.error("[proxjogo]", e.message);
-      await client.sendMessage(chatId, "❌ Não foi possível buscar os próximos jogos.");
+      await client.sendMessage(chatId, "❌ Não foi possível buscar os 5 próximos jogos.");
     }
   },
 };
