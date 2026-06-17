@@ -50,7 +50,11 @@ function parseLeagueInput(raw) {
   const mComp = s.match(
     /cartola\.globo\.com\/(?:#!\/)?(?:[^/?&#\s/]+\/)*competicoes\/([^/?&#\s/]+)\/([^/?&#\s]+)/i,
   );
-  if (mComp) return { slug: mComp[2].toLowerCase(), tipo: mComp[1].toLowerCase() };
+  if (mComp) {
+    const isCopa = /cartola\.globo\.com\/(?:#!\/)?copa\/competicoes\//i.test(s);
+    const tipo = isCopa ? `copa/${mComp[1].toLowerCase()}` : mComp[1].toLowerCase();
+    return { slug: mComp[2].toLowerCase(), tipo };
+  }
   // /ligas/{slug}
   const mLiga = s.match(/cartola\.globo\.com\/(?:#!\/)?(?:[^/?&#\s/]+\/)*ligas\/([^/?&#\s]+)/i);
   if (mLiga) return { slug: mLiga[1].toLowerCase(), tipo: "liga" };
