@@ -67,6 +67,7 @@ const {
 const mediaHelper = require("../utils/media/mediaHelper");
 const stickerHelper = require("../utils/media/stickerHelper");
 const commandPolicyService = require("../services/commandPolicyService");
+const groupFeatureFlagClient = require("../services/groupFeatureFlagClient");
 
 /**
  * Comandos utilizáveis sem utilizador pré-registado na BD (fluxo /cadastro).
@@ -93,7 +94,7 @@ function getCachedUserId(identifier) {
   return e ? e.userId : null;
 }
 
-function setCachedUserId(identifier, userId, confessions_vip) {
+function setCachedUserId(identifier, userId, confessions_vip, isAdmin) {
   const key = String(identifier || "")
     .trim()
     .toLowerCase();
@@ -102,6 +103,7 @@ function setCachedUserId(identifier, userId, confessions_vip) {
     userId,
     confessions_vip:
       typeof confessions_vip === "boolean" ? confessions_vip : false,
+    isAdmin: typeof isAdmin === "boolean" ? isAdmin : undefined,
     ts: Date.now(),
   });
 }
@@ -838,7 +840,8 @@ async function handle(context) {
 
     const requiresRegistration = !PUBLIC_COMMANDS.has(canonical);
     const needsUserLookup =
-      requiresRegistration || !!(policyForCmd && policyForCmd.vipOnly);
+      requiresRegistration ||
+      !!(policyForCmd && (policyForCmd.vipOnly || policyForCmd.adminOnly));
 
     let lookupResult = null;
     if (needsUserLookup) {
@@ -854,6 +857,10 @@ async function handle(context) {
             confessions_vip:
               earlyCached && typeof earlyCached.confessions_vip === "boolean"
                 ? earlyCached.confessions_vip
+                : undefined,
+            isAdmin:
+              earlyCached && typeof earlyCached.isAdmin === "boolean"
+                ? earlyCached.isAdmin
                 : undefined,
           };
           const isConfissao = body && /^\s*\/?confiss[aã]o\b/i.test(body);
@@ -899,14 +906,17 @@ async function handle(context) {
             commandLookupIdentifier = cmdActualNumber;
             const cached = getCachedLookup(cmdActualNumber);
             const needVipFlag = !!(policyForCmd && policyForCmd.vipOnly);
+            const needAdminFlag = !!(policyForCmd && policyForCmd.adminOnly);
             const cacheUsable =
               cached &&
-              (!needVipFlag || typeof cached.confessions_vip === "boolean");
+              (!needVipFlag || typeof cached.confessions_vip === "boolean") &&
+              (!needAdminFlag || typeof cached.isAdmin === "boolean");
             if (cacheUsable) {
               lookupResult = {
                 found: true,
                 userId: cached.userId,
                 confessions_vip: cached.confessions_vip,
+                isAdmin: cached.isAdmin,
               };
             } else {
               if (!isConfissao) {
@@ -924,6 +934,7 @@ async function handle(context) {
                   cmdActualNumber,
                   lookupResult.userId,
                   lookupResult.confessions_vip,
+                  lookupResult.isAdmin,
                 );
               }
             }
@@ -935,10 +946,13 @@ async function handle(context) {
 
         if (
           policyForCmd &&
-          policyForCmd.vipOnly &&
+          (policyForCmd.vipOnly || policyForCmd.adminOnly) &&
           lookupResult &&
           lookupResult.found &&
-          typeof lookupResult.confessions_vip !== "boolean" &&
+          (
+            (policyForCmd.vipOnly && typeof lookupResult.confessions_vip !== "boolean") ||
+            (policyForCmd.adminOnly && typeof lookupResult.isAdmin !== "boolean")
+          ) &&
           commandLookupIdentifier
         ) {
           try {
@@ -952,11 +966,13 @@ async function handle(context) {
                 found: true,
                 userId: fresh.userId,
                 confessions_vip: !!fresh.confessions_vip,
+                isAdmin: !!fresh.isAdmin,
               };
               setCachedUserId(
                 commandLookupIdentifier,
                 fresh.userId,
                 fresh.confessions_vip,
+                fresh.isAdmin,
               );
             }
           } catch (e) {
@@ -976,6 +992,8 @@ async function handle(context) {
                 "É necessário enviar /cadastro no privado antes de utilizar qualquer comando",
               );
             }
+          } else if (policyForCmd && policyForCmd.adminOnly) {
+            await reply("Este comando é exclusivo para administradores.");
           } else {
             await reply("Este comando é exclusivo para usuários VIP.");
           }
@@ -992,9 +1010,30 @@ async function handle(context) {
           await reply("Este comando é exclusivo para usuários VIP.");
           return;
         }
+
+        if (
+          policyForCmd &&
+          policyForCmd.adminOnly &&
+          lookupResult &&
+          lookupResult.found &&
+          lookupResult.isAdmin !== true
+        ) {
+          await reply("Este comando é exclusivo para administradores.");
+          return;
+        }
       } catch (err) {
         logger.error("Erro ao verificar usuário:", err);
         // Continue execution on lookup error to avoid blocking legitimate users
+      }
+    }
+
+    // Group feature flag check (silently block disabled features per group)
+    if (from && String(from).endsWith("@g.us") && cmd.commandType) {
+      try {
+        const allowed = await groupFeatureFlagClient.isCommandTypeAllowed(from, cmd.commandType);
+        if (!allowed) return;
+      } catch (e) {
+        logger.debug("[groupFeatureFlag] erro ao verificar flag:", e && e.message);
       }
     }
 
