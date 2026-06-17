@@ -5,6 +5,7 @@ const worldcupClient = require("../services/worldcupClient");
 const polls = require("../components/poll");
 const { matchup, searchTeams, withFlag, localize } = require("../utils/teamLocale");
 const logger = require("../utils/logger");
+const dmAlertState = require("../services/dmAlertState");
 
 // Aceita: "2-1", "2 - 1", "2x1", "2 X 1", "2 a 1", "2a1", "2 1"
 const SCORE_RE = /^\s*(\d{1,2})\s*(?:[-xX]|[aA]|\s+)\s*(\d{1,2})\s*$/;
@@ -137,6 +138,7 @@ async function _submitPrediction(stateKey, data, reply) {
     const userId = data.userId || stateKey;
     await worldcupClient.submitPrediction(userId, data.matchId, data.predictedHome, data.predictedAway, data.advancingTeam || null);
     conversationState.clearState(stateKey);
+    dmAlertState.clearUser(userId);
 
     const kickoff = new Date(data.kickoffAt);
     const date = kickoff.toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo", day: "2-digit", month: "2-digit" });

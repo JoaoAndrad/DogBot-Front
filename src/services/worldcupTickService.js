@@ -415,6 +415,9 @@ async function handleReminder1h(client, action) {
   const { match, groupIds, predictions = [] } = action;
   if (!groupIds || !groupIds.length) return;
 
+  const dmAlertState = require("./dmAlertState");
+  const worldcupClient = require("./worldcupClient");
+
   const { time } = fmtKickoff(match.kickoff_at);
   const stage = fmtStage(match);
 
@@ -461,12 +464,12 @@ async function handleReminder1h(client, action) {
     }
   }
 
-  // DM único por usuário — deduplicado entre todos os grupos Copa
+  // DM individual — apenas para quem já fez pelo menos 1 palpite
   const dmOptedOut = new Set(
-    (action.dmOptedOutNumbers || []).map((n) => `${n}@c.us`),
+    (action.dmOptedOutNumbers || []).map((n) => toJid(n)),
   );
-  const registered = new Set(
-    (action.registeredNumbers || []).map((n) => `${n}@c.us`),
+  const palpiteiros = new Set(
+    (action.palpiteiroNumbers || []).map((n) => toJid(n)),
   );
 
   const dmText = [
@@ -480,9 +483,19 @@ async function handleReminder1h(client, action) {
 
   for (const jid of allUnpredictedJids) {
     if (dmOptedOut.has(jid)) continue;
-    if (registered.size > 0 && !registered.has(jid)) continue;
+    if (palpiteiros.size > 0 && !palpiteiros.has(jid)) continue;
     try {
       await client.sendMessage(jid, dmText);
+
+      // Registra alerta ignorado; auto-desativa após MAX_IGNORED jogos sem palpite
+      const count = dmAlertState.recordAlert(jid, match.id);
+      if (count >= dmAlertState.MAX_IGNORED) {
+        logger.info(`[worldcupTick] auto-desativando alertas DM para ${jid} (${count} ignorados)`);
+        dmAlertState.clearUser(jid);
+        worldcupClient.setDmAlerts(jid, false).catch((e) => {
+          logger.debug(`[worldcupTick] setDmAlerts(false) error for ${jid}:`, e.message);
+        });
+      }
     } catch (e) {
       logger.warn(`[worldcupTick] reminder_1h DM → ${jid}:`, e.message);
     }
