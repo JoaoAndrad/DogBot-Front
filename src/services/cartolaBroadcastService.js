@@ -1,6 +1,7 @@
 "use strict";
 
 const logger = require("../utils/logger");
+const { withFlag } = require("../utils/teamLocale");
 
 const POSICAO = { 1: "GOL", 2: "LAT", 3: "ZAG", 4: "MEI", 5: "ATA", 6: "TEC" };
 
@@ -104,16 +105,36 @@ async function processOne(client, action) {
     }
 
     case "parcial": {
-      const title = copa
-        ? `🏆 *Parcial Copa — Rodada ${action.rodada}*`
-        : `📊 *Parcial — Rodada ${action.rodada}*`;
-      const lines = [title, ""];
       const ranking = action.ranking || [];
-      for (let i = 0; i < ranking.length; i++) {
-        const r = ranking[i];
-        const pos = medals[i] || `${i + 1}.`;
-        lines.push(`${pos} ${r.displayName} — *${fmt(r.pontos)} pts*`);
-        if (!copa) lines.push(`    🏠 ${r.teamName}`);
+      let lines;
+      if (copa && action.trigger) {
+        const triggerLabel = action.trigger === "halftime" ? "⏸ Intervalo" : "🏁 Fim de jogo";
+        const mc = action.matchContext;
+        const scoreStr = mc && mc.homeScore != null ? ` ${mc.homeScore}x${mc.awayScore}` : "";
+        const matchLine = mc ? `${withFlag(mc.homeTeam)}${scoreStr} ${withFlag(mc.awayTeam)}` : "";
+        lines = [
+          `🏆 *Copa do Cartola · ${triggerLabel}*`,
+          matchLine,
+          "",
+          `📊 *Parcial — Rodada ${action.rodada}*`,
+          "",
+        ];
+        for (let i = 0; i < ranking.length; i++) {
+          const r = ranking[i];
+          const pos = medals[i] || `${i + 1}.`;
+          lines.push(`${pos} ${r.displayName} _(${r.teamName})_ — *${fmt(r.pontos)} pts*`);
+        }
+      } else {
+        const title = copa
+          ? `🏆 *Parcial Copa — Rodada ${action.rodada}*`
+          : `📊 *Parcial — Rodada ${action.rodada}*`;
+        lines = [title, ""];
+        for (let i = 0; i < ranking.length; i++) {
+          const r = ranking[i];
+          const pos = medals[i] || `${i + 1}.`;
+          lines.push(`${pos} ${r.displayName} — *${fmt(r.pontos)} pts*`);
+          if (!copa) lines.push(`    🏠 ${r.teamName}`);
+        }
       }
       await client.sendMessage(action.groupId, lines.join("\n"));
       break;
