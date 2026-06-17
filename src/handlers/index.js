@@ -10,8 +10,16 @@ const {
 const botMetricsReporter = require("../services/botMetricsReporter");
 const { loadIgnoredChats } = require("../utils/bot/chatCleaner");
 const { handleCadastroFlow } = require("./cadastroFlowHandler");
-const { handleCopaFlow, handleCopaChampionFlow, handleCopaZebraFlow, handleCopaMvpFlow } = require("./copaFlowHandler");
-const { handleCartolaTeamFlow, handleCartolaLeagueFlow } = require("./cartolaFlowHandler");
+const {
+  handleCopaFlow,
+  handleCopaChampionFlow,
+  handleCopaZebraFlow,
+  handleCopaMvpFlow,
+} = require("./copaFlowHandler");
+const {
+  handleCartolaTeamFlow,
+  handleCartolaLeagueFlow,
+} = require("./cartolaFlowHandler");
 const groupDisplayNameSync = require("../services/groupDisplayNameSync");
 
 /** Evita POST repetido: mesmo nome ~6h; sincroniza GroupChat.name no backend para admin UI. */
@@ -460,7 +468,10 @@ async function handle(context) {
 
     if (state.flowType === "cartola-team-input") {
       if (isGroup) return;
-      return await handleCartolaTeamFlow(stateKey, body, state, reply, { client: context.client, chatId: from });
+      return await handleCartolaTeamFlow(stateKey, body, state, reply, {
+        client: context.client,
+        chatId: from,
+      });
     }
 
     if (state.flowType === "cartola-league-input") {
@@ -804,7 +815,9 @@ async function handle(context) {
     const cmd = commands.getCommand(cmdName);
     if (!cmd) {
       logger.debug("Comando não encontrado:", cmdName);
-      await reply(`Comando desconhecido: ${cmdName}`);
+      await reply(
+        `Comando desconhecido.\n\nUse */ajuda* no privado para ver os comandos disponíveis.`,
+      );
       return;
     }
 
@@ -1165,7 +1178,10 @@ async function handle(context) {
           );
         }
       } catch (err) {
-        logger.debug("[fallback] erro ao enviar mensagem padrão:", err && err.message);
+        logger.debug(
+          "[fallback] erro ao enviar mensagem padrão:",
+          err && err.message,
+        );
       }
     }
   }
