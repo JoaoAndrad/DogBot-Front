@@ -37,41 +37,80 @@ async function _sendShieldSticker(client, chatId, svgUrl) {
   }
 }
 
+async function resolveId(client, rawId) {
+  if (!rawId) return rawId;
+  if (!String(rawId).includes("@lid")) return rawId;
+  try {
+    const contact = await client.getContactById(rawId);
+    return jidFromContact(contact) || rawId;
+  } catch (e) {
+    logger.debug("[scout] resolveId:", e.message);
+    return rawId;
+  }
+}
+
+async function fetchTeamData(userId, tipo) {
+  const savedRes = await cartolaClient.getUserTeam(userId, tipo);
+  const saved = savedRes?.team || null;
+  if (!saved) return { saved: null, data: null };
+  const dataRes = await cartolaClient.getMyTeamData(userId, tipo);
+  return { saved, data: dataRes?.data || null };
+}
+
+function buildScoutLines(saved, data, capitaoId) {
+  const time = data?.time || {};
+  const atletas = data?.atletas || [];
+  const nome = time.nome || saved?.team_name || saved?.slug || "?";
+
+  const comMovimento = atletas.filter(
+    (a) => Object.values(a.scout || {}).some((v) => v > 0) || (a.pontos_num ?? 0) !== 0,
+  );
+
+  const lines = [];
+  if (!comMovimento.length) {
+    lines.push("  _Nenhum atleta pontuou ainda_");
+  } else {
+    for (const a of comMovimento) {
+      const isCap = a.atleta_id === capitaoId;
+      const pts = fmt(isCap ? (a.pontos_num ?? 0) * 2 : (a.pontos_num ?? 0));
+      const pos = POSICAO[a.posicao_id] || "?";
+      const entries = Object.entries(a.scout || {}).filter(([, v]) => v > 0);
+      const scoutStr = entries.length
+        ? ` (${entries.map(([k, v]) => `${SCOUT_LABEL[k] || k}${v > 1 ? ` ×${v}` : ""}`).join(", ")})`
+        : "";
+      lines.push(`  • [${pos}] ${a.apelido || a.nome}${isCap ? " ⭐" : ""} — ${pts} pts${scoutStr}`);
+    }
+  }
+
+  const total = data?.pontos != null ? fmt(data.pontos) : null;
+  return { nome, lines, total, svgUrl: time.url_escudo_svg || null };
+}
+
+// ─── Detecção de modo versus ──────────────────────────────────────────────────
+
+const VERSUS_RE = /\b(x|vs|versus|\+)\b/i;
+
+function isVersusMode(body) {
+  const afterCmd = body.replace(/^[!/]\w+\s*/, "");
+  return VERSUS_RE.test(afterCmd);
+}
+
+function bodyHasEu(body) {
+  return /\beu\b/i.test(body);
+}
+
 module.exports = {
   name: "scout",
   aliases: ["scouts"],
-  description: "Ver scouts do time Cartola de um usuário. Uso: /scout @usuario",
+  description: "Ver scouts do time Cartola. /scout @usuario | /scout @a vs @b | /scout @a x eu",
 
   async execute(ctx) {
     const { client, message, reply } = ctx;
     const chatId = message.from;
+    const senderId = message.author || message.from;
 
-    // Sem menção → scouts do próprio usuário
     const mentionedIds = message.mentionedIds || [];
-    let targetId = null;
-    if (mentionedIds.length) {
-      targetId = mentionedIds[0];
-      if (targetId.includes("@lid")) {
-        try {
-          const contact = await client.getContactById(targetId);
-          const jid = jidFromContact(contact);
-          if (jid) targetId = jid;
-        } catch (e) {
-          logger.debug("[scout] getContactById:", e.message);
-        }
-      }
-    } else {
-      targetId = message.author || message.from;
-      if (targetId.includes("@lid")) {
-        try {
-          const contact = await client.getContactById(targetId);
-          const jid = jidFromContact(contact);
-          if (jid) targetId = jid;
-        } catch (e) {
-          logger.debug("[scout] getContactById self:", e.message);
-        }
-      }
-    }
+    const body = message.body || "";
 
     // Detecta tipo pela liga do grupo
     let tipo = "brasileirao";
@@ -82,6 +121,86 @@ module.exports = {
         if (leagueData?.league?.tipo?.startsWith("copa/")) tipo = "copa";
       } catch {}
     }
+
+    const icon = tipo === "copa" ? "🏆" : "⚽";
+    const label = tipo === "copa" ? "Copa do Cartola" : "Cartola FC";
+
+    // ── Resolve IDs de menções ────────────────────────────────────────────────
+    const resolvedMentions = await Promise.all(
+      mentionedIds.map((id) => resolveId(client, id)),
+    );
+
+    const resolvedSender = await resolveId(client, senderId);
+
+    // ── Modo versus ───────────────────────────────────────────────────────────
+    const versus = isVersusMode(body);
+
+    if (versus) {
+      // Determina os dois lados
+      let idA, idB;
+      if (resolvedMentions.length >= 2) {
+        [idA, idB] = resolvedMentions;
+      } else if (resolvedMentions.length === 1) {
+        // um lado é a menção, o outro é "eu" (sender) — independente de qual ordem
+        idA = resolvedMentions[0];
+        idB = resolvedSender;
+      } else {
+        await reply(`${icon} Use: */scout @alguém x eu* ou */scout @a vs @b*`);
+        return;
+      }
+
+      // Busca paralela
+      let resA, resB;
+      try {
+        [resA, resB] = await Promise.all([
+          fetchTeamData(idA, tipo),
+          fetchTeamData(idB, tipo),
+        ]);
+      } catch (e) {
+        logger.error("[scout versus] fetchTeamData:", e.message);
+        await reply("❌ Erro ao buscar dados. Tente novamente.");
+        return;
+      }
+
+      if (!resA.saved) {
+        await reply(`${icon} O primeiro usuário ainda não vinculou o time no ${label}.`);
+        return;
+      }
+      if (!resB.saved) {
+        await reply(`${icon} O segundo usuário ainda não vinculou o time no ${label}.`);
+        return;
+      }
+
+      const sideA = buildScoutLines(resA.saved, resA.data, resA.data?.capitao_id);
+      const sideB = buildScoutLines(resB.saved, resB.data, resB.data?.capitao_id);
+
+      const totalA = resA.data?.pontos ?? 0;
+      const totalB = resB.data?.pontos ?? 0;
+      const diff = Math.abs(totalA - totalB);
+      const leader = totalA > totalB ? sideA.nome : totalB > totalA ? sideB.nome : null;
+
+      const placarLine = leader
+        ? `📊 *${leader}* lidera por *+${fmt(diff)} pts*`
+        : `📊 *Empate!* — ${fmt(totalA)} pts cada`;
+
+      const lines = [
+        `⚔️ *${sideA.nome}* × *${sideB.nome}*${tipo === "copa" ? " _(Copa)_" : ""}`,
+        "",
+        `*${sideA.nome}* — ${sideA.total ?? "–"} pts`,
+        ...sideA.lines,
+        "",
+        `*${sideB.nome}* — ${sideB.total ?? "–"} pts`,
+        ...sideB.lines,
+        "",
+        placarLine,
+      ];
+
+      await reply(lines.join("\n"));
+      return;
+    }
+
+    // ── Modo normal (scout de um usuário) ─────────────────────────────────────
+    let targetId = resolvedMentions.length ? resolvedMentions[0] : resolvedSender;
 
     let saved;
     try {
@@ -94,11 +213,10 @@ module.exports = {
     }
 
     if (!saved) {
-      const label = tipo === "copa" ? "Copa do Cartola" : "Cartola FC";
       await reply(
         mentionedIds.length
-          ? `${tipo === "copa" ? "🏆" : "⚽"} Esse usuário ainda não vinculou o time no ${label}.`
-          : `${tipo === "copa" ? "🏆" : "⚽"} Você ainda não vinculou seu time no ${label}.\n\nUse */cartola → Configurações → Vincular meu time* no privado.`,
+          ? `${icon} Esse usuário ainda não vinculou o time no ${label}.`
+          : `${icon} Você ainda não vinculou seu time no ${label}.\n\nUse */cartola → Configurações → Vincular meu time* no privado.`,
       );
       return;
     }
@@ -108,7 +226,6 @@ module.exports = {
       const res = await cartolaClient.getMyTeamData(targetId, tipo);
       data = res?.data;
     } catch (e) {
-      const icon = tipo === "copa" ? "🏆" : "⚽";
       if (e.message?.includes("team_not_found") || e.message?.includes("no_team_saved")) {
         await reply(`${icon} *${saved.team_name || saved.slug}*\n\nTime não encontrado na API do Cartola.`);
       } else {
