@@ -870,11 +870,10 @@ const cartolaFlow = createFlow("cartola", {
         tipo: "brasileirao",
       });
       await ctx.reply(
-        "🔗 *Vincular meu time (Brasileirão)*\n\n" +
-          "Me manda o número ou slug do seu time.\n\n" +
-          "Você encontra na URL do Cartola FC:\n" +
-          "_cartola.globo.com/#!/time/*123456*_ → manda o número\n" +
-          "_cartola.globo.com/time/*meu-time*_ → manda o slug\n\n" +
+        "🇧🇷 *Vincular meu time (Brasileirão)*\n\n" +
+          "Me envie o URL do seu time no Brasileirão ou o ID numérico.\n\n" +
+          "Você encontra no site do Cartola FC:\n" +
+          "_cartola.globo.com/#!/time/*123456*_ → pode mandar só o número\n\n" +
           "_(ou /cancelar para sair)_",
       );
       return { end: true };
@@ -896,9 +895,9 @@ const cartolaFlow = createFlow("cartola", {
       });
       await ctx.reply(
         "🏆 *Vincular meu time (Copa do Cartola)*\n\n" +
-          "Me manda o ID numérico do seu time Copa.\n\n" +
-          "Você encontra na URL:\n" +
-          "_cartola.globo.com/#!/copa/time/*50271939*_ → manda o número\n\n" +
+          "Me envie o URL do seu time na Copa ou o ID numérico.\n\n" +
+          "Você encontra no site do Cartola FC:\n" +
+          "_cartola.globo.com/#!/copa/time/*123456*_ → pode mandar só o número\n\n" +
           "_(ou /cancelar para sair)_",
       );
       return { end: true };

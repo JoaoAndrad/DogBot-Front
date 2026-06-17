@@ -94,14 +94,25 @@ async function handleCartolaTeamFlow(stateKey, body, state, reply, opts = {}) {
   }
 
   const parsed = parseTeamInput(body);
-  // tipo do contexto (Copa/Brasileirão) vem do state; URL pode sobrepor
   const contextTipo = data.tipo || "brasileirao";
-  const tipo = parsed.tipo || contextTipo;
   const id = parsed.id;
+
   if (!id || id.length < 2) {
     await reply("❌ Entrada inválida. Tente novamente.\n_(ou /cancelar para sair)_");
     return true;
   }
+
+  // Rejeita se o URL enviado é claramente do tipo errado
+  if (parsed.tipo && parsed.tipo !== contextTipo) {
+    const expected = contextTipo === "copa"
+      ? "_cartola.globo.com/#!/copa/time/*123456*_"
+      : "_cartola.globo.com/#!/time/*123456*_";
+    const label = contextTipo === "copa" ? "Copa do Cartola" : "Brasileirão";
+    await reply(`❌ Este link é de um time do ${parsed.tipo === "copa" ? "Copa" : "Brasileirão"}, mas você está vinculando um time do *${label}*.\n\nEnvie o URL ou ID correto:\n${expected}\n_(ou /cancelar para sair)_`);
+    return true;
+  }
+
+  const tipo = parsed.tipo || contextTipo;
 
   try {
     const userId = data.userId || stateKey;
