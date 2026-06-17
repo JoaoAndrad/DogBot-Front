@@ -702,6 +702,25 @@ async function handleMiss(client, action) {
   }
 }
 
+async function handleVarRevert(client, action) {
+  const { goal, groupIds } = action;
+  if (!groupIds || !groupIds.length) return;
+
+  const h = goal.homeScore ?? 0;
+  const a = goal.awayScore ?? 0;
+  const homeFlag = withFlag(goal.homeTeam);
+  const awayFlag = withFlag(goal.awayTeam);
+  const msg = `🚫 *VAR — Gol anulado*\n\n${homeFlag} *${goal.homeTeam}* ${h} x ${a} *${goal.awayTeam}* ${awayFlag}`;
+
+  for (const groupId of groupIds) {
+    try {
+      await client.sendMessage(groupId, msg);
+    } catch (e) {
+      logger.warn(`[worldcupTick] var_revert → ${groupId}:`, e.message);
+    }
+  }
+}
+
 async function handleVar(client, action) {
   const { varEvent, groupIds } = action;
   if (!groupIds || !groupIds.length) return;
@@ -913,6 +932,9 @@ async function processWorldCupTickPayload(client, payload) {
           break;
         case "miss":
           await handleMiss(client, action);
+          break;
+        case "var_revert":
+          await handleVarRevert(client, action);
           break;
         case "var":
           await handleVar(client, action);
