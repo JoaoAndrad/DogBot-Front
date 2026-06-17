@@ -1,7 +1,7 @@
 "use strict";
 
 const logger = require("../utils/logger");
-const { withFlag, matchup } = require("../utils/teamLocale");
+const { withFlag, matchup, localize } = require("../utils/teamLocale");
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -542,11 +542,16 @@ async function handleReminder1h(client, action) {
     (action.palpiteiroNumbers || []).map((n) => toJid(n)),
   );
 
+  const homePt = localize(match.home_team).pt;
+  const awayPt = localize(match.away_team).pt;
+
   const dmText = [
     `⏰ *Falta 1 hora para: ${matchup(match.home_team, match.away_team)}!*`,
     ``,
     `Você ainda não fez seu palpite para este jogo.`,
     `Envie */palpite* agora para participar! 🎯`,
+    ``,
+    `💡 *Atalho rápido:* */palpite ${homePt} 1x0 ${awayPt}*`,
     ``,
     `Ou */alertaoff* para parar de receber esse tipo de notificação`,
   ].join("\n");
