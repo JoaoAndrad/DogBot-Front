@@ -117,14 +117,16 @@ async function handleCartolaTeamFlow(stateKey, body, state, reply, opts = {}) {
     }
     logger.info(`[cartola-team] ${stateKey.split("@")[0]} → ${id} (${tipo})`);
   } catch (e) {
-    conversationState.clearState(stateKey);
     const hint = tipo === "copa"
       ? `_cartola.globo.com/#!/copa/time/*50271939*_`
       : `_cartola.globo.com/#!/time/*19513040*_`;
-    const msg = e.message?.includes("team_not_found")
-      ? `❌ Time não encontrado.\n\nTente com o ID numérico ou URL completa:\n${hint}`
-      : `❌ Erro ao vincular time. Tente novamente mais tarde.`;
-    await reply(msg);
+    if (e.message?.includes("team_not_found")) {
+      // Mantém o estado ativo para o usuário tentar novamente
+      await reply(`❌ Time não encontrado.\n\nTente novamente com o ID numérico ou URL completa:\n${hint}\n_(ou /cancelar para sair)_`);
+    } else {
+      conversationState.clearState(stateKey);
+      await reply("❌ Erro ao vincular time. Tente novamente mais tarde.");
+    }
     logger.error("[cartola-team] saveUserTeam:", e.message);
   }
 

@@ -41,6 +41,90 @@ function formatMercadoStatus(rodada) {
   return [rodadaNum, status].filter(Boolean).join(" — ");
 }
 
+async function _showMyTeamForTipo(ctx, tipo) {
+  const isCopa = tipo === "copa";
+
+  let saved;
+  try {
+    const { team } = await cartolaClient.getUserTeam(ctx.userId, tipo);
+    saved = team;
+  } catch (e) {
+    logger.error("[cartolaFlow] getUserTeam:", e.message);
+    await ctx.reply("❌ Erro ao buscar seu time. Tente novamente.");
+    return;
+  }
+
+  if (!saved) {
+    const hint = isCopa
+      ? "⚙️ *Configurações → Vincular time (Copa)*\n\n_Você vai precisar do ID numérico do seu time Copa:\ncartola.globo.com/#!/copa/time/*123456*_"
+      : "⚙️ *Configurações → Vincular time (Brasileirão)*\n\n_Você vai precisar do ID numérico do seu time:\ncartola.globo.com/#!/time/*123456*_";
+    await ctx.reply(
+      `${isCopa ? "🏆" : "🇧🇷"} *Meu time${isCopa ? " (Copa)" : ""}*\n\nVocê ainda não vinculou seu time.\n\nNo privado, use ${hint}`,
+    );
+    return;
+  }
+
+  try {
+    const { data } = await cartolaClient.getMyTeamData(ctx.userId, tipo);
+    const time = data?.time || {};
+    const atletas = data?.atletas || [];
+    const capitaoId = data?.capitao_id;
+    const pontosTotais = data?.pontos;
+
+    const lines = [
+      `${isCopa ? "🏆" : "🇧🇷"} *${time.nome || saved.team_name || saved.slug}*${isCopa ? " _(Copa)_" : ""}`,
+      `👤 ${time.nome_cartola || "–"}`,
+      "",
+    ];
+
+    if (atletas.length) {
+      const titulares = atletas.slice(0, 11);
+      const reservas = atletas.slice(11);
+
+      lines.push("*Escalação:*");
+      for (const a of titulares) {
+        const isCap = a.atleta_id === capitaoId;
+        const pos = POSICAO[a.posicao_id] || "?";
+        const rawPts = a.pontos_num;
+        const pts = rawPts != null ? ` — ${formatPontuacao(isCap ? rawPts * 2 : rawPts)} pts` : "";
+        const capMark = isCap ? " ⭐" : "";
+        lines.push(`• [${pos}] ${a.apelido || a.nome}${capMark}${pts}`);
+      }
+
+      if (reservas.length) {
+        lines.push("", "*Banco:*");
+        for (const a of reservas) {
+          const pos = POSICAO[a.posicao_id] || "?";
+          const pts = a.pontos_num != null ? ` — ${formatPontuacao(a.pontos_num)} pts` : "";
+          lines.push(`• [${pos}] ${a.apelido || a.nome}${pts}`);
+        }
+      }
+    } else {
+      lines.push("_Escalação não disponível_");
+    }
+
+    if (pontosTotais != null) {
+      lines.push("", `📊 *Total: ${formatPontuacao(pontosTotais)} pts*`);
+    }
+
+    await ctx.reply(lines.join("\n"));
+    if (time.url_escudo_svg && ctx.client) {
+      await _sendShieldSticker(ctx.client, ctx.chatId, time.url_escudo_svg);
+    }
+  } catch (e) {
+    if (e.message === "team_not_found" || e.message === "no_team_saved") {
+      await ctx.reply(
+        `${isCopa ? "🏆" : "🇧🇷"} *${saved.team_name || saved.slug}*\n\nTime não encontrado. Use ⚙️ Configurações para re-vincular.`,
+      );
+    } else {
+      logger.error("[cartolaFlow] getMyTeamData:", e.message);
+      await ctx.reply(
+        `${isCopa ? "🏆" : "🇧🇷"} *${saved.team_name || saved.slug}*\n\n_Dados indisponíveis no momento._`,
+      );
+    }
+  }
+}
+
 // ─── Flow principal ───────────────────────────────────────────────────────────
 
 const cartolaFlow = createFlow("cartola", {
@@ -344,103 +428,45 @@ const cartolaFlow = createFlow("cartola", {
 
     // ── Meu time ─────────────────────────────────────────────────────────────
     showMyTeam: async (ctx) => {
-      // Detecta se o grupo tem liga Copa para mostrar time correto
       const isGroup = String(ctx.chatId).endsWith("@g.us");
-      let tipo = "brasileirao";
+
+      // Em grupos: tipo determinado pela liga do grupo
       if (isGroup) {
+        let tipo = "brasileirao";
         try {
           const leagueData = await cartolaClient.getGroupLeague(ctx.chatId);
           if (leagueData?.league?.tipo?.startsWith("copa/")) tipo = "copa";
         } catch {}
-      }
-
-      let saved;
-      try {
-        const { team } = await cartolaClient.getUserTeam(ctx.userId, tipo);
-        saved = team;
-      } catch (e) {
-        logger.error("[cartolaFlow] getUserTeam:", e.message);
-        await ctx.reply("❌ Erro ao buscar seu time. Tente novamente.");
+        await _showMyTeamForTipo(ctx, tipo);
         return { noRender: true };
       }
 
-      if (!saved) {
-        const hint = tipo === "copa"
-          ? "⚙️ *Configurações → Vincular time (Copa)*\n\n_Você vai precisar do ID numérico do seu time Copa:\ncartola.globo.com/#!/copa/time/*123456*_"
-          : "⚙️ *Configurações → Vincular time (Brasileirão)*\n\n_Você vai precisar do ID numérico do seu time:\ncartola.globo.com/#!/time/*123456*_";
+      // No privado: mostra todos os times vinculados (Copa + Brasileirão)
+      let allTeams;
+      try {
+        const result = await cartolaClient.getAllUserTeams(ctx.userId);
+        allTeams = result?.teams || [];
+      } catch (e) {
+        logger.error("[cartolaFlow] getAllUserTeams:", e.message);
+        await ctx.reply("❌ Erro ao buscar seus times. Tente novamente.");
+        return { noRender: true };
+      }
+
+      if (!allTeams.length) {
         await ctx.reply(
-          `${tipo === "copa" ? "🏆" : "🇧🇷"} *Meu time${tipo === "copa" ? " (Copa)" : ""}*\n\n` +
-            "Você ainda não vinculou seu time.\n\n" +
-            `No privado, use ${hint}`,
+          "🏠 *Meu time*\n\nVocê ainda não vinculou nenhum time.\n\n" +
+            "Use ⚙️ *Configurações → Vincular meu time* para começar.",
         );
         return { noRender: true };
       }
 
-      try {
-        const { data } = await cartolaClient.getMyTeamData(ctx.userId, tipo);
-        const time = data?.time || {};
-        const atletas = data?.atletas || [];
-        const capitaoId = data?.capitao_id;
-        const pontosTotais = data?.pontos;
-        const isCopa = tipo === "copa";
-
-        const lines = [
-          `${isCopa ? "🏆" : "🇧🇷"} *${time.nome || saved.team_name || saved.slug}*${isCopa ? " _(Copa)_" : ""}`,
-          `👤 ${time.nome_cartola || "–"}`,
-          "",
-        ];
-
-        if (atletas.length) {
-          const titulares = atletas.slice(0, 11);
-          const reservas = atletas.slice(11);
-
-          lines.push("*Escalação:*");
-          for (const a of titulares) {
-            const isCap = a.atleta_id === capitaoId;
-            const pos = POSICAO[a.posicao_id] || "?";
-            const rawPts = a.pontos_num;
-            const pts =
-              rawPts != null
-                ? ` — ${formatPontuacao(isCap ? rawPts * 2 : rawPts)} pts`
-                : "";
-            const capMark = isCap ? " ⭐" : "";
-            lines.push(`• [${pos}] ${a.apelido || a.nome}${capMark}${pts}`);
-          }
-
-          if (reservas.length) {
-            lines.push("", "*Banco:*");
-            for (const a of reservas) {
-              const pos = POSICAO[a.posicao_id] || "?";
-              const pts =
-                a.pontos_num != null
-                  ? ` — ${formatPontuacao(a.pontos_num)} pts`
-                  : "";
-              lines.push(`• [${pos}] ${a.apelido || a.nome}${pts}`);
-            }
-          }
-        } else {
-          lines.push("_Escalação não disponível_");
-        }
-
-        if (pontosTotais != null) {
-          lines.push("", `📊 *Total: ${formatPontuacao(pontosTotais)} pts*`);
-        }
-
-        await ctx.reply(lines.join("\n"));
-        if (time.url_escudo_svg && ctx.client) {
-          await _sendShieldSticker(ctx.client, ctx.chatId, time.url_escudo_svg);
-        }
-      } catch (e) {
-        if (e.message === "team_not_found" || e.message === "no_team_saved") {
-          await ctx.reply(
-            `${tipo === "copa" ? "🏆" : "🇧🇷"} *${saved.team_name || saved.slug}*\n\nTime não encontrado. Use ⚙️ Configurações para re-vincular.`,
-          );
-        } else {
-          logger.error("[cartolaFlow] getMyTeamData:", e.message);
-          await ctx.reply(
-            `${tipo === "copa" ? "🏆" : "🇧🇷"} *${saved.team_name || saved.slug}*\n\n_Dados indisponíveis no momento._`,
-          );
-        }
+      // Exibe cada time vinculado separadamente
+      const tipoOrder = ["copa", "brasileirao"];
+      const sorted = [...allTeams].sort(
+        (a, b) => tipoOrder.indexOf(a.tipo) - tipoOrder.indexOf(b.tipo),
+      );
+      for (const saved of sorted) {
+        await _showMyTeamForTipo(ctx, saved.tipo);
       }
 
       return { noRender: true };

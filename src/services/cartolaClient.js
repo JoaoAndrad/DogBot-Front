@@ -15,6 +15,10 @@ async function getUserTeam(userId, tipo = "brasileirao") {
   return backendClient.sendToBackend(`/api/cartola/team/${encodeURIComponent(userId)}?tipo=${encodeURIComponent(tipo)}`, null, "GET");
 }
 
+async function getAllUserTeams(userId) {
+  return backendClient.sendToBackend(`/api/cartola/team/${encodeURIComponent(userId)}/all`, null, "GET");
+}
+
 async function saveUserTeam(userId, slug, tipo = "brasileirao") {
   return backendClient.sendToBackend("/api/cartola/team", { userId, slug, tipo }, "POST");
 }
@@ -81,6 +85,7 @@ async function saveGroupSettings(groupId, data) {
 module.exports = {
   getRodada,
   getUserTeam,
+  getAllUserTeams,
   saveUserTeam,
   getMyTeamData,
   getGroupLeague,
