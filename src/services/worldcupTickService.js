@@ -535,13 +535,6 @@ async function handleReminder1h(client, action) {
   }
 
   // DM individual — apenas para quem já fez pelo menos 1 palpite
-  const dmOptedOut = new Set(
-    (action.dmOptedOutNumbers || []).map((n) => toJid(n)),
-  );
-  const palpiteiros = new Set(
-    (action.palpiteiroNumbers || []).map((n) => toJid(n)),
-  );
-
   const homePt = localize(match.home_team).pt;
   const awayPt = localize(match.away_team).pt;
 
