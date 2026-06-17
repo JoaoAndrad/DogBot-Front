@@ -676,9 +676,16 @@ const cartolaFlow = createFlow("cartola", {
       }
 
       // Copa: parcial = ranking da liga Copa
+      let isCopa = false;
       try {
         const leagueData = await cartolaClient.getGroupLeague(ctx.chatId);
-        if (leagueData?.league?.tipo?.startsWith("copa/")) {
+        isCopa = leagueData?.league?.tipo?.startsWith("copa/") || false;
+      } catch (e) {
+        logger.warn("[cartolaFlow] getGroupLeague:", e.message);
+      }
+
+      if (isCopa) {
+        try {
           const { liga } = await cartolaClient.getLeagueRanking(ctx.chatId);
           const ranking = liga?.ranking || [];
           if (!ranking.length) {
@@ -692,9 +699,12 @@ const cartolaFlow = createFlow("cartola", {
             lines.push(`${pos} ${r.nome || r.time_id} — *${formatPontuacao(r.pontos_cartola ?? r.pontos)} pts*`);
           }
           await ctx.reply(lines.join("\n"));
-          return { noRender: true };
+        } catch (e) {
+          logger.error("[cartolaFlow] showGroupParcial Copa:", e.message);
+          await ctx.reply("❌ Erro ao buscar parcial da Copa. Tente novamente.");
         }
-      } catch {}
+        return { noRender: true };
+      }
 
       try {
         const { ranking } = await cartolaClient.getGroupParcial(ctx.chatId);

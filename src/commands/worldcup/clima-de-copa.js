@@ -48,10 +48,11 @@ module.exports = {
         const lines = [
           "⚽ *Copa do Mundo já está ativa neste grupo!*",
           "",
-          `🔔 Notificações de gol: ${s.goal_notifications ? "✅" : "❌"}`,
-          `⏰ Lembretes de jogo: ${s.match_reminders ? "✅" : "❌"}`,
+          `⚽ Gols: ${s.goal_notifications ? "✅" : "❌"}`,
+          `🟨 Cartões: ${s.card_notifications ? "✅" : "❌"}`,
+          `🔄 Substituições: ${s.substitution_notifications ? "✅" : "❌"}`,
           `📊 Resumo semanal: ${s.weekly_summary ? "✅" : "❌"}`,
-          `🎯 Bolão: ${s.prediction_enabled ? "✅" : "❌"}`,
+          `🎯 Bolão: ${s.bolao_notifications ? "✅" : "❌"}`,
           "",
           "Use */copa* para abrir o menu ou */clima-de-copa off* para desativar.",
         ];

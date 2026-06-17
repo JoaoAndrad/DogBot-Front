@@ -315,10 +315,11 @@ const worldcupFlow = createFlow("copa", {
         const lines = [
           "⚙️ *Configurações Copa — este grupo*",
           "",
-          `🔔 Notificações de gol: ${settings.goal_notifications ? "✅" : "❌"}`,
-          `⏰ Lembretes de jogo: ${settings.match_reminders ? "✅" : "❌"}`,
+          `⚽ Gols: ${settings.goal_notifications ? "✅" : "❌"}`,
+          `🟨 Cartões: ${settings.card_notifications ? "✅" : "❌"}`,
+          `🔄 Substituições: ${settings.substitution_notifications ? "✅" : "❌"}`,
           `📊 Resumo semanal: ${settings.weekly_summary ? "✅" : "❌"}`,
-          `🎯 Bolão: ${settings.prediction_enabled ? "✅" : "❌"}`,
+          `🎯 Bolão: ${settings.bolao_notifications ? "✅" : "❌"}`,
           "",
           "Para alterar as configurações, peça ao admin do grupo.",
         ];

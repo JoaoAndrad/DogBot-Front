@@ -465,6 +465,9 @@ async function handleReminder1h(client, action) {
   const dmOptedOut = new Set(
     (action.dmOptedOutNumbers || []).map((n) => `${n}@c.us`),
   );
+  const registered = new Set(
+    (action.registeredNumbers || []).map((n) => `${n}@c.us`),
+  );
 
   const dmText = [
     `⏰ *Falta 1 hora para: ${matchup(match.home_team, match.away_team)}!*`,
@@ -477,6 +480,7 @@ async function handleReminder1h(client, action) {
 
   for (const jid of allUnpredictedJids) {
     if (dmOptedOut.has(jid)) continue;
+    if (registered.size > 0 && !registered.has(jid)) continue;
     try {
       await client.sendMessage(jid, dmText);
     } catch (e) {
@@ -895,12 +899,14 @@ async function handleWeeklySummary(client, action) {
 
       const medals = ["🥇", "🥈", "🥉"];
       const rankingLines = weeklyRanking.map((e, i) => {
-        const p = participants.find(
-          (x) => (x.id._serialized || x.id.user + "@c.us") === e.userId,
+        const jid = e.senderNumber ? `${e.senderNumber}@c.us` : null;
+        const p = jid && participants.find(
+          (x) => (x.id._serialized || x.id.user + "@c.us") === jid,
         );
-        const name = p
-          ? p.pushname || p.name || e.userId.split("@")[0]
-          : e.userId.split("@")[0];
+        const name = e.pushName
+          || e.displayName
+          || (p ? p.pushname || p.name : null)
+          || (e.senderNumber || e.userId.slice(0, 8));
         return `${medals[i] || `${e.rank}.`} ${name} — *${e.weeklyPoints} pts*`;
       });
 
