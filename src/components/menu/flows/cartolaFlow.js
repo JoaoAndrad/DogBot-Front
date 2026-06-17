@@ -153,6 +153,7 @@ const cartolaFlow = createFlow("cartola", {
       const options = isGroup
         ? [
             { label: "🏠 Meu time", action: "exec", handler: "showMyTeam" },
+            { label: "Jogando agora 🟢", action: "exec", handler: "showJogandoAgora" },
             {
               label: "🔍 Scouts do meu time",
               action: "exec",
@@ -180,6 +181,7 @@ const cartolaFlow = createFlow("cartola", {
           ]
         : [
             { label: "🏠 Meu time", action: "exec", handler: "showMyTeam" },
+            { label: "Jogando agora 🟢", action: "exec", handler: "showJogandoAgora" },
             {
               label: "🔍 Scouts do meu time",
               action: "exec",
@@ -471,6 +473,74 @@ const cartolaFlow = createFlow("cartola", {
         await _showMyTeamForTipo(ctx, saved.tipo);
       }
 
+      return { noRender: true };
+    },
+
+    // ── Jogando agora ─────────────────────────────────────────────────────────
+    showJogandoAgora: async (ctx) => {
+      const isGroup = String(ctx.chatId).endsWith("@g.us");
+      const targetGroup = isGroup ? ctx.chatId : null;
+
+      if (!targetGroup) {
+        await ctx.reply(
+          "🟢 *Jogando agora*\n\nEsta opção mostra os atletas do grupo em campo.\n\nUse em um grupo do Cartola.",
+        );
+        return { noRender: true };
+      }
+
+      let data;
+      try {
+        data = await cartolaClient.getGroupJogandoAgora(targetGroup);
+      } catch (e) {
+        logger.error("[cartolaFlow] getGroupJogandoAgora:", e.message);
+        await ctx.reply("❌ Erro ao buscar atletas em campo. Tente novamente.");
+        return { noRender: true };
+      }
+
+      if (!data.rodada) {
+        await ctx.reply("🟢 *Jogando agora*\n\nRodada não encontrada.");
+        return { noRender: true };
+      }
+
+      if (!data.liveMatches || !data.liveMatches.length) {
+        await ctx.reply(
+          `🟢 *Jogando agora*\n\nNenhum jogo ao vivo no momento.\n_Rodada ${data.rodada} · ${data.tipo === "copa" ? "Copa" : "Brasileirão"}_`,
+        );
+        return { noRender: true };
+      }
+
+      if (!data.athletes || !data.athletes.length) {
+        const matchLabels = data.liveMatches
+          .map((m) => `${m.home_team} ${m.home_score ?? 0}x${m.away_score ?? 0} ${m.away_team}`)
+          .join("  |  ");
+        await ctx.reply(
+          `🟢 *Jogando agora*\n\n🔴 Ao vivo: ${matchLabels}\n\nNenhum atleta do grupo está jogando.`,
+        );
+        return { noRender: true };
+      }
+
+      const matchLabels = data.liveMatches
+        .map((m) => `${m.home_team} ${m.home_score ?? 0}x${m.away_score ?? 0} ${m.away_team}`)
+        .join("  |  ");
+
+      const tipo = data.tipo === "copa" ? "copa" : "brasileirao";
+      const lines = [
+        `=== Cartola em campo (${tipo} · rodada ${data.rodada}) ===`,
+        "",
+        `🔴 Ao vivo: ${matchLabels}`,
+        "",
+      ];
+
+      for (const a of data.athletes) {
+        lines.push(`⚽ ${a.apelido} (${a.clube}) — ${formatPontuacao(a.pts)} pts`);
+        for (const e of a.escaladoPor) {
+          const cap = e.isCapitao ? " ★ capitão" : "";
+          lines.push(`   └ ${e.displayName}${e.teamName ? ` (${e.teamName})` : ""}${cap}`);
+        }
+        lines.push("");
+      }
+
+      await ctx.reply(lines.join("\n").trim());
       return { noRender: true };
     },
 

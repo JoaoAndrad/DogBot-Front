@@ -83,6 +83,10 @@ async function getCopaGroupTeams(groupId, userId = null) {
   return backendClient.sendToBackend(`/api/cartola/group/${encodeURIComponent(groupId)}/copa-teams${qs}`, null, "GET");
 }
 
+async function getGroupJogandoAgora(groupId) {
+  return backendClient.sendToBackend(`/api/cartola/group/${encodeURIComponent(groupId)}/jogando`, null, "GET");
+}
+
 async function getGroupSettings(groupId) {
   return backendClient.sendToBackend(`/api/cartola/group/${encodeURIComponent(groupId)}/settings`, null, "GET");
 }
@@ -111,4 +115,5 @@ module.exports = {
   saveGroupSettings,
   getCopaActiveGroups,
   getCopaGroupTeams,
+  getGroupJogandoAgora,
 };
