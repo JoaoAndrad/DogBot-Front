@@ -940,6 +940,7 @@ const cartolaFlow = createFlow("cartola", {
 
       // ── Busca grupos Copa com liga setada onde o usuário está ──────────────
       let sortedTeams = [];
+      let claimedTeam = null;
       try {
         const { groups = [] } = await cartolaClient.getCopaActiveGroups();
         for (const g of groups) {
@@ -950,8 +951,10 @@ const cartolaFlow = createFlow("cartola", {
               return pid === userId || pid.split("@")[0] === userId.split("@")[0];
             });
             if (!isInGroup) continue;
-            const { teams = [] } = await cartolaClient.getCopaGroupTeams(g.groupId);
-            if (!teams.length) continue;
+            const res = await cartolaClient.getCopaGroupTeams(g.groupId, userId);
+            const { teams = [], claimedByUser = null } = res || {};
+            claimedTeam = claimedByUser || null;
+            if (!teams.length && !claimedTeam) continue;
             const userName = ctx.message?.notifyName || ctx.message?.pushName || userId.split("@")[0];
             sortedTeams = [...teams].sort(
               (a, b) => fuzzyScore(b.name, userName) - fuzzyScore(a.name, userName),
@@ -961,24 +964,33 @@ const cartolaFlow = createFlow("cartola", {
         }
       } catch {}
 
-      // ── Sem times disponíveis: vai direto ao URL/ID ────────────────────────
-      if (!sortedTeams.length) {
+      // ── Sem nada para mostrar: vai direto ao URL/ID ────────────────────────
+      if (!sortedTeams.length && !claimedTeam) {
         await goToUrlFlow();
         return { end: true };
       }
 
       // ── Poll paginada ──────────────────────────────────────────────────────
       const polls = require("../../../components/poll");
+      const CLAIMED_SUFFIX = " (Reclamado por você)";
+      // Página 0 reserva 1 slot pro time já reclamado (quando houver)
+      const FIRST_PAGE_CAPACITY = claimedTeam ? 9 : 10;
       const TEAMS_PER_PAGE = 10;
-      const totalPages = Math.ceil(sortedTeams.length / TEAMS_PER_PAGE);
+      const totalPages = 1 + Math.ceil(Math.max(0, sortedTeams.length - FIRST_PAGE_CAPACITY) / TEAMS_PER_PAGE);
 
       const showPage = async (pageIdx) => {
-        const start = pageIdx * TEAMS_PER_PAGE;
-        const pageTeams = sortedTeams.slice(start, start + TEAMS_PER_PAGE);
+        const pageTeams = pageIdx === 0
+          ? sortedTeams.slice(0, FIRST_PAGE_CAPACITY)
+          : sortedTeams.slice(FIRST_PAGE_CAPACITY + (pageIdx - 1) * TEAMS_PER_PAGE,
+                              FIRST_PAGE_CAPACITY + pageIdx * TEAMS_PER_PAGE);
         const hasMore = pageIdx + 1 < totalPages;
-        const options = pageTeams.map((t) => t.name);
+
+        const options = [];
+        if (pageIdx === 0 && claimedTeam) options.push(claimedTeam.name + CLAIMED_SUFFIX);
+        options.push(...pageTeams.map((t) => t.name));
         if (hasMore) options.push("(Próxima página)");
         options.push("(Enviar url ou id diretamente)");
+
         const pageLabel = totalPages > 1 ? ` (${pageIdx + 1}/${totalPages})` : "";
 
         await polls.createPoll(
@@ -992,12 +1004,15 @@ const cartolaFlow = createFlow("cartola", {
               if (!chosen) return;
               if (String(voter).split("@")[0] !== userId.split("@")[0]) return;
 
-              if (chosen === "(Próxima página)") {
-                await showPage(pageIdx + 1);
-                return;
-              }
-              if (chosen === "(Enviar url ou id diretamente)") {
-                await goToUrlFlow();
+              if (chosen === "(Próxima página)") { await showPage(pageIdx + 1); return; }
+              if (chosen === "(Enviar url ou id diretamente)") { await goToUrlFlow(); return; }
+
+              // Time já reclamado selecionado
+              if (chosen.endsWith(CLAIMED_SUFFIX) && claimedTeam) {
+                await client.sendMessage(
+                  chatId,
+                  `🏆 *${claimedTeam.name}* já está vinculado ao seu perfil!`,
+                );
                 return;
               }
 

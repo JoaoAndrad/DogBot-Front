@@ -78,8 +78,9 @@ async function getCopaActiveGroups() {
   return backendClient.sendToBackend("/api/cartola/copa-groups", null, "GET");
 }
 
-async function getCopaGroupTeams(groupId) {
-  return backendClient.sendToBackend(`/api/cartola/group/${encodeURIComponent(groupId)}/copa-teams`, null, "GET");
+async function getCopaGroupTeams(groupId, userId = null) {
+  const qs = userId ? `?userId=${encodeURIComponent(userId)}` : "";
+  return backendClient.sendToBackend(`/api/cartola/group/${encodeURIComponent(groupId)}/copa-teams${qs}`, null, "GET");
 }
 
 async function getGroupSettings(groupId) {
