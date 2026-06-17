@@ -94,7 +94,12 @@ function toJid(senderNumber) {
 }
 
 function formatPredictionsBlock(predictions, currentHome, currentAway, opts) {
-  const { text } = formatPredictionsBlockWithMentions(predictions, currentHome, currentAway, opts);
+  const { text } = formatPredictionsBlockWithMentions(
+    predictions,
+    currentHome,
+    currentAway,
+    opts,
+  );
   return text;
 }
 
@@ -104,21 +109,35 @@ function formatPredictionsBlock(predictions, currentHome, currentAway, opts) {
  * Quando há perdedores: seções "Ainda concorrendo" e "Já perderam", cada uma com os três sub-grupos.
  * opts: { homeTeam, awayTeam } para labels das categorias.
  */
-function formatPredictionsBlockWithMentions(predictions, currentHome, currentAway, opts = {}) {
-  if (!predictions || !predictions.length) return { text: null, mentionIds: [] };
+function formatPredictionsBlockWithMentions(
+  predictions,
+  currentHome,
+  currentAway,
+  opts = {},
+) {
+  if (!predictions || !predictions.length)
+    return { text: null, mentionIds: [] };
 
   const { homeTeam, awayTeam } = opts;
   const nameMap = buildNameMap(predictions);
-  const { competing, lost } = categorizePredictions(predictions, currentHome, currentAway);
+  const { competing, lost } = categorizePredictions(
+    predictions,
+    currentHome,
+    currentAway,
+  );
   const mentionIds = [];
 
-  const homeLabel = homeTeam ? `Vitória ${withFlag(homeTeam)}` : "Vitória (casa)";
-  const awayLabel = awayTeam ? `Vitória ${withFlag(awayTeam)}` : "Vitória (visitante)";
+  const homeLabel = homeTeam
+    ? `Vitória ${withFlag(homeTeam)}`
+    : "Vitória (casa)";
+  const awayLabel = awayTeam
+    ? `Vitória ${withFlag(awayTeam)}`
+    : "Vitória (visitante)";
 
   function byOutcome(preds) {
     return {
       homeWin: preds.filter((p) => p.predictedHome > p.predictedAway),
-      draw:    preds.filter((p) => p.predictedHome === p.predictedAway),
+      draw: preds.filter((p) => p.predictedHome === p.predictedAway),
       awayWin: preds.filter((p) => p.predictedHome < p.predictedAway),
     };
   }
@@ -163,7 +182,9 @@ function formatPredictionsBlockWithMentions(predictions, currentHome, currentAwa
       lines.push(...renderOutcomeGroups(competing, true));
     }
     if (lost.length) {
-      lines.push(`\n❌ *${lost.length === 1 ? "Já perdeu" : "Já perderam"} 🤣:*`);
+      lines.push(
+        `\n❌ *${lost.length === 1 ? "Já perdeu" : "Já perderam"} 🤣:*`,
+      );
       lines.push(...renderOutcomeGroups(lost, false));
     }
   }
@@ -192,7 +213,9 @@ function formatFinishedBlock(predictions, finalHome, finalAway) {
   }
 
   if (winner.length) {
-    lines.push(isDraw ? "✓ *Acertou o empate — 1 pt*" : "✓ *Vencedor certo — 1 pt*");
+    lines.push(
+      isDraw ? "✓ *Acertou o empate — 1 pt*" : "✓ *Vencedor certo — 1 pt*",
+    );
     for (const p of winner)
       lines.push(
         `  • ${nameMap[p.userId]} — ${p.predictedHome}x${p.predictedAway}`,
@@ -372,7 +395,10 @@ async function handleKickoff(client, action) {
       let mentionIds = [];
       if (groupPreds.length) {
         const { text: predBlock, mentionIds: ids } =
-          formatPredictionsBlockWithMentions(groupPreds, 0, 0, { homeTeam: match.home_team, awayTeam: match.away_team });
+          formatPredictionsBlockWithMentions(groupPreds, 0, 0, {
+            homeTeam: match.home_team,
+            awayTeam: match.away_team,
+          });
         if (predBlock) lines.push(``, predBlock);
         mentionIds = ids;
       }
@@ -425,6 +451,13 @@ async function handleReminder1h(client, action) {
     predictions.map((p) => toJid(p.senderNumber)).filter(Boolean),
   );
 
+  const dmOptedOut = new Set(
+    (action.dmOptedOutNumbers || []).map((n) => toJid(n)),
+  );
+  const palpiteiros = new Set(
+    (action.palpiteiroNumbers || []).map((n) => toJid(n)),
+  );
+
   const botJid =
     (client.info && client.info.wid && client.info.wid._serialized) ||
     (client.info && client.info.me && client.info.me._serialized) ||
@@ -438,7 +471,11 @@ async function handleReminder1h(client, action) {
 
       const unpredicted = memberJids
         ? [...memberJids].filter(
-            (jid) => jid.endsWith("@c.us") && !predictedJids.has(jid) && jid !== botJid,
+            (jid) =>
+              jid.endsWith("@c.us") &&
+              !predictedJids.has(jid) &&
+              !dmOptedOut.has(jid) &&
+              jid !== botJid,
           )
         : [];
 
@@ -446,7 +483,7 @@ async function handleReminder1h(client, action) {
         `⏰ *Em 1 hora: ${matchup(match.home_team, match.away_team)}*`,
         `🕐 Hoje às ${time} · ${stage}`,
         ``,
-        `🎯 Último chamado para palpites! Envie */palpite* no privado.`,
+        `🎯 Último chamado para palpites!`,
       ];
 
       if (unpredicted.length) {
@@ -454,6 +491,12 @@ async function handleReminder1h(client, action) {
         for (const jid of unpredicted) {
           lines.push(`  • @${jid.split("@")[0]}`);
         }
+        lines.push(
+          ``,
+          `Envie */palpite* no privado agora para participar! 🎯`,
+          ``,
+          `Ou */alertaoff* para parar de receber esse tipo de notificação`,
+        );
       }
 
       await sendWithMentions(client, groupId, lines.join("\n"), unpredicted);
@@ -490,10 +533,15 @@ async function handleReminder1h(client, action) {
       // Registra alerta ignorado; auto-desativa após MAX_IGNORED jogos sem palpite
       const count = dmAlertState.recordAlert(jid, match.id);
       if (count >= dmAlertState.MAX_IGNORED) {
-        logger.info(`[worldcupTick] auto-desativando alertas DM para ${jid} (${count} ignorados)`);
+        logger.info(
+          `[worldcupTick] auto-desativando alertas DM para ${jid} (${count} ignorados)`,
+        );
         dmAlertState.clearUser(jid);
         worldcupClient.setDmAlerts(jid, false).catch((e) => {
-          logger.debug(`[worldcupTick] setDmAlerts(false) error for ${jid}:`, e.message);
+          logger.debug(
+            `[worldcupTick] setDmAlerts(false) error for ${jid}:`,
+            e.message,
+          );
         });
       }
     } catch (e) {
@@ -725,7 +773,11 @@ async function handleGoalScorer(client, action) {
 
   const minuteTag = minute ? ` ${minute}'` : "";
   const detailTag =
-    goalDetail === "Penalty" ? " *(pênalti)*" : goalDetail === "Own Goal" ? " *(gol contra)*" : "";
+    goalDetail === "Penalty"
+      ? " *(pênalti)*"
+      : goalDetail === "Own Goal"
+        ? " *(gol contra)*"
+        : "";
   let msg = `⚽ *Marcou:* ${scorerName}${minuteTag}${detailTag}`;
   if (assistName && !detailTag) msg += `\n🎯 *Assistência:* ${assistName}`;
 
@@ -775,14 +827,17 @@ async function handleVar(client, action) {
   const { varEvent, groupIds } = action;
   if (!groupIds || !groupIds.length) return;
 
-  const isGoalCancel = varEvent.detail && varEvent.detail.toLowerCase().includes("goal");
+  const isGoalCancel =
+    varEvent.detail && varEvent.detail.toLowerCase().includes("goal");
   const label = VAR_PT[varEvent.detail] || varEvent.detail || "Decisão";
   const icon = isGoalCancel ? "🚫" : "📺";
   const minuteTag = varEvent.minute ? ` ${varEvent.minute}'` : "";
   const teamFlag = varEvent.team ? withFlag(varEvent.team) : "";
   const playerLine = varEvent.player
     ? `\n${varEvent.player}${minuteTag}${teamFlag ? ` — ${teamFlag}` : ""}`
-    : (teamFlag ? `\n${teamFlag}` : "");
+    : teamFlag
+      ? `\n${teamFlag}`
+      : "";
   const msg = `${icon} *VAR — ${label}*${playerLine}`;
 
   for (const groupId of groupIds) {
@@ -827,51 +882,88 @@ async function handleResultNotification(client, action) {
         const memberJidsList = memberJids ? [...memberJids] : [];
         let rankingLines = null;
 
-        const bolaoData = await worldcupClient.getBolao(groupId).catch(() => null);
-        if (bolaoData && bolaoData.bolao && bolaoData.leaderboard && bolaoData.leaderboard.length) {
+        const bolaoData = await worldcupClient
+          .getBolao(groupId)
+          .catch(() => null);
+        if (
+          bolaoData &&
+          bolaoData.bolao &&
+          bolaoData.leaderboard &&
+          bolaoData.leaderboard.length
+        ) {
           rankingLines = ["🎲 *Bolão da Copa — Ranking*", ""];
           for (let i = 0; i < bolaoData.leaderboard.length; i++) {
             const e = bolaoData.leaderboard[i];
-            const name = e.pushName || e.displayName || (e.senderNumber ? e.senderNumber.split("@")[0] : "?");
+            const name =
+              e.pushName ||
+              e.displayName ||
+              (e.senderNumber ? e.senderNumber.split("@")[0] : "?");
             const pts = e.bolaoPoints === 1 ? "pt" : "pts";
-            rankingLines.push(`${medals[i] || `${i + 1}.`} ${name} — *${e.bolaoPoints} ${pts}*`);
+            rankingLines.push(
+              `${medals[i] || `${i + 1}.`} ${name} — *${e.bolaoPoints} ${pts}*`,
+            );
           }
           rankingLines.push("", "_Pontuação desde a criação do bolão_");
 
           // Ranking geral abaixo do bolão
           if (memberJidsList.length) {
-            const { leaderboard: general } = await worldcupClient.getLeaderboard(groupId, memberJidsList).catch(() => ({ leaderboard: [] }));
+            const { leaderboard: general } = await worldcupClient
+              .getLeaderboard(groupId, memberJidsList)
+              .catch(() => ({ leaderboard: [] }));
             if (general && general.length) {
-              rankingLines.push("", "──────────────────", "🏆 *Ranking Geral do Grupo*", "");
+              rankingLines.push(
+                "",
+                "──────────────────",
+                "🏆 *Ranking Geral do Grupo*",
+                "",
+              );
               for (let i = 0; i < general.length; i++) {
                 const e = general[i];
-                const name = e.pushName || e.displayName || (e.senderNumber ? e.senderNumber.split("@")[0] : "?");
+                const name =
+                  e.pushName ||
+                  e.displayName ||
+                  (e.senderNumber ? e.senderNumber.split("@")[0] : "?");
                 const pts = e.totalPoints === 1 ? "pt" : "pts";
-                rankingLines.push(`${medals[i] || `${i + 1}.`} ${name} — *${e.totalPoints} ${pts}*`);
+                rankingLines.push(
+                  `${medals[i] || `${i + 1}.`} ${name} — *${e.totalPoints} ${pts}*`,
+                );
               }
             }
           }
         } else if (memberJidsList.length) {
-          const { leaderboard } = await worldcupClient.getLeaderboard(groupId, memberJidsList).catch(() => ({ leaderboard: [] }));
+          const { leaderboard } = await worldcupClient
+            .getLeaderboard(groupId, memberJidsList)
+            .catch(() => ({ leaderboard: [] }));
           if (leaderboard && leaderboard.length) {
             rankingLines = ["🏆 *Ranking — Copa do Mundo*", ""];
             for (let i = 0; i < leaderboard.length; i++) {
               const e = leaderboard[i];
-              const name = e.pushName || e.displayName || (e.senderNumber ? e.senderNumber.split("@")[0] : "?");
+              const name =
+                e.pushName ||
+                e.displayName ||
+                (e.senderNumber ? e.senderNumber.split("@")[0] : "?");
               const pts = e.totalPoints === 1 ? "pt" : "pts";
-              rankingLines.push(`${medals[i] || `${i + 1}.`} ${name} — *${e.totalPoints} ${pts}*`);
+              rankingLines.push(
+                `${medals[i] || `${i + 1}.`} ${name} — *${e.totalPoints} ${pts}*`,
+              );
             }
           }
         }
 
         if (rankingLines) {
-          const rankMsg = await client.sendMessage(groupId, rankingLines.join("\n"));
+          const rankMsg = await client.sendMessage(
+            groupId,
+            rankingLines.join("\n"),
+          );
           if (rankMsg && typeof rankMsg.pin === "function") {
             await rankMsg.pin(86400).catch(() => {});
           }
         }
       } catch (rankErr) {
-        logger.warn(`[worldcupTick] ranking após resultado → ${groupId}:`, rankErr.message);
+        logger.warn(
+          `[worldcupTick] ranking após resultado → ${groupId}:`,
+          rankErr.message,
+        );
       }
     } catch (e) {
       logger.warn(
@@ -913,13 +1005,17 @@ async function handleWeeklySummary(client, action) {
       const medals = ["🥇", "🥈", "🥉"];
       const rankingLines = weeklyRanking.map((e, i) => {
         const jid = e.senderNumber ? `${e.senderNumber}@c.us` : null;
-        const p = jid && participants.find(
-          (x) => (x.id._serialized || x.id.user + "@c.us") === jid,
-        );
-        const name = e.pushName
-          || e.displayName
-          || (p ? p.pushname || p.name : null)
-          || (e.senderNumber || e.userId.slice(0, 8));
+        const p =
+          jid &&
+          participants.find(
+            (x) => (x.id._serialized || x.id.user + "@c.us") === jid,
+          );
+        const name =
+          e.pushName ||
+          e.displayName ||
+          (p ? p.pushname || p.name : null) ||
+          e.senderNumber ||
+          e.userId.slice(0, 8);
         return `${medals[i] || `${e.rank}.`} ${name} — *${e.weeklyPoints} pts*`;
       });
 
@@ -1055,4 +1151,4 @@ async function handleBolaoMemberRemoved(client, action) {
   await client.sendMessage(groupId, text);
 }
 
-module.exports = { processWorldCupTickPayload }; 
+module.exports = { processWorldCupTickPayload };

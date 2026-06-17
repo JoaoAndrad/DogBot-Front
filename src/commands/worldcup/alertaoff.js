@@ -13,15 +13,8 @@ module.exports = {
     const chatId = message.from;
     const isGroup = String(chatId).endsWith("@g.us");
 
-    if (isGroup) {
-      await client.sendMessage(
-        chatId,
-        "⚙️ Envie */alertaoff* no privado para desativar as notificações de jogo.",
-      );
-      return;
-    }
-
-    let userId = chatId;
+    // Resolve o userId do autor (funciona tanto no privado quanto no grupo)
+    let userId = isGroup ? (message.author || message.from) : chatId;
     try {
       const contact = await message.getContact();
       if (contact && contact.id && contact.id._serialized)
@@ -32,9 +25,10 @@ module.exports = {
 
     try {
       await worldcupClient.setDmAlerts(userId, false);
+      const replyTo = isGroup ? chatId : chatId;
       await client.sendMessage(
-        chatId,
-        "🔕 Pronto! Você não vai mais receber notificações de palpite no privado.\n\nSe mudar de ideia, envie */alertaon* para reativar.",
+        replyTo,
+        "🔕 Certo! Você não vai mais receber notificações de palpite no privado nem ser mencionado em grupos.\n\nSe mudar de ideia, envie */alertaon* para reativar.",
       );
     } catch (e) {
       logger.error("[alertaoff] error:", e.message);
