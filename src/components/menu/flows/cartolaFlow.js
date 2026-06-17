@@ -459,9 +459,19 @@ const cartolaFlow = createFlow("cartola", {
 
     // ── Scouts do meu time ───────────────────────────────────────────────────
     showScout: async (ctx) => {
+      // Detecta tipo pela liga do grupo
+      const isGroup = String(ctx.chatId).endsWith("@g.us");
+      let tipo = "brasileirao";
+      if (isGroup) {
+        try {
+          const leagueData = await cartolaClient.getGroupLeague(ctx.chatId);
+          if (leagueData?.league?.tipo?.startsWith("copa/")) tipo = "copa";
+        } catch {}
+      }
+
       let saved;
       try {
-        const { team } = await cartolaClient.getUserTeam(ctx.userId);
+        const { team } = await cartolaClient.getUserTeam(ctx.userId, tipo);
         saved = team;
       } catch (e) {
         await ctx.reply("❌ Erro ao buscar seu time. Tente novamente.");
@@ -470,9 +480,7 @@ const cartolaFlow = createFlow("cartola", {
 
       if (!saved) {
         await ctx.reply(
-          "🔍 *Scouts do meu time*\n\n" +
-            "Você ainda não vinculou seu time.\n\n" +
-            "No privado, use ⚙️ *Configurações → Vincular meu time*.",
+          `🔍 *Scouts do meu time*\n\nVocê ainda não vinculou seu time${tipo === "copa" ? " da Copa" : ""}.\n\nNo privado, use ⚙️ *Configurações → Vincular meu time*.`,
         );
         return { noRender: true };
       }
@@ -499,10 +507,11 @@ const cartolaFlow = createFlow("cartola", {
       };
 
       try {
-        const { data } = await cartolaClient.getMyTeamData(ctx.userId);
+        const { data } = await cartolaClient.getMyTeamData(ctx.userId, tipo);
         const atletas = data?.atletas || [];
         const capitaoId = data?.capitao_id;
         const time = data?.time || {};
+        const isCopa = tipo === "copa";
 
         const comMovimento = atletas.filter(
           (a) =>
@@ -511,7 +520,7 @@ const cartolaFlow = createFlow("cartola", {
         );
 
         const lines = [
-          `🔍 *Scouts — ${time.nome || saved.team_name || saved.slug}*`,
+          `🔍 *Scouts — ${time.nome || saved.team_name || saved.slug}*${isCopa ? " _(Copa)_" : ""}`,
           "",
         ];
 
