@@ -4,8 +4,9 @@ const backendClient = require("./backendClient");
 
 // ─── Rodada ───────────────────────────────────────────────────────────────────
 
-async function getRodada() {
-  return backendClient.sendToBackend("/api/cartola/rodada", null, "GET");
+async function getRodada(tipo = "brasileirao") {
+  const q = tipo !== "brasileirao" ? `?tipo=${encodeURIComponent(tipo)}` : "";
+  return backendClient.sendToBackend(`/api/cartola/rodada${q}`, null, "GET");
 }
 
 // ─── Time do usuário ─────────────────────────────────────────────────────────

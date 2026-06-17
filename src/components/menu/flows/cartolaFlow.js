@@ -812,10 +812,20 @@ const cartolaFlow = createFlow("cartola", {
 
     // ── Rodada atual ──────────────────────────────────────────────────────────
     showRodada: async (ctx) => {
+      const isGroup = String(ctx.chatId).endsWith("@g.us");
+      let tipo = "brasileirao";
+      if (isGroup) {
+        try {
+          const leagueData = await cartolaClient.getGroupLeague(ctx.chatId);
+          if (leagueData?.league?.tipo?.startsWith("copa/")) tipo = "copa";
+        } catch {}
+      }
+
       try {
-        const rodada = await cartolaClient.getRodada();
+        const rodada = await cartolaClient.getRodada(tipo);
+        const titulo = tipo === "copa" ? "📊 *Rodada atual — Copa do Cartola*" : "📊 *Rodada atual — Cartola FC*";
         const lines = [
-          "📊 *Rodada atual — Cartola FC*",
+          titulo,
           "",
           formatMercadoStatus(rodada),
         ];
