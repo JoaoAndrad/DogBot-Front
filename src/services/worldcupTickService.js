@@ -469,15 +469,38 @@ async function handleReminder1h(client, action) {
     try {
       const memberJids = await getGroupMemberJids(client, groupId);
 
-      const unpredicted = memberJids
+      // Palpiteiros que ainda não palpitaram este jogo → mencionados com @
+      const unpredictedPalpiteiros = memberJids
         ? [...memberJids].filter(
             (jid) =>
               jid.endsWith("@c.us") &&
               !predictedJids.has(jid) &&
               !dmOptedOut.has(jid) &&
+              palpiteiros.has(jid) &&
               jid !== botJid,
           )
         : [];
+
+      // Quem nunca palpitou → nome simples (sem expor número)
+      const unpredictedOthers = memberJids
+        ? [...memberJids].filter(
+            (jid) =>
+              jid.endsWith("@c.us") &&
+              !predictedJids.has(jid) &&
+              !palpiteiros.has(jid) &&
+              !dmOptedOut.has(jid) &&
+              jid !== botJid,
+          )
+        : [];
+
+      const otherNames = [];
+      for (const jid of unpredictedOthers) {
+        try {
+          const contact = await client.getContactById(jid);
+          const name = contact?.pushname || contact?.name || null;
+          if (name) otherNames.push(name);
+        } catch {}
+      }
 
       const lines = [
         `⏰ *Em 1 hora: ${matchup(match.home_team, match.away_team)}*`,
@@ -486,10 +509,14 @@ async function handleReminder1h(client, action) {
         `🎯 Último chamado para palpites!`,
       ];
 
-      if (unpredicted.length) {
+      const hasUnpredicted = unpredictedPalpiteiros.length || otherNames.length;
+      if (hasUnpredicted) {
         lines.push(``, `Ainda não palpitaram:`);
-        for (const jid of unpredicted) {
+        for (const jid of unpredictedPalpiteiros) {
           lines.push(`  • @${jid.split("@")[0]}`);
+        }
+        for (const name of otherNames) {
+          lines.push(`  • ${name}`);
         }
         lines.push(
           ``,
@@ -499,9 +526,9 @@ async function handleReminder1h(client, action) {
         );
       }
 
-      await sendWithMentions(client, groupId, lines.join("\n"), unpredicted);
+      await sendWithMentions(client, groupId, lines.join("\n"), unpredictedPalpiteiros);
 
-      for (const jid of unpredicted) allUnpredictedJids.add(jid);
+      for (const jid of unpredictedPalpiteiros) allUnpredictedJids.add(jid);
     } catch (e) {
       logger.warn(`[worldcupTick] reminder_1h → ${groupId}:`, e.message);
     }
