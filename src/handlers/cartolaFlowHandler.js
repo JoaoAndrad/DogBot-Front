@@ -44,25 +44,37 @@ function parseTeamInput(raw) {
  *   - https://cartola.globo.com/ligas/minha-liga  (formato alternativo)
  *   - d5uku6ak58ms73dfplg0  (só o slug)
  */
-function parseLeagueInput(raw) {
-  const s = raw.trim();
-  // /#!/[copa/]competicoes/{tipo}/{slug}  — aceita segmentos opcionais antes de "competicoes"
-  const mComp = s.match(
-    /cartola\.globo\.com\/(?:#!\/)?(?:[^/?&#\s/]+\/)*competicoes\/([^/?&#\s/]+)\/([^/?&#\s]+)/i,
-  );
+const RE_COMP = /cartola\.globo\.com\/(?:#!\/)?(?:[^/?&#\s/]+\/)*competicoes\/([^/?&#\s/]+)\/([^/?&#\s]+)/i;
+const RE_COPA_PREFIX = /cartola\.globo\.com\/(?:#!\/)?copa\/competicoes\//i;
+const RE_LIGA = /cartola\.globo\.com\/(?:#!\/)?(?:[^/?&#\s/]+\/)*ligas\/([^/?&#\s]+)/i;
+const RE_CARTOLA_URL = /https?:\/\/[^\s]+cartola\.globo\.com[^\s]*/gi;
+
+function _tryParseUrl(url) {
+  const mComp = url.match(RE_COMP);
   if (mComp) {
-    const isCopa = /cartola\.globo\.com\/(?:#!\/)?copa\/competicoes\//i.test(s);
+    const isCopa = RE_COPA_PREFIX.test(url);
     const tipo = isCopa ? `copa/${mComp[1].toLowerCase()}` : mComp[1].toLowerCase();
     return { slug: mComp[2].toLowerCase(), tipo };
   }
-  // /ligas/{slug}
-  const mLiga = s.match(/cartola\.globo\.com\/(?:#!\/)?(?:[^/?&#\s/]+\/)*ligas\/([^/?&#\s]+)/i);
+  const mLiga = url.match(RE_LIGA);
   if (mLiga) return { slug: mLiga[1].toLowerCase(), tipo: "liga" };
-  // texto puro — só aceita se for uma única palavra/slug (sem espaços ou quebras de linha)
+  return null;
+}
+
+function parseLeagueInput(raw) {
+  const s = raw.trim();
+
+  // 1. Tenta achar URL de competição/liga em qualquer ponto do texto
+  //    (cobre mensagens multi-linha com texto + URL, e múltiplos URLs)
+  const allUrls = [...s.matchAll(RE_CARTOLA_URL)].map((m) => m[0]);
+  for (const url of allUrls) {
+    const result = _tryParseUrl(url);
+    if (result) return result;
+  }
+
+  // 2. Texto puro sem URL — só aceita se for uma única palavra/slug
   if (/^[^\s]+$/.test(s)) return { slug: s.toLowerCase(), tipo: null };
-  // mensagem com texto + URL — tenta extrair a URL do corpo
-  const urlMatch = s.match(/https?:\/\/[^\s]+cartola[^\s]+/i);
-  if (urlMatch) return parseLeagueInput(urlMatch[0]);
+
   return { slug: "", tipo: null };
 }
 
@@ -119,7 +131,9 @@ async function handleCartolaLeagueFlow(stateKey, body, state, reply) {
   const parsed = parseLeagueInput(body);
   const { slug, tipo } = parsed;
   if (!slug || slug.length < 2) {
-    await reply("❌ Entrada inválida. Tente novamente.\n_(ou /cancelar para sair)_");
+    await reply(
+      "❌ Não consegui encontrar um link de liga válido.\n\nEnvie o link da sua liga no Cartola FC, por exemplo:\n_cartola.globo.com/#!/competicoes/pontoscorridos/*slug*_\n_(ou /cancelar para sair)_",
+    );
     return true;
   }
 
@@ -143,7 +157,7 @@ async function handleCartolaLeagueFlow(stateKey, body, state, reply) {
   } catch (e) {
     conversationState.clearState(stateKey);
     const msg = e.message?.includes("league_not_found")
-      ? `❌ Liga não encontrada para *${slug}*.\n\nVerifique a URL no Cartola FC e tente novamente:\n_cartola.globo.com/#!/competicoes/pontoscorridos/*slug*_`
+      ? `❌ Liga não encontrada.\n\nVerifique se o link está correto e tente novamente:\n_cartola.globo.com/#!/competicoes/pontoscorridos/*slug*_`
       : e.message?.includes("401")
         ? `🔒 Esta liga é privada e requer autenticação.\n\nO bot precisa de credenciais configuradas para acessá-la. Fale com o admin.`
         : `❌ Erro ao vincular liga. Tente novamente mais tarde.`;

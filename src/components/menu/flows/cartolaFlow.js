@@ -697,8 +697,16 @@ const cartolaFlow = createFlow("cartola", {
         for (let i = 0; i < Math.min(times.length, 10); i++) {
           const t = times[i];
           const nome = t.nome || t.time?.nome || `Time ${i + 1}`;
-          const pts =
-            t.pontos != null ? ` — *${formatPontuacao(t.pontos)} pts*` : "";
+          let pts = "";
+          if (t.pontos_cartola != null) {
+            // Copa: mostra pontos Cartola + V/E/D
+            const vitorias = t.vitorias ?? 0;
+            const empates = t.empates ?? 0;
+            const derrotas = t.derrotas ?? 0;
+            pts = ` — *${formatPontuacao(t.pontos_cartola)} pts* (${vitorias}V ${empates}E ${derrotas}D)`;
+          } else if (t.pontos != null) {
+            pts = ` — *${formatPontuacao(t.pontos)} pts*`;
+          }
           lines.push(`${medals[i] || `${i + 1}.`} ${nome}${pts}`);
         }
 
@@ -707,6 +715,10 @@ const cartolaFlow = createFlow("cartola", {
         if (e.message === "no_league_linked") {
           await ctx.reply(
             "🏆 Nenhuma liga vinculada a este grupo.\n\nUse ⚙️ *Configurações → Vincular liga* para adicionar.",
+          );
+        } else if (e.message === "copa_no_team") {
+          await ctx.reply(
+            "⚠️ Esta é uma liga da *Copa do Cartola*.\n\nO ranking Copa requer autenticação individual — ainda não é suportado automaticamente pelo bot.",
           );
         } else {
           logger.error("[cartolaFlow] getLeagueRanking:", e.message);
