@@ -62,18 +62,12 @@ async function _sendVersusSticker(client, chatId, svgUrlA, svgUrlB) {
       sharp(pngB).extract({ left: HALF, top: 0, width: HALF, height: SIZE }).png().toBuffer(),
     ]);
 
-    // Linha divisória branca no meio
-    const divider = await sharp({
-      create: { width: 4, height: SIZE, channels: 4, background: { r: 255, g: 255, b: 255, alpha: 200 } },
-    }).png().toBuffer();
-
     const combined = await sharp({
       create: { width: SIZE, height: SIZE, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } },
     })
       .composite([
-        { input: leftHalf,  left: 0,        top: 0 },
-        { input: rightHalf, left: HALF,      top: 0 },
-        { input: divider,   left: HALF - 2,  top: 0 },
+        { input: leftHalf,  left: 0,    top: 0 },
+        { input: rightHalf, left: HALF, top: 0 },
       ])
       .png()
       .toBuffer();
