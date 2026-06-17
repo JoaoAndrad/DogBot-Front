@@ -98,27 +98,17 @@ const cartolaFlow = createFlow("cartola", {
     dynamic: true,
     handler: async (ctx) => {
       const isGroup = String(ctx.chatId).endsWith("@g.us");
-      // Verifica se o grupo tem liga Copa para mostrar opção de vincular time Copa
-      let groupHasCopa = false;
-      if (isGroup) {
-        try {
-          const leagueData = await cartolaClient.getGroupLeague(ctx.chatId);
-          groupHasCopa = leagueData?.league?.tipo?.startsWith("copa/") || false;
-        } catch {}
-      }
       const options = [
         {
-          label: "🔗 Vincular time (Brasileirão)",
+          label: "🇧🇷 Vincular time (Brasileirão)",
           action: "exec",
           handler: "startTeamLink",
         },
-        ...(groupHasCopa
-          ? [{
-              label: "🏆 Vincular time (Copa)",
-              action: "exec",
-              handler: "startCopaTeamLink",
-            }]
-          : []),
+        {
+          label: "🏆 Vincular time (Copa)",
+          action: "exec",
+          handler: "startCopaTeamLink",
+        },
         ...(isGroup
           ? [
               {
