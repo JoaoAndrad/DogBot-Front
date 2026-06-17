@@ -80,6 +80,10 @@ async function createBolao(groupId, senderNumbers, { name, createdBy } = {}) {
   return backendClient.sendToBackend("/api/worldcup/bolao", { groupId, senderNumbers, name, createdBy }, "POST");
 }
 
+async function autoJoinBolao(senderNumber, groupIds) {
+  return backendClient.sendToBackend("/api/worldcup/bolao/auto-join", { senderNumber, groupIds }, "POST");
+}
+
 // ─── Internal tick ───────────────────────────────────────────────────────────
 
 async function setDmAlerts(userId, enabled) {
@@ -149,5 +153,6 @@ module.exports = {
   syncData,
   getBolao,
   createBolao,
+  autoJoinBolao,
   setDmAlerts,
 };

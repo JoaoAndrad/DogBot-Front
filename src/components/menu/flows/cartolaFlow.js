@@ -989,14 +989,14 @@ const cartolaFlow = createFlow("cartola", {
         if (pageIdx === 0 && claimedTeam) options.push(claimedTeam.name + CLAIMED_SUFFIX);
         options.push(...pageTeams.map((t) => t.name));
         if (hasMore) options.push("(Próxima página)");
-        options.push("(Enviar url ou id diretamente)");
+        options.push("(Não encontrei meu time)");
 
         const pageLabel = totalPages > 1 ? ` (${pageIdx + 1}/${totalPages})` : "";
 
         await polls.createPoll(
           client,
           chatId,
-          `🏆 Você é dono de algum desses times?${pageLabel}`,
+          `🏆 Você é dono de algum desses times? Se sim, selecione-o${pageLabel}`,
           options,
           {
             onVote: async ({ voter, selectedNames }) => {
@@ -1005,7 +1005,7 @@ const cartolaFlow = createFlow("cartola", {
               if (String(voter).split("@")[0] !== userId.split("@")[0]) return;
 
               if (chosen === "(Próxima página)") { await showPage(pageIdx + 1); return; }
-              if (chosen === "(Enviar url ou id diretamente)") { await goToUrlFlow(); return; }
+              if (chosen === "(Não encontrei meu time)") { await goToUrlFlow(); return; }
 
               // Time já reclamado selecionado
               if (chosen.endsWith(CLAIMED_SUFFIX) && claimedTeam) {

@@ -1,6 +1,7 @@
 const backendClient = require("../services/backendClient");
 const conversationState = require("../services/conversationState");
 const pollComponent = require("../components/poll");
+const worldcupClient = require("../services/worldcupClient");
 const logger = require("../utils/logger");
 
 /**
@@ -99,7 +100,7 @@ async function handleCadastroFlow(userId, body, state, reply, context) {
         ["✅ Sim, confirmar", "❌ Não, cancelar"],
         {
           onVote: async (voteData) => {
-            await handleCadastroVote(userId, voteData, reply);
+            await handleCadastroVote(userId, voteData, reply, context);
           },
         },
       );
@@ -144,7 +145,7 @@ async function handleCadastroFlow(userId, body, state, reply, context) {
 /**
  * Handle vote on cadastro confirmation poll
  */
-async function handleCadastroVote(userId, voteData, reply) {
+async function handleCadastroVote(userId, voteData, reply, context) {
   const state = conversationState.getState(userId);
 
   if (!state || state.flowType !== "cadastro" || state.step !== 1) {
@@ -181,6 +182,25 @@ async function handleCadastroVote(userId, voteData, reply) {
           userName: finalData.userName,
           backendResponse: res,
         });
+
+        // Silently auto-join bolões em grupos que o usuário já participa
+        try {
+          const client = context && context.client;
+          if (client) {
+            const chats = await client.getChats();
+            const groupIds = chats
+              .filter((c) => c.isGroup)
+              .map((c) => c.id._serialized || (c.id.user + "@g.us"));
+            if (groupIds.length) {
+              const senderNumber = String(finalData.identifier || userId).replace(/@.*$/, "");
+              worldcupClient.autoJoinBolao(senderNumber, groupIds).catch((e) => {
+                logger.debug("[cadastro] autoJoinBolao:", e.message);
+              });
+            }
+          }
+        } catch (e) {
+          logger.debug("[cadastro] autoJoinBolao setup:", e.message);
+        }
 
         return reply(
           `🎉 *Cadastro realizado com sucesso!*\n\n` +

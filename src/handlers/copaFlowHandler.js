@@ -3,7 +3,7 @@
 const conversationState = require("../services/conversationState");
 const worldcupClient = require("../services/worldcupClient");
 const polls = require("../components/poll");
-const { matchup, searchTeams, withFlag } = require("../utils/teamLocale");
+const { matchup, searchTeams, withFlag, localize } = require("../utils/teamLocale");
 const logger = require("../utils/logger");
 
 // Aceita: "2-1", "2 - 1", "2x1", "2 X 1", "2 a 1", "2a1", "2 1"
@@ -142,6 +142,9 @@ async function _submitPrediction(stateKey, data, reply) {
     const date = kickoff.toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo", day: "2-digit", month: "2-digit" });
     const time = kickoff.toLocaleTimeString("pt-BR", { timeZone: "America/Sao_Paulo", hour: "2-digit", minute: "2-digit" });
 
+    const homePt = localize(data.homeTeam).pt;
+    const awayPt = localize(data.awayTeam).pt;
+
     const lines = [
       "✅ *Palpite salvo!*", "",
       `⚽ ${matchup(data.homeTeam, data.awayTeam)}`,
@@ -154,6 +157,8 @@ async function _submitPrediction(stateKey, data, reply) {
       "Use */palpite* para fazer mais palpites ou editar este até o início do jogo.",
       "",
       "*Dica:* Para palpitar em outros jogos, basta clicar em outro confronto na enquete 🐶",
+      "",
+      `💡 *Atalho rápido:* */palpite ${homePt} ${data.predictedHome}x${data.predictedAway} ${awayPt}*`,
     );
     await reply(lines.join("\n"));
     logger.info(`[copa-palpite] palpite salvo: ${userId.split("@")[0]} — ${data.homeTeam} ${data.predictedHome}x${data.predictedAway} ${data.awayTeam}`);
