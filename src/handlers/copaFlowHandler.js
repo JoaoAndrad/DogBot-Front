@@ -149,7 +149,12 @@ async function _submitPrediction(stateKey, data, reply) {
       `📅 ${date} às ${time}`,
     ];
     if (data.venue) lines.push(`🏟 ${data.venue}`);
-    lines.push("", "Use */palpite* para fazer mais palpites ou editar este até o início do jogo.");
+    lines.push(
+      "",
+      "Use */palpite* para fazer mais palpites ou editar este até o início do jogo.",
+      "",
+      "*Dica:* Para palpitar em outros jogos, basta clicar em outro confronto na enquete 🐶",
+    );
     await reply(lines.join("\n"));
     logger.info(`[copa-palpite] palpite salvo: ${userId.split("@")[0]} — ${data.homeTeam} ${data.predictedHome}x${data.predictedAway} ${data.awayTeam}`);
   } catch (e) {
