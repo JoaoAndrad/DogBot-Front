@@ -684,6 +684,8 @@ const cartolaFlow = createFlow("cartola", {
         logger.warn("[cartolaFlow] getGroupLeague:", e.message);
       }
 
+      const medals = ["🥇", "🥈", "🥉"];
+
       if (isCopa) {
         try {
           const { liga } = await cartolaClient.getLeagueRanking(ctx.chatId);
@@ -718,7 +720,6 @@ const cartolaFlow = createFlow("cartola", {
           return { noRender: true };
         }
 
-        const medals = ["🥇", "🥈", "🥉"];
         const lines = ["📊 *Parcial do grupo*", ""];
 
         for (let i = 0; i < ranking.length; i++) {
