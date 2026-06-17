@@ -1142,6 +1142,24 @@ async function handle(context) {
     } catch (err) {
       logger.error("Erro ao enviar resposta:", err);
     }
+    return;
+  }
+
+  // Fallback para mensagens privadas sem comando reconhecido
+  if (!isGroup && body) {
+    try {
+      if (!dbUserId) {
+        await reply(
+          "Olá! 🐶 Ainda não te conheço por aqui.\n\nUse */cadastro* para se registrar ou */ajuda* para ver o que posso fazer.",
+        );
+      } else {
+        await reply(
+          "Não entendi a solicitação. 🐾\n\nUse */ajuda* para ver os comandos disponíveis.",
+        );
+      }
+    } catch (err) {
+      logger.debug("[fallback] erro ao enviar mensagem padrão:", err && err.message);
+    }
   }
 }
 
