@@ -31,11 +31,16 @@ async function _sendShieldSticker(client, chatId, svgUrl) {
  */
 function parseTeamInput(raw) {
   const s = raw.trim();
-  // URL do Cartola FC — captura o segmento após /time/
+  // Copa: cartola.globo.com/#!/copa/time/{id}
+  const mCopa = s.match(/cartola\.globo\.com\/(?:#!\/)?copa\/time\/(\d+)/i);
+  if (mCopa) return { id: mCopa[1], tipo: "copa" };
+  // Brasileirão: cartola.globo.com/#!/time/{id|slug}
   const m = s.match(/cartola\.globo\.com\/(?:#!\/)?time\/([^/?&#\s]+)/i);
-  if (m) return m[1];
-  // Slugs usam hífens — normaliza espaços
-  return s.toLowerCase().replace(/\s+/g, "-");
+  if (m) return { id: m[1], tipo: "brasileirao" };
+  // Só ID numérico — pode ser Copa ou Brasileirão (ambíguo, usa contexto)
+  if (/^\d+$/.test(s)) return { id: s, tipo: null };
+  // Slug — assume Brasileirão
+  return { id: s.toLowerCase().replace(/\s+/g, "-"), tipo: "brasileirao" };
 }
 
 /**
@@ -88,28 +93,36 @@ async function handleCartolaTeamFlow(stateKey, body, state, reply, opts = {}) {
     return false;
   }
 
-  const slug = parseTeamInput(body);
-  if (!slug || slug.length < 2) {
+  const parsed = parseTeamInput(body);
+  // tipo do contexto (Copa/Brasileirão) vem do state; URL pode sobrepor
+  const contextTipo = data.tipo || "brasileirao";
+  const tipo = parsed.tipo || contextTipo;
+  const id = parsed.id;
+  if (!id || id.length < 2) {
     await reply("❌ Entrada inválida. Tente novamente.\n_(ou /cancelar para sair)_");
     return true;
   }
 
   try {
     const userId = data.userId || stateKey;
-    const result = await cartolaClient.saveUserTeam(userId, slug);
+    const result = await cartolaClient.saveUserTeam(userId, id, tipo);
     conversationState.clearState(stateKey);
 
-    const nome = result.team_name || slug;
-    await reply(`✅ *Time vinculado!*\n\n⚽ *${nome}*\n\nUse */cartola → Meu time* para ver sua pontuação.`);
+    const nome = result.team_name || id;
+    const isCopa = tipo === "copa";
+    await reply(`✅ *Time ${isCopa ? "Copa " : ""}vinculado!*\n\n${isCopa ? "🏆" : "🇧🇷"} *${nome}*\n\nUse */cartola → Meu time* para ver sua pontuação.`);
     const { client, chatId } = opts;
     if (result.shield_url && client && chatId) {
       await _sendShieldSticker(client, chatId, result.shield_url);
     }
-    logger.info(`[cartola-team] ${stateKey.split("@")[0]} → ${slug}`);
+    logger.info(`[cartola-team] ${stateKey.split("@")[0]} → ${id} (${tipo})`);
   } catch (e) {
     conversationState.clearState(stateKey);
+    const hint = tipo === "copa"
+      ? `_cartola.globo.com/#!/copa/time/*50271939*_`
+      : `_cartola.globo.com/#!/time/*19513040*_`;
     const msg = e.message?.includes("team_not_found")
-      ? `❌ Time não encontrado para *${slug}*.\n\nTente com o ID numérico ou URL completa:\n_cartola.globo.com/#!/time/*19513040*_`
+      ? `❌ Time não encontrado.\n\nTente com o ID numérico ou URL completa:\n${hint}`
       : `❌ Erro ao vincular time. Tente novamente mais tarde.`;
     await reply(msg);
     logger.error("[cartola-team] saveUserTeam:", e.message);

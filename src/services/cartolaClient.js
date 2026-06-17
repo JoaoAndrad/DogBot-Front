@@ -10,16 +10,16 @@ async function getRodada() {
 
 // ─── Time do usuário ─────────────────────────────────────────────────────────
 
-async function getUserTeam(userId) {
-  return backendClient.sendToBackend(`/api/cartola/team/${encodeURIComponent(userId)}`, null, "GET");
+async function getUserTeam(userId, tipo = "brasileirao") {
+  return backendClient.sendToBackend(`/api/cartola/team/${encodeURIComponent(userId)}?tipo=${encodeURIComponent(tipo)}`, null, "GET");
 }
 
-async function saveUserTeam(userId, slug) {
-  return backendClient.sendToBackend("/api/cartola/team", { userId, slug }, "POST");
+async function saveUserTeam(userId, slug, tipo = "brasileirao") {
+  return backendClient.sendToBackend("/api/cartola/team", { userId, slug, tipo }, "POST");
 }
 
-async function getMyTeamData(userId) {
-  return backendClient.sendToBackend(`/api/cartola/team/${encodeURIComponent(userId)}/data`, null, "GET");
+async function getMyTeamData(userId, tipo = "brasileirao") {
+  return backendClient.sendToBackend(`/api/cartola/team/${encodeURIComponent(userId)}/data?tipo=${encodeURIComponent(tipo)}`, null, "GET");
 }
 
 // ─── Liga do grupo ────────────────────────────────────────────────────────────

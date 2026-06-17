@@ -98,12 +98,27 @@ const cartolaFlow = createFlow("cartola", {
     dynamic: true,
     handler: async (ctx) => {
       const isGroup = String(ctx.chatId).endsWith("@g.us");
+      // Verifica se o grupo tem liga Copa para mostrar opção de vincular time Copa
+      let groupHasCopa = false;
+      if (isGroup) {
+        try {
+          const leagueData = await cartolaClient.getGroupLeague(ctx.chatId);
+          groupHasCopa = leagueData?.league?.tipo?.startsWith("copa/") || false;
+        } catch {}
+      }
       const options = [
         {
-          label: "🔗 Vincular meu time",
+          label: "🔗 Vincular time (Brasileirão)",
           action: "exec",
           handler: "startTeamLink",
         },
+        ...(groupHasCopa
+          ? [{
+              label: "🏆 Vincular time (Copa)",
+              action: "exec",
+              handler: "startCopaTeamLink",
+            }]
+          : []),
         ...(isGroup
           ? [
               {
@@ -339,9 +354,19 @@ const cartolaFlow = createFlow("cartola", {
 
     // ── Meu time ─────────────────────────────────────────────────────────────
     showMyTeam: async (ctx) => {
+      // Detecta se o grupo tem liga Copa para mostrar time correto
+      const isGroup = String(ctx.chatId).endsWith("@g.us");
+      let tipo = "brasileirao";
+      if (isGroup) {
+        try {
+          const leagueData = await cartolaClient.getGroupLeague(ctx.chatId);
+          if (leagueData?.league?.tipo?.startsWith("copa/")) tipo = "copa";
+        } catch {}
+      }
+
       let saved;
       try {
-        const { team } = await cartolaClient.getUserTeam(ctx.userId);
+        const { team } = await cartolaClient.getUserTeam(ctx.userId, tipo);
         saved = team;
       } catch (e) {
         logger.error("[cartolaFlow] getUserTeam:", e.message);
@@ -350,25 +375,27 @@ const cartolaFlow = createFlow("cartola", {
       }
 
       if (!saved) {
+        const hint = tipo === "copa"
+          ? "⚙️ *Configurações → Vincular time (Copa)*\n\n_Você vai precisar do ID numérico do seu time Copa:\ncartola.globo.com/#!/copa/time/*123456*_"
+          : "⚙️ *Configurações → Vincular time (Brasileirão)*\n\n_Você vai precisar do ID numérico do seu time:\ncartola.globo.com/#!/time/*123456*_";
         await ctx.reply(
-          "⚽ *Meu time*\n\n" +
+          `${tipo === "copa" ? "🏆" : "🇧🇷"} *Meu time${tipo === "copa" ? " (Copa)" : ""}*\n\n` +
             "Você ainda não vinculou seu time.\n\n" +
-            "No privado, use ⚙️ *Configurações → Vincular meu time* para começar.\n\n" +
-            "_Você vai precisar do ID numérico do seu time — encontra na URL do Cartola:\n" +
-            "cartola.globo.com/#!/time/*123456*_",
+            `No privado, use ${hint}`,
         );
         return { noRender: true };
       }
 
       try {
-        const { data } = await cartolaClient.getMyTeamData(ctx.userId);
+        const { data } = await cartolaClient.getMyTeamData(ctx.userId, tipo);
         const time = data?.time || {};
         const atletas = data?.atletas || [];
         const capitaoId = data?.capitao_id;
         const pontosTotais = data?.pontos;
+        const isCopa = tipo === "copa";
 
         const lines = [
-          `🏠 *${time.nome || saved.team_name || saved.slug}*`,
+          `${isCopa ? "🏆" : "🏠"} *${time.nome || saved.team_name || saved.slug}*${isCopa ? " _(Copa)_" : ""}`,
           `👤 ${time.nome_cartola || "–"}`,
           "",
         ];
@@ -416,12 +443,12 @@ const cartolaFlow = createFlow("cartola", {
       } catch (e) {
         if (e.message === "team_not_found" || e.message === "no_team_saved") {
           await ctx.reply(
-            `⚽ *${saved.team_name || saved.slug}*\n\nTime não encontrado. Use ⚙️ Configurações para re-vincular.`,
+            `${tipo === "copa" ? "🏆" : "🇧🇷"} *${saved.team_name || saved.slug}*\n\nTime não encontrado. Use ⚙️ Configurações para re-vincular.`,
           );
         } else {
           logger.error("[cartolaFlow] getMyTeamData:", e.message);
           await ctx.reply(
-            `⚽ *${saved.team_name || saved.slug}*\n\n_Dados indisponíveis no momento._`,
+            `${tipo === "copa" ? "🏆" : "🇧🇷"} *${saved.team_name || saved.slug}*\n\n_Dados indisponíveis no momento._`,
           );
         }
       }
@@ -539,6 +566,29 @@ const cartolaFlow = createFlow("cartola", {
         return { noRender: true };
       }
 
+      // Copa: destaques = ranking da liga Copa (sem atletas individuais disponíveis)
+      try {
+        const leagueData = await cartolaClient.getGroupLeague(ctx.chatId);
+        if (leagueData?.league?.tipo?.startsWith("copa/")) {
+          const { liga } = await cartolaClient.getLeagueRanking(ctx.chatId);
+          const ranking = liga?.ranking || [];
+          if (!ranking.length) {
+            await ctx.reply("⭐ *Destaques Copa*\n\nSem dados de ranking disponíveis no momento.");
+            return { noRender: true };
+          }
+          const lines = [`⭐ *Destaques — ${liga?.nome || "Copa"}*`, ""];
+          for (let i = 0; i < Math.min(ranking.length, 5); i++) {
+            const r = ranking[i];
+            const vitorias = r.vitorias ?? 0;
+            const empates = r.empates ?? 0;
+            const derrotas = r.derrotas ?? 0;
+            lines.push(`${medals[i] || `${i + 1}.`} *${r.nome || r.time_id}* — ${formatPontuacao(r.pontos_cartola ?? r.pontos)} pts (${vitorias}V ${empates}E ${derrotas}D)`);
+          }
+          await ctx.reply(lines.join("\n"));
+          return { noRender: true };
+        }
+      } catch {}
+
       const SCOUT_ICON = {
         G: "⚽",
         A: "🎯",
@@ -634,6 +684,27 @@ const cartolaFlow = createFlow("cartola", {
         await ctx.reply("📊 A parcial do grupo só está disponível em grupos.");
         return { noRender: true };
       }
+
+      // Copa: parcial = ranking da liga Copa
+      try {
+        const leagueData = await cartolaClient.getGroupLeague(ctx.chatId);
+        if (leagueData?.league?.tipo?.startsWith("copa/")) {
+          const { liga } = await cartolaClient.getLeagueRanking(ctx.chatId);
+          const ranking = liga?.ranking || [];
+          if (!ranking.length) {
+            await ctx.reply("📊 *Parcial Copa*\n\nSem dados disponíveis no momento.");
+            return { noRender: true };
+          }
+          const lines = [`📊 *Parcial — ${liga?.nome || "Copa"}*`, ""];
+          for (let i = 0; i < ranking.length; i++) {
+            const r = ranking[i];
+            const pos = medals[i] || `${i + 1}.`;
+            lines.push(`${pos} ${r.nome || r.time_id} — *${formatPontuacao(r.pontos_cartola ?? r.pontos)} pts*`);
+          }
+          await ctx.reply(lines.join("\n"));
+          return { noRender: true };
+        }
+      } catch {}
 
       try {
         const { ranking } = await cartolaClient.getGroupParcial(ctx.chatId);
@@ -786,7 +857,7 @@ const cartolaFlow = createFlow("cartola", {
     startTeamLink: async (ctx) => {
       if (String(ctx.chatId).endsWith("@g.us")) {
         await ctx.reply(
-          "🔗 *Vincular meu time*\n\n" +
+          "🔗 *Vincular meu time (Brasileirão)*\n\n" +
             "A vinculação de time é feita apenas no privado.\n\n" +
             "Manda */cartola* pra mim no privado para configurar.",
         );
@@ -795,13 +866,38 @@ const cartolaFlow = createFlow("cartola", {
       conversationState.startFlow(ctx.userId, "cartola-team-input", {
         step: "await_slug",
         userId: ctx.userId,
+        tipo: "brasileirao",
       });
       await ctx.reply(
-        "🔗 *Vincular meu time*\n\n" +
+        "🔗 *Vincular meu time (Brasileirão)*\n\n" +
           "Me manda o número ou slug do seu time.\n\n" +
           "Você encontra na URL do Cartola FC:\n" +
           "_cartola.globo.com/#!/time/*123456*_ → manda o número\n" +
           "_cartola.globo.com/time/*meu-time*_ → manda o slug\n\n" +
+          "_(ou /cancelar para sair)_",
+      );
+      return { end: true };
+    },
+
+    startCopaTeamLink: async (ctx) => {
+      if (String(ctx.chatId).endsWith("@g.us")) {
+        await ctx.reply(
+          "🏆 *Vincular meu time (Copa)*\n\n" +
+            "A vinculação de time é feita apenas no privado.\n\n" +
+            "Manda */cartola* pra mim no privado para configurar.",
+        );
+        return { noRender: true };
+      }
+      conversationState.startFlow(ctx.userId, "cartola-team-input", {
+        step: "await_slug",
+        userId: ctx.userId,
+        tipo: "copa",
+      });
+      await ctx.reply(
+        "🏆 *Vincular meu time (Copa do Cartola)*\n\n" +
+          "Me manda o ID numérico do seu time Copa.\n\n" +
+          "Você encontra na URL:\n" +
+          "_cartola.globo.com/#!/copa/time/*50271939*_ → manda o número\n\n" +
           "_(ou /cancelar para sair)_",
       );
       return { end: true };
