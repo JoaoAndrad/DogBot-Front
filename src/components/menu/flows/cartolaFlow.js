@@ -428,20 +428,6 @@ const cartolaFlow = createFlow("cartola", {
 
     // ── Meu time ─────────────────────────────────────────────────────────────
     showMyTeam: async (ctx) => {
-      const isGroup = String(ctx.chatId).endsWith("@g.us");
-
-      // Em grupos: tipo determinado pela liga do grupo
-      if (isGroup) {
-        let tipo = "brasileirao";
-        try {
-          const leagueData = await cartolaClient.getGroupLeague(ctx.chatId);
-          if (leagueData?.league?.tipo?.startsWith("copa/")) tipo = "copa";
-        } catch {}
-        await _showMyTeamForTipo(ctx, tipo);
-        return { noRender: true };
-      }
-
-      // No privado: mostra todos os times vinculados (Copa + Brasileirão)
       let allTeams;
       try {
         const result = await cartolaClient.getAllUserTeams(ctx.userId);
@@ -460,7 +446,6 @@ const cartolaFlow = createFlow("cartola", {
         return { noRender: true };
       }
 
-      // Exibe cada time vinculado separadamente
       const tipoOrder = ["copa", "brasileirao"];
       const sorted = [...allTeams].sort(
         (a, b) => tipoOrder.indexOf(a.tipo) - tipoOrder.indexOf(b.tipo),
