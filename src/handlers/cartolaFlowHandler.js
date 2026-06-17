@@ -46,16 +46,20 @@ function parseTeamInput(raw) {
  */
 function parseLeagueInput(raw) {
   const s = raw.trim();
-  // /#!/competicoes/{tipo}/{slug}
+  // /#!/[copa/]competicoes/{tipo}/{slug}  — aceita segmentos opcionais antes de "competicoes"
   const mComp = s.match(
-    /cartola\.globo\.com\/(?:#!\/)?competicoes\/([^/?&#\s/]+)\/([^/?&#\s]+)/i,
+    /cartola\.globo\.com\/(?:#!\/)?(?:[^/?&#\s/]+\/)*competicoes\/([^/?&#\s/]+)\/([^/?&#\s]+)/i,
   );
   if (mComp) return { slug: mComp[2].toLowerCase(), tipo: mComp[1].toLowerCase() };
-  // /ligas/{slug} ou /#!/ligas/{slug}
-  const mLiga = s.match(/cartola\.globo\.com\/(?:#!\/)?ligas\/([^/?&#\s]+)/i);
+  // /ligas/{slug}
+  const mLiga = s.match(/cartola\.globo\.com\/(?:#!\/)?(?:[^/?&#\s/]+\/)*ligas\/([^/?&#\s]+)/i);
   if (mLiga) return { slug: mLiga[1].toLowerCase(), tipo: "liga" };
-  // texto puro — slug ou ID
-  return { slug: s.toLowerCase(), tipo: null };
+  // texto puro — só aceita se for uma única palavra/slug (sem espaços ou quebras de linha)
+  if (/^[^\s]+$/.test(s)) return { slug: s.toLowerCase(), tipo: null };
+  // mensagem com texto + URL — tenta extrair a URL do corpo
+  const urlMatch = s.match(/https?:\/\/[^\s]+cartola[^\s]+/i);
+  if (urlMatch) return parseLeagueInput(urlMatch[0]);
+  return { slug: "", tipo: null };
 }
 
 // ─── Vincular time ────────────────────────────────────────────────────────────
