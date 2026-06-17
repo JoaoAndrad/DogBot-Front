@@ -700,7 +700,7 @@ const cartolaFlow = createFlow("cartola", {
           }
           await ctx.reply(lines.join("\n"));
         } catch (e) {
-          logger.error("[cartolaFlow] showGroupParcial Copa:", e.message);
+          console.error("[cartolaFlow] showGroupParcial Copa:", e.message, e.status, e.body);
           await ctx.reply("❌ Erro ao buscar parcial da Copa. Tente novamente.");
         }
         return { noRender: true };
