@@ -10,7 +10,7 @@ function fmt(n) {
 }
 
 function buildScoutSummary(scout) {
-  const LABELS = { G: "⚽", A: "🎯", FT: "🥅", FD: "🧤", FF: "💨", DS: "🛡️", CA: "🟨", CV: "🟥" };
+  const LABELS = { G: "⚽", A: "🎯", FT: "🥅", FD: "🧤", FF: "💨", DS: "🛡️", CA: "🟨", CV: "🟥", GS: "🥅", PS: "⚡" };
   return Object.entries(scout || {})
     .filter(([, v]) => v > 0)
     .map(([k, v]) => `${LABELS[k] || k}×${v}`)
@@ -104,6 +104,70 @@ async function processOne(client, action) {
           lines.push("", `🔥 *Destaque:* ${topAtleta.apelido} — ${fmt(topAtleta.pontos_num)} pts (${topAtleta.owner})`);
         }
       }
+      await client.sendMessage(action.groupId, lines.join("\n"));
+      break;
+    }
+
+    case "capitao_em_campo": {
+      const prefix = copa ? "🏆 " : "";
+      const lines = [
+        `${prefix}⭐ *Capitão em campo!*`,
+        "",
+        `*${action.athlete.apelido}* entrou em campo`,
+        `Time de ${action.owner.displayName}`,
+      ];
+      await client.sendMessage(action.groupId, lines.join("\n"));
+      break;
+    }
+
+    case "artilheiro": {
+      const prefix = copa ? "🏆 " : "";
+      const { apelido, gols } = action.athlete;
+      const title = action.isHatTrick
+        ? `${prefix}🎩 *Hat-trick! — ${apelido}*`
+        : `${prefix}⚽ *Artilheiro da rodada — ${apelido}*`;
+      const golStr = gols === 1 ? "1 gol" : `${gols} gols`;
+      const lines = [title, "", `${golStr} marcados nesta rodada`];
+      await client.sendMessage(action.groupId, lines.join("\n"));
+      break;
+    }
+
+    case "quase_virada": {
+      const prefix = copa ? "🏆 Copa do Cartola\n" : "";
+      const diffStr = fmt(action.diff);
+      const lines = [
+        `${prefix}⚡ *Quase virada!*`,
+        "",
+        `*${action.lider.displayName}* lidera com *${fmt(action.lider.pontos)} pts*`,
+        `*${action.perseguidor.displayName}* está a apenas *${diffStr} pts* atrás`,
+      ];
+      await client.sendMessage(action.groupId, lines.join("\n"));
+      break;
+    }
+
+    case "time_completo": {
+      const prefix = copa ? "🏆 " : "";
+      const lines = [
+        `${prefix}✅ *Time completo em campo*`,
+        "",
+        `Todos os atletas de *${action.owner.displayName}* já jogaram nesta rodada`,
+        `_A pontuação de ${action.teamName || action.owner.displayName} está definida_`,
+      ];
+      await client.sendMessage(action.groupId, lines.join("\n"));
+      break;
+    }
+
+    case "atleta_nao_jogou": {
+      const prefix = copa ? "🏆 " : "";
+      const lista = (action.atletas || []).map((n) => `• ${n}`).join("\n");
+      const lines = [
+        `${prefix}🚨 *Atleta não jogou*`,
+        "",
+        `Time de *${action.owner.displayName}*:`,
+        lista,
+        "",
+        `_${action.atletas.length === 1 ? "Este atleta" : "Estes atletas"} não entraram em campo nesta rodada_`,
+      ];
       await client.sendMessage(action.groupId, lines.join("\n"));
       break;
     }

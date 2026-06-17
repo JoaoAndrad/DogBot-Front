@@ -74,6 +74,14 @@ async function getGroupParcial(groupId, tipo = "brasileirao") {
   return backendClient.sendToBackend(`/api/cartola/group/${encodeURIComponent(groupId)}/parcial${qs}`, null, "GET");
 }
 
+async function getCopaActiveGroups() {
+  return backendClient.sendToBackend("/api/cartola/copa-groups", null, "GET");
+}
+
+async function getCopaGroupTeams(groupId) {
+  return backendClient.sendToBackend(`/api/cartola/group/${encodeURIComponent(groupId)}/copa-teams`, null, "GET");
+}
+
 async function getGroupSettings(groupId) {
   return backendClient.sendToBackend(`/api/cartola/group/${encodeURIComponent(groupId)}/settings`, null, "GET");
 }
@@ -100,4 +108,6 @@ module.exports = {
   getGroupParcial,
   getGroupSettings,
   saveGroupSettings,
+  getCopaActiveGroups,
+  getCopaGroupTeams,
 };

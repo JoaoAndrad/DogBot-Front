@@ -27,6 +27,23 @@ async function _sendShieldSticker(client, chatId, svgUrl) {
 
 const POSICAO = { 1: "GOL", 2: "LAT", 3: "ZAG", 4: "MEI", 5: "ATA", 6: "TEC" };
 
+function fuzzyScore(teamName, query) {
+  const norm = (s) =>
+    String(s).toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").trim();
+  const t = norm(teamName);
+  const q = norm(query);
+  if (!q) return 0;
+  if (t === q) return 100;
+  const qWords = q.split(/\s+/).filter((w) => w.length > 2);
+  let score = 0;
+  if (t.includes(q)) score += 20;
+  for (const word of qWords) {
+    if (t.includes(word)) score += 5;
+    if (t.startsWith(word)) score += 2;
+  }
+  return score;
+}
+
 function formatPontuacao(pontos) {
   if (pontos == null) return "–";
   return Number(pontos).toFixed(2).replace(".", ",");
@@ -901,18 +918,108 @@ const cartolaFlow = createFlow("cartola", {
         );
         return { noRender: true };
       }
-      conversationState.startFlow(ctx.userId, "cartola-team-input", {
-        step: "await_slug",
-        userId: ctx.userId,
-        tipo: "copa",
-      });
-      await ctx.reply(
-        "🏆 *Vincular meu time (Copa do Cartola)*\n\n" +
-          "Me envie o URL do seu time na Copa ou o ID numérico.\n\n" +
-          "Você encontra no site do Cartola FC:\n" +
-          "_cartola.globo.com/#!/copa/time/*123456*_ → pode mandar só o número\n\n" +
-          "_(ou /cancelar para sair)_",
-      );
+
+      const userId = ctx.userId;
+      const chatId = ctx.chatId;
+      const client = ctx.client;
+
+      const goToUrlFlow = async () => {
+        conversationState.startFlow(userId, "cartola-team-input", {
+          step: "await_slug",
+          userId,
+          tipo: "copa",
+        });
+        await client.sendMessage(
+          chatId,
+          "🏆 *Vincular meu time (Copa do Cartola)*\n\n" +
+            "Me envie o URL do seu time na Copa ou o ID numérico.\n\n" +
+            "_cartola.globo.com/#!/copa/time/*123456*_ → pode mandar só o número\n\n" +
+            "_(ou /cancelar para sair)_",
+        );
+      };
+
+      // ── Busca grupos Copa com liga setada onde o usuário está ──────────────
+      let sortedTeams = [];
+      try {
+        const { groups = [] } = await cartolaClient.getCopaActiveGroups();
+        for (const g of groups) {
+          try {
+            const chat = await client.getChatById(g.groupId);
+            const isInGroup = (chat?.participants || []).some((p) => {
+              const pid = p.id?._serialized || String(p.id || "");
+              return pid === userId || pid.split("@")[0] === userId.split("@")[0];
+            });
+            if (!isInGroup) continue;
+            const { teams = [] } = await cartolaClient.getCopaGroupTeams(g.groupId);
+            if (!teams.length) continue;
+            const userName = ctx.message?.notifyName || ctx.message?.pushName || userId.split("@")[0];
+            sortedTeams = [...teams].sort(
+              (a, b) => fuzzyScore(b.name, userName) - fuzzyScore(a.name, userName),
+            );
+            break;
+          } catch {}
+        }
+      } catch {}
+
+      // ── Sem times disponíveis: vai direto ao URL/ID ────────────────────────
+      if (!sortedTeams.length) {
+        await goToUrlFlow();
+        return { end: true };
+      }
+
+      // ── Poll paginada ──────────────────────────────────────────────────────
+      const polls = require("../../../components/poll");
+      const TEAMS_PER_PAGE = 10;
+      const totalPages = Math.ceil(sortedTeams.length / TEAMS_PER_PAGE);
+
+      const showPage = async (pageIdx) => {
+        const start = pageIdx * TEAMS_PER_PAGE;
+        const pageTeams = sortedTeams.slice(start, start + TEAMS_PER_PAGE);
+        const hasMore = pageIdx + 1 < totalPages;
+        const options = pageTeams.map((t) => t.name);
+        if (hasMore) options.push("(Próxima página)");
+        options.push("(Enviar url ou id diretamente)");
+        const pageLabel = totalPages > 1 ? ` (${pageIdx + 1}/${totalPages})` : "";
+
+        await polls.createPoll(
+          client,
+          chatId,
+          `🏆 Você é dono de algum desses times?${pageLabel}`,
+          options,
+          {
+            onVote: async ({ voter, selectedNames }) => {
+              const chosen = selectedNames?.[0];
+              if (!chosen) return;
+              if (String(voter).split("@")[0] !== userId.split("@")[0]) return;
+
+              if (chosen === "(Próxima página)") {
+                await showPage(pageIdx + 1);
+                return;
+              }
+              if (chosen === "(Enviar url ou id diretamente)") {
+                await goToUrlFlow();
+                return;
+              }
+
+              const team = sortedTeams.find((t) => t.name === chosen);
+              if (!team) { await goToUrlFlow(); return; }
+
+              try {
+                await cartolaClient.saveUserTeam(userId, String(team.time_id), "copa");
+                await client.sendMessage(
+                  chatId,
+                  `🏆 *Time vinculado!*\n\n*${team.name}* foi adicionado ao seu perfil.`,
+                );
+              } catch (e) {
+                logger.error("[startCopaTeamLink] saveUserTeam:", e.message);
+                await goToUrlFlow();
+              }
+            },
+          },
+        );
+      };
+
+      await showPage(0);
       return { end: true };
     },
 
