@@ -29,6 +29,7 @@ async function processActions(client, actions) {
 
 async function processOne(client, action) {
   const medals = ["🥇", "🥈", "🥉"];
+  const copa = !!action.isCopa;
 
   switch (action.kind) {
     case "gol":
@@ -36,7 +37,10 @@ async function processOne(client, action) {
     case "finalizacao_trave":
     case "cartao_vermelho":
     case "cartao_amarelo": {
-      const lines = [`${action.label} — *${action.athlete.apelido}*`, ""];
+      const lines = [
+        `${copa ? "🏆 " : ""}${action.label} — *${action.athlete.apelido}*`,
+        "",
+      ];
       const impacto = action.impacto || [];
       if (impacto.length) {
         lines.push("Impacto no grupo:");
@@ -53,8 +57,9 @@ async function processOne(client, action) {
     }
 
     case "virada": {
+      const prefix = copa ? "🏆 Copa do Cartola\n" : "";
       const lines = [
-        "🔄 *Virada no grupo!*",
+        `${prefix}🔄 *Virada no grupo!*`,
         "",
         `*${action.novoLider.displayName}* assumiu a liderança com *${fmt(action.novoLider.pontos)} pts*`,
         `Passou ${action.anteriorLider.displayName} (${fmt(action.anteriorLider.pontos)} pts)`,
@@ -64,13 +69,16 @@ async function processOne(client, action) {
     }
 
     case "parcial": {
-      const lines = [`📊 *Parcial — Rodada ${action.rodada}*`, ""];
+      const title = copa
+        ? `🏆 *Parcial Copa — Rodada ${action.rodada}*`
+        : `📊 *Parcial — Rodada ${action.rodada}*`;
+      const lines = [title, ""];
       const ranking = action.ranking || [];
       for (let i = 0; i < ranking.length; i++) {
         const r = ranking[i];
         const pos = medals[i] || `${i + 1}.`;
         lines.push(`${pos} ${r.displayName} — *${fmt(r.pontos)} pts*`);
-        lines.push(`    🏠 ${r.teamName}`);
+        if (!copa) lines.push(`    🏠 ${r.teamName}`);
       }
       await client.sendMessage(action.groupId, lines.join("\n"));
       break;
@@ -78,13 +86,15 @@ async function processOne(client, action) {
 
     case "resultado_final": {
       const ranking = action.ranking || [];
-      const lines = [`🏁 *Resultado Final — Rodada ${action.rodada}*`, ""];
+      const title = copa
+        ? `🏆 *Resultado Final Copa — Rodada ${action.rodada}*`
+        : `🏁 *Resultado Final — Rodada ${action.rodada}*`;
+      const lines = [title, ""];
       for (let i = 0; i < ranking.length; i++) {
         const r = ranking[i];
         const pos = medals[i] || `${i + 1}.`;
         lines.push(`${pos} ${r.displayName} — *${fmt(r.pontos)} pts*`);
       }
-      // Highlight top scorer and most damaging player
       if (ranking.length) {
         const allAtletas = ranking.flatMap((r) =>
           (r.atletas || []).map((a) => ({ ...a, owner: r.displayName }))
