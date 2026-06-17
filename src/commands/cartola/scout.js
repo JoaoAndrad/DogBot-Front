@@ -178,14 +178,22 @@ module.exports = {
     const versus = isVersusMode(body);
 
     if (versus) {
-      // Determina os dois lados
+      // Determina os dois lados respeitando a ordem escrita no corpo
       let idA, idB;
       if (resolvedMentions.length >= 2) {
         [idA, idB] = resolvedMentions;
       } else if (resolvedMentions.length === 1) {
-        // um lado é a menção, o outro é "eu" (sender) — independente de qual ordem
-        idA = resolvedMentions[0];
-        idB = resolvedSender;
+        // Detecta se "eu" vem antes ou depois do separador (x/vs/versus/+)
+        const afterCmd = body.replace(/^[!/]\w+\s*/, "");
+        const vsMatch = afterCmd.match(/\b(x|vs|versus|\+)\b/i);
+        const euFirst = vsMatch ? /\beu\b/i.test(afterCmd.slice(0, vsMatch.index)) : false;
+        if (euFirst) {
+          idA = resolvedSender;
+          idB = resolvedMentions[0];
+        } else {
+          idA = resolvedMentions[0];
+          idB = resolvedSender;
+        }
       } else {
         await reply(`${icon} Use: */scout @alguém x eu* ou */scout @a vs @b*`);
         return;
