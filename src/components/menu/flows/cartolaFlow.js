@@ -680,6 +680,14 @@ const cartolaFlow = createFlow("cartola", {
         return { noRender: true };
       }
 
+      const leagueLink = await cartolaClient.getGroupLeague(groupId).catch(() => null);
+      if (!leagueLink?.league) {
+        await ctx.reply(
+          "🏆 Nenhuma liga vinculada a este grupo.\n\nVá em ⚙️ *Configurações → Vincular liga* e envie o link da sua liga no Cartola FC.",
+        );
+        return { noRender: true };
+      }
+
       try {
         const { slug, liga } = await cartolaClient.getLeagueRanking(groupId);
         const times = liga?.times || liga?.ranking || liga?.ligas_times || [];
