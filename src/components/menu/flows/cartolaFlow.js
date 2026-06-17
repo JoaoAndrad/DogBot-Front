@@ -385,7 +385,7 @@ const cartolaFlow = createFlow("cartola", {
         const isCopa = tipo === "copa";
 
         const lines = [
-          `${isCopa ? "🏆" : "🏠"} *${time.nome || saved.team_name || saved.slug}*${isCopa ? " _(Copa)_" : ""}`,
+          `${isCopa ? "🏆" : "🇧🇷"} *${time.nome || saved.team_name || saved.slug}*${isCopa ? " _(Copa)_" : ""}`,
           `👤 ${time.nome_cartola || "–"}`,
           "",
         ];
