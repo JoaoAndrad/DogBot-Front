@@ -104,9 +104,10 @@ function buildScoutLines(saved, data, capitaoId) {
   const atletas = data?.atletas || [];
   const nome = time.nome || saved?.team_name || saved?.slug || "?";
 
-  const comMovimento = atletas.filter(
-    (a) => Object.values(a.scout || {}).some((v) => v > 0) || (a.pontos_num ?? 0) !== 0,
-  );
+  const POS_ORDER = { 6: 0, 1: 1, 2: 2, 3: 3, 4: 4, 5: 5 };
+  const comMovimento = atletas
+    .filter((a) => Object.values(a.scout || {}).some((v) => v > 0) || (a.pontos_num ?? 0) !== 0)
+    .sort((a, b) => (POS_ORDER[a.posicao_id] ?? 99) - (POS_ORDER[b.posicao_id] ?? 99));
 
   const lines = [];
   if (!comMovimento.length) {
