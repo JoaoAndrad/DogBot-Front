@@ -16,6 +16,9 @@ const groupDisplayNameSync = require("../services/groupDisplayNameSync");
 
 /** Evita POST repetido: mesmo nome ~6h; sincroniza GroupChat.name no backend para admin UI. */
 const GROUP_DISPLAY_SYNC_TTL_MS = 6 * 60 * 60 * 1000;
+
+const FALLBACK_REPLY_TTL_MS = 30 * 1000;
+const fallbackReplyCache = new Map(); // identifier → lastSentAt
 const groupDisplaySyncCache = new Map();
 
 function maybeSyncGroupDisplayName(chatId, name) {
@@ -1147,18 +1150,23 @@ async function handle(context) {
 
   // Fallback para mensagens privadas sem comando reconhecido
   if (!isGroup && body) {
-    try {
-      if (!dbUserId) {
-        await reply(
-          "Olá! 🐶 Ainda não te conheço por aqui.\n\nUse */cadastro* para se registrar ou */ajuda* para ver o que posso fazer.",
-        );
-      } else {
-        await reply(
-          "Não entendi a solicitação. 🐾\n\nUse */ajuda* para ver os comandos disponíveis.",
-        );
+    const fallbackKey = String(actualNumber || from || "");
+    const lastSent = fallbackReplyCache.get(fallbackKey) || 0;
+    if (Date.now() - lastSent >= FALLBACK_REPLY_TTL_MS) {
+      fallbackReplyCache.set(fallbackKey, Date.now());
+      try {
+        if (!dbUserId) {
+          await reply(
+            "Olá! 🐶 Ainda não te conheço por aqui.\n\nUse */cadastro* para se registrar ou */ajuda* para ver o que posso fazer.",
+          );
+        } else {
+          await reply(
+            "Não entendi a solicitação. 🐾\n\nUse */ajuda* para ver os comandos disponíveis.",
+          );
+        }
+      } catch (err) {
+        logger.debug("[fallback] erro ao enviar mensagem padrão:", err && err.message);
       }
-    } catch (err) {
-      logger.debug("[fallback] erro ao enviar mensagem padrão:", err && err.message);
     }
   }
 }
