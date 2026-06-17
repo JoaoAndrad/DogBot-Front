@@ -37,6 +37,54 @@ async function _sendShieldSticker(client, chatId, svgUrl) {
   }
 }
 
+async function _sendVersusSticker(client, chatId, svgUrlA, svgUrlB) {
+  try {
+    const sharp = require("sharp");
+    const stickerHelper = require("../../utils/media/stickerHelper");
+    const SIZE = 512;
+    const HALF = SIZE / 2;
+
+    // Fetch e converte os dois SVGs para PNG quadrado
+    const [bufA, bufB] = await Promise.all([
+      fetch(svgUrlA, { timeout: 8000 }).then((r) => r.ok ? r.buffer() : null),
+      fetch(svgUrlB, { timeout: 8000 }).then((r) => r.ok ? r.buffer() : null),
+    ]);
+    if (!bufA || !bufB) return false;
+
+    const [pngA, pngB] = await Promise.all([
+      sharp(bufA).resize(SIZE, SIZE, { fit: "contain", background: { r: 0, g: 0, b: 0, alpha: 0 } }).png().toBuffer(),
+      sharp(bufB).resize(SIZE, SIZE, { fit: "contain", background: { r: 0, g: 0, b: 0, alpha: 0 } }).png().toBuffer(),
+    ]);
+
+    // Metade esquerda do A, metade direita do B
+    const [leftHalf, rightHalf] = await Promise.all([
+      sharp(pngA).extract({ left: 0, top: 0, width: HALF, height: SIZE }).png().toBuffer(),
+      sharp(pngB).extract({ left: HALF, top: 0, width: HALF, height: SIZE }).png().toBuffer(),
+    ]);
+
+    // Linha divisória branca no meio
+    const divider = await sharp({
+      create: { width: 4, height: SIZE, channels: 4, background: { r: 255, g: 255, b: 255, alpha: 200 } },
+    }).png().toBuffer();
+
+    const combined = await sharp({
+      create: { width: SIZE, height: SIZE, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } },
+    })
+      .composite([
+        { input: leftHalf,  left: 0,        top: 0 },
+        { input: rightHalf, left: HALF,      top: 0 },
+        { input: divider,   left: HALF - 2,  top: 0 },
+      ])
+      .png()
+      .toBuffer();
+
+    return await stickerHelper.sendBufferAsSticker(client, chatId, combined, { fullOnly: true });
+  } catch (e) {
+    logger.debug("[scout] versus sticker error:", e.message);
+    return false;
+  }
+}
+
 async function resolveId(client, rawId) {
   if (!rawId) return rawId;
   if (!String(rawId).includes("@lid")) return rawId;
@@ -196,6 +244,10 @@ module.exports = {
       ];
 
       await reply(lines.join("\n"));
+
+      if (sideA.svgUrl && sideB.svgUrl) {
+        await _sendVersusSticker(client, chatId, sideA.svgUrl, sideB.svgUrl);
+      }
       return;
     }
 
