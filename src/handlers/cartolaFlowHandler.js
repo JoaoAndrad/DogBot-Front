@@ -47,7 +47,7 @@ function parseTeamInput(raw) {
 const RE_COMP = /cartola\.globo\.com\/(?:#!\/)?(?:[^/?&#\s/]+\/)*competicoes\/([^/?&#\s/]+)\/([^/?&#\s]+)/i;
 const RE_COPA_PREFIX = /cartola\.globo\.com\/(?:#!\/)?copa\/competicoes\//i;
 const RE_LIGA = /cartola\.globo\.com\/(?:#!\/)?(?:[^/?&#\s/]+\/)*ligas\/([^/?&#\s]+)/i;
-const RE_CARTOLA_URL = /https?:\/\/[^\s]+cartola\.globo\.com[^\s]*/gi;
+const RE_CARTOLA_URL = /https?:\/\/[^\s]*cartola\.globo\.com[^\s]*/gi;
 
 function _tryParseUrl(url) {
   const mComp = url.match(RE_COMP);
