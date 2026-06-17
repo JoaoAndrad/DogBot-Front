@@ -250,9 +250,9 @@ function getGoalText({
   const name = scorer || null;
   const flag = withFlag(scoringTeam);
 
-  // Prefixo: com ou sem autor
-  const by = (text) => (name ? `*${name} ${text}` : `*${text}`);
-  const gol = (text) => (name ? `⚽ *${name} ${text}` : `⚽ *${text}`);
+  // Prefixo: com nome do marcador, ou com flag do time como fallback
+  const by = (text) => (name ? `*${name} ${text}` : `${flag} *${text}`);
+  const gol = (text) => (name ? `⚽ *${name} ${text}` : `${flag} *${text}`);
 
   // Priority order ─────────────────────────────────
 
@@ -702,19 +702,52 @@ async function handleMiss(client, action) {
   }
 }
 
-async function handleVarRevert(client, action) {
-  const { goal, groupIds } = action;
+async function handleGoalScorer(client, action) {
+  const { scorerName, assistName, goalDetail, minute, groupIds } = action;
   if (!groupIds || !groupIds.length) return;
 
-  const h = goal.homeScore ?? 0;
-  const a = goal.awayScore ?? 0;
-  const homeFlag = withFlag(goal.homeTeam);
-  const awayFlag = withFlag(goal.awayTeam);
-  const msg = `🚫 *VAR — Gol anulado*\n\n${homeFlag} *${goal.homeTeam}* ${h} x ${a} *${goal.awayTeam}* ${awayFlag}`;
+  const minuteTag = minute ? ` ${minute}'` : "";
+  const detailTag =
+    goalDetail === "Penalty" ? " *(pênalti)*" : goalDetail === "Own Goal" ? " *(gol contra)*" : "";
+  let msg = `⚽ *Marcou:* ${scorerName}${minuteTag}${detailTag}`;
+  if (assistName && !detailTag) msg += `\n🎯 *Assistência:* ${assistName}`;
 
   for (const groupId of groupIds) {
     try {
       await client.sendMessage(groupId, msg);
+    } catch (e) {
+      logger.warn(`[worldcupTick] goal_scorer → ${groupId}:`, e.message);
+    }
+  }
+}
+
+async function handleVarRevert(client, action) {
+  const { goal, predictions = [], groupIds } = action;
+  if (!groupIds || !groupIds.length) return;
+
+  const h = goal.homeScore ?? 0;
+  const a = goal.awayScore ?? 0;
+
+  for (const groupId of groupIds) {
+    try {
+      const memberJids = await getGroupMemberJids(client, groupId);
+      const groupPreds = filterForGroup(predictions, memberJids);
+
+      const { text: predBlock, mentionIds } = groupPreds.length
+        ? formatPredictionsBlockWithMentions(groupPreds, h, a, {
+            homeTeam: goal.homeTeam,
+            awayTeam: goal.awayTeam,
+          })
+        : { text: null, mentionIds: [] };
+
+      const lines = [
+        `🚫 *VAR — Gol anulado*`,
+        ``,
+        `*${withFlag(goal.homeTeam)} ${h} x ${a} ${withFlag(goal.awayTeam)}*`,
+      ];
+      if (predBlock) lines.push(predBlock);
+
+      await sendWithMentions(client, groupId, lines.join("\n"), mentionIds);
     } catch (e) {
       logger.warn(`[worldcupTick] var_revert → ${groupId}:`, e.message);
     }
@@ -932,6 +965,9 @@ async function processWorldCupTickPayload(client, payload) {
           break;
         case "miss":
           await handleMiss(client, action);
+          break;
+        case "goal_scorer":
+          await handleGoalScorer(client, action);
           break;
         case "var_revert":
           await handleVarRevert(client, action);
