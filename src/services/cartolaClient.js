@@ -65,8 +65,9 @@ async function getAuthLigas(userId) {
   return backendClient.sendToBackend(`/api/cartola/auth/ligas/${encodeURIComponent(userId)}`, null, "GET");
 }
 
-async function getGroupParcial(groupId) {
-  return backendClient.sendToBackend(`/api/cartola/group/${encodeURIComponent(groupId)}/parcial`, null, "GET");
+async function getGroupParcial(groupId, tipo = "brasileirao") {
+  const qs = tipo !== "brasileirao" ? `?tipo=${encodeURIComponent(tipo)}` : "";
+  return backendClient.sendToBackend(`/api/cartola/group/${encodeURIComponent(groupId)}/parcial${qs}`, null, "GET");
 }
 
 async function getGroupSettings(groupId) {

@@ -556,28 +556,15 @@ const cartolaFlow = createFlow("cartola", {
         return { noRender: true };
       }
 
-      // Copa: destaques = ranking da liga Copa (sem atletas individuais disponíveis)
+      const medals = ["🥇", "🥈", "🥉"];
+
+      let isCopa = false;
       try {
         const leagueData = await cartolaClient.getGroupLeague(ctx.chatId);
-        if (leagueData?.league?.tipo?.startsWith("copa/")) {
-          const { liga } = await cartolaClient.getLeagueRanking(ctx.chatId);
-          const ranking = liga?.ranking || [];
-          if (!ranking.length) {
-            await ctx.reply("⭐ *Destaques Copa*\n\nSem dados de ranking disponíveis no momento.");
-            return { noRender: true };
-          }
-          const lines = [`⭐ *Destaques — ${liga?.nome || "Copa"}*`, ""];
-          for (let i = 0; i < Math.min(ranking.length, 5); i++) {
-            const r = ranking[i];
-            const vitorias = r.vitorias ?? 0;
-            const empates = r.empates ?? 0;
-            const derrotas = r.derrotas ?? 0;
-            lines.push(`${medals[i] || `${i + 1}.`} *${r.nome || r.time_id}* — ${formatPontuacao(r.pontos_cartola ?? r.pontos)} pts (${vitorias}V ${empates}E ${derrotas}D)`);
-          }
-          await ctx.reply(lines.join("\n"));
-          return { noRender: true };
-        }
-      } catch {}
+        isCopa = leagueData?.league?.tipo?.startsWith("copa/") || false;
+      } catch (e) {
+        logger.warn("[cartolaFlow] showDestaques getGroupLeague:", e.message);
+      }
 
       const SCOUT_ICON = {
         G: "⚽",
@@ -592,21 +579,17 @@ const cartolaFlow = createFlow("cartola", {
         PP: "❌",
         GC: "🚫",
       };
-      const medals = ["🥇", "🥈", "🥉"];
 
       try {
-        const { ranking } = await cartolaClient.getGroupParcial(ctx.chatId);
+        const { ranking } = await cartolaClient.getGroupParcial(ctx.chatId, isCopa ? "copa" : "brasileirao");
 
         if (!ranking || !ranking.length) {
           await ctx.reply(
-            "⭐ *Destaques do grupo*\n\n" +
-              "Nenhum membro vinculou seu time ainda.\n\n" +
-              "Use ⚙️ *Configurações → Vincular meu time*.",
+            `⭐ *Destaques do grupo*\n\nNenhum membro vinculou seu time ${isCopa ? "da Copa" : ""} ainda.\n\nUse ⚙️ *Configurações → Vincular meu time*.`,
           );
           return { noRender: true };
         }
 
-        // Flatten todos os atletas com dono e pontos exibidos (capitão 2x)
         const allAtletas = ranking.flatMap((r) =>
           (r.atletas || []).map((a) => ({
             ...a,
@@ -623,12 +606,8 @@ const cartolaFlow = createFlow("cartola", {
           .sort((a, b) => b.pts_exibido - a.pts_exibido)
           .slice(0, 3);
 
-        const lines = [
-          "⭐ *Destaques do grupo*",
-          "",
-          "🏅 *Melhores atletas*",
-          "",
-        ];
+        const header = isCopa ? "🏆 *Destaques Copa do Cartola*" : "⭐ *Destaques do grupo*";
+        const lines = [header, "", "🏅 *Melhores atletas*", ""];
 
         if (topAtletas.length) {
           for (let i = 0; i < topAtletas.length; i++) {
