@@ -14,6 +14,7 @@ const SCOUT_LABEL = {
   DD: "🧤 Def.Difícil",  FC: "🦵 Falta",         V:  "✅ Vitória",
   CA: "🟨 Amarelo",      CV: "🟥 Vermelho",      I:  "🚑 Impedimento",
   PP: "❌ Pên.Perdido",  PC: "⚡ Pên.Comet.",    GC: "🚫 G.Contra",
+  GS: "🥅 G.Sofrido",   PS: "⚡ Pên.Sofrido",
 };
 
 function fmt(n) {

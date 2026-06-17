@@ -504,6 +504,8 @@ const cartolaFlow = createFlow("cartola", {
         PP: "❌ Pên.Perdido",
         PC: "⚡ Pên.Comet.",
         GC: "🚫 G.Contra",
+        GS: "🥅 G.Sofrido",
+        PS: "⚡ Pên.Sofrido",
       };
 
       try {
@@ -598,6 +600,8 @@ const cartolaFlow = createFlow("cartola", {
         CV: "🟥",
         PP: "❌",
         GC: "🚫",
+        GS: "🥅",
+        PS: "⚡",
       };
 
       try {
