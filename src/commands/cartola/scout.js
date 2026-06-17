@@ -72,9 +72,19 @@ module.exports = {
       }
     }
 
+    // Detecta tipo pela liga do grupo
+    let tipo = "brasileirao";
+    const isGroup = String(chatId).endsWith("@g.us");
+    if (isGroup) {
+      try {
+        const leagueData = await cartolaClient.getGroupLeague(chatId);
+        if (leagueData?.league?.tipo?.startsWith("copa/")) tipo = "copa";
+      } catch {}
+    }
+
     let saved;
     try {
-      const res = await cartolaClient.getUserTeam(targetId);
+      const res = await cartolaClient.getUserTeam(targetId, tipo);
       saved = res?.team;
     } catch (e) {
       logger.error("[scout] getUserTeam:", e.message);
@@ -83,24 +93,26 @@ module.exports = {
     }
 
     if (!saved) {
+      const label = tipo === "copa" ? "Copa do Cartola" : "Cartola FC";
       await reply(
         mentionedIds.length
-          ? "⚽ Esse usuário ainda não vinculou o time no Cartola FC."
-          : "⚽ Você ainda não vinculou seu time.\n\nUse */cartola → Configurações → Vincular meu time* no privado.",
+          ? `${tipo === "copa" ? "🏆" : "⚽"} Esse usuário ainda não vinculou o time no ${label}.`
+          : `${tipo === "copa" ? "🏆" : "⚽"} Você ainda não vinculou seu time no ${label}.\n\nUse */cartola → Configurações → Vincular meu time* no privado.`,
       );
       return;
     }
 
     let data;
     try {
-      const res = await cartolaClient.getMyTeamData(targetId);
+      const res = await cartolaClient.getMyTeamData(targetId, tipo);
       data = res?.data;
     } catch (e) {
+      const icon = tipo === "copa" ? "🏆" : "⚽";
       if (e.message?.includes("team_not_found") || e.message?.includes("no_team_saved")) {
-        await reply(`⚽ *${saved.team_name || saved.slug}*\n\nTime não encontrado na API do Cartola.`);
+        await reply(`${icon} *${saved.team_name || saved.slug}*\n\nTime não encontrado na API do Cartola.`);
       } else {
         logger.error("[scout] getMyTeamData:", e.message);
-        await reply(`⚽ *${saved.team_name || saved.slug}*\n\n_Dados indisponíveis no momento._`);
+        await reply(`${icon} *${saved.team_name || saved.slug}*\n\n_Dados indisponíveis no momento._`);
       }
       return;
     }
@@ -108,12 +120,13 @@ module.exports = {
     const time = data?.time || {};
     const atletas = data?.atletas || [];
     const capitaoId = data?.capitao_id;
+    const isCopa = tipo === "copa";
 
     const comMovimento = atletas.filter(
       (a) => Object.values(a.scout || {}).some((v) => v > 0) || (a.pontos_num ?? 0) !== 0,
     );
 
-    const lines = [`🔍 *Scouts — ${time.nome || saved.team_name || saved.slug}*`, ""];
+    const lines = [`🔍 *Scouts — ${time.nome || saved.team_name || saved.slug}*${isCopa ? " _(Copa)_" : ""}`, ""];
 
     if (!comMovimento.length) {
       lines.push("_Nenhum atleta pontuou ainda nesta rodada._");
