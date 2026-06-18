@@ -99,7 +99,8 @@ async function fetchTeamData(userId, tipo) {
   return { saved, data: dataRes?.data || null };
 }
 
-function buildScoutLines(saved, data, capitaoId) {
+function buildScoutLines(saved, data, capitaoId, isCopa = false) {
+  const capMult = isCopa ? 1.5 : 2;
   const time = data?.time || {};
   const atletas = data?.atletas || [];
   const nome = time.nome || saved?.team_name || saved?.slug || "?";
@@ -115,7 +116,7 @@ function buildScoutLines(saved, data, capitaoId) {
   } else {
     for (const a of comMovimento) {
       const isCap = a.atleta_id === capitaoId;
-      const pts = fmt(isCap ? (a.pontos_num ?? 0) * 2 : (a.pontos_num ?? 0));
+      const pts = fmt(isCap ? (a.pontos_num ?? 0) * capMult : (a.pontos_num ?? 0));
       const pos = POSICAO[a.posicao_id] || "?";
       const entries = Object.entries(a.scout || {}).filter(([, v]) => v > 0);
       const scoutStr = entries.length
@@ -222,8 +223,8 @@ module.exports = {
         return;
       }
 
-      const sideA = buildScoutLines(resA.saved, resA.data, resA.data?.capitao_id);
-      const sideB = buildScoutLines(resB.saved, resB.data, resB.data?.capitao_id);
+      const sideA = buildScoutLines(resA.saved, resA.data, resA.data?.capitao_id, tipo === "copa");
+      const sideB = buildScoutLines(resB.saved, resB.data, resB.data?.capitao_id, tipo === "copa");
 
       const totalA = resA.data?.pontos ?? 0;
       const totalB = resB.data?.pontos ?? 0;
@@ -306,7 +307,7 @@ module.exports = {
     } else {
       for (const a of comMovimento) {
         const isCap = a.atleta_id === capitaoId;
-        const pts = fmt(isCap ? (a.pontos_num ?? 0) * 2 : (a.pontos_num ?? 0));
+        const pts = fmt(isCap ? (a.pontos_num ?? 0) * (isCopa ? 1.5 : 2) : (a.pontos_num ?? 0));
         const pos = POSICAO[a.posicao_id] || "?";
         lines.push("");
         lines.push(`*[${pos}] ${a.apelido || a.nome}${isCap ? " ⭐" : ""}* — ${pts} pts`);
