@@ -1,7 +1,7 @@
 const express = require("express");
 const logger = require("../utils/logger");
 const bootLog = require("../lib/bootLog");
-const { loadIgnoredChats, addToIgnoredChats } = require("../utils/bot/chatCleaner");
+const { loadIgnoredChats, addToIgnoredChats, removeFromIgnoredChats } = require("../utils/bot/chatCleaner");
 
 let server = null;
 
@@ -367,6 +367,22 @@ function createApp(client) {
     } catch (err) {
       const errMsg = err && (err.message || String(err));
       logger.error("[internal/bot-groups/ignore]", errMsg);
+      res.status(500).json({ ok: false, error: errMsg });
+    }
+  });
+
+  router.post("/internal/bot-groups/unignore", async (req, res) => {
+    const chatId = String((req.body || {}).chatId || "").trim();
+    if (!chatId) {
+      return res.status(400).json({ ok: false, error: "invalid_chatId" });
+    }
+    try {
+      removeFromIgnoredChats(chatId);
+      await syncCompanionChatsAfterGroupAction(client);
+      res.json({ ok: true });
+    } catch (err) {
+      const errMsg = err && (err.message || String(err));
+      logger.error("[internal/bot-groups/unignore]", errMsg);
       res.status(500).json({ ok: false, error: errMsg });
     }
   });
