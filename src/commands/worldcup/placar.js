@@ -68,10 +68,11 @@ module.exports = {
             entry.displayName ||
             (entry.senderNumber ? entry.senderNumber.split("@")[0] : "?");
           const pts = entry.bolaoPoints === 1 ? "pt" : "pts";
-          lines.push(`${medal} ${name} — *${entry.bolaoPoints} ${pts}*`);
+          const count = entry.predictionsScored || 0;
+          lines.push(`${medal} ${name} — *${entry.bolaoPoints} ${pts}* (${count})`);
         }
 
-        lines.push("", "_Pontuação contada a partir da criação do bolão_");
+        lines.push("", "_Pontuação desde a criação do bolão_");
 
         // Ranking geral do grupo (pontuação total, todos os participantes)
         try {
@@ -94,7 +95,8 @@ module.exports = {
                 entry.displayName ||
                 (entry.senderNumber ? entry.senderNumber.split("@")[0] : "?");
               const pts = entry.totalPoints === 1 ? "pt" : "pts";
-              lines.push(`${medal} ${name} — *${entry.totalPoints} ${pts}*`);
+              const count = entry.predictionsScored || 0;
+              lines.push(`${medal} ${name} — *${entry.totalPoints} ${pts}* (${count})`);
             }
           }
         } catch (_) {}

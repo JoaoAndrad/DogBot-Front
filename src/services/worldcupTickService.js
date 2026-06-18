@@ -924,8 +924,9 @@ async function handleResultNotification(client, action) {
               e.displayName ||
               (e.senderNumber ? e.senderNumber.split("@")[0] : "?");
             const pts = e.bolaoPoints === 1 ? "pt" : "pts";
+            const count = e.predictionsScored || 0;
             rankingLines.push(
-              `${medals[i] || `${i + 1}.`} ${name} — *${e.bolaoPoints} ${pts}*`,
+              `${medals[i] || `${i + 1}.`} ${name} — *${e.bolaoPoints} ${pts}* (${count})`,
             );
           }
           rankingLines.push("", "_Pontuação desde a criação do bolão_");
@@ -949,8 +950,9 @@ async function handleResultNotification(client, action) {
                   e.displayName ||
                   (e.senderNumber ? e.senderNumber.split("@")[0] : "?");
                 const pts = e.totalPoints === 1 ? "pt" : "pts";
+                const count = e.predictionsScored || 0;
                 rankingLines.push(
-                  `${medals[i] || `${i + 1}.`} ${name} — *${e.totalPoints} ${pts}*`,
+                  `${medals[i] || `${i + 1}.`} ${name} — *${e.totalPoints} ${pts}* (${count})`,
                 );
               }
             }
@@ -968,8 +970,9 @@ async function handleResultNotification(client, action) {
                 e.displayName ||
                 (e.senderNumber ? e.senderNumber.split("@")[0] : "?");
               const pts = e.totalPoints === 1 ? "pt" : "pts";
+              const count = e.predictionsScored || 0;
               rankingLines.push(
-                `${medals[i] || `${i + 1}.`} ${name} — *${e.totalPoints} ${pts}*`,
+                `${medals[i] || `${i + 1}.`} ${name} — *${e.totalPoints} ${pts}* (${count})`,
               );
             }
           }
