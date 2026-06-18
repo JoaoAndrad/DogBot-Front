@@ -949,10 +949,10 @@ async function handle(context) {
           (policyForCmd.vipOnly || policyForCmd.adminOnly) &&
           lookupResult &&
           lookupResult.found &&
-          (
-            (policyForCmd.vipOnly && typeof lookupResult.confessions_vip !== "boolean") ||
-            (policyForCmd.adminOnly && typeof lookupResult.isAdmin !== "boolean")
-          ) &&
+          ((policyForCmd.vipOnly &&
+            typeof lookupResult.confessions_vip !== "boolean") ||
+            (policyForCmd.adminOnly &&
+              typeof lookupResult.isAdmin !== "boolean")) &&
           commandLookupIdentifier
         ) {
           try {
@@ -1027,13 +1027,24 @@ async function handle(context) {
       }
     }
 
-    // Group feature flag check (silently block disabled features per group)
+    // Group feature flag check
     if (from && String(from).endsWith("@g.us") && cmd.commandType) {
       try {
-        const allowed = await groupFeatureFlagClient.isCommandTypeAllowed(from, cmd.commandType);
-        if (!allowed) return;
+        const allowed = await groupFeatureFlagClient.isCommandTypeAllowed(
+          from,
+          cmd.commandType,
+        );
+        if (!allowed) {
+          await reply(
+            "Este comando foi desativado para este grupo. Contate o administrador.",
+          );
+          return;
+        }
       } catch (e) {
-        logger.debug("[groupFeatureFlag] erro ao verificar flag:", e && e.message);
+        logger.debug(
+          "[groupFeatureFlag] erro ao verificar flag:",
+          e && e.message,
+        );
       }
     }
 
