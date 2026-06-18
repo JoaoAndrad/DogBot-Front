@@ -979,6 +979,7 @@ async function handleResultNotification(client, action) {
         }
 
         if (rankingLines) {
+          rankingLines.push("", "_Colocação - Nome - Pontuação - Palpites_");
           const rankMsg = await client.sendMessage(
             groupId,
             rankingLines.join("\n"),

@@ -101,6 +101,7 @@ module.exports = {
           }
         } catch (_) {}
 
+        lines.push("", "_Colocação - Nome - Pontuação - Palpites_");
         await client.sendMessage(chatId, lines.join("\n"));
         return;
       }
@@ -137,6 +138,7 @@ module.exports = {
         );
       }
 
+      lines.push("", "_Colocação - Nome - Pontuação - Palpites_");
       await client.sendMessage(chatId, lines.join("\n"));
     } catch (e) {
       logger.error("[placar]", e.message);
