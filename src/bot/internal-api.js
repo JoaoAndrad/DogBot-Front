@@ -251,6 +251,10 @@ function createApp(client) {
     try {
       const ignored = loadIgnoredChats();
       const chats = await client.getChats();
+      const botId =
+        (client.info && client.info.wid && client.info.wid._serialized) ||
+        (client.info && client.info.me && client.info.me._serialized) ||
+        null;
       const groups = [];
       for (const chat of chats) {
         try {
@@ -266,9 +270,12 @@ function createApp(client) {
           }
           let participantsCount = 0;
           try {
-            participantsCount = Array.isArray(chat.participants)
-              ? chat.participants.length
-              : 0;
+            if (Array.isArray(chat.participants)) {
+              const members = chat.participants.filter(
+                (p) => !botId || (p && p.id && p.id._serialized) !== botId,
+              );
+              participantsCount = members.length;
+            }
           } catch (_) {
             /* ignore */
           }
@@ -289,6 +296,35 @@ function createApp(client) {
     } catch (err) {
       const errMsg = err && (err.stack || err.message || String(err));
       logger.error("[internal/bot-groups] GET failed", errMsg);
+      res.status(500).json({ ok: false, error: errMsg });
+    }
+  });
+
+  router.get("/internal/bot-groups/:chatId/participants", async (req, res) => {
+    const { chatId } = req.params;
+    if (!chatId || !String(chatId).endsWith("@g.us")) {
+      return res.status(400).json({ ok: false, error: "invalid_chatId" });
+    }
+    try {
+      const botId =
+        (client.info && client.info.wid && client.info.wid._serialized) ||
+        (client.info && client.info.me && client.info.me._serialized) ||
+        null;
+      const chat = await client.getChatById(chatId);
+      if (!chat || !chat.isGroup) {
+        return res.status(404).json({ ok: false, error: "group_not_found" });
+      }
+      const participants = (chat.participants || [])
+        .filter((p) => !botId || (p && p.id && p.id._serialized) !== botId)
+        .map((p) => ({
+          jid: p.id && p.id._serialized,
+          pushName: p.pushname || null,
+          isAdmin: !!(p.isAdmin || p.isSuperAdmin),
+        }));
+      res.json({ ok: true, chatId, participants });
+    } catch (err) {
+      const errMsg = err && (err.message || String(err));
+      logger.error("[internal/bot-groups/participants]", errMsg);
       res.status(500).json({ ok: false, error: errMsg });
     }
   });
