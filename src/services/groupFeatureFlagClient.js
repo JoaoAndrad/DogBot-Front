@@ -1,7 +1,7 @@
 const backendClient = require("./backendClient");
 const logger = require("../utils/logger");
 
-const TTL_MS = 60 * 1000;
+const TTL_MS = 15 * 1000;
 const _cache = new Map(); // chatId -> { flags, ts }
 
 const COMMAND_TYPE_TO_FEATURE = {
