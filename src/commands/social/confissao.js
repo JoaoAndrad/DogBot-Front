@@ -1,4 +1,5 @@
 const jsonStore = require("../../storage/jsonStore");
+const groupFeatureFlagClient = require("../../services/groupFeatureFlagClient");
 
 /** Plural correcto em português: 1 confissão, 0/2+ confissões */
 function pluralConfissao(count) {
@@ -397,6 +398,11 @@ module.exports = {
         }
 
         if (memberIds.includes(senderNumber)) {
+          let confissaoOk = true;
+          try {
+            confissaoOk = await groupFeatureFlagClient.isCommandTypeAllowed(chatId, "social");
+          } catch (_) {}
+          if (!confissaoOk) continue;
           // Get readable name from fresh data
           const name = (full && full.name) || chatId.split("@")[0];
           candidateGroups.push({ id: chatId, name });
