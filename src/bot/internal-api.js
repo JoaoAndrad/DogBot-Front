@@ -269,12 +269,16 @@ function createApp(client) {
             name = String(chat.groupMetadata.subject).trim() || null;
           }
           let participantsCount = 0;
+          let participantJids = [];
           try {
             if (Array.isArray(chat.participants)) {
               const members = chat.participants.filter(
                 (p) => !botId || (p && p.id && p.id._serialized) !== botId,
               );
               participantsCount = members.length;
+              participantJids = members
+                .map((p) => p && p.id && p.id._serialized)
+                .filter(Boolean);
             }
           } catch (_) {
             /* ignore */
@@ -283,6 +287,7 @@ function createApp(client) {
             chatId,
             name,
             participantsCount,
+            participantJids,
             ignored: ignored.has(chatId),
           });
         } catch (e) {
