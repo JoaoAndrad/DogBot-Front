@@ -103,7 +103,7 @@ async function _showMyTeamForTipo(ctx, tipo) {
         const isCap = a.atleta_id === capitaoId;
         const pos = POSICAO[a.posicao_id] || "?";
         const rawPts = a.pontos_num;
-        const pts = rawPts != null ? ` — ${formatPontuacao(isCap ? rawPts * 2 : rawPts)} pts` : "";
+        const pts = rawPts != null ? ` — ${formatPontuacao(isCap ? rawPts * 1.5 : rawPts)} pts` : "";
         const capMark = isCap ? " ⭐" : "";
         lines.push(`• [${pos}] ${a.apelido || a.nome}${capMark}${pts}`);
       }
@@ -299,6 +299,11 @@ const cartolaFlow = createFlow("cartola", {
           label: `${on(s.notify_resultado)} Resultado final`,
           action: "exec",
           handler: "toggleNotResultado",
+        },
+        {
+          label: `${on(s.notify_lembrete_mercado)} Lembrete de fechamento do mercado`,
+          action: "exec",
+          handler: "toggleNotLembreteMercado",
         },
         { label: "🔙 Voltar", action: "back" },
       ];
@@ -921,28 +926,58 @@ const cartolaFlow = createFlow("cartola", {
           formatMercadoStatus(rodada),
         ];
 
+        let fechamentoMs = null;
         if (rodada.fechamentoMercado) {
           let dtInput = rodada.fechamentoMercado;
-          // "2024-11-01 12:00:00" → "2024-11-01T12:00:00" para o construtor Date()
-          if (
-            typeof dtInput === "string" &&
-            /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}/.test(dtInput)
-          ) {
+          if (typeof dtInput === "string" && /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}/.test(dtInput)) {
             dtInput = dtInput.replace(" ", "T");
           }
           const dt = new Date(typeof dtInput === "number" ? dtInput : dtInput);
           if (!isNaN(dt.getTime())) {
-            const dateFmt = dt.toLocaleDateString("pt-BR", {
-              timeZone: "America/Sao_Paulo",
-              day: "2-digit",
-              month: "2-digit",
-            });
-            const timeFmt = dt.toLocaleTimeString("pt-BR", {
-              timeZone: "America/Sao_Paulo",
-              hour: "2-digit",
-              minute: "2-digit",
-            });
-            lines.push(`⏰ Fechamento: ${dateFmt} às ${timeFmt}`);
+            fechamentoMs = dt.getTime();
+            const dateFmt = dt.toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo", day: "2-digit", month: "2-digit" });
+            const timeFmt = dt.toLocaleTimeString("pt-BR", { timeZone: "America/Sao_Paulo", hour: "2-digit", minute: "2-digit" });
+            const diffMs = dt.getTime() - Date.now();
+            if (diffMs > 0) {
+              const totalMin = Math.floor(diffMs / 60000);
+              const h = Math.floor(totalMin / 60);
+              const m = totalMin % 60;
+              const restante = h > 0 ? `${h}h ${m}min` : `${m}min`;
+              lines.push(`⏰ Fechamento: ${dateFmt} às ${timeFmt} (falta ${restante})`);
+            } else {
+              lines.push(`⏰ Fechamento: ${dateFmt} às ${timeFmt} — mercado fechado`);
+            }
+          }
+        }
+
+        // Quem não escalou — somente se grupo, mercado aberto e participantes disponíveis
+        if (isGroup && rodada.mercadoAberto && fechamentoMs && fechamentoMs > Date.now()) {
+          try {
+            const chat = await ctx.client.getChatById(ctx.chatId);
+            const botId = ctx.client?.info?.wid?._serialized || null;
+            const participantNumbers = (chat?.participants || [])
+              .map((p) => p.id && p.id._serialized)
+              .filter((jid) => jid && jid !== botId)
+              .map((jid) => jid.replace(/@(c\.us|s\.whatsapp\.net|g\.us|lid)$/i, ""));
+
+            if (participantNumbers.length) {
+              const { naoEscalados = [], incompletos = [] } =
+                await cartolaClient.getNaoEscalados(ctx.chatId, tipo, participantNumbers);
+
+              if (naoEscalados.length || incompletos.length) {
+                lines.push("", "⚠️ *Ainda sem time escalado:*");
+                for (const u of naoEscalados) {
+                  lines.push(`  • ${u.displayName}${u.teamName ? ` (${u.teamName})` : ""} — não escalou`);
+                }
+                for (const u of incompletos) {
+                  lines.push(`  • ${u.displayName}${u.teamName ? ` (${u.teamName})` : ""} — ${u.atletasCount}/12 atletas`);
+                }
+              } else {
+                lines.push("", "✅ Todos escalaram o time completo!");
+              }
+            }
+          } catch (e) {
+            logger.warn("[cartolaFlow] showRodada escalação:", e.message);
           }
         }
 
@@ -1322,6 +1357,24 @@ const cartolaFlow = createFlow("cartola", {
         newVal
           ? "✅ Notificação de *resultado final* ligada."
           : "⬜ Notificação de *resultado final* desligada.",
+      );
+      return { noRender: true };
+    },
+
+    toggleNotLembreteMercado: async (ctx) => {
+      let s = {};
+      try {
+        const r = await cartolaClient.getGroupSettings(ctx.chatId);
+        s = r?.settings || r || {};
+      } catch (e) {
+        /* ignore */
+      }
+      const newVal = s.notify_lembrete_mercado === false ? true : false;
+      await cartolaClient.saveGroupSettings(ctx.chatId, { notify_lembrete_mercado: newVal });
+      await ctx.reply(
+        newVal
+          ? "✅ Lembrete de *fechamento do mercado* ligado."
+          : "⬜ Lembrete de *fechamento do mercado* desligado.",
       );
       return { noRender: true };
     },

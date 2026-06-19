@@ -87,6 +87,14 @@ async function getGroupJogandoAgora(groupId) {
   return backendClient.sendToBackend(`/api/cartola/group/${encodeURIComponent(groupId)}/jogando`, null, "GET");
 }
 
+async function getNaoEscalados(groupId, tipo, participantNumbers) {
+  return backendClient.sendToBackend(
+    `/api/cartola/group/${encodeURIComponent(groupId)}/nao-escalados`,
+    { tipo, participantNumbers },
+    "POST",
+  );
+}
+
 async function getGroupSettings(groupId) {
   return backendClient.sendToBackend(`/api/cartola/group/${encodeURIComponent(groupId)}/settings`, null, "GET");
 }
@@ -116,4 +124,5 @@ module.exports = {
   getCopaActiveGroups,
   getCopaGroupTeams,
   getGroupJogandoAgora,
+  getNaoEscalados,
 };

@@ -18,12 +18,89 @@ function buildScoutSummary(scout) {
     .join(" ");
 }
 
+async function getGroupMemberJids(client, groupId) {
+  try {
+    const chat = await client.getChatById(groupId);
+    if (!chat || !chat.isGroup) return null;
+    return new Set((chat.participants || []).map((p) => p.id._serialized));
+  } catch {
+    return null;
+  }
+}
+
+async function sendWithMentions(client, chatId, body, mentionJids) {
+  const jids = (mentionJids || []).filter(Boolean);
+  if (!jids.length) return client.sendMessage(chatId, body);
+  const contacts = await Promise.all(
+    jids.map((jid) => client.getContactById(jid).catch(() => null)),
+  );
+  const valid = contacts.filter(Boolean);
+  if (valid.length) {
+    try {
+      return await client.sendMessage(chatId, body, { mentions: valid });
+    } catch (e) {
+      logger.warn("[cartolaBroadcast] mentions fallback:", e.message);
+    }
+  }
+  return client.sendMessage(chatId, body);
+}
+
+async function handleLembreteMercado(client, action) {
+  const { tipo, groupIds, naoEscalados, fechamentoMs } = action;
+  const copa = tipo === "copa";
+  const prefix = copa ? "🏆 Copa do Cartola\n" : "";
+
+  const closeDate = new Date(fechamentoMs);
+  const closeHHMM = closeDate.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", timeZone: "America/Sao_Paulo" });
+  const closeDDMM = closeDate.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", timeZone: "America/Sao_Paulo" });
+
+  for (const groupId of groupIds) {
+    try {
+      const memberJids = await getGroupMemberJids(client, groupId);
+
+      const membersNaoEscalados = naoEscalados.filter((u) => {
+        if (!memberJids) return true;
+        if (!u.senderNumber) return false;
+        return memberJids.has(`${u.senderNumber}@c.us`);
+      });
+
+      if (!membersNaoEscalados.length) continue;
+
+      const mentionJids = membersNaoEscalados
+        .filter((u) => u.senderNumber)
+        .map((u) => `${u.senderNumber}@c.us`);
+
+      const lines = [
+        `${prefix}⏰ *Mercado fecha em 1 hora!*`,
+        `📅 Fechamento: ${closeHHMM} de ${closeDDMM}`,
+        ``,
+        `Ainda não escalaram o time completo:`,
+      ];
+      for (const u of membersNaoEscalados) {
+        const num = u.senderNumber || null;
+        const atletasStr = u.atletasCount > 0 ? ` (${u.atletasCount}/12)` : "";
+        if (num) {
+          lines.push(`  • @${num}${atletasStr}`);
+        } else {
+          lines.push(`  • ${u.displayName || u.teamName || "?"}${atletasStr}`);
+        }
+      }
+      lines.push(``, `Corra para escalar! ⚽`);
+
+      await sendWithMentions(client, groupId, lines.join("\n"), mentionJids);
+    } catch (e) {
+      logger.warn(`[cartolaBroadcast] lembrete_mercado → ${groupId}:`, e.message);
+    }
+  }
+}
+
 async function processActions(client, actions) {
   const list = actions || [];
 
   // Agrupa time_completo e atleta_nao_jogou do mesmo groupId numa única mensagem
   const groupedCompleto = new Map(); // key: `${groupId}|${isCopa}` → [action, ...]
   const groupedNaoJogou = new Map();
+  const lembreteActions = [];
   const remaining = [];
   for (const action of list) {
     const key = `${action.groupId}|${!!action.isCopa}`;
@@ -33,6 +110,8 @@ async function processActions(client, actions) {
     } else if (action.kind === "atleta_nao_jogou") {
       if (!groupedNaoJogou.has(key)) groupedNaoJogou.set(key, []);
       groupedNaoJogou.get(key).push(action);
+    } else if (action.kind === "lembrete_mercado") {
+      lembreteActions.push(action);
     } else {
       remaining.push(action);
     }
@@ -89,6 +168,14 @@ async function processActions(client, actions) {
       await processOne(client, action);
     } catch (e) {
       logger.warn("[cartolaBroadcast] action falhou:", action.kind, e.message);
+    }
+  }
+
+  for (const action of lembreteActions) {
+    try {
+      await handleLembreteMercado(client, action);
+    } catch (e) {
+      logger.warn("[cartolaBroadcast] lembrete_mercado falhou:", e.message);
     }
   }
 }
