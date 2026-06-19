@@ -69,8 +69,13 @@ module.exports = {
       }
     } catch (_) {}
 
-    // Coleta JIDs de todos os participantes
-    const senderNumbers = participants.map((p) => p.id._serialized || `${p.id.user}@c.us`);
+    // Coleta JIDs de todos os participantes, excluindo o próprio bot
+    const botJid =
+      (client.info && client.info.wid && client.info.wid._serialized) ||
+      (client.info && client.info.me && client.info.me._serialized);
+    const senderNumbers = participants
+      .map((p) => p.id._serialized || `${p.id.user}@c.us`)
+      .filter((jid) => !botJid || jid !== botJid);
 
     try {
       const { bolao } = await worldcupClient.createBolao(chatId, senderNumbers, {
