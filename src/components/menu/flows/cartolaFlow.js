@@ -797,18 +797,54 @@ const cartolaFlow = createFlow("cartola", {
         return { noRender: true };
       }
 
-      // Copa: parcial = ranking da liga Copa
-      let isCopa = false;
+      // Detecta tipo da liga do grupo
+      let leagueTipo = "brasileirao";
       try {
         const leagueData = await cartolaClient.getGroupLeague(ctx.chatId);
-        isCopa = leagueData?.league?.tipo?.startsWith("copa/") || false;
+        if (leagueData?.league?.tipo) leagueTipo = leagueData.league.tipo;
       } catch (e) {
         logger.warn("[cartolaFlow] getGroupLeague:", e.message);
       }
 
       const medals = ["🥇", "🥈", "🥉"];
 
-      if (isCopa) {
+      // Copa/Duelos: mostra confrontos da rodada atual
+      if (leagueTipo === "copa/duelos") {
+        try {
+          const result = await cartolaClient.getGroupParcial(ctx.chatId, "copa/duelos");
+          const { confrontos = [], rodada, ligaName, rodadaCompleted } = result;
+          if (!confrontos.length) {
+            await ctx.reply("📊 *Parcial — Duelos*\n\nSem confrontos disponíveis no momento.");
+            return { noRender: true };
+          }
+          const statusLabel = rodadaCompleted ? "Resultado" : "Parcial";
+          const lines = [`⚔️ *${statusLabel} Duelos — Rodada ${rodada}*`];
+          if (ligaName) lines.push(`📊 ${ligaName}`);
+          lines.push("");
+          for (const c of confrontos) {
+            const mPts = formatPontuacao(c.mandante.pontos);
+            const vPts = formatPontuacao(c.visitante.pontos);
+            let resultMark = "";
+            if (rodadaCompleted && c.vencedor_id) {
+              resultMark = c.vencedor_id === c.mandante.teamId ? " ✅" : "";
+              const vMark = c.vencedor_id === c.visitante.teamId ? " ✅" : "";
+              lines.push(`⚔️ *${c.mandante.teamName}${resultMark}* ${mPts} × ${vPts} *${c.visitante.teamName}${vMark}*`);
+            } else if (rodadaCompleted) {
+              lines.push(`⚔️ *${c.mandante.teamName}* ${mPts} × ${vPts} *${c.visitante.teamName}* 🤝`);
+            } else {
+              lines.push(`⚔️ ${c.mandante.teamName} *${mPts}* × *${vPts}* ${c.visitante.teamName}`);
+            }
+          }
+          await ctx.reply(lines.join("\n"));
+        } catch (e) {
+          logger.error("[cartolaFlow] showGroupParcial Duelos:", e.message);
+          await ctx.reply("❌ Erro ao buscar parcial dos duelos. Tente novamente.");
+        }
+        return { noRender: true };
+      }
+
+      // Copa pontos corridos: parcial = ranking da liga
+      if (leagueTipo.startsWith("copa/") || leagueTipo === "copa") {
         try {
           const { liga } = await cartolaClient.getLeagueRanking(ctx.chatId);
           const ranking = liga?.ranking || [];
