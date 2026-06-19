@@ -69,7 +69,14 @@ async function getAuthLigas(userId) {
   return backendClient.sendToBackend(`/api/cartola/auth/ligas/${encodeURIComponent(userId)}`, null, "GET");
 }
 
-async function getGroupParcial(groupId, tipo = "brasileirao") {
+async function getGroupParcial(groupId, tipo = "brasileirao", participantNumbers = null) {
+  if (participantNumbers && participantNumbers.length) {
+    return backendClient.sendToBackend(
+      `/api/cartola/group/${encodeURIComponent(groupId)}/parcial`,
+      { tipo, participantNumbers },
+      "POST",
+    );
+  }
   const qs = tipo !== "brasileirao" ? `?tipo=${encodeURIComponent(tipo)}` : "";
   return backendClient.sendToBackend(`/api/cartola/group/${encodeURIComponent(groupId)}/parcial${qs}`, null, "GET");
 }

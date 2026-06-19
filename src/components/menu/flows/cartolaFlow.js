@@ -697,7 +697,17 @@ const cartolaFlow = createFlow("cartola", {
       };
 
       try {
-        const { ranking } = await cartolaClient.getGroupParcial(ctx.chatId, isCopa ? "copa" : "brasileirao");
+        let participantNumbers = null;
+        try {
+          const chat = await ctx.client.getChatById(ctx.chatId);
+          const botId = ctx.client?.info?.wid?._serialized || null;
+          participantNumbers = (chat?.participants || [])
+            .map((p) => p.id._serialized)
+            .filter((jid) => jid && jid !== botId)
+            .map((jid) => jid.replace(/@(c\.us|s\.whatsapp\.net|g\.us|lid)$/i, ""));
+        } catch {}
+
+        const { ranking } = await cartolaClient.getGroupParcial(ctx.chatId, isCopa ? "copa" : "brasileirao", participantNumbers);
 
         if (!ranking || !ranking.length) {
           await ctx.reply(
@@ -804,7 +814,17 @@ const cartolaFlow = createFlow("cartola", {
       }
 
       try {
-        const { ranking } = await cartolaClient.getGroupParcial(ctx.chatId);
+        let participantNumbers = null;
+        try {
+          const chat = await ctx.client.getChatById(ctx.chatId);
+          const botId = ctx.client?.info?.wid?._serialized || null;
+          participantNumbers = (chat?.participants || [])
+            .map((p) => p.id._serialized)
+            .filter((jid) => jid && jid !== botId)
+            .map((jid) => jid.replace(/@(c\.us|s\.whatsapp\.net|g\.us|lid)$/i, ""));
+        } catch {}
+
+        const { ranking } = await cartolaClient.getGroupParcial(ctx.chatId, "brasileirao", participantNumbers);
 
         if (!ranking || !ranking.length) {
           await ctx.reply(
