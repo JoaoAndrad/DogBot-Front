@@ -119,16 +119,19 @@ async function handleFechamentoMercado(client, action) {
       if (groupNaoEscalados.length) {
         lines.push(``, `❌ *Não escalaram:*`);
         for (const u of groupNaoEscalados) {
-          const name = u.displayName || u.teamName || "?";
-          const atletasStr = u.atletasCount > 0 ? ` (${u.atletasCount}/12)` : "";
-          lines.push(`  • ${name}${atletasStr}`);
+          const name = u.displayName || "?";
+          const team = u.teamName ? ` _(${u.teamName})_` : "";
+          const atletasStr = u.atletasCount > 0 ? ` — ${u.atletasCount}/12` : "";
+          lines.push(`  • ${name}${team}${atletasStr}`);
         }
       }
 
       if (groupEscalados.length) {
         lines.push(``, `✅ *Escalaram:*`);
         for (const u of groupEscalados) {
-          lines.push(`  • ${u.displayName || u.teamName || "?"}`);
+          const name = u.displayName || "?";
+          const team = u.teamName ? ` _(${u.teamName})_` : "";
+          lines.push(`  • ${name}${team}`);
         }
       }
 
