@@ -116,7 +116,7 @@ module.exports = {
         }
 
         const hostName =
-          jam.host?.push_name || jam.host?.display_name || "Anônimo";
+          jam.host?.display_name || jam.host?.push_name || "Anônimo";
 
         let msg = `👋 *Você saiu da jam de ${hostName}*\n\n`;
         msg += `Envie */jam* para criar sua própria jam ou entrar em outra.`;

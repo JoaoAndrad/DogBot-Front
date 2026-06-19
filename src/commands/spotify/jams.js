@@ -11,7 +11,7 @@ const { lookupByIdentifier } = require("../../utils/whatsapp/getUserData");
  */
 async function resolveHostName(jam, client) {
   // Try database fields first
-  let name = jam.host?.push_name || jam.host?.display_name;
+  let name = jam.host?.display_name || jam.host?.push_name;
 
   // If empty, try to fetch from WhatsApp
   if (!name && jam.host?.sender_number && client) {

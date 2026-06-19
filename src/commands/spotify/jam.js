@@ -23,8 +23,8 @@ async function resolveHostName(jam, client) {
   // Values that look like phone numbers or JIDs are not human names
   const isUsableName = (s) => s && s.trim() && !/^@?[\d]+(@\S+)?$/.test(s.trim());
 
-  let name = isUsableName(jam.host?.push_name) ? jam.host.push_name.trim()
-    : isUsableName(jam.host?.display_name) ? jam.host.display_name.trim()
+  let name = isUsableName(jam.host?.display_name) ? jam.host.display_name.trim()
+    : isUsableName(jam.host?.push_name) ? jam.host.push_name.trim()
     : null;
 
   if (!name && jam.host?.sender_number && client) {

@@ -70,7 +70,7 @@ async function handleAddFilmFlow(userId, body, state, reply, context) {
           const listsByOwner = {};
           lists.forEach((list) => {
             const ownerName =
-              list.owner?.push_name || list.ownerUserId || "Desconhecido";
+              list.owner?.display_name || list.owner?.push_name || list.ownerUserId || "Desconhecido";
             if (!listsByOwner[ownerName]) {
               listsByOwner[ownerName] = [];
             }

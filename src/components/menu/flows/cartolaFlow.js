@@ -956,6 +956,7 @@ const cartolaFlow = createFlow("cartola", {
             pts = ` — *${formatPontuacao(t.pontos)} pts*`;
           }
           lines.push(`${medals[i] || `${i + 1}.`} ${nome}${pts}`);
+          if (t.display_name) lines.push(`    👤 ${t.display_name}`);
         }
 
         await ctx.reply(lines.join("\n"));

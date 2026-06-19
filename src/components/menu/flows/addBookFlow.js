@@ -104,7 +104,7 @@ const addBookFlow = createFlow("add-book", {
           return {
             label:
               `📋 ${list.title} (${list._count?.items ?? 0} items)` +
-              (isGroup && list.owner ? ` - ${list.owner.push_name}` : ""),
+              (isGroup && list.owner ? ` - ${list.owner.display_name || list.owner.push_name}` : ""),
             action: "exec",
             handler: "selectList",
             data: optionData,

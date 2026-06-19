@@ -104,7 +104,7 @@ const addFilmFlow = createFlow("add-film", {
         // Log detailed info about each list
         lists.forEach((list, idx) => {
           const ownerInfo = list.owner
-            ? `${list.owner.push_name}`
+            ? `${list.owner.display_name || list.owner.push_name}`
             : "Desconhecido";
           const visibility = list.isPublic ? "🔓 Pública" : "🔒 Privada";
           const itemCount = list._count?.items || 0;
@@ -135,7 +135,7 @@ const addFilmFlow = createFlow("add-film", {
           const listsByOwner = {};
           lists.forEach((list) => {
             const ownerName =
-              list.owner?.push_name || list.ownerUserId || "Desconhecido";
+              list.owner?.display_name || list.owner?.push_name || list.ownerUserId || "Desconhecido";
             if (!listsByOwner[ownerName]) {
               listsByOwner[ownerName] = [];
             }
@@ -167,7 +167,7 @@ const addFilmFlow = createFlow("add-film", {
           return {
             label:
               `📋 ${list.title} (${list._count?.items ?? 0} items)` +
-              (isGroup && list.owner ? ` - ${list.owner.push_name}` : ""),
+              (isGroup && list.owner ? ` - ${list.owner.display_name || list.owner.push_name}` : ""),
             action: "exec",
             handler: "selectList",
             data: optionData,
