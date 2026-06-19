@@ -824,16 +824,16 @@ const cartolaFlow = createFlow("cartola", {
           for (const c of confrontos) {
             const mPts = formatPontuacao(c.mandante.pontos);
             const vPts = formatPontuacao(c.visitante.pontos);
-            let resultMark = "";
             if (rodadaCompleted && c.vencedor_id) {
-              resultMark = c.vencedor_id === c.mandante.teamId ? " ✅" : "";
+              const mMark = c.vencedor_id === c.mandante.teamId ? " ✅" : "";
               const vMark = c.vencedor_id === c.visitante.teamId ? " ✅" : "";
-              lines.push(`⚔️ *${c.mandante.teamName}${resultMark}* ${mPts} × ${vPts} *${c.visitante.teamName}${vMark}*`);
+              lines.push(`⚔️ *${c.mandante.teamName}${mMark}* ${mPts} × ${vPts} *${c.visitante.teamName}${vMark}*`);
             } else if (rodadaCompleted) {
               lines.push(`⚔️ *${c.mandante.teamName}* ${mPts} × ${vPts} *${c.visitante.teamName}* 🤝`);
             } else {
               lines.push(`⚔️ ${c.mandante.teamName} *${mPts}* × *${vPts}* ${c.visitante.teamName}`);
             }
+            lines.push("");
           }
           await ctx.reply(lines.join("\n"));
         } catch (e) {
