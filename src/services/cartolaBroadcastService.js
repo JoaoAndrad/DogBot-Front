@@ -95,20 +95,46 @@ async function handleLembreteMercado(client, action) {
 }
 
 async function handleFechamentoMercado(client, action) {
-  const { tipo, rodada, groupIds } = action;
+  const { tipo, rodada, groupIds, escalados = [], naoEscalados = [] } = action;
   const copa = tipo === "copa";
   const prefix = copa ? "🏆 Copa do Cartola\n" : "";
 
-  const lines = [
-    `${prefix}🔒 *Mercado fechado — Rodada ${rodada}*`,
-    ``,
-    `O mercado está fechado. Boa sorte a todos! ⚽`,
-  ];
-  const msg = lines.join("\n");
-
   for (const groupId of groupIds) {
     try {
-      await client.sendMessage(groupId, msg);
+      const memberJids = await getGroupMemberJids(client, groupId);
+
+      const filterByGroup = (arr) => arr.filter((u) => {
+        if (!memberJids) return true;
+        if (!u.senderNumber) return false;
+        return memberJids.has(`${u.senderNumber}@c.us`);
+      });
+
+      const groupEscalados = filterByGroup(escalados);
+      const groupNaoEscalados = filterByGroup(naoEscalados);
+
+      const lines = [
+        `${prefix}🔒 *Mercado fechado — Rodada ${rodada}*`,
+      ];
+
+      if (groupNaoEscalados.length) {
+        lines.push(``, `❌ *Não escalaram:*`);
+        for (const u of groupNaoEscalados) {
+          const name = u.displayName || u.teamName || "?";
+          const atletasStr = u.atletasCount > 0 ? ` (${u.atletasCount}/12)` : "";
+          lines.push(`  • ${name}${atletasStr}`);
+        }
+      }
+
+      if (groupEscalados.length) {
+        lines.push(``, `✅ *Escalaram:*`);
+        for (const u of groupEscalados) {
+          lines.push(`  • ${u.displayName || u.teamName || "?"}`);
+        }
+      }
+
+      lines.push(``, `Boa sorte a todos! ⚽`);
+
+      await client.sendMessage(groupId, lines.join("\n"));
     } catch (e) {
       logger.warn(`[cartolaBroadcast] fechamento_mercado → ${groupId}:`, e.message);
     }
