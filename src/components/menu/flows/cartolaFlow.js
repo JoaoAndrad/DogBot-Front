@@ -625,7 +625,7 @@ const cartolaFlow = createFlow("cartola", {
             const isCap = a.atleta_id === capitaoId;
             const capMark = isCap ? " ⭐" : "";
             const pts = formatPontuacao(
-              isCap ? (a.pontos_num ?? 0) * (isCopa ? 1.5 : 2) : (a.pontos_num ?? 0),
+              isCap ? (a.pontos_num ?? 0) * 1.5 : (a.pontos_num ?? 0),
             );
             const pos = POSICAO[a.posicao_id] || "?";
             lines.push("");

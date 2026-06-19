@@ -399,6 +399,45 @@ async function processOne(client, action) {
       break;
     }
 
+    case "parcial_duelos": {
+      const confrontos = action.confrontos || [];
+      const lines = [`🏆 *Copa Duelos — Parcial Rodada ${action.rodada}*`, ""];
+      for (const c of confrontos) {
+        const mName = c.mandante.teamName ? `${c.mandante.displayName} _(${c.mandante.teamName})_` : c.mandante.displayName;
+        const vName = c.visitante.teamName ? `${c.visitante.displayName} _(${c.visitante.teamName})_` : c.visitante.displayName;
+        lines.push(`⚔️ ${mName} *${fmt(c.mandante.pontos)}* × *${fmt(c.visitante.pontos)}* ${vName}`);
+      }
+      await client.sendMessage(action.groupId, lines.join("\n"));
+      break;
+    }
+
+    case "resultado_duelo": {
+      const confrontos = action.confrontos || [];
+      const ranking = action.ranking || [];
+      const lines = [`🏆 *Copa Duelos — Resultado Rodada ${action.rodada}*`, "", `⚔️ *Confrontos:*`];
+      for (const c of confrontos) {
+        let resultMark;
+        if (!c.vencedor_id) {
+          resultMark = "🤝 Empate";
+        } else if (c.vencedor_id === c.mandante.teamId) {
+          resultMark = `🏆 ${c.mandante.displayName}`;
+        } else {
+          resultMark = `🏆 ${c.visitante.displayName}`;
+        }
+        lines.push(`• ${c.mandante.displayName} *${fmt(c.mandante.pontos)}* × *${fmt(c.visitante.pontos)}* ${c.visitante.displayName} — ${resultMark}`);
+      }
+      if (ranking.length) {
+        lines.push("", `📊 *Classificação:*`);
+        for (let i = 0; i < ranking.length; i++) {
+          const r = ranking[i];
+          const pos = medals[i] || `${i + 1}.`;
+          lines.push(`${pos} ${r.displayName} — ${r.vitorias}V ${r.empates}E ${r.derrotas}D`);
+        }
+      }
+      await client.sendMessage(action.groupId, lines.join("\n"));
+      break;
+    }
+
     default:
       logger.warn("[cartolaBroadcast] action desconhecida:", action.kind);
   }
