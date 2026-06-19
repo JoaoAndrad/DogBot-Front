@@ -94,6 +94,27 @@ async function handleLembreteMercado(client, action) {
   }
 }
 
+async function handleFechamentoMercado(client, action) {
+  const { tipo, rodada, groupIds } = action;
+  const copa = tipo === "copa";
+  const prefix = copa ? "🏆 Copa do Cartola\n" : "";
+
+  const lines = [
+    `${prefix}🔒 *Mercado fechado — Rodada ${rodada}*`,
+    ``,
+    `O mercado está fechado. Boa sorte a todos! ⚽`,
+  ];
+  const msg = lines.join("\n");
+
+  for (const groupId of groupIds) {
+    try {
+      await client.sendMessage(groupId, msg);
+    } catch (e) {
+      logger.warn(`[cartolaBroadcast] fechamento_mercado → ${groupId}:`, e.message);
+    }
+  }
+}
+
 async function processActions(client, actions) {
   const list = actions || [];
 
@@ -110,7 +131,7 @@ async function processActions(client, actions) {
     } else if (action.kind === "atleta_nao_jogou") {
       if (!groupedNaoJogou.has(key)) groupedNaoJogou.set(key, []);
       groupedNaoJogou.get(key).push(action);
-    } else if (action.kind === "lembrete_mercado") {
+    } else if (action.kind === "lembrete_mercado" || action.kind === "fechamento_mercado") {
       lembreteActions.push(action);
     } else {
       remaining.push(action);
@@ -173,9 +194,13 @@ async function processActions(client, actions) {
 
   for (const action of lembreteActions) {
     try {
-      await handleLembreteMercado(client, action);
+      if (action.kind === "fechamento_mercado") {
+        await handleFechamentoMercado(client, action);
+      } else {
+        await handleLembreteMercado(client, action);
+      }
     } catch (e) {
-      logger.warn("[cartolaBroadcast] lembrete_mercado falhou:", e.message);
+      logger.warn(`[cartolaBroadcast] ${action.kind} falhou:`, e.message);
     }
   }
 }
