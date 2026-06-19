@@ -721,9 +721,7 @@ const cartolaFlow = createFlow("cartola", {
             ...a,
             owner: r.displayName,
             teamName: r.teamName,
-            pts_exibido: a.is_capitao
-              ? (a.pontos_num ?? 0) * (isCopa ? 1.5 : 2)
-              : (a.pontos_num ?? 0),
+            pts_exibido: a.is_capitao ? (a.pontos_num ?? 0) * 1.5 : (a.pontos_num ?? 0),
           })),
         );
 
@@ -732,7 +730,26 @@ const cartolaFlow = createFlow("cartola", {
           .sort((a, b) => b.pts_exibido - a.pts_exibido)
           .slice(0, 3);
 
+        const allZero = ranking.every((r) => (r.pontos ?? 0) === 0);
         const header = isCopa ? "🏆 *Destaques Copa do Cartola*" : "⭐ *Destaques do grupo*";
+
+        if (allZero) {
+          const lines = [
+            header,
+            "",
+            "_Nenhum jogador escalado ainda pontuou._",
+            "",
+            "📊 *Times escalados:*",
+            "",
+          ];
+          for (let i = 0; i < ranking.length; i++) {
+            const r = ranking[i];
+            lines.push(`${medals[i] || `${i + 1}.`} ${r.displayName}${r.teamName ? ` _(${r.teamName})_` : ""}`);
+          }
+          await ctx.reply(lines.join("\n"));
+          return { noRender: true };
+        }
+
         const lines = [header, "", "🏅 *Melhores atletas*", ""];
 
         if (topAtletas.length) {
