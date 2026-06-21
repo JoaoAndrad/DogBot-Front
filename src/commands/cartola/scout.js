@@ -229,7 +229,7 @@ module.exports = {
       const totalA = resA.data?.pontos ?? 0;
       const totalB = resB.data?.pontos ?? 0;
       const diff = Math.abs(totalA - totalB);
-      const leader = totalA > totalB ? sideA.nome : totalB > totalA ? sideB.nome : null;
+      const leader = diff < 0.005 ? null : totalA > totalB ? sideA.nome : sideB.nome;
 
       const placarLine = leader
         ? `📊 *${leader}* lidera por *+${fmt(diff)} pts*`
