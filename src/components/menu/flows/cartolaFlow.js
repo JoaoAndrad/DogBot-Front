@@ -493,9 +493,19 @@ const cartolaFlow = createFlow("cartola", {
         return { noRender: true };
       }
 
+      let participantNumbers = null;
+      try {
+        const chat = await ctx.client.getChatById(targetGroup);
+        const botId = ctx.client?.info?.wid?._serialized || null;
+        participantNumbers = (chat?.participants || [])
+          .map((p) => p.id._serialized)
+          .filter((jid) => jid && jid !== botId)
+          .map((jid) => jid.replace(/@(c\.us|s\.whatsapp\.net|g\.us|lid)$/i, ""));
+      } catch {}
+
       let data;
       try {
-        data = await cartolaClient.getGroupJogandoAgora(targetGroup);
+        data = await cartolaClient.getGroupJogandoAgora(targetGroup, participantNumbers);
       } catch (e) {
         logger.error("[cartolaFlow] getGroupJogandoAgora:", e.message);
         await ctx.reply("❌ Erro ao buscar atletas em campo. Tente novamente.");

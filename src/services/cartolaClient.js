@@ -90,7 +90,14 @@ async function getCopaGroupTeams(groupId, userId = null) {
   return backendClient.sendToBackend(`/api/cartola/group/${encodeURIComponent(groupId)}/copa-teams${qs}`, null, "GET");
 }
 
-async function getGroupJogandoAgora(groupId) {
+async function getGroupJogandoAgora(groupId, participantNumbers = null) {
+  if (participantNumbers && participantNumbers.length) {
+    return backendClient.sendToBackend(
+      `/api/cartola/group/${encodeURIComponent(groupId)}/jogando`,
+      { participantNumbers },
+      "POST",
+    );
+  }
   return backendClient.sendToBackend(`/api/cartola/group/${encodeURIComponent(groupId)}/jogando`, null, "GET");
 }
 
