@@ -5,6 +5,8 @@ const { withFlag, matchup, localize } = require("../utils/teamLocale");
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
+const goat = (n) => (n && /messi/i.test(n) ? `${n} 🐐` : n);
+
 function fmtKickoff(kickoffAt) {
   const d = new Date(kickoffAt);
   const date = d.toLocaleDateString("pt-BR", {
@@ -270,7 +272,7 @@ function getGoalText({
   else if (isAddedTime) timing = " nos acréscimos";
   else if (isHalfTimeEnd) timing = " no fim do primeiro tempo";
 
-  const name = scorer || null;
+  const name = goat(scorer) || null;
   const flag = withFlag(scoringTeam);
 
   // Prefixo: com nome do marcador, ou com flag do time como fallback
@@ -633,8 +635,8 @@ async function handleGoal(client, action) {
         : goalDetail === "Own Goal"
           ? " *(gol contra)*"
           : "";
-    scorerLine = `\n⚽ ${scorer}${minuteTag}${detailTag}`;
-    if (assist && !detailTag) scorerLine += `\n🎯 Assistência: ${assist}`;
+    scorerLine = `\n⚽ ${goat(scorer)}${minuteTag}${detailTag}`;
+    if (assist && !detailTag) scorerLine += `\n🎯 Assistência: ${goat(assist)}`;
   }
 
   for (const groupId of groupIds) {
@@ -893,8 +895,8 @@ async function handleGoalScorer(client, action) {
       : goalDetail === "Own Goal"
         ? " *(gol contra)*"
         : "";
-  let msg = `⚽ *Marcou:* ${scorerName}${minuteTag}${detailTag}`;
-  if (assistName && !detailTag) msg += `\n🎯 *Assistência:* ${assistName}`;
+  let msg = `⚽ *Marcou:* ${goat(scorerName)}${minuteTag}${detailTag}`;
+  if (assistName && !detailTag) msg += `\n🎯 *Assistência:* ${goat(assistName)}`;
 
   for (const groupId of groupIds) {
     try {

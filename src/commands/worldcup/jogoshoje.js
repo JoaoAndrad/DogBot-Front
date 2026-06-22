@@ -4,20 +4,40 @@ const worldcupClient = require("../../services/worldcupClient");
 const { withFlag } = require("../../utils/teamLocale");
 const logger = require("../../utils/logger");
 
+const goat = (n) => (n && /messi/i.test(n) ? `${n} 🐐` : n);
+
+function formatGoals(goals) {
+  if (!goals || !goals.length) return "";
+  return goals
+    .map((g) => {
+      const min = g.minute != null ? `${g.minute}' ` : "";
+      const name = goat(g.scorer) || "";
+      return `   ⚽ ${min}${name}`.trimEnd();
+    })
+    .join("\n");
+}
+
 function formatMatch(m) {
   const kickoff = new Date(m.kickoff_at);
   const time = kickoff.toLocaleTimeString("pt-BR", { timeZone: "America/Sao_Paulo", hour: "2-digit", minute: "2-digit" });
   const groupLetter = m.group_name ? m.group_name.replace(/^GROUP_?/i, "").replace(/^Group\s*/i, "").trim() : "";
   const stage = groupLetter ? `Grupo ${groupLetter}` : "";
+  const stageTag = stage ? ` (${stage})` : "";
+  const goals = formatGoals(m.goals);
 
-  if (m.status === "live") {
-    const score = m.home_score != null ? `${m.home_score} x ${m.away_score}` : "0 x 0";
-    return `🔴 ${withFlag(m.home_team)} *${score}* ${withFlag(m.away_team)} — AO VIVO${stage ? ` (${stage})` : ""}`;
-  }
   if (m.status === "finished") {
-    return `✅ ${withFlag(m.home_team)} ${m.home_score} x ${m.away_score} ${withFlag(m.away_team)}${stage ? ` (${stage})` : ""}`;
+    const header = `✅ ${withFlag(m.home_team)} *${m.home_score} x ${m.away_score}* ${withFlag(m.away_team)}${stageTag}`;
+    return goals ? `${header}\n${goals}` : header;
   }
-  return `⏰ ${time} — ${withFlag(m.home_team)} 🆚 ${withFlag(m.away_team)}${stage ? ` (${stage})` : ""}`;
+
+  if (m.status === "live" || m.status === "paused" || m.status === "extra_time" || m.status === "penalties") {
+    const score = m.home_score != null ? `${m.home_score} x ${m.away_score}` : "0 x 0";
+    const statusTag = m.status === "extra_time" ? " — PRORROGAÇÃO" : m.status === "penalties" ? " — PÊNALTIS" : " — AO VIVO";
+    const header = `🔴 ${withFlag(m.home_team)} *${score}* ${withFlag(m.away_team)}${statusTag}${stageTag}`;
+    return goals ? `${header}\n${goals}` : header;
+  }
+
+  return `⏰ ${time} — ${withFlag(m.home_team)} 🆚 ${withFlag(m.away_team)}${stageTag}`;
 }
 
 module.exports = {
@@ -39,7 +59,11 @@ module.exports = {
 
       const today = new Date().toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo", weekday: "long", day: "2-digit", month: "2-digit" });
       const lines = [`⚽ *Jogos de hoje — ${today}*`, ""];
-      for (const m of matches) lines.push(formatMatch(m));
+      for (const m of matches) {
+        lines.push(formatMatch(m));
+        lines.push("");  // linha em branco entre jogos
+      }
+      lines.pop(); // remove última linha em branco
 
       await client.sendMessage(chatId, lines.join("\n"));
     } catch (e) {
