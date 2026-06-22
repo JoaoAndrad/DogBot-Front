@@ -570,8 +570,8 @@ const worldcupPalpiteFlow = createFlow("copa-palpite", {
         return { end: true };
       }
 
-      const futurePreds = matchPreds.filter(p => p.match && (p.match.status === "scheduled" || p.match.status === "live"));
-      const pastPreds   = matchPreds.filter(p => p.match && p.match.status !== "scheduled" && p.match.status !== "live");
+      const futurePreds = matchPreds.filter(p => p.match && p.match.status !== "finished");
+      const pastPreds   = matchPreds.filter(p => p.match && p.match.status === "finished");
 
       const futureTournament = [championPrediction, zebraPrediction, mvpPrediction].filter(p => p && p.points == null);
       const pastTournament   = [championPrediction, zebraPrediction, mvpPrediction].filter(p => p && p.points != null);
@@ -644,7 +644,7 @@ const worldcupPalpiteFlow = createFlow("copa-palpite", {
         .filter(p => {
           if (!p.match) return false;
           const s = p.match.status;
-          return isFuture ? (s === "scheduled" || s === "live") : (s !== "scheduled" && s !== "live");
+          return isFuture ? p.match.status !== "finished" : p.match.status === "finished";
         })
         .sort((a, b) => new Date(a.match.kickoff_at) - new Date(b.match.kickoff_at));
 
