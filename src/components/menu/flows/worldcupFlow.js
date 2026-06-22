@@ -278,6 +278,7 @@ const worldcupFlow = createFlow("copa", {
     },
 
     showMyPredictions: async (ctx) => {
+      console.log(`[DBG-COPA] worldcupFlow.showMyPredictions chamado userId=${ctx.userId} chatId=${ctx.chatId}`);
       const isPrivate = !String(ctx.chatId).endsWith("@g.us");
       if (!isPrivate) {
         await ctx.reply("📋 Envie */palpite* no privado para ver e fazer seus palpites.");
@@ -539,6 +540,7 @@ const worldcupPalpiteFlow = createFlow("copa-palpite", {
 
     // ── Meus palpites ───────────────────────────────────────────────────────
     showMyPredictions: async (ctx) => {
+      console.log(`[DBG-COPA] showMyPredictions chamado userId=${ctx.userId} chatId=${ctx.chatId}`);
       let predictions;
       let championPrediction = null;
       let zebraPrediction = null;
@@ -609,6 +611,7 @@ const worldcupPalpiteFlow = createFlow("copa-palpite", {
     },
 
     showPredictionsByType: async (ctx, data = {}) => {
+      console.log(`[DBG-COPA] showPredictionsByType chamado userId=${ctx.userId} type=${data && data.type} page=${data && data.page}`);
       const PAGE_SIZE = 8;
       const type = (data && data.type) || "future";
       const page = (data && data.page) || 0;

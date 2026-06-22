@@ -340,6 +340,7 @@ async function handleVoteUpdate(vote) {
 
     // Try direct lookup first
     let poll = await storage.getPoll(messageId);
+    console.log(`[DBG-POLL] handleVoteUpdate: messageId=${messageId} pollFound=${!!poll}`);
 
     // Check if it's a confissão poll to skip logs
     let isConfissaoPoll =
@@ -377,9 +378,11 @@ async function handleVoteUpdate(vote) {
     }
 
     if (!poll) {
+      console.log(`[DBG-POLL] handleVoteUpdate: poll NÃO encontrada messageId=${messageId}`);
       logger.debug("vote_update para enquete desconhecida", messageId);
       return false;
     }
+    console.log(`[DBG-POLL] handleVoteUpdate: poll encontrada id=${poll.id} title="${poll.title}" flowId=${poll.metadata && (typeof poll.metadata === 'string' ? JSON.parse(poll.metadata) : poll.metadata).flowId}`);
 
     // Extract raw voter ID from vote event
     let voter =
@@ -428,6 +431,7 @@ async function handleVoteUpdate(vote) {
         banKey: `rl:${voter}`,
       });
       if (!r.ok) {
+        console.log(`[DBG-POLL] RATE LIMIT bloqueado reason=${r.reason} voter=${voter}`);
         logger.debug(
           `[rateLimit] voto em enquete bloqueado (${r.reason}): ${voter}`,
         );

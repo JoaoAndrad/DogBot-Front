@@ -241,8 +241,10 @@ async function processVoteViaBackend(pollId, vote, client) {
     }
 
     const selectedIndexes = selectedIndexesFromVoteAndPoll(vote, storedPoll);
+    console.log(`[DBG-PROC] processVoteViaBackend: pollId=${String(pollId).slice(0,60)} voterId=${voterId} selectedIndexes=${JSON.stringify(selectedIndexes)}`);
 
     if (!selectedIndexes.length) {
+      console.log(`[DBG-PROC] ABORT: nenhum índice de opção`);
       logger.warn(
         `[processor] process-vote: nenhum índice de opção (pollId=${String(pollId).slice(0, 96)})`,
       );
@@ -264,6 +266,7 @@ async function processVoteViaBackend(pollId, vote, client) {
       "POST",
     );
 
+    console.log(`[DBG-PROC] backend result: action=${result.action} handler=${result.handler} flowId=${result.data && result.data.flowId}`);
     logger.debug(
       `[processor] Backend returned action: ${result.action}`,
       result.handler || result.target || "",
@@ -615,6 +618,7 @@ async function executeAction(result, client) {
           const flowManager = require("../menu/flowManager");
           const storage = require("../menu/storage");
           const flow = flowManager.flows.get(data.flowId);
+          console.log(`[DBG-PROC] case menu: handler=${handler} flowId=${data.flowId} flowFound=${!!flow} handlerFound=${!!(flow && flow.handlers && flow.handlers[handler])}`);
 
           if (flow && flow.handlers && flow.handlers[handler]) {
             // Load state by the userId that started the flow (metadata), not the resolved voter,
@@ -630,6 +634,7 @@ async function executeAction(result, client) {
 
             // Copa: apenas quem invocou o comando pode interagir com os polls
             if (data.flowId === "copa" || data.flowId === "copa-palpite") {
+              console.log(`[DBG-PROC] copa owner check: data.userId=${data.userId} result.voterId=${result.voterId} match=${sameWaPhoneNum(data.userId, result.voterId)}`);
               if (!sameWaPhoneNum(data.userId, result.voterId)) {
                 logger.info(
                   `[processor] Copa: voto ignorado de ${result.voterId} (dono: ${data.userId})`,
