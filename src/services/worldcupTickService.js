@@ -1166,6 +1166,22 @@ async function handleWeeklySummary(client, action) {
   }
 }
 
+// action: { kind: "broadcast", groupIds: [...], message: "...", pin: true }
+async function handleBroadcast(client, action) {
+  const { groupIds, message, pin } = action;
+  if (!groupIds || !groupIds.length || !message) return;
+  for (const groupId of groupIds) {
+    try {
+      const msg = await client.sendMessage(groupId, message);
+      if (pin && msg && typeof msg.pin === "function") {
+        msg.pin(86400).catch(() => {});
+      }
+    } catch (e) {
+      logger.warn(`[worldcupTick] broadcast → ${groupId}:`, e.message);
+    }
+  }
+}
+
 // ─── Main processor ───────────────────────────────────────────────────────────
 
 async function processWorldCupTickPayload(client, payload) {
@@ -1231,6 +1247,9 @@ async function processWorldCupTickPayload(client, payload) {
           break;
         case "bolao_member_removed":
           await handleBolaoMemberRemoved(client, action);
+          break;
+        case "broadcast":
+          await handleBroadcast(client, action);
           break;
         default:
           logger.debug(`[worldcupTick] ação desconhecida: ${action.kind}`);
