@@ -32,34 +32,30 @@ async function handleCopaFlow(stateKey, body, state, reply, opts) {
     const isDraw = predictedHome === predictedAway;
     const isKnockout = data.stage && data.stage !== "group";
 
-    // Empate em partida eliminatória → perguntar quem avança antes da confirmação
+    // Empate em partida eliminatória → oferecer palpite opcional de prorrogação
     if (isDraw && isKnockout) {
       conversationState.startFlow(stateKey, "copa-palpite-input", {
         ...data,
-        step: "await_advancing",
+        step: "await_et_opt",
         predictedHome,
         predictedAway,
       });
-      const { withFlag: wf } = require("../utils/teamLocale");
-      const options = [
-        `${wf(data.homeTeam)} ${data.homeTeam} avança`,
-        `${wf(data.awayTeam)} ${data.awayTeam} avança`,
-      ];
+      const etOptions = ["⏱️ Sim, quero palpitar a prorrogação", "⏩ Não, pular para confirmação"];
       const pollMeta = {
         actionType: "menu",
         flowId: "copa-palpite",
-        path: "/advancing",
+        path: "/et-opt",
         userId: stateKey,
         options: [
-          { index: 0, label: options[0], action: "exec", handler: "setAdvancingTeam", data: { team: data.homeTeam, stateKey } },
-          { index: 1, label: options[1], action: "exec", handler: "setAdvancingTeam", data: { team: data.awayTeam, stateKey } },
+          { index: 0, label: etOptions[0], action: "exec", handler: "acceptEtPrediction", data: { stateKey } },
+          { index: 1, label: etOptions[1], action: "exec", handler: "skipEtPrediction",   data: { stateKey } },
         ],
       };
       await polls.createPoll(client || { sendPoll: async () => null }, from || data.userId || stateKey,
-        `🔮 Empate! ${matchup(data.homeTeam, data.awayTeam)}\nQuem avança nos pênaltis?`,
-        options, { metadata: pollMeta, sender: client });
+        `🎯 Empate! Quer palpitar o placar da *prorrogação*? (+1 pt bônus)`,
+        etOptions, { metadata: pollMeta, sender: client });
       if (!client || !from) {
-        await reply("⚽ Responda na enquete acima para indicar quem avança.");
+        await reply("⏱️ Responda na enquete acima.");
       }
       return true;
     }
@@ -123,6 +119,54 @@ async function handleCopaFlow(stateKey, body, state, reply, opts) {
     return true;
   }
 
+  // ── Aguardando opção de prorrogação (usuário deve votar na enquete) ──────────
+  if (data.step === "await_et_opt") {
+    await reply("⏱️ Vote na enquete acima para continuar.\n_(ou /cancelar para sair)_");
+    return true;
+  }
+
+  // ── Aguardando placar da prorrogação (texto) ─────────────────────────────────
+  if (data.step === "await_et_score") {
+    const m = body.trim().match(SCORE_RE);
+    if (!m) {
+      await reply(
+        "❌ Formato inválido. Ex: *2-1* ou *1x0*\n\n_(ou /cancelar para sair)_",
+      );
+      return true;
+    }
+    const etHome = parseInt(m[1], 10);
+    const etAway = parseInt(m[2], 10);
+
+    // Salva o placar da prorrogação e vai para a seleção do vencedor
+    conversationState.startFlow(stateKey, "copa-palpite-input", {
+      ...data,
+      step: "await_advancing",
+      predicted_extra_home: etHome,
+      predicted_extra_away: etAway,
+    });
+
+    const { withFlag: wf } = require("../utils/teamLocale");
+    const options = [
+      `${wf(data.homeTeam)} ${data.homeTeam} avança`,
+      `${wf(data.awayTeam)} ${data.awayTeam} avança`,
+    ];
+    const pollMeta = {
+      actionType: "menu",
+      flowId: "copa-palpite",
+      path: "/advancing",
+      userId: stateKey,
+      options: [
+        { index: 0, label: options[0], action: "exec", handler: "setAdvancingTeam", data: { team: data.homeTeam, stateKey } },
+        { index: 1, label: options[1], action: "exec", handler: "setAdvancingTeam", data: { team: data.awayTeam, stateKey } },
+      ],
+    };
+    await polls.createPoll(client || { sendPoll: async () => null }, from || data.userId || stateKey,
+      `✅ Prorrogação: *${etHome} x ${etAway}*\n\n🔮 ${matchup(data.homeTeam, data.awayTeam)}\nQuem avança?`,
+      options, { metadata: pollMeta, sender: client });
+    if (!client || !from) await reply("⚽ Vote na enquete acima.");
+    return true;
+  }
+
   // ── Aguardando confirmação (usuário deve votar na enquete) ───────────────────
   if (data.step === "await_confirmation") {
     await reply("🎯 Vote na enquete acima para confirmar, corrigir ou cancelar.\n_(ou /cancelar para sair)_");
@@ -136,7 +180,11 @@ async function handleCopaFlow(stateKey, body, state, reply, opts) {
 async function _submitPrediction(stateKey, data, reply) {
   try {
     const userId = data.userId || stateKey;
-    await worldcupClient.submitPrediction(userId, data.matchId, data.predictedHome, data.predictedAway, data.advancingTeam || null);
+    await worldcupClient.submitPrediction(userId, data.matchId, data.predictedHome, data.predictedAway, data.advancingTeam || null, {
+      predictedExtraHome: data.predicted_extra_home ?? null,
+      predictedExtraAway: data.predicted_extra_away ?? null,
+      penaltiesWinner:    data.penalties_winner    ?? null,
+    });
     conversationState.clearState(stateKey);
     dmAlertState.clearUser(userId);
 

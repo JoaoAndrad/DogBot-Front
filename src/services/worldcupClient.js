@@ -48,8 +48,14 @@ async function getStandingsGrouped(group) {
 
 // ─── Predictions ─────────────────────────────────────────────────────────────
 
-async function submitPrediction(userId, matchId, predictedHome, predictedAway, advancingTeam) {
-  return backendClient.sendToBackend("/api/worldcup/predictions", { userId, matchId, predictedHome, predictedAway, advancingTeam: advancingTeam || null }, "POST");
+async function submitPrediction(userId, matchId, predictedHome, predictedAway, advancingTeam, extra = {}) {
+  return backendClient.sendToBackend("/api/worldcup/predictions", {
+    userId, matchId, predictedHome, predictedAway,
+    advancingTeam: advancingTeam || null,
+    predictedExtraHome: extra.predictedExtraHome ?? null,
+    predictedExtraAway: extra.predictedExtraAway ?? null,
+    penaltiesWinner:    extra.penaltiesWinner    ?? null,
+  }, "POST");
 }
 
 async function getUserPredictions(userId) {

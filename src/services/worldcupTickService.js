@@ -763,6 +763,96 @@ async function handleResume(client, action) {
   }
 }
 
+async function handleExtraTime(client, action) {
+  const { match, predictions, groupIds } = action;
+  if (!groupIds || !groupIds.length) return;
+
+  const score = `${match.home_score ?? 0} x ${match.away_score ?? 0}`;
+
+  for (const groupId of groupIds) {
+    try {
+      const memberJids = await getGroupMemberJids(client, groupId);
+      const groupPreds = filterForGroup(predictions, memberJids);
+
+      // Main preds block (90-min scores)
+      const { text: predBlock, mentionIds: predMentions } = groupPreds.length
+        ? formatPredictionsBlockWithMentions(
+            groupPreds,
+            match.home_score ?? 0,
+            match.away_score ?? 0,
+            { homeTeam: match.home_team, awayTeam: match.away_team },
+          )
+        : { text: null, mentionIds: [] };
+
+      // ET-specific preds block
+      const etPreds = groupPreds.filter((p) => p.predictedExtraHome != null);
+      const etMentions = [];
+      let etBlock = null;
+      if (etPreds.length) {
+        const etLines = etPreds.map((p) => {
+          const jid = toJid(p.senderNumber);
+          if (jid) etMentions.push(jid);
+          return `  • @${String(p.senderNumber || "").split("@")[0]} — prorr. ${p.predictedExtraHome}x${p.predictedExtraAway}`;
+        });
+        etBlock = `⏱️ *Palpites de prorrogação:*\n${etLines.join("\n")}`;
+      }
+
+      const lines = [
+        `⏱️ *Prorrogação!*`,
+        `${withFlag(match.home_team)} *${score}* ${withFlag(match.away_team)} — empate nos 90min`,
+        `Agora são mais 30 minutos!`,
+      ];
+      if (predBlock) lines.push(predBlock);
+      if (etBlock) lines.push(etBlock);
+
+      const allMentions = [...new Set([...predMentions, ...etMentions])];
+      await sendWithMentions(client, groupId, lines.join("\n"), allMentions);
+    } catch (e) {
+      logger.warn(`[worldcupTick] extra_time → ${groupId}:`, e.message);
+    }
+  }
+}
+
+async function handlePenalties(client, action) {
+  const { match, predictions, groupIds } = action;
+  if (!groupIds || !groupIds.length) return;
+
+  const etScore = match.extra_time_home != null
+    ? `${match.extra_time_home} x ${match.extra_time_away}`
+    : `${match.home_score ?? 0} x ${match.away_score ?? 0}`;
+
+  for (const groupId of groupIds) {
+    try {
+      const memberJids = await getGroupMemberJids(client, groupId);
+      const groupPreds = filterForGroup(predictions, memberJids);
+
+      // Pen-winner preds block
+      const penPreds = groupPreds.filter((p) => p.penaltiesWinner);
+      const penMentions = [];
+      let penBlock = null;
+      if (penPreds.length) {
+        const penLines = penPreds.map((p) => {
+          const jid = toJid(p.senderNumber);
+          if (jid) penMentions.push(jid);
+          return `  • @${String(p.senderNumber || "").split("@")[0]} — ${withFlag(p.penaltiesWinner)} ${p.penaltiesWinner}`;
+        });
+        penBlock = `🎯 *Palpites de pênaltis (quem avança):*\n${penLines.join("\n")}`;
+      }
+
+      const lines = [
+        `🥅 *Pênaltis!*`,
+        `${withFlag(match.home_team)} *${etScore}* ${withFlag(match.away_team)} — empate na prorrogação`,
+        `Vai para a disputa de pênaltis!`,
+      ];
+      if (penBlock) lines.push(penBlock);
+
+      await sendWithMentions(client, groupId, lines.join("\n"), penMentions);
+    } catch (e) {
+      logger.warn(`[worldcupTick] penalties → ${groupId}:`, e.message);
+    }
+  }
+}
+
 const VAR_PT = {
   "Goal cancelled": "Gol anulado",
   "Goal Disallowed": "Gol anulado",
@@ -1097,6 +1187,12 @@ async function processWorldCupTickPayload(client, payload) {
           break;
         case "halftime":
           await handleHalftime(client, action);
+          break;
+        case "extra_time":
+          await handleExtraTime(client, action);
+          break;
+        case "penalties":
+          await handlePenalties(client, action);
           break;
         case "resume":
           await handleResume(client, action);

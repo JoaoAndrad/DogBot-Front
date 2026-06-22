@@ -842,6 +842,51 @@ const worldcupPalpiteFlow = createFlow("copa-palpite", {
       return { end: true };
     },
 
+    // ── ET prediction poll callbacks ─────────────────────────────────────────
+    acceptEtPrediction: async (ctx, data) => {
+      const stateKey = data.stateKey || ctx.userId;
+      const current = conversationState.getState(stateKey);
+      if (!current || !current.data) { await ctx.reply("❌ Sessão expirada. Use /palpite novamente."); return { end: true }; }
+      const matchData = current.data;
+      conversationState.startFlow(stateKey, "copa-palpite-input", {
+        ...matchData,
+        step: "await_et_score",
+      });
+      await ctx.reply(
+        `⏱️ *Placar da prorrogação — ${matchup(matchData.homeTeam, matchData.awayTeam)}*\n\n` +
+        `Digite o placar no formato *H-A* (apenas gols na prorrogação, sem os dos 90min)\n` +
+        `Ex: se você acha que o 2º tempo extra termina *2-1*, escreva *2-1*\n\n` +
+        `_(ou /cancelar para sair)_`,
+      );
+      return { end: true };
+    },
+
+    skipEtPrediction: async (ctx, data) => {
+      const stateKey = data.stateKey || ctx.userId;
+      const current = conversationState.getState(stateKey);
+      if (!current || !current.data) { await ctx.reply("❌ Sessão expirada. Use /palpite novamente."); return { end: true }; }
+      const matchData = current.data;
+      conversationState.startFlow(stateKey, "copa-palpite-input", {
+        ...matchData,
+        step: "await_advancing",
+      });
+      const options = [
+        `${withFlag(matchData.homeTeam)} ${matchData.homeTeam} avança`,
+        `${withFlag(matchData.awayTeam)} ${matchData.awayTeam} avança`,
+      ];
+      const pollMeta = {
+        actionType: "menu", flowId: "copa-palpite", path: "/advancing", userId: stateKey,
+        options: [
+          { index: 0, label: options[0], action: "exec", handler: "setAdvancingTeam", data: { team: matchData.homeTeam, stateKey } },
+          { index: 1, label: options[1], action: "exec", handler: "setAdvancingTeam", data: { team: matchData.awayTeam, stateKey } },
+        ],
+      };
+      await polls.createPoll(ctx.client, ctx.chatId,
+        `🔮 Empate! ${matchup(matchData.homeTeam, matchData.awayTeam)}\nQuem avança?`,
+        options, { metadata: pollMeta });
+      return { end: true };
+    },
+
     // ── Advancing team poll callback ──────────────────────────────────────────
     setAdvancingTeam: async (ctx, data) => {
       const stateKey = data.stateKey || ctx.userId;
@@ -856,9 +901,12 @@ const worldcupPalpiteFlow = createFlow("copa-palpite", {
       const kickoff = new Date(matchData.kickoffAt);
       const date = kickoff.toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo", day: "2-digit", month: "2-digit" });
       const time = kickoff.toLocaleTimeString("pt-BR", { timeZone: "America/Sao_Paulo", hour: "2-digit", minute: "2-digit" });
+      const etLine = matchData.predicted_extra_home != null
+        ? `\n⏱️ Prorrogação: *${matchData.predicted_extra_home} x ${matchData.predicted_extra_away}*`
+        : "";
       const title =
         `🎯 Confirmar palpite?\n${matchup(matchData.homeTeam, matchData.awayTeam)}\n` +
-        `*${matchData.predictedHome} x ${matchData.predictedAway}* · ${date} ${time}\n` +
+        `*${matchData.predictedHome} x ${matchData.predictedAway}* · ${date} ${time}${etLine}\n` +
         `🔮 Avança: *${withFlag(data.team)}*`;
       const options = ["✅ Confirmar", "✏️ Corrigir placar", "❌ Cancelar"];
       const pollMeta = {
