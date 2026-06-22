@@ -612,7 +612,9 @@ const worldcupPalpiteFlow = createFlow("copa-palpite", {
 
     showPredictionsByType: async (ctx, data = {}) => {
       console.log(`[DBG-COPA] showPredictionsByType chamado userId=${ctx.userId} type=${data && data.type} page=${data && data.page}`);
-      const PAGE_SIZE = 8;
+      // PAGE_SIZE=7: WhatsApp limit is 12 options.
+      // Worst case: 3 tournament + 7 match + 1 next + 1 back = 12 exactly.
+      const PAGE_SIZE = 7;
       const type = (data && data.type) || "future";
       const page = (data && data.page) || 0;
       const { localize } = require("../../../utils/teamLocale");
