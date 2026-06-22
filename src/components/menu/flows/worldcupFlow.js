@@ -538,10 +538,7 @@ const worldcupPalpiteFlow = createFlow("copa-palpite", {
     },
 
     // ── Meus palpites ───────────────────────────────────────────────────────
-    showMyPredictions: async (ctx, data = {}) => {
-      const PAGE_SIZE = 8;
-      const page = (data && data.page) || 0;
-      const { localize } = require("../../../utils/teamLocale");
+    showMyPredictions: async (ctx) => {
       let predictions;
       let championPrediction = null;
       let zebraPrediction = null;
@@ -559,11 +556,13 @@ const worldcupPalpiteFlow = createFlow("copa-palpite", {
           worldcupClient.getMvpPrediction(ctx.userId),
         ]);
       } catch (e) {
+        logger.error("[worldcupFlow] showMyPredictions:", e.message);
         await ctx.reply("❌ Erro ao buscar palpites.");
         return { end: true };
       }
 
-      const hasAny = (predictions && predictions.length) || championPrediction || zebraPrediction || mvpPrediction;
+      const matchPreds = predictions || [];
+      const hasAny = matchPreds.length || championPrediction || zebraPrediction || mvpPrediction;
       if (!hasAny) {
         await ctx.reply(
           "📋 *Meus palpites*\n\nVocê ainda não realizou nenhum palpite.\nUse *Novo palpite* para começar! 🎯",
@@ -571,53 +570,141 @@ const worldcupPalpiteFlow = createFlow("copa-palpite", {
         return { end: true };
       }
 
-      const matchPredictions = predictions || [];
-      const totalPages = Math.max(1, Math.ceil(matchPredictions.length / PAGE_SIZE));
-      const safePage = Math.min(page, totalPages - 1);
-      const pageItems = matchPredictions.slice(safePage * PAGE_SIZE, (safePage + 1) * PAGE_SIZE);
+      const futurePreds = matchPreds.filter(p => p.match && (p.match.status === "scheduled" || p.match.status === "live"));
+      const pastPreds   = matchPreds.filter(p => p.match && p.match.status !== "scheduled" && p.match.status !== "live");
+
+      const futureTournament = [championPrediction, zebraPrediction, mvpPrediction].filter(p => p && p.points == null);
+      const pastTournament   = [championPrediction, zebraPrediction, mvpPrediction].filter(p => p && p.points != null);
+
+      const futureCount = futurePreds.length + futureTournament.length;
+      const pastCount   = pastPreds.length   + pastTournament.length;
 
       const optionLabels = [];
-      const optionsMeta = [];
+      const optionsMeta  = [];
 
-      // Palpites de torneio — só na primeira página
+      if (futureCount > 0) {
+        const label = `📅 Palpites futuros (${futureCount})`;
+        optionLabels.push(label);
+        optionsMeta.push({ index: optionLabels.length - 1, label, action: "exec", handler: "showPredictionsByType", data: { type: "future", page: 0 } });
+      }
+      if (pastCount > 0) {
+        const label = `📆 Palpites passados (${pastCount})`;
+        optionLabels.push(label);
+        optionsMeta.push({ index: optionLabels.length - 1, label, action: "exec", handler: "showPredictionsByType", data: { type: "past", page: 0 } });
+      }
+
+      // WhatsApp exige mínimo 2 opções na enquete
+      if (optionLabels.length < 2) {
+        optionLabels.push("🔙 Voltar");
+        optionsMeta.push({ index: optionLabels.length - 1, label: "🔙 Voltar", action: "exec", handler: "backToRoot", data: {} });
+      } else {
+        optionLabels.push("🔙 Voltar");
+        optionsMeta.push({ index: optionLabels.length - 1, label: "🔙 Voltar", action: "exec", handler: "backToRoot", data: {} });
+      }
+
+      await polls.createPoll(ctx.client, ctx.chatId, "📋 Meus palpites", optionLabels, {
+        metadata: { actionType: "menu", flowId: "copa-palpite", path: "/my", userId: ctx.userId, options: optionsMeta },
+      });
+      return { end: true };
+    },
+
+    showPredictionsByType: async (ctx, data = {}) => {
+      const PAGE_SIZE = 8;
+      const type = (data && data.type) || "future";
+      const page = (data && data.page) || 0;
+      const { localize } = require("../../../utils/teamLocale");
+
+      let predictions;
+      let championPrediction = null;
+      let zebraPrediction = null;
+      let mvpPrediction = null;
+      try {
+        [
+          { predictions },
+          { prediction: championPrediction },
+          { prediction: zebraPrediction },
+          { prediction: mvpPrediction },
+        ] = await Promise.all([
+          worldcupClient.getUserPredictions(ctx.userId),
+          worldcupClient.getChampionPrediction(ctx.userId),
+          worldcupClient.getZebraPrediction(ctx.userId),
+          worldcupClient.getMvpPrediction(ctx.userId),
+        ]);
+      } catch (e) {
+        logger.error("[worldcupFlow] showPredictionsByType:", e.message);
+        await ctx.reply("❌ Erro ao buscar palpites.");
+        return { end: true };
+      }
+
+      const allMatch = predictions || [];
+      const isFuture = type === "future";
+
+      // Filtra partidas pelo tipo e ordena crescente por data do jogo
+      const matchItems = allMatch
+        .filter(p => {
+          if (!p.match) return false;
+          const s = p.match.status;
+          return isFuture ? (s === "scheduled" || s === "live") : (s !== "scheduled" && s !== "live");
+        })
+        .sort((a, b) => new Date(a.match.kickoff_at) - new Date(b.match.kickoff_at));
+
+      // Palpites de torneio para este tipo
+      const tournamentItems = [];
+      if (championPrediction) {
+        const resolved = championPrediction.points != null;
+        if ((isFuture && !resolved) || (!isFuture && resolved)) tournamentItems.push({ kind: "champion", p: championPrediction });
+      }
+      if (zebraPrediction) {
+        const resolved = zebraPrediction.points != null;
+        if ((isFuture && !resolved) || (!isFuture && resolved)) tournamentItems.push({ kind: "zebra", p: zebraPrediction });
+      }
+      if (mvpPrediction) {
+        const resolved = mvpPrediction.points != null;
+        if ((isFuture && !resolved) || (!isFuture && resolved)) tournamentItems.push({ kind: "mvp", p: mvpPrediction });
+      }
+
+      const totalMatchPages = Math.max(1, Math.ceil(matchItems.length / PAGE_SIZE));
+
+      // Torneio só na primeira página; partidas paginadas
+      const safePage = Math.min(page, totalMatchPages - 1);
+      const pageMatchItems = matchItems.slice(safePage * PAGE_SIZE, (safePage + 1) * PAGE_SIZE);
+
+      const optionLabels = [];
+      const optionsMeta  = [];
+
+      // Torneio (sem data) aparece no topo da primeira página
       if (safePage === 0) {
-        if (championPrediction) {
-          const { pt, flag } = localize(championPrediction.team);
-          const pts = championPrediction.points != null
-            ? ` — ${championPrediction.points === 20 ? "🎉 +20 pts" : "❌ 0 pts"}`
-            : " — aguardando";
-          const label = `🏆 Campeão: ${flag} ${pt}${pts}`.slice(0, 100);
-          optionLabels.push(label);
-          optionsMeta.push({ index: optionLabels.length - 1, label, action: "exec", handler: "showChampionMenu", data: {} });
-        }
-
-        if (zebraPrediction) {
-          const { pt: zPt, flag: zFlag } = localize(zebraPrediction.team);
-          const zPts = zebraPrediction.points != null
-            ? ` — ${zebraPrediction.points > 0 ? `🎉 +${zebraPrediction.points} pts` : "❌ 0 pts"}` : "";
-          const zLabel = `🦓 Zebra: ${zFlag} ${zPt}${zPts}`.slice(0, 100);
-          optionLabels.push(zLabel);
-          optionsMeta.push({ index: optionLabels.length - 1, label: zLabel, action: "exec", handler: "startZebraInput", data: {} });
-        }
-
-        if (mvpPrediction) {
-          const mvpPts = mvpPrediction.points != null
-            ? ` — ${mvpPrediction.points > 0 ? `🎉 +${mvpPrediction.points} pts` : "❌ 0 pts"}` : "";
-          const mvpLabel = `⭐ Craque: ${mvpPrediction.player_name}${mvpPts}`.slice(0, 100);
-          optionLabels.push(mvpLabel);
-          optionsMeta.push({ index: optionLabels.length - 1, label: mvpLabel, action: "exec", handler: "startMvpInput", data: {} });
+        for (const { kind, p } of tournamentItems) {
+          let label;
+          if (kind === "champion") {
+            const { pt, flag } = localize(p.team);
+            const pts = p.points != null ? ` — ${p.points === 20 ? "🎉 +20 pts" : "❌ 0 pts"}` : " — aguardando";
+            label = `🏆 Campeão: ${flag} ${pt}${pts}`.slice(0, 100);
+            optionLabels.push(label);
+            optionsMeta.push({ index: optionLabels.length - 1, label, action: "exec", handler: "showChampionMenu", data: {} });
+          } else if (kind === "zebra") {
+            const { pt, flag } = localize(p.team);
+            const pts = p.points != null ? ` — ${p.points > 0 ? `🎉 +${p.points} pts` : "❌ 0 pts"}` : "";
+            label = `🦓 Zebra: ${flag} ${pt}${pts}`.slice(0, 100);
+            optionLabels.push(label);
+            optionsMeta.push({ index: optionLabels.length - 1, label, action: "exec", handler: "startZebraInput", data: {} });
+          } else if (kind === "mvp") {
+            const pts = p.points != null ? ` — ${p.points > 0 ? `🎉 +${p.points} pts` : "❌ 0 pts"}` : "";
+            label = `⭐ Craque: ${p.player_name}${pts}`.slice(0, 100);
+            optionLabels.push(label);
+            optionsMeta.push({ index: optionLabels.length - 1, label, action: "exec", handler: "startMvpInput", data: {} });
+          }
         }
       }
 
-      // Palpites de partida desta página
-      for (const p of pageItems) {
+      // Partidas desta página
+      for (const p of pageMatchItems) {
         const m = p.match;
         const label = predictionLabel(p);
         optionLabels.push(label);
-        const idx = optionLabels.length - 1;
         const isEditable = m.status === "scheduled";
         optionsMeta.push({
-          index: idx,
+          index: optionLabels.length - 1,
           label,
           action: "exec",
           handler: isEditable ? "selectMatch" : "showPredictionDetail",
@@ -627,33 +714,40 @@ const worldcupPalpiteFlow = createFlow("copa-palpite", {
         });
       }
 
-      // Navegação de páginas
+      // Navegação de páginas (carrega tipo junto)
       if (safePage > 0) {
         const label = "◀️ Página anterior";
         optionLabels.push(label);
-        optionsMeta.push({ index: optionLabels.length - 1, label, action: "exec", handler: "showMyPredictionsPage", data: { page: safePage - 1 } });
+        optionsMeta.push({ index: optionLabels.length - 1, label, action: "exec", handler: "showPredictionsByType", data: { type, page: safePage - 1 } });
       }
-      if (safePage < totalPages - 1) {
-        const label = `▶️ Próxima página (${safePage + 1}/${totalPages})`;
+      if (safePage < totalMatchPages - 1) {
+        const label = `▶️ Próxima página (${safePage + 1}/${totalMatchPages})`;
         optionLabels.push(label);
-        optionsMeta.push({ index: optionLabels.length - 1, label, action: "exec", handler: "showMyPredictionsPage", data: { page: safePage + 1 } });
+        optionsMeta.push({ index: optionLabels.length - 1, label, action: "exec", handler: "showPredictionsByType", data: { type, page: safePage + 1 } });
       }
 
       optionLabels.push("🔙 Voltar");
-      optionsMeta.push({ index: optionLabels.length - 1, label: "🔙 Voltar", action: "exec", handler: "backToRoot", data: {} });
+      optionsMeta.push({ index: optionLabels.length - 1, label: "🔙 Voltar", action: "exec", handler: "showMyPredictions", data: {} });
 
-      const title = totalPages > 1
-        ? `📋 Meus palpites (${safePage + 1}/${totalPages})`
-        : "📋 Meus palpites";
+      const typeLabel = isFuture ? "📅 Palpites futuros" : "📆 Palpites passados";
+      const title = totalMatchPages > 1
+        ? `${typeLabel} (${safePage + 1}/${totalMatchPages})`
+        : typeLabel;
+
+      // Garante mínimo de 2 opções (exigência do WhatsApp)
+      if (optionLabels.length < 2) {
+        await ctx.reply("Nenhum palpite encontrado para esta categoria.");
+        return { end: true };
+      }
 
       await polls.createPoll(ctx.client, ctx.chatId, title, optionLabels, {
-        metadata: { actionType: "menu", flowId: "copa-palpite", path: "/my", userId: ctx.userId, options: optionsMeta },
+        metadata: { actionType: "menu", flowId: "copa-palpite", path: "/my-type", userId: ctx.userId, options: optionsMeta },
       });
       return { end: true };
     },
 
     showMyPredictionsPage: async (ctx, data) => {
-      return worldcupPalpiteFlow.handlers.showMyPredictions(ctx, data);
+      return worldcupPalpiteFlow.handlers.showPredictionsByType(ctx, data);
     },
 
     showPredictionDetail: async (ctx, data) => {

@@ -280,6 +280,23 @@ async function processVoteViaBackend(pollId, vote, client) {
 }
 
 /**
+ * Compara dois JIDs do WhatsApp como sendo o mesmo número de telefone.
+ * Normaliza números brasileiros de 8 e 9 dígitos: 558185251791 ≡ 5581985251791.
+ */
+function sameWaPhoneNum(a, b) {
+  const digits = (x) => String(x || "").split("@")[0].replace(/\D/g, "");
+  // Normaliza número BR de 13 dígitos (55 + DDD + 9 + 8d) para 12 dígitos (remove o 9)
+  const norm = (x) => {
+    const d = digits(x);
+    if (d.length === 13 && d.startsWith("55")) return "55" + d.slice(2, 4) + d.slice(5);
+    return d;
+  };
+  const na = norm(a);
+  const nb = norm(b);
+  return !!(na && nb && na === nb);
+}
+
+/**
  * Execute action returned by backend
  * @param {Object} result - Result from backend processVote
  * @param {Object} client - WhatsApp client instance
@@ -613,10 +630,8 @@ async function executeAction(result, client) {
 
             // Copa: apenas quem invocou o comando pode interagir com os polls
             if (data.flowId === "copa" || data.flowId === "copa-palpite") {
-              const ownerNum = String(data.userId || "").split("@")[0].replace(/\D/g, "");
-              const voterNum = String(result.voterId || "").split("@")[0].replace(/\D/g, "");
-              if (ownerNum && voterNum && ownerNum !== voterNum) {
-                logger.debug(
+              if (!sameWaPhoneNum(data.userId, result.voterId)) {
+                logger.info(
                   `[processor] Copa: voto ignorado de ${result.voterId} (dono: ${data.userId})`,
                 );
                 break;
@@ -625,10 +640,8 @@ async function executeAction(result, client) {
 
             // Cartola: apenas quem invocou o comando pode interagir com os polls
             if (data.flowId === "cartola") {
-              const ownerNum = String(data.userId || "").split("@")[0].replace(/\D/g, "");
-              const voterNum = String(result.voterId || "").split("@")[0].replace(/\D/g, "");
-              if (ownerNum && voterNum && ownerNum !== voterNum) {
-                logger.debug(
+              if (!sameWaPhoneNum(data.userId, result.voterId)) {
+                logger.info(
                   `[processor] Cartola: voto ignorado de ${result.voterId} (dono: ${data.userId})`,
                 );
                 break;
