@@ -33,7 +33,7 @@ function formatMatch(m) {
   if (m.status === "live" || m.status === "paused" || m.status === "extra_time" || m.status === "penalties") {
     const score = m.home_score != null ? `${m.home_score} x ${m.away_score}` : "0 x 0";
     const statusTag = m.status === "extra_time" ? " — PRORROGAÇÃO" : m.status === "penalties" ? " — PÊNALTIS" : " — AO VIVO";
-    const header = `🔴 ${withFlag(m.home_team)} *${score}* ${withFlag(m.away_team)}${statusTag}${stageTag}`;
+    const header = `🟢 ${withFlag(m.home_team)} *${score}* ${withFlag(m.away_team)}${statusTag}${stageTag}`;
     return goals ? `${header}\n${goals}` : header;
   }
 
