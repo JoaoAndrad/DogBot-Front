@@ -83,7 +83,6 @@ function separator(which) {
   } else if (which === "complete") {
     const secs = ((Date.now() - _startMs) / 1000).toFixed(1);
     console.log(`\n  Operacional em ${secs}s`);
-    console.log(`  ${"─".repeat(46)}\n`);
   }
 }
 
