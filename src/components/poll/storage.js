@@ -1,4 +1,3 @@
-const url = require("url");
 const logger = require("../../utils/logger");
 
 const BACKEND_URL = process.env.BACKEND_URL || "http://127.0.0.1:8000";
@@ -23,6 +22,10 @@ function _headers() {
   return h;
 }
 
+function _url(path) {
+  return new URL(path, BACKEND_URL).href;
+}
+
 async function savePoll(msgId, poll) {
   const payload = {
     id: msgId,
@@ -38,7 +41,7 @@ async function savePoll(msgId, poll) {
     metadata: poll.metadata || poll.meta || null,
   };
   try {
-    const res = await _fetch(url.resolve(BACKEND_URL, "/api/polls/"), {
+    const res = await _fetch(_url("/api/polls/"), {
       method: "POST",
       headers: _headers(),
       body: JSON.stringify(payload),
@@ -60,7 +63,7 @@ async function savePoll(msgId, poll) {
 async function getPoll(msgId) {
   try {
     const res = await _fetch(
-      url.resolve(BACKEND_URL, `/api/polls/${encodeURIComponent(msgId)}/`),
+      _url(`/api/polls/${encodeURIComponent(msgId)}/`),
       {
         method: "GET",
         headers: _headers(),
@@ -84,7 +87,7 @@ async function getPoll(msgId) {
 
 async function listPolls() {
   try {
-    const res = await _fetch(url.resolve(BACKEND_URL, "/api/polls/"), {
+    const res = await _fetch(_url("/api/polls/"), {
       method: "GET",
       headers: _headers(),
     });
@@ -128,7 +131,7 @@ async function findPollsByChat(chatId) {
 
 async function removePoll(msgId) {
   const res = await _fetch(
-    url.resolve(BACKEND_URL, `/api/polls/${encodeURIComponent(msgId)}/`),
+    _url(`/api/polls/${encodeURIComponent(msgId)}/`),
     {
       method: "DELETE",
       headers: _headers(),
@@ -157,7 +160,7 @@ async function recordVote(
   };
 
   const res = await _fetch(
-    url.resolve(BACKEND_URL, `/api/polls/${encodeURIComponent(msgId)}/votes/`),
+    _url(`/api/polls/${encodeURIComponent(msgId)}/votes/`),
     {
       method: "POST",
       headers: _headers(),

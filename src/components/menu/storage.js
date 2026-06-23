@@ -1,5 +1,3 @@
-const url = require("url");
-
 const BACKEND_URL = process.env.BACKEND_URL || "http://127.0.0.1:8000";
 const INTERNAL_SECRET = process.env.POLL_SHARED_SECRET || null;
 
@@ -20,6 +18,10 @@ function _headers() {
   return h;
 }
 
+function _url(path) {
+  return new URL(path, BACKEND_URL).href;
+}
+
 /**
  * Save or update menu state
  * @param {string} userId
@@ -37,7 +39,7 @@ async function saveState(userId, flowId, state) {
     expiresAt: state.expiresAt || null,
   };
 
-  const res = await _fetch(url.resolve(BACKEND_URL, "/api/menu/state"), {
+  const res = await _fetch(_url("/api/menu/state"), {
     method: "POST",
     headers: _headers(),
     body: JSON.stringify(payload),
@@ -59,12 +61,7 @@ async function saveState(userId, flowId, state) {
  */
 async function getState(userId, flowId) {
   const res = await _fetch(
-    url.resolve(
-      BACKEND_URL,
-      `/api/menu/state/${encodeURIComponent(userId)}/${encodeURIComponent(
-        flowId
-      )}`
-    ),
+    _url(`/api/menu/state/${encodeURIComponent(userId)}/${encodeURIComponent(flowId)}`),
     {
       method: "GET",
       headers: _headers(),
@@ -89,12 +86,7 @@ async function getState(userId, flowId) {
  */
 async function deleteState(userId, flowId) {
   const res = await _fetch(
-    url.resolve(
-      BACKEND_URL,
-      `/api/menu/state/${encodeURIComponent(userId)}/${encodeURIComponent(
-        flowId
-      )}`
-    ),
+    _url(`/api/menu/state/${encodeURIComponent(userId)}/${encodeURIComponent(flowId)}`),
     {
       method: "DELETE",
       headers: _headers(),
@@ -118,7 +110,7 @@ async function deleteState(userId, flowId) {
  */
 async function listStates(userId) {
   const res = await _fetch(
-    url.resolve(BACKEND_URL, `/api/menu/state/${encodeURIComponent(userId)}`),
+    _url(`/api/menu/state/${encodeURIComponent(userId)}`),
     {
       method: "GET",
       headers: _headers(),
