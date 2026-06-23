@@ -232,6 +232,28 @@ module.exports = {
     // Marca cedo para o catchup não reprocessar o mesmo /confissao se o bot reiniciar antes do fim do fluxo (enquetes).
     if (msgIdSerialized) jsonStore.markProcessed(msgIdSerialized);
 
+    // Pre-check balance before entering the heavy flow.
+    // This prevents sending the confession to the group when the balance is already 0.
+    // If the backend is unreachable we let the flow proceed (consume will fail later
+    // and the user gets an explicit error) rather than blocking on a transient outage.
+    if (senderNumber && services && services.backend) {
+      try {
+        const balanceRes = await services.backend.sendToBackend(
+          `/api/confessions/balance?senderNumber=${encodeURIComponent(senderNumber)}`,
+          null,
+          "GET",
+        );
+        if (balanceRes && balanceRes.ok && balanceRes.balance === 0) {
+          await reply(
+            "❌ Você não tem confissões disponíveis hoje. O saldo renova à meia-noite.",
+          );
+          return;
+        }
+      } catch (e) {
+        // Backend indisponível — prossegue; o consume falhará com mensagem adequada
+      }
+    }
+
     // media helpers (images/videos) — implemented below
 
     // Find groups in common with the user by scanning bot chats and checking membership
