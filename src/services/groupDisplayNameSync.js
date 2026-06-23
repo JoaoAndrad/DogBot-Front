@@ -150,11 +150,6 @@ async function syncAllGroupDisplayNames(client, opts = {}) {
   }
 
   const processed = groups.length - skippedIgnored;
-  const bootLog = require("../lib/bootLog");
-  const extra = fail > 0
-    ? `${ok}/${processed} grupos  ·  ${fail} falha(s) HTTP`
-    : `${ok}/${processed} grupos`;
-  bootLog.line("grupos", { ok: fail === 0, extra });
   return {
     ok,
     total: groups.length,
