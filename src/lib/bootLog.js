@@ -82,7 +82,8 @@ function separator(which) {
     console.log(`\n${c.bold("dogbot")}  iniciando  ${_nowTime()}\n`);
   } else if (which === "complete") {
     const secs = ((Date.now() - _startMs) / 1000).toFixed(1);
-    console.log(`\n  Operacional em ${secs}s\n`);
+    console.log(`\n  Operacional em ${secs}s`);
+    console.log(`  ${"─".repeat(46)}\n`);
   }
 }
 
