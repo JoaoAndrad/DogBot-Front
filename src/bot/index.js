@@ -53,6 +53,92 @@ async function start() {
     logger.info("WhatsApp client pronto");
 
     try {
+      const messageGate = require("../services/messageGate");
+      const { GATE_ADMIN_POLL_TIMEOUT_MS } = require("../constants");
+
+      messageGate.init(client, {
+        onQueueFull: async ({ queueLength }) => {
+          try {
+            // 1. Find admin users via backend
+            const backendClient = require("../services/backendClient");
+            const res = await backendClient.sendToBackend(
+              "/api/confessions/admins",
+              null,
+              "GET",
+            );
+            const admins = (res && res.admins) || [];
+            const adminNumber =
+              admins[0] && admins[0].sender_number ? admins[0].sender_number : null;
+
+            if (!adminNumber) {
+              logger.warn("[MessageGate] nenhum admin encontrado — descartando fila");
+              messageGate.clearAndResume();
+              return;
+            }
+
+            // 2. Notify admin with context
+            const adminName =
+              (admins[0].push_name || admins[0].display_name || "").split(" ")[0] ||
+              "Admin";
+            await client.sendMessage(
+              adminNumber,
+              `⚠️ *MessageGate* — fila cheia\n\n` +
+              `Há *${queueLength} mensagens* acumuladas na fila de envio do bot.\n` +
+              `Responda à enquete abaixo para decidir o que fazer.`,
+            );
+
+            // 3. Send decision poll — one-shot: first vote wins
+            let decided = false;
+            const onDecision = (shouldResume) => {
+              if (decided) return;
+              decided = true;
+              clearTimeout(autoDiscardTimer);
+              if (shouldResume) {
+                logger.info("[MessageGate] admin liberou a fila");
+                messageGate.resume();
+              } else {
+                logger.info("[MessageGate] admin descartou a fila");
+                messageGate.clearAndResume();
+              }
+            };
+
+            // 4. Auto-discard timeout
+            const autoDiscardTimer = setTimeout(() => {
+              if (!decided) {
+                logger.warn(
+                  `[MessageGate] timeout (${GATE_ADMIN_POLL_TIMEOUT_MS / 60000}min) — descartando fila automaticamente`,
+                );
+                onDecision(false);
+              }
+            }, GATE_ADMIN_POLL_TIMEOUT_MS);
+
+            const polls = require("../components/poll");
+            await polls.createPoll(
+              client,
+              adminNumber,
+              `🚦 Fila com ${queueLength} msgs. O que fazer?`,
+              ["✅ Liberar — processar tudo", "🗑️ Descartar — ignorar fila"],
+              {
+                onVote: async (payload) => {
+                  const idx =
+                    payload.selectedIndexes && payload.selectedIndexes[0] != null
+                      ? Number(payload.selectedIndexes[0])
+                      : -1;
+                  onDecision(idx === 0);
+                },
+              },
+            );
+          } catch (err) {
+            logger.error("[MessageGate] onQueueFull erro:", err && err.message);
+            messageGate.clearAndResume();
+          }
+        },
+      });
+    } catch (err) {
+      logger.warn("[MessageGate] falha ao inicializar:", err && err.message);
+    }
+
+    try {
       const {
         startRoutineTickLoop,
       } = require("../services/routineTickService");

@@ -295,12 +295,23 @@ async function handle(context) {
   }
 
   // prepare reply helper
+  // Real-time replies go through the MessageGate (rate limiting + queue).
+  // Catchup replies bypass the gate — they're already rate-limited by the
+  // 150ms delay in catchup.js and must not block the gate's real-time queue.
+  const _rawSend = () => {
+    if (typeof msg.reply === "function") return msg.reply.bind(msg);
+    if (context.client && from) return (text) => context.client.sendMessage(from, text);
+    return () => Promise.resolve(null);
+  };
+  const _sendFn = _rawSend();
+
   const reply = async (text) => {
     try {
-      if (typeof msg.reply === "function") return await msg.reply(text);
-      if (context.client && from)
-        return await context.client.sendMessage(from, text);
-      return null;
+      if (context.fromCatchup) {
+        return await _sendFn(text);
+      }
+      const messageGate = require("../services/messageGate");
+      return await messageGate.enqueue(() => _sendFn(text));
     } catch (err) {
       logger.error("Erro ao enviar reply:", err);
     }
