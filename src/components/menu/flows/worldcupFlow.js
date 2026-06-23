@@ -712,7 +712,7 @@ const worldcupPalpiteFlow = createFlow("copa-palpite", {
             optionsMeta.push({ index: optionLabels.length - 1, label, action: "exec", handler: "startZebraInput", data: {} });
           } else if (kind === "mvp") {
             const pts = p.points != null ? ` — ${p.points > 0 ? `🎉 +${p.points} pts` : "❌ 0 pts"}` : "";
-            const mvpName = p.player_name && /messi/i.test(p.player_name) ? `${p.player_name} 🐐` : p.player_name;
+            const mvpName = p.player_name && /messi/i.test(p.player_name) ? `${p.player_name} 🐐` : p.player_name && /ronaldo/i.test(p.player_name) ? `${p.player_name} 💩` : p.player_name;
             label = `⭐ Craque: ${mvpName}${pts}`.slice(0, 100);
             optionLabels.push(label);
             optionsMeta.push({ index: optionLabels.length - 1, label, action: "exec", handler: "startMvpInput", data: {} });

@@ -5,7 +5,12 @@ const { withFlag, matchup, localize } = require("../utils/teamLocale");
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-const goat = (n) => (n && /messi/i.test(n) ? `${n} 🐐` : n);
+const goat = (n) => {
+  if (!n) return n;
+  if (/messi/i.test(n)) return `${n} 🐐`;
+  if (/ronaldo/i.test(n)) return `${n} 💩`;
+  return n;
+};
 
 function fmtKickoff(kickoffAt) {
   const d = new Date(kickoffAt);

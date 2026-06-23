@@ -4,7 +4,12 @@ const worldcupClient = require("../../services/worldcupClient");
 const { withFlag } = require("../../utils/teamLocale");
 const logger = require("../../utils/logger");
 
-const goat = (n) => (n && /messi/i.test(n) ? `${n} 🐐` : n);
+const goat = (n) => {
+  if (!n) return n;
+  if (/messi/i.test(n)) return `${n} 🐐`;
+  if (/ronaldo/i.test(n)) return `${n} 💩`;
+  return n;
+};
 
 function formatGoals(goals) {
   if (!goals || !goals.length) return "";
