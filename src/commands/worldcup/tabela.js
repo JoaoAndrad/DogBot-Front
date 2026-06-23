@@ -29,7 +29,7 @@ async function findGroupByTeamName(query) {
   const { standings } = await worldcupClient.getStandings();
   if (!standings || !standings.length) return null;
 
-  const entry = standings.find((s) => localize(s.team_name).pt === ptName);
+  const entry = standings.find((s) => localize(s.team).pt === ptName);
   if (!entry || !entry.group_name) return null;
 
   // "Group K" → "K"
