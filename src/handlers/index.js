@@ -595,14 +595,8 @@ async function handle(context) {
     // Check if bot was mentioned and message contains "treinei"
     const containsTreinei = /\btreinei\b/i.test(body);
 
-    // Debug: log mention detection
     if (containsTreinei && isGroup) {
-      console.log("[workoutHandler] Detected 'treinei' in group message");
-      console.log("[workoutHandler] msg.mentionedIds:", msg.mentionedIds);
-      console.log(
-        "[workoutHandler] client.info.wid:",
-        context.client?.info?.wid?._serialized,
-      );
+      logger.debug("[workoutHandler] Detected 'treinei' in group message", { mentionedIds: msg.mentionedIds });
     }
 
     // Resolve mentioned IDs (handles @lid, @c.us, etc.)
@@ -616,9 +610,7 @@ async function handle(context) {
           const contact = await context.client.getContactById(mentionedId);
           const resolvedId = contact?.id?._serialized || mentionedId;
 
-          console.log(
-            `[workoutHandler] Resolved: ${mentionedId} → ${resolvedId}`,
-          );
+          logger.debug(`[workoutHandler] Resolved: ${mentionedId} → ${resolvedId}`);
 
           if (resolvedId === botId) {
             botWasMentioned = true;
@@ -670,15 +662,11 @@ async function handle(context) {
             senderNumber = resolvedAuthor.replace(/@c\.us$/i, "");
             displayName =
               contact?.pushname || contact?.name || contact?.notify || null;
-            console.log(
-              `[workoutHandler] Author resolved: ${author} → ${resolvedAuthor} → ${senderNumber} (${displayName})`,
-            );
+            logger.debug(`[workoutHandler] Author resolved: ${author} → ${resolvedAuthor} → ${senderNumber} (${displayName})`);
           } catch (err) {
             // Fallback to original author
             senderNumber = author.replace(/@(c\.us|lid)$/i, "");
-            console.log(
-              `[workoutHandler] Author fallback: ${author} → ${senderNumber}`,
-            );
+            logger.debug(`[workoutHandler] Author fallback: ${author} → ${senderNumber}`);
           }
 
           // Extract note: remove bot mention and "treinei" word
