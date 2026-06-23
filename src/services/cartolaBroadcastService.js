@@ -34,16 +34,10 @@ async function getGroupMemberJids(client, groupId) {
 async function sendWithMentions(client, chatId, body, mentionJids) {
   const jids = (mentionJids || []).filter(Boolean);
   if (!jids.length) return client.sendMessage(chatId, body);
-  const contacts = await Promise.all(
-    jids.map((jid) => client.getContactById(jid).catch(() => null)),
-  );
-  const valid = contacts.filter(Boolean);
-  if (valid.length) {
-    try {
-      return await client.sendMessage(chatId, body, { mentions: valid });
-    } catch (e) {
-      logger.warn("[cartolaBroadcast] mentions fallback:", e.message);
-    }
+  try {
+    return await client.sendMessage(chatId, body, { mentions: jids });
+  } catch (e) {
+    logger.warn("[cartolaBroadcast] mentions fallback:", e.message);
   }
   return client.sendMessage(chatId, body);
 }
