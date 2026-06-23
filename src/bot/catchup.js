@@ -68,7 +68,8 @@ async function runCatchup(client, options = {}) {
 
   if (isFirstRun) {
     logger.info("Catchup: firstrun");
-    // Criar checkpoints com timestamp atual para todos os chats
+    // Criar checkpoints com timestamp atual para todos os chats.
+    // chat.lastMessage.timestamp já está disponível no objeto — sem fetchMessages.
     for (const chat of chats) {
       try {
         const chatId =
@@ -76,10 +77,9 @@ async function runCatchup(client, options = {}) {
             ? chat.id._serialized
             : chat.id || chat.name || "unknown";
 
-        // Buscar a última mensagem do chat
-        const messages = await fetchMessagesSafe(chat, { limit: 1 });
-        if (messages.length > 0 && messages[0].timestamp) {
-          storage.setLastTs(chatId, messages[0].timestamp);
+        const lastMsgTs = chat.lastMessage && chat.lastMessage.timestamp;
+        if (lastMsgTs) {
+          storage.setLastTs(chatId, lastMsgTs);
         }
       } catch (err) {
         /* transientes ignorados */
@@ -97,7 +97,7 @@ async function runCatchup(client, options = {}) {
 
   // Fase 1 — recolha paralela: verificar membership + buscar mensagens (sem enviar nada).
   // Paralelizar aqui é seguro porque não há envio de mensagens ao WA.
-  const FETCH_CONCURRENCY = 5;
+  const FETCH_CONCURRENCY = 8;
   const fetchQueue = [...chats];
   /** @type {{ chatId: string, msgs: any[] }[]} */
   const pendingMessages = [];
@@ -114,14 +114,23 @@ async function runCatchup(client, options = {}) {
               ? chat.id._serialized
               : chat.id || chat.name || "unknown";
 
-          const stillInGroup = await chatCleaner.verifyAndCleanGroupChat(
-            client,
-            chat,
-            chatId,
-          );
-          if (!stillInGroup) continue;
-
           const lastTs = storage.getLastTs(chatId) || 0;
+
+          // Fast skip: chat.lastMessage.timestamp já é conhecido sem fetchMessages.
+          // Se a última mensagem do chat não mudou desde nosso checkpoint, não há nada a fazer.
+          const chatLastTs = chat.lastMessage && chat.lastMessage.timestamp;
+          if (chatLastTs && chatLastTs <= lastTs) continue;
+
+          // Verificar membership apenas para grupos (DMs não precisam).
+          if (chat.isGroup) {
+            const stillInGroup = await chatCleaner.verifyAndCleanGroupChat(
+              client,
+              chat,
+              chatId,
+            );
+            if (!stillInGroup) continue;
+          }
+
           const messages = await fetchMessagesSafe(chat, {
             limit: Math.min(limitPerChat, 200),
           });
