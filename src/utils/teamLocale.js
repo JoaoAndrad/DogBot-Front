@@ -81,11 +81,25 @@ function matchup(home, away) {
   return `${withFlag(home)} x ${withFlag(away)}`;
 }
 
+function levenshtein(a, b) {
+  const m = a.length, n = b.length;
+  const dp = Array.from({ length: m + 1 }, (_, i) => [i, ...Array(n).fill(0)]);
+  for (let j = 0; j <= n; j++) dp[0][j] = j;
+  for (let i = 1; i <= m; i++)
+    for (let j = 1; j <= n; j++)
+      dp[i][j] = a[i - 1] === b[j - 1]
+        ? dp[i - 1][j - 1]
+        : 1 + Math.min(dp[i - 1][j], dp[i][j - 1], dp[i - 1][j - 1]);
+  return dp[m][n];
+}
+
 /** Retorna os 5 times cujo nome (PT-BR ou inglês) mais se aproxima da query. */
 function searchTeams(query, limit = 5) {
   const q = query.trim().toLowerCase()
     .normalize("NFD").replace(/[̀-ͯ]/g, "");
   if (!q) return [];
+
+  const maxDist = Math.max(1, Math.floor(q.length / 4));
 
   const seen = new Set();
   const scored = Object.entries(TEAM_LOCALE)
@@ -103,6 +117,18 @@ function searchTeams(query, limit = 5) {
           const words = name.split(" ");
           if (words.some((w) => w.startsWith(q))) s = 40;
           else if (q.split(" ").some((qw) => qw.length >= 3 && name.includes(qw))) s = 20;
+        }
+        if (s === 0 && q.length >= 4) {
+          const dist = levenshtein(q, name);
+          if (dist <= maxDist) s = Math.max(5, 30 - dist * 10);
+          else {
+            // tenta contra cada palavra do nome composto
+            for (const w of name.split(" ")) {
+              if (w.length < 3) continue;
+              const wd = levenshtein(q, w);
+              if (wd <= maxDist) { s = Math.max(5, 20 - wd * 8); break; }
+            }
+          }
         }
         if (s > score) score = s;
       }
