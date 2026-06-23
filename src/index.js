@@ -15,27 +15,35 @@ async function main() {
       extra: `keys=${commands.commands.size}`,
     });
 
-    try {
-      const { syncRegisteredCommandsToBackend } = require("./services/commandPolicySync");
-      const tSync = Date.now();
-      const sync = await syncRegisteredCommandsToBackend(
-        commands.listCommandsForPolicySync(),
-      );
-      bootLog.line("commandPolicySync", {
-        ok: true,
-        ms: Date.now() - tSync,
-        extra: `created=${sync.created ?? 0} skipped=${sync.skipped ?? 0} removed=${sync.removed ?? 0}`,
-      });
-    } catch (err) {
-      bootLog.line("commandPolicySync", {
-        ok: false,
-        ms: 0,
-        extra: err && err.message ? String(err.message) : "sync failed",
-      });
-    }
-
+    // commandPolicySync and bot startup are independent — run in parallel.
+    // Commands are already loaded above, so the bot can start immediately.
     const tBot = Date.now();
-    await BotService.start();
+    const [, botResult] = await Promise.allSettled([
+      (async () => {
+        try {
+          const { syncRegisteredCommandsToBackend } = require("./services/commandPolicySync");
+          const tSync = Date.now();
+          const sync = await syncRegisteredCommandsToBackend(
+            commands.listCommandsForPolicySync(),
+          );
+          bootLog.line("commandPolicySync", {
+            ok: true,
+            ms: Date.now() - tSync,
+            extra: `created=${sync.created ?? 0} skipped=${sync.skipped ?? 0} removed=${sync.removed ?? 0}`,
+          });
+        } catch (err) {
+          bootLog.line("commandPolicySync", {
+            ok: false,
+            ms: 0,
+            extra: err && err.message ? String(err.message) : "sync failed",
+          });
+        }
+      })(),
+      BotService.start(),
+    ]);
+
+    if (botResult.status === "rejected") throw botResult.reason;
+
     bootLog.line("bot", {
       ok: true,
       ms: Date.now() - tBot,
