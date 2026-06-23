@@ -41,9 +41,9 @@ const logger = require("../../utils/logger");
 const { jidFromContact } = require("../../utils/whatsapp/getUserData");
 
 const bootLog = require("../../lib/bootLog");
-bootLog.line("flows", {
+bootLog.line("flow", {
   ok: true,
-  extra: `n=${flowManager.flows.size}`,
+  extra: `${flowManager.flows.size}`,
 });
 
 module.exports = {

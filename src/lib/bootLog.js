@@ -2,8 +2,10 @@
 
 const { execSync } = require("child_process");
 
-const PHASE_W = 10;
-const STATUS_W = 4;
+const PHASE_W = 12;
+const CONTENT_W = 44; // extra + ms stay within this width
+
+let _startMs = 0;
 
 function isBootDebug() {
   const l = String(process.env.LOG_LEVEL || "").toLowerCase();
@@ -30,27 +32,25 @@ function useColor() {
 
 const c = useColor()
   ? {
-      dim: (s) => `\x1b[2m${s}\x1b[0m`,
+      dim:   (s) => `\x1b[2m${s}\x1b[0m`,
+      bold:  (s) => `\x1b[1m${s}\x1b[0m`,
       green: (s) => `\x1b[32m${s}\x1b[0m`,
-      red: (s) => `\x1b[31m${s}\x1b[0m`,
-      yellow: (s) => `\x1b[33m${s}\x1b[0m`,
+      red:   (s) => `\x1b[31m${s}\x1b[0m`,
+      yellow:(s) => `\x1b[33m${s}\x1b[0m`,
     }
   : {
-      dim: (s) => s,
+      dim:   (s) => s,
+      bold:  (s) => s,
       green: (s) => s,
-      red: (s) => s,
-      yellow: (s) => s,
+      red:   (s) => s,
+      yellow:(s) => s,
     };
 
-function padPhase(name) {
-  const s = String(name || "").slice(0, PHASE_W);
-  return s + " ".repeat(Math.max(0, PHASE_W - s.length));
-}
-
-function padMs(ms) {
-  if (ms == null || !Number.isFinite(ms)) return " ".repeat(7);
-  const t = `${Math.round(ms)}ms`;
-  return t.length >= 7 ? t : " ".repeat(7 - t.length) + t;
+function _nowTime() {
+  const d = new Date();
+  return [d.getHours(), d.getMinutes(), d.getSeconds()]
+    .map((n) => String(n).padStart(2, "0"))
+    .join(":");
 }
 
 /**
@@ -59,19 +59,26 @@ function padMs(ms) {
  */
 function line(phase, opts = {}) {
   const ok = opts.ok !== false;
-  const status = ok
-    ? c.green("ok".padEnd(STATUS_W))
-    : c.red("fail".padEnd(STATUS_W));
-  const ms = padMs(opts.ms);
-  const extra = opts.extra ? `  ${opts.extra}` : "";
-  console.log(`[boot] ${padPhase(phase)} ${status} ${ms}${extra}`);
+  const phaseStr = String(phase || "").slice(0, PHASE_W).padEnd(PHASE_W);
+  const label = ok ? phaseStr : c.red(phaseStr);
+  const extra = opts.extra ? String(opts.extra) : "";
+
+  if (opts.ms != null && Number.isFinite(opts.ms)) {
+    const msStr = `${Math.round(opts.ms)}ms`;
+    const gap = Math.max(2, CONTENT_W - extra.length - msStr.length);
+    console.log(`  ${label}  ${extra}${" ".repeat(gap)}${c.dim(msStr)}`);
+  } else {
+    console.log(`  ${label}  ${extra}`);
+  }
 }
 
 function separator(which) {
   if (which === "start") {
-    console.log(c.dim("── dogbot frontend boot ──"));
+    _startMs = Date.now();
+    console.log(`\n${c.bold("dogbot")}  iniciando  ${_nowTime()}\n`);
   } else if (which === "complete") {
-    console.log(c.dim("── boot complete ──"));
+    const secs = ((Date.now() - _startMs) / 1000).toFixed(1);
+    console.log(`\n  operacional em ${secs}s\n`);
   }
 }
 

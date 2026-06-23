@@ -50,11 +50,12 @@ async function start() {
   };
 
   client.on("ready", async () => {
-    logger.info("WhatsApp client pronto");
+    const bootLog = require("../lib/bootLog");
+    bootLog.separator("complete");
 
     try {
       const messageGate = require("../services/messageGate");
-      const { GATE_ADMIN_POLL_TIMEOUT_MS } = require("../constants");
+      const { GATE_ADMIN_POLL_TIMEOUT_MS, GATE_RATE_MS, GATE_QUEUE_MAX, GATE_ENABLED } = require("../constants");
 
       messageGate.init(client, {
         onQueueFull: async ({ queueLength }) => {
@@ -134,6 +135,9 @@ async function start() {
           }
         },
       });
+      bootLog.line("gate", {
+        extra: `${GATE_ENABLED ? "ativo" : "inativo"}  ·  ${GATE_RATE_MS}ms/msg  ·  fila máx ${GATE_QUEUE_MAX}`,
+      });
     } catch (err) {
       logger.warn("[MessageGate] falha ao inicializar:", err && err.message);
     }
@@ -154,9 +158,9 @@ async function start() {
     try {
       const groupRankingService = require("../services/groupRankingService");
       groupRankingService.initialize(client);
-      logger.info("Workout ranking service initialized");
+      bootLog.line("ranking", { extra: "iniciado" });
     } catch (err) {
-      logger.error("Error initializing workout ranking service:", err);
+      bootLog.line("ranking", { ok: false, extra: "falha ao inicializar" });
     }
 
     const config = require("../core/config");
@@ -216,9 +220,8 @@ async function start() {
             );
           }
         }, syncMs);
-        logger.info(
-          `[companionChatSync] sincronização periódica a cada ${syncMs}ms`,
-        );
+        const syncLabel = syncMs >= 60000 ? `${Math.round(syncMs / 60000)}min` : `${syncMs}ms`;
+        bootLog.line("sync", { extra: `periódico  ·  a cada ${syncLabel}` });
       }
     } catch (e) {
       logger.warn("[companionChatSync] não iniciado:", e && e.message);

@@ -9,34 +9,31 @@ async function main() {
     const tCmd = Date.now();
     // load commands before starting the bot so handlers can dispatch them
     commands.loadCommands();
-    bootLog.line("commands", {
-      ok: true,
-      ms: Date.now() - tCmd,
-      extra: `keys=${commands.commands.size}`,
-    });
+    const cmdMs = Date.now() - tCmd;
+    const cmdCount = commands.listCanonicalCommandNames().length;
 
     // commandPolicySync and bot startup are independent — run in parallel.
     // Commands are already loaded above, so the bot can start immediately.
     const tBot = Date.now();
-    const [, botResult] = await Promise.allSettled([
+    const [syncResult, botResult] = await Promise.allSettled([
       (async () => {
         try {
           const { syncRegisteredCommandsToBackend } = require("./services/commandPolicySync");
-          const tSync = Date.now();
           const sync = await syncRegisteredCommandsToBackend(
             commands.listCommandsForPolicySync(),
           );
-          bootLog.line("commandPolicySync", {
-            ok: true,
-            ms: Date.now() - tSync,
-            extra: `created=${sync.created ?? 0} skipped=${sync.skipped ?? 0} removed=${sync.removed ?? 0}`,
-          });
+          const syncExtra = sync.created > 0
+            ? `${cmdCount} cmd  ·  DB +${sync.created}`
+            : `${cmdCount} cmd  ·  DB ok`;
+          bootLog.line("comandos", { ok: true, ms: cmdMs, extra: syncExtra });
+          return sync;
         } catch (err) {
-          bootLog.line("commandPolicySync", {
+          bootLog.line("comandos", {
             ok: false,
-            ms: 0,
-            extra: err && err.message ? String(err.message) : "sync failed",
+            ms: cmdMs,
+            extra: `${cmdCount} cmd  ·  sync falhou`,
           });
+          throw err;
         }
       })(),
       BotService.start(),
@@ -44,13 +41,12 @@ async function main() {
 
     if (botResult.status === "rejected") throw botResult.reason;
 
-    bootLog.line("bot", {
+    bootLog.line("WhatsApp", {
       ok: true,
       ms: Date.now() - tBot,
-      extra: "wa+polls+internal_api",
+      extra: "conectado",
     });
-    bootLog.separator("complete");
-    // Keep process alive
+    // separator("complete") fires from bot/index.js ready handler once WA is truly ready
     process.on("SIGINT", async () => {
       console.log("SIGINT recebido, parando bot...");
       await BotService.stop();

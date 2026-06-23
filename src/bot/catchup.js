@@ -180,7 +180,8 @@ async function runCatchup(client, options = {}) {
     }
   }
 
-  logger.info("Catchup: concluído");
+  const bootLog = require("../lib/bootLog");
+  bootLog.line("catchup", { extra: "concluído" });
   // Run in background — sync is non-critical and shouldn't delay the ready state
   groupDisplayNameSync
     .syncAllGroupDisplayNames(client, { force: true })

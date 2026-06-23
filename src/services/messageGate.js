@@ -133,9 +133,7 @@ function init(client, opts = {}) {
   _lastRefill = Date.now();
   _paused = false;
   _waitingForAdmin = false;
-  logger.info(
-    `[MessageGate] iniciado — enabled=${GATE_ENABLED} rate=${GATE_RATE_MS}ms burst=${GATE_BURST} qmax=${GATE_QUEUE_MAX} qwarn=${GATE_QUEUE_WARN}`,
-  );
+  logger.debug("[MessageGate] iniciado");
 }
 
 /**

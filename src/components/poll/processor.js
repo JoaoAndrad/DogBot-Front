@@ -963,7 +963,7 @@ async function restoreAllPolls(client) {
         "[processor] Response content:",
         JSON.stringify(polls).substring(0, 200),
       );
-      bootLog.line("polls", { ok: false, extra: "backend response invalid" });
+      bootLog.line("enquetes", { ok: false, extra: "resposta inválida do backend" });
       return;
     }
 
@@ -991,9 +991,10 @@ async function restoreAllPolls(client) {
     const typesStr = Object.entries(pollsByType)
       .map(([k, v]) => `${k}=${v}`)
       .join(" ");
-    bootLog.line("polls", {
+    const menuCount = pollsByType["menu"] || 0;
+    bootLog.line("enquetes", {
       ok: true,
-      extra: `db=${polls.length} handlers=${recoverable}/${polls.length}${typesStr ? ` ${typesStr}` : ""}`,
+      extra: `${polls.length} no BD  ·  ${menuCount} menu`,
     });
     logger.debug("[processor] Poll types:", pollsByType);
     logger.debug(
@@ -1003,9 +1004,9 @@ async function restoreAllPolls(client) {
     logger.error("[processor] Failed to validate polls:", error.message);
     logger.error("[processor] Stack trace:", error.stack);
     logger.error("[processor] Full error:", error);
-    bootLog.line("polls", {
+    bootLog.line("enquetes", {
       ok: false,
-      extra: error && error.message ? String(error.message) : "error",
+      extra: error && error.message ? String(error.message) : "erro",
     });
   }
 }

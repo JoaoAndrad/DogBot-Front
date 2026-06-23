@@ -592,9 +592,9 @@ async function startInternalApi(client, opts = {}) {
   await new Promise((resolve, reject) => {
     server = appInstance.listen(PORT, HOST, (err) => {
       if (err) return reject(err);
-      bootLog.line("internal", {
+      bootLog.line("API interna", {
         ok: true,
-        extra: `http://${HOST}:${PORT}`,
+        extra: `porta ${PORT}`,
       });
       resolve();
     });
