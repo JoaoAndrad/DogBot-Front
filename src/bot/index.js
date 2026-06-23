@@ -222,6 +222,7 @@ async function start() {
         }, syncMs);
         const syncLabel = syncMs >= 60000 ? `${Math.round(syncMs / 60000)}min` : `${syncMs}ms`;
         bootLog.line("sync", { extra: `periódico  ·  a cada ${syncLabel}` });
+        console.log(`\n  ${"─".repeat(46)}`);
       }
     } catch (e) {
       logger.warn("[companionChatSync] não iniciado:", e && e.message);
