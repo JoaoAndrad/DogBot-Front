@@ -1,7 +1,11 @@
 "use strict";
 
+const crypto = require("crypto");
 const logger = require("../utils/logger");
 const { withFlag, matchup, localize } = require("../utils/teamLocale");
+
+const PLAYER_PHOTO_URL = (id) => `https://media.api-sports.io/football/players/${id}.png`;
+const PLACEHOLDER_HASH = "2ff7d52a628fce5d954c58480dde4e47396db4bb405b7b7d6a6567134bf86422";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -601,10 +605,27 @@ async function sendWithMentions(client, chatId, body, mentionJids) {
   return client.sendMessage(chatId, body);
 }
 
+async function fetchScorerSticker(scorerId) {
+  if (!scorerId) return null;
+  try {
+    const res = await fetch(PLAYER_PHOTO_URL(scorerId));
+    if (!res.ok) return null;
+    const buf = Buffer.from(await res.arrayBuffer());
+    const hash = crypto.createHash("sha256").update(buf).digest("hex");
+    if (hash === PLACEHOLDER_HASH) return null;
+    const sharp = require("sharp");
+    const webp = await sharp(buf).resize(512, 512, { fit: "cover" }).webp().toBuffer();
+    return webp;
+  } catch {
+    return null;
+  }
+}
+
 async function handleGoal(client, action) {
   const {
     match,
     scorer,
+    scorerId,
     assist,
     goalDetail,
     minute,
@@ -644,6 +665,8 @@ async function handleGoal(client, action) {
     if (assist && !detailTag) scorerLine += `\n🎯 Assistência: ${goat(assist)}`;
   }
 
+  const stickerBuf = goalDetail !== "Own Goal" ? await fetchScorerSticker(scorerId) : null;
+
   for (const groupId of groupIds) {
     try {
       const memberJids = await getGroupMemberJids(client, groupId);
@@ -666,6 +689,16 @@ async function handleGoal(client, action) {
       if (predBlock) lines.push(predBlock);
 
       await sendWithMentions(client, groupId, lines.join("\n"), mentionIds);
+
+      if (stickerBuf) {
+        try {
+          const { MessageMedia } = require("whatsapp-web.js");
+          const media = new MessageMedia("image/webp", stickerBuf.toString("base64"));
+          await client.sendMessage(groupId, media, { sendMediaAsSticker: true });
+        } catch (e) {
+          logger.debug(`[worldcupTick] sticker → ${groupId}:`, e.message);
+        }
+      }
     } catch (e) {
       logger.warn(`[worldcupTick] goal → ${groupId}:`, e.message);
     }
@@ -890,7 +923,7 @@ async function handleMiss(client, action) {
 }
 
 async function handleGoalScorer(client, action) {
-  const { scorerName, assistName, goalDetail, minute, groupIds } = action;
+  const { scorerName, scorerId, assistName, goalDetail, minute, groupIds } = action;
   if (!groupIds || !groupIds.length) return;
 
   const minuteTag = minute ? ` ${minute}'` : "";
@@ -903,9 +936,21 @@ async function handleGoalScorer(client, action) {
   let msg = `⚽ *Marcou:* ${goat(scorerName)}${minuteTag}${detailTag}`;
   if (assistName && !detailTag) msg += `\n🎯 *Assistência:* ${goat(assistName)}`;
 
+  const stickerBuf = goalDetail !== "Own Goal" ? await fetchScorerSticker(scorerId) : null;
+
   for (const groupId of groupIds) {
     try {
       await client.sendMessage(groupId, msg);
+
+      if (stickerBuf) {
+        try {
+          const { MessageMedia } = require("whatsapp-web.js");
+          const media = new MessageMedia("image/webp", stickerBuf.toString("base64"));
+          await client.sendMessage(groupId, media, { sendMediaAsSticker: true });
+        } catch (e) {
+          logger.debug(`[worldcupTick] sticker → ${groupId}:`, e.message);
+        }
+      }
     } catch (e) {
       logger.warn(`[worldcupTick] goal_scorer → ${groupId}:`, e.message);
     }
