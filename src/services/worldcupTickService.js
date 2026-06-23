@@ -8,7 +8,7 @@ const { withFlag, matchup, localize } = require("../utils/teamLocale");
 const goat = (n) => {
   if (!n) return n;
   if (/messi/i.test(n)) return `${n} 🐐`;
-  if (/ronaldo/i.test(n)) return `${n} 💩`;
+  if (/cristiano\s+ronaldo|c\.?\s*ronaldo/i.test(n)) return `${n} 💩`;
   return n;
 };
 
