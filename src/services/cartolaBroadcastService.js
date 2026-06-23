@@ -3,6 +3,9 @@
 const logger = require("../utils/logger");
 const { withFlag } = require("../utils/teamLocale");
 
+const INTER_MSG_DELAY_MS = 2000;
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
 const POSICAO = { 1: "GOL", 2: "LAT", 3: "ZAG", 4: "MEI", 5: "ATA", 6: "TEC" };
 
 function fmt(n) {
@@ -185,6 +188,7 @@ async function processActions(client, actions) {
     } catch (e) {
       logger.warn("[cartolaBroadcast] time_completo falhou:", e.message);
     }
+    await sleep(INTER_MSG_DELAY_MS);
   }
 
   for (const [, batch] of groupedNaoJogou) {
@@ -194,8 +198,7 @@ async function processActions(client, actions) {
       } else {
         const copa = batch[0].isCopa;
         const prefix = copa ? "🏆 " : "";
-        // Agrupa por atleta → lista de donos
-        const byAtleta = new Map(); // atletaNome → [displayName, ...]
+        const byAtleta = new Map();
         for (const a of batch) {
           for (const nome of (a.atletas || [])) {
             if (!byAtleta.has(nome)) byAtleta.set(nome, []);
@@ -211,6 +214,7 @@ async function processActions(client, actions) {
     } catch (e) {
       logger.warn("[cartolaBroadcast] atleta_nao_jogou falhou:", e.message);
     }
+    await sleep(INTER_MSG_DELAY_MS);
   }
 
   for (const action of remaining) {
@@ -219,6 +223,7 @@ async function processActions(client, actions) {
     } catch (e) {
       logger.warn("[cartolaBroadcast] action falhou:", action.kind, e.message);
     }
+    await sleep(INTER_MSG_DELAY_MS);
   }
 
   for (const action of lembreteActions) {
@@ -231,6 +236,7 @@ async function processActions(client, actions) {
     } catch (e) {
       logger.warn(`[cartolaBroadcast] ${action.kind} falhou:`, e.message);
     }
+    await sleep(INTER_MSG_DELAY_MS);
   }
 }
 
