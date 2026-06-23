@@ -1,7 +1,7 @@
 "use strict";
 
 const worldcupClient = require("../../services/worldcupClient");
-const { withFlag } = require("../../utils/teamLocale");
+const { withFlag, localize } = require("../../utils/teamLocale");
 const logger = require("../../utils/logger");
 
 const goat = (n) => {
@@ -17,7 +17,8 @@ function formatGoals(goals) {
     .map((g) => {
       const min = g.minute != null ? `${g.minute}' ` : "";
       const name = goat(g.scorer) || "";
-      return `   ⚽ ${min}${name}`.trimEnd();
+      const flag = g.team ? (localize(g.team).flag || "") : "";
+      return `   ⚽ ${min}${name}${flag ? ` ${flag}` : ""}`.trimEnd();
     })
     .join("\n");
 }
