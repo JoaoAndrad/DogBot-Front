@@ -112,7 +112,7 @@ async function logPngDimensions(buffer, label, deviceScaleFactor) {
       : DEFAULT_CARD_VIEWPORT.deviceScaleFactor;
   try {
     const meta = await sharp(buffer).metadata();
-    console.log(
+    console.debug(
       `[${label}] PNG: ${meta.width}×${meta.height}px (DPR=${dpr})`,
     );
   } catch (e) {
@@ -122,11 +122,11 @@ async function logPngDimensions(buffer, label, deviceScaleFactor) {
 
 async function getBrowser() {
   if (browserInstance && browserInstance.isConnected()) {
-    console.log("[statsCard] Reutilizando instância de browser existente");
+    console.debug("[statsCard] Reutilizando instância de browser existente");
     return browserInstance;
   }
 
-  console.log("[statsCard] Lançando nova instância de Puppeteer...");
+  console.debug("[statsCard] Lançando nova instância de Puppeteer...");
   browserInstance = await puppeteer.launch({
     headless: true,
     args: [
@@ -136,7 +136,7 @@ async function getBrowser() {
       "--disable-gpu",
     ],
   });
-  console.log("[statsCard] Browser lançado com sucesso");
+  console.debug("[statsCard] Browser lançado com sucesso");
 
   return browserInstance;
 }
@@ -477,7 +477,7 @@ async function renderBooksCard(data, opts = {}) {
 
 async function renderRatingsCard(data, opts = {}) {
   const payload = normalizeRatingsTemplateData(data);
-  console.log("[statsRatingsCard] Iniciando renderização");
+  console.debug("[statsRatingsCard] Iniciando renderização");
 
   if (payload.logoPath) {
     const exists = fs.existsSync(payload.logoPath);
@@ -508,7 +508,7 @@ async function renderRatingsCard(data, opts = {}) {
       deviceScaleFactor:
         opts.deviceScaleFactor ?? DEFAULT_CARD_VIEWPORT.deviceScaleFactor,
     };
-    console.log("[statsRatingsCard] Configurando viewport:", viewport);
+    console.debug("[statsRatingsCard] Configurando viewport:", viewport);
     await page.setViewport(viewport);
     await page.setContent(html, { waitUntil: "networkidle0" });
     const buffer = await page.screenshot({
@@ -526,42 +526,24 @@ async function renderRatingsCard(data, opts = {}) {
 }
 
 async function renderCard(data, opts = {}) {
-  console.log("[statsCard] Iniciando renderização com dados:", {
+  console.debug("[statsCard] Iniciando renderização com dados:", {
     total: data.total,
     unique: data.unique,
     time: data.time,
   });
 
   // Convert logo to base64 if logoPath is provided
-  console.log("[statsCard/LOGO] logoPath recebido:", data.logoPath);
+  console.debug("[statsCard/LOGO] logoPath recebido:", data.logoPath);
 
   if (data.logoPath) {
-    console.log(
-      "[statsCard/LOGO] Verificando se arquivo existe:",
-      data.logoPath,
-    );
     const exists = fs.existsSync(data.logoPath);
-    console.log("[statsCard/LOGO] Arquivo existe?", exists);
 
     if (exists) {
       try {
-        console.log("[statsCard/LOGO] Lendo arquivo do logo...");
         const logoBuffer = fs.readFileSync(data.logoPath);
-        console.log(
-          "[statsCard/LOGO] Logo lido, tamanho:",
-          logoBuffer.length,
-          "bytes",
-        );
-
         const logoBase64 = logoBuffer.toString("base64");
-        console.log(
-          "[statsCard/LOGO] Logo convertido para base64, tamanho:",
-          logoBase64.length,
-          "caracteres",
-        );
-
         data.logoBase64 = `data:image/png;base64,${logoBase64}`;
-        console.log("[statsCard/LOGO] ✅ Logo base64 configurado com sucesso");
+        console.debug("[statsCard/LOGO] ✅ Logo base64 configurado com sucesso");
       } catch (err) {
         console.error("[statsCard/LOGO] ❌ Erro ao converter logo:", err);
         data.logoBase64 = "";
@@ -579,29 +561,12 @@ async function renderCard(data, opts = {}) {
   }
 
   const html = tpl(data);
-  console.log(
-    "[statsCard] Template HTML compilado, tamanho:",
-    html.length,
-    "caracteres",
-  );
-
-  // Log para verificar se logoBase64 está no HTML
-  if (data.logoBase64) {
-    const hasLogoInHtml = html.includes('class="logo"');
-    console.log(
-      "[statsCard/LOGO] Tag de logo presente no HTML?",
-      hasLogoInHtml,
-    );
-  }
 
   let browser = null;
   let page = null;
 
   try {
-    console.log("[statsCard] Obtendo instância do browser...");
     browser = await getBrowser();
-
-    console.log("[statsCard] Criando nova página...");
     page = await browser.newPage();
 
     const viewport = {
@@ -610,30 +575,16 @@ async function renderCard(data, opts = {}) {
       deviceScaleFactor:
         opts.deviceScaleFactor ?? DEFAULT_CARD_VIEWPORT.deviceScaleFactor,
     };
-    console.log("[statsCard] Configurando viewport:", viewport);
     await page.setViewport(viewport);
-
-    console.log("[statsCard] Carregando HTML na página...");
     await page.setContent(html, { waitUntil: "networkidle0" });
-    console.log("[statsCard] HTML carregado com sucesso");
 
-    console.log("[statsCard] Capturando screenshot...");
     const buffer = await page.screenshot({
       type: "png",
       fullPage: true,
     });
     await logPngDimensions(buffer, "statsCard", viewport.deviceScaleFactor);
-    console.log(
-      "[statsCard] Screenshot capturado, tamanho:",
-      buffer.length,
-      "bytes",
-    );
 
     await page.close();
-    console.log("[statsCard] Página fechada");
-
-    // Return buffer directly without downscaling for maximum quality
-    console.log("[statsCard] Imagem final:", buffer.length, "bytes");
     return buffer;
   } catch (error) {
     console.error("[statsCard] Erro durante renderização:", error);

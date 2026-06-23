@@ -214,7 +214,7 @@ async function _submitPrediction(stateKey, data, reply) {
       `💡 *Atalho rápido:* */palpite ${homePt} ${data.predictedHome}x${data.predictedAway} ${awayPt}*`,
     );
     await reply(lines.join("\n"));
-    logger.info(`[copa-palpite] palpite salvo: ${userId.split("@")[0]} — ${data.homeTeam} ${data.predictedHome}x${data.predictedAway} ${data.awayTeam}`);
+    logger.debug(`[copa-palpite] palpite salvo: ${userId.split("@")[0]} — ${data.homeTeam} ${data.predictedHome}x${data.predictedAway} ${data.awayTeam}`);
   } catch (e) {
     conversationState.clearState(stateKey);
     const msg = e.message === "match_already_started"
