@@ -562,13 +562,13 @@ async function handleReminder1h(client, action) {
     try {
       await client.sendMessage(jid, dmText);
 
-      // Registra alerta ignorado; auto-desativa após MAX_IGNORED jogos sem palpite
+      // Registra alerta ignorado; auto-desativa após MAX_IGNORED jogos consecutivos sem palpite
       const count = dmAlertState.recordAlert(jid, match.id);
       if (count >= dmAlertState.MAX_IGNORED) {
         logger.info(
           `[worldcupTick] auto-desativando alertas DM para ${jid} (${count} ignorados)`,
         );
-        dmAlertState.clearUser(jid);
+        dmAlertState.markAutoDisabled(jid);
         worldcupClient.setDmAlerts(jid, false).catch((e) => {
           logger.debug(
             `[worldcupTick] setDmAlerts(false) error for ${jid}:`,

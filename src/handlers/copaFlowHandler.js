@@ -186,7 +186,10 @@ async function _submitPrediction(stateKey, data, reply) {
       penaltiesWinner:    data.penalties_winner    ?? null,
     });
     conversationState.clearState(stateKey);
-    dmAlertState.clearUser(userId);
+    const wasAutoDisabled = dmAlertState.clearUser(userId);
+    if (wasAutoDisabled) {
+      worldcupClient.setDmAlerts(userId, true).catch(() => {});
+    }
 
     const kickoff = new Date(data.kickoffAt);
     const date = kickoff.toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo", day: "2-digit", month: "2-digit" });
