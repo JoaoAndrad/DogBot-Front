@@ -25,10 +25,10 @@ const GATE_RATE_MS = e("GATE_RATE_MS", 800);
 const GATE_BURST = e("GATE_BURST", 3);
 
 /** Queue length that triggers the admin poll (gate pauses). */
-const GATE_QUEUE_MAX = e("GATE_QUEUE_MAX", 50);
+const GATE_QUEUE_MAX = e("GATE_QUEUE_MAX", 20);
 
 /** Queue length that logs a warning (below MAX, no pause). */
-const GATE_QUEUE_WARN = e("GATE_QUEUE_WARN", 20);
+const GATE_QUEUE_WARN = e("GATE_QUEUE_WARN", 15);
 
 /** Whether the gate is active. false = all sends bypass the gate. */
 const GATE_ENABLED = eb("GATE_ENABLED", true);
@@ -39,7 +39,7 @@ const GATE_ADMIN_POLL_TIMEOUT_MS = e("GATE_ADMIN_POLL_TIMEOUT_MS", 10 * 60 * 100
 // ── Catchup ──────────────────────────────────────────────────────────────────
 
 /** ms to wait after WA ready event before starting catchup. */
-const CATCHUP_DELAY_MS = e("CATCHUP_DELAY_MS", 2000);
+const CATCHUP_DELAY_MS = e("CATCHUP_DELAY_MS", 3000);
 
 /** Messages older than this (seconds) are skipped in catchup. 0 = no limit. */
 const CATCHUP_MAX_AGE_SECS = e("CATCHUP_MAX_AGE_SECS", 300);
