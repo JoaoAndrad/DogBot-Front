@@ -62,7 +62,8 @@ function _nowTime() {
  */
 function line(phase, opts = {}) {
   const ok = opts.ok !== false;
-  const phaseStr = String(phase || "").slice(0, PHASE_W).padEnd(PHASE_W);
+  const raw = String(phase || "");
+  const phaseStr = (raw.charAt(0).toUpperCase() + raw.slice(1)).slice(0, PHASE_W).padEnd(PHASE_W);
   const label = ok ? phaseStr : c.red(phaseStr);
   const extra = opts.extra ? String(opts.extra) : "";
 
@@ -81,7 +82,7 @@ function separator(which) {
     console.log(`\n${c.bold("dogbot")}  iniciando  ${_nowTime()}\n`);
   } else if (which === "complete") {
     const secs = ((Date.now() - _startMs) / 1000).toFixed(1);
-    console.log(`\n  operacional em ${secs}s\n`);
+    console.log(`\n  Operacional em ${secs}s\n`);
   }
 }
 
