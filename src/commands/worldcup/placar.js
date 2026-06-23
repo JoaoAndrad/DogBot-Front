@@ -64,8 +64,8 @@ module.exports = {
           const entry = leaderboard[i];
           const medal = medals[i] || `${i + 1}.`;
           const name =
-            entry.pushName ||
             entry.displayName ||
+            entry.pushName ||
             (entry.senderNumber ? entry.senderNumber.split("@")[0] : "?");
           const pts = entry.bolaoPoints === 1 ? "pt" : "pts";
           const count = entry.predictionsScored || 0;
@@ -91,8 +91,8 @@ module.exports = {
               const entry = general[i];
               const medal = medals[i] || `${i + 1}.`;
               const name =
-                entry.pushName ||
                 entry.displayName ||
+                entry.pushName ||
                 (entry.senderNumber ? entry.senderNumber.split("@")[0] : "?");
               const pts = entry.totalPoints === 1 ? "pt" : "pts";
               const count = entry.predictionsScored || 0;
@@ -127,8 +127,8 @@ module.exports = {
         const entry = leaderboard[i];
         const medal = medals[i] || `${i + 1}.`;
         const name =
-          entry.pushName ||
           entry.displayName ||
+          entry.pushName ||
           (entry.senderNumber ? entry.senderNumber.split("@")[0] : "?");
         const pts = entry.totalPoints === 1 ? "pt" : "pts";
         const count = entry.predictionsScored || 0;
