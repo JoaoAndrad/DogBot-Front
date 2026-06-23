@@ -106,19 +106,13 @@ module.exports = {
         // Delete original message
         if (originalMsg && typeof originalMsg.delete === "function") {
           try {
-            const deleteResult = await originalMsg.delete(true, true);
-
-            // Alternative: try without parameters if first attempt returned undefined
-            if (deleteResult === undefined || deleteResult === false) {
-              await originalMsg.delete();
-            }
+            await originalMsg.delete(true);
           } catch (err) {
             console.error("[confissao] ERRO ao deletar mensagem original:", {
               error: err?.message || err,
               stack: err?.stack,
             });
           }
-        } else {
         }
       } catch (err) {
         // Silently fail cleanup
@@ -877,6 +871,7 @@ module.exports = {
                   return;
                 }
 
+                let confirmMsg;
                 try {
                   const remaining = consumeResult.ok
                     ? consumeResult.remaining
@@ -886,7 +881,6 @@ module.exports = {
                     (remaining === null ||
                       remaining === Infinity ||
                       String(remaining).toLowerCase() === "infinity");
-                  let confirmMsg;
                   if (consumeResult.ok && isVip) {
                     confirmMsg = await reply(
                       "*🎉 Sua confissão foi enviada anonimamente com sucesso!* \n\n🙏 Você possui confissões vitalícias — não será debitado. 💸",
@@ -912,10 +906,10 @@ module.exports = {
                       `✅ Confissão enviada ao grupo ${targetGroup.name}. Não foi possível confirmar o saldo no momento.`,
                     );
                   }
-                  await cleanupAfterConfession(message, confirmMsg);
                 } catch (e) {
                   // ignore reply errors
                 }
+                await cleanupAfterConfession(message, confirmMsg);
               } catch (err) {
                 console.error(
                   "Erro ao notificar backend sobre consumo de confissão (menção):",
@@ -1065,6 +1059,7 @@ module.exports = {
           return;
         }
 
+        let confirmMsg;
         try {
           const remaining = consumeResult.ok
             ? consumeResult.remaining
@@ -1074,7 +1069,6 @@ module.exports = {
             (remaining === null ||
               remaining === Infinity ||
               String(remaining).toLowerCase() === "infinity");
-          let confirmMsg;
           if (consumeResult.ok && isVip) {
             confirmMsg = await reply(
               "*🎉 Sua confissão foi enviada anonimamente com sucesso!* \n\n🙏 Você possui confissões vitalícias — não será debitado. 💸",
@@ -1098,10 +1092,10 @@ module.exports = {
               `✅ Confissão enviada ao grupo ${target.name}. Não foi possível confirmar o saldo no momento.`,
             );
           }
-          await cleanupAfterConfession(message, confirmMsg);
         } catch (e) {
           // ignore reply errors
         }
+        await cleanupAfterConfession(message, confirmMsg);
       } catch (err) {
         console.error(
           "Erro ao notificar backend sobre consumo de confissão (único grupo):",
@@ -1273,6 +1267,7 @@ module.exports = {
           }
 
           const pickedName = candidateGroups[pick].name;
+          let confirmMsg;
           try {
             const remaining = consumeResult.ok
               ? consumeResult.remaining
@@ -1282,7 +1277,6 @@ module.exports = {
               (remaining === null ||
                 remaining === Infinity ||
                 String(remaining).toLowerCase() === "infinity");
-            let confirmMsg;
             if (consumeResult.ok && isVip) {
               confirmMsg = await reply(
                 "*🎉 Sua confissão foi enviada anonimamente com sucesso!* \n\n🙏 Você possui confissões vitalícias — não será debitado. 💸",
@@ -1306,8 +1300,8 @@ module.exports = {
                 `✅ Confissão enviada ao grupo ${pickedName}. Não foi possível confirmar o saldo no momento.`,
               );
             }
-            await cleanupAfterConfession(message, confirmMsg);
           } catch (e) {}
+          await cleanupAfterConfession(message, confirmMsg);
         } catch (err) {
           console.error(
             "Erro ao notificar backend sobre consumo de confissão:",
