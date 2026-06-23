@@ -2,6 +2,8 @@ const flowManager = require("../../components/menu/flowManager");
 const logger = require("../../utils/logger");
 const { jidFromContact } = require("../../utils/whatsapp/getUserData");
 
+//deve ser atualizado sempre que algo novo for adicionado
+
 module.exports = {
   name: "ajuda",
   aliases: ["help"],
