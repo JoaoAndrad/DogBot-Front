@@ -116,7 +116,10 @@ function searchTeams(query, limit = 5) {
         else if (q.length >= 3) {
           const words = name.split(" ");
           if (words.some((w) => w.startsWith(q))) s = 40;
-          else if (q.split(" ").some((qw) => qw.length >= 3 && name.includes(qw))) s = 20;
+          else {
+            const qSig = q.split(" ").filter((qw) => qw.length >= 3);
+            if (qSig.length >= 2 && qSig.every((qw) => name.includes(qw))) s = 20;
+          }
         }
         if (s === 0 && q.length >= 4) {
           const dist = levenshtein(q, name);
