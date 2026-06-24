@@ -28,7 +28,10 @@ function formatMeta(m) {
   const stage = groupLetter ? `Grupo ${groupLetter}` : "";
   const venue = m.venue || "";
   const meta = [stage, venue].filter(Boolean).join(" · ");
-  const palpites = m.predictionCount > 0 ? `🎯 ${m.predictionCount} palpite${m.predictionCount !== 1 ? "s" : ""}` : "";
+  let palpites = m.predictionCount > 0 ? `🎯 ${m.predictionCount} palpite${m.predictionCount !== 1 ? "s" : ""}` : "";
+  if (palpites && m.exactScoreCount != null) {
+    palpites += ` · ✅ ${m.exactScoreCount} acertaram o placar`;
+  }
   return [meta ? `🏟️ ${meta}` : "", palpites].filter(Boolean).join("\n");
 }
 
