@@ -300,12 +300,12 @@ async function _saveChampion(stateKey, userId, team, flag, reply) {
   try {
     await worldcupClient.submitChampionPrediction(userId, team);
     conversationState.clearState(stateKey);
-    await reply(`✅ *Palpite salvo!*\n\n🏆 Campeão: *${flag} ${team}*\n\nPode alterar até o fim da fase de grupos.`);
+    await reply(`✅ *Palpite salvo!*\n\n🏆 Campeão: *${flag} ${team}*\n\nPode alterar até o início do mata-mata.`);
     logger.debug(`[copa-champion] ${userId.split("@")[0]} → ${team}`);
   } catch (e) {
     conversationState.clearState(stateKey);
-    const msg = e.message === "group_stage_over"
-      ? "❌ A fase de grupos acabou. Não é mais possível votar no campeão."
+    const msg = (e.message === "knockout_started" || e.message === "group_stage_over")
+      ? "❌ O mata-mata já começou. Não é mais possível alterar o palpite de campeão."
       : `❌ Erro ao salvar: ${e.message}`;
     await reply(msg);
   }
@@ -353,12 +353,12 @@ async function _saveZebra(stateKey, userId, team, flag, reply) {
   try {
     await worldcupClient.submitZebraPrediction(userId, team);
     conversationState.clearState(stateKey);
-    await reply(`✅ *Zebra salva!*\n\n🦓 Sua zebra: *${flag} ${team}*\n\nPode alterar até o fim da fase de grupos.`);
+    await reply(`✅ *Zebra salva!*\n\n🦓 Sua zebra: *${flag} ${team}*\n\nPode alterar até o início do mata-mata.`);
     logger.debug(`[copa-zebra] ${userId.split("@")[0]} → ${team}`);
   } catch (e) {
     conversationState.clearState(stateKey);
-    const msg = e.message === "group_stage_over"
-      ? "❌ A fase de grupos acabou. Não é mais possível votar na zebra."
+    const msg = (e.message === "knockout_started" || e.message === "group_stage_over")
+      ? "❌ O mata-mata já começou. Não é mais possível alterar o palpite de zebra."
       : `❌ Erro ao salvar: ${e.message}`;
     await reply(msg);
   }
@@ -380,12 +380,12 @@ async function handleCopaMvpFlow(stateKey, body, state, reply) {
     const userId = data.userId || stateKey;
     await worldcupClient.submitMvpPrediction(userId, playerName);
     conversationState.clearState(stateKey);
-    await reply(`✅ *Craque salvo!*\n\n⭐ Seu craque: *${playerName}*\n\nPode alterar até o fim da fase de grupos.`);
+    await reply(`✅ *Craque salvo!*\n\n⭐ Seu craque: *${playerName}*\n\nPode alterar até o início do mata-mata.`);
     logger.debug(`[copa-mvp] ${userId.split("@")[0]} → ${playerName}`);
   } catch (e) {
     conversationState.clearState(stateKey);
-    const msg = e.message === "group_stage_over"
-      ? "❌ A fase de grupos acabou. Não é mais possível votar no craque."
+    const msg = (e.message === "knockout_started" || e.message === "group_stage_over")
+      ? "❌ O mata-mata já começou. Não é mais possível alterar o palpite de craque."
       : `❌ Erro ao salvar: ${e.message}`;
     await reply(msg);
   }
