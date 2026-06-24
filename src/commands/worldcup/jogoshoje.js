@@ -23,27 +23,34 @@ function formatGoals(goals) {
     .join("\n");
 }
 
+function formatMeta(m) {
+  const groupLetter = m.group_name ? m.group_name.replace(/^GROUP_?/i, "").replace(/^Group\s*/i, "").trim() : "";
+  const stage = groupLetter ? `Grupo ${groupLetter}` : "";
+  const venue = m.venue || "";
+  const meta = [stage, venue].filter(Boolean).join(" · ");
+  const palpites = m.predictionCount > 0 ? ` · 🎯 ${m.predictionCount} palpite${m.predictionCount !== 1 ? "s" : ""}` : "";
+  return meta ? `🏟️ ${meta}${palpites}` : palpites ? `🎯${palpites.slice(2)}` : "";
+}
+
 function formatMatch(m) {
   const kickoff = new Date(m.kickoff_at);
   const time = kickoff.toLocaleTimeString("pt-BR", { timeZone: "America/Sao_Paulo", hour: "2-digit", minute: "2-digit" });
-  const groupLetter = m.group_name ? m.group_name.replace(/^GROUP_?/i, "").replace(/^Group\s*/i, "").trim() : "";
-  const stage = groupLetter ? `Grupo ${groupLetter}` : "";
-  const stageTag = stage ? ` (${stage})` : "";
+  const meta = formatMeta(m);
   const goals = formatGoals(m.goals);
 
   if (m.status === "finished") {
-    const header = `✅ ${withFlag(m.home_team)} *${m.home_score} x ${m.away_score}* ${withFlag(m.away_team)}${stageTag}`;
-    return goals ? `${header}\n${goals}` : header;
+    const header = `✅ ${withFlag(m.home_team)} *${m.home_score} x ${m.away_score}* ${withFlag(m.away_team)}`;
+    return [header, meta, goals].filter(Boolean).join("\n");
   }
 
   if (m.status === "live" || m.status === "paused" || m.status === "extra_time" || m.status === "penalties") {
     const score = m.home_score != null ? `${m.home_score} x ${m.away_score}` : "0 x 0";
     const statusTag = m.status === "extra_time" ? " — PRORROGAÇÃO" : m.status === "penalties" ? " — PÊNALTIS" : " — AO VIVO";
-    const header = `🟢 ${withFlag(m.home_team)} *${score}* ${withFlag(m.away_team)}${statusTag}${stageTag}`;
-    return goals ? `${header}\n${goals}` : header;
+    const header = `🟢 ${withFlag(m.home_team)} *${score}* ${withFlag(m.away_team)}${statusTag}`;
+    return [header, meta, goals].filter(Boolean).join("\n");
   }
 
-  return `⏰ ${time} — ${withFlag(m.home_team)} 🆚 ${withFlag(m.away_team)}${stageTag}`;
+  return [`⏰ ${time} — ${withFlag(m.home_team)} 🆚 ${withFlag(m.away_team)}`, meta].filter(Boolean).join("\n");
 }
 
 module.exports = {
