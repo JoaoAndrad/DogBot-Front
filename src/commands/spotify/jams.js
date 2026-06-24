@@ -172,7 +172,7 @@ module.exports = {
           // If no image in jam data, fetch from Spotify API
           if (!image && jam.currentTrackId) {
             try {
-              logger.info(
+              logger.debug(
                 `[Jams] Fetching album art for track ${jam.currentTrackId}`,
               );
               const trackRes = await backend.sendToBackend(
@@ -190,7 +190,7 @@ module.exports = {
                 ) {
                   // Get largest image (first one is usually largest)
                   image = trackRes.track.album.images[0].url;
-                  logger.info(
+                  logger.debug(
                     `[Jams] Found album art from Spotify API: ${image}`,
                   );
                 }
@@ -214,7 +214,7 @@ module.exports = {
           if (tracksForSticker.length >= 9) break; // Max 9 tracks for composite
         }
 
-        logger.info(
+        logger.debug(
           `[Jams] Found ${tracksForSticker.length} tracks with images for sticker`,
         );
 
@@ -222,7 +222,7 @@ module.exports = {
           if (!ctx.client) {
             logger.error("[Jams] No client available for sending sticker");
           } else {
-            logger.info(
+            logger.debug(
               `[Jams] Attempting to send composite sticker to ${chatId}`,
             );
             const ok = await sendCompositeSticker(
@@ -235,11 +235,11 @@ module.exports = {
                 "[Jams] sendCompositeSticker returned false - sticker may not have been sent",
               );
             } else {
-              logger.info("[Jams] Composite sticker sent successfully");
+              logger.debug("[Jams] Composite sticker sent successfully");
             }
           }
         } else {
-          logger.info(
+          logger.debug(
             "[Jams] No tracks with valid images found, skipping sticker",
           );
         }

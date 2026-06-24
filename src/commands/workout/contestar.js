@@ -95,7 +95,7 @@ module.exports = {
         return;
       }
 
-      logger.info(
+      logger.debug(
         `[contestar] Buscando último treino de ${targetUserNumber} no grupo ${chatId}`,
       );
 
@@ -128,7 +128,7 @@ module.exports = {
       // Formatar data do treino
       const workoutDate = lastWorkout.workout_date || "data desconhecida";
 
-      logger.info(
+      logger.debug(
         `[contestar] Último treino encontrado: ${lastWorkout.id} em ${workoutDate}`,
       );
 
@@ -136,7 +136,7 @@ module.exports = {
       const participants = chat.participants || [];
       const memberIds = participants.map((p) => p.id._serialized);
 
-      logger.info(`[contestar] 👥 Membros do grupo: ${memberIds.length}`);
+      logger.debug(`[contestar] 👥 Membros do grupo: ${memberIds.length}`);
 
       // Get bot ID
       const botId = ctx.client.info?.wid?._serialized;
@@ -170,7 +170,7 @@ module.exports = {
         logger.warn(`[contestar] Erro ao buscar admins do DB: ${err.message}`);
       }
 
-      logger.info(
+      logger.debug(
         `[contestar] 👑 Admins elegíveis (DB, no grupo, decisão final): ${adminNumbers.length}`,
       );
 
@@ -184,7 +184,7 @@ module.exports = {
         );
       });
 
-      logger.info(
+      logger.debug(
         `[contestar] 👥 Elegíveis para votar: ${eligibleVoters.length} (excluindo contestador, contestado e bot)`,
       );
 
@@ -269,7 +269,7 @@ module.exports = {
         return;
       }
 
-      logger.info(
+      logger.debug(
         `[contestar] Poll de contestação criada: ${pollResult.msgId}`,
       );
 
@@ -291,7 +291,7 @@ module.exports = {
         resolved: false,
       });
 
-      logger.info(
+      logger.debug(
         `[contestar] Voto automático do contestador ${contesterName} registrado (remover)`,
       );
     } catch (err) {
@@ -374,7 +374,7 @@ async function handleContestVote(
         return;
       }
       // Admin is voting — fall through to register vote, then resolved via admin path below
-      logger.info(`[contestar] 👑 Admin ${voterNumber} dando a palavra final`);
+      logger.debug(`[contestar] 👑 Admin ${voterNumber} dando a palavra final`);
     }
 
     // Check if voter already voted
@@ -393,7 +393,7 @@ async function handleContestVote(
     // 0 = Manter, 1 = Remover
     const voteToRemove = selectedIndexes.includes(1);
 
-    logger.info(
+    logger.debug(
       `[contestar] Voto recebido: voter=${voterNumber} voteToRemove=${voteToRemove}`,
     );
 
@@ -426,7 +426,7 @@ async function handleContestVote(
               `👑 *${adminName}* (admin) deu a palavra final: *REMOVER*\n\n` +
               `❌ O treino de *${targetName}* (${workoutDate}) foi *REMOVIDO*.`,
           );
-          logger.info(
+          logger.debug(
             `[contestar] Treino ${workoutId} removido por decisão do admin ${adminName}`,
           );
           const groupRankingService = require("../../services/groupRankingService");
@@ -481,7 +481,7 @@ async function handleContestVote(
     const totalVotes = contest.votes.keep + contest.votes.remove;
     const needed = Math.ceil(totalEligible / 2); // Maioria simples
 
-    logger.info(
+    logger.debug(
       `[contestar] Votos: ${contest.votes.remove} remover, ${contest.votes.keep} manter (${totalVotes}/${totalEligible}, ${needed} necessários)`,
     );
 
@@ -530,7 +530,7 @@ async function handleContestVote(
             `_(Outros votos não serão mais aceitos)_`,
           { mentions: adminMentionsList },
         );
-        logger.info(
+        logger.debug(
           `[contestar] Aguardando decisão do admin para remoção do treino ${workoutId}`,
         );
         return;
@@ -542,7 +542,7 @@ async function handleContestVote(
 
     if (removeWon) {
       // Remover treino
-      logger.info(`[contestar] Removendo treino ${workoutId}`);
+      logger.debug(`[contestar] Removendo treino ${workoutId}`);
 
       try {
         await backendClient.sendToBackend(
@@ -558,13 +558,13 @@ async function handleContestVote(
             `❌ O treino de *${targetName}* (${workoutDate}) foi *REMOVIDO* por decisão da maioria.`,
         );
 
-        logger.info(`[contestar] Treino ${workoutId} removido com sucesso`);
+        logger.debug(`[contestar] Treino ${workoutId} removido com sucesso`);
 
         // Atualizar ranking do grupo imediatamente
         const groupRankingService = require("../../services/groupRankingService");
-        logger.info(`[contestar] Atualizando ranking do grupo ${chatId}...`);
+        logger.debug(`[contestar] Atualizando ranking do grupo ${chatId}...`);
         await groupRankingService.updateGroupRanking(chatId);
-        logger.info(`[contestar] Ranking atualizado com sucesso`);
+        logger.debug(`[contestar] Ranking atualizado com sucesso`);
       } catch (deleteErr) {
         logger.error(
           `[contestar] Erro ao remover treino: ${deleteErr.message}`,

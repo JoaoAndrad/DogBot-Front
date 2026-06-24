@@ -67,7 +67,7 @@ async function runCatchup(client, options = {}) {
   }
 
   if (isFirstRun) {
-    logger.info("Catchup: firstrun");
+    logger.debug("Catchup: firstrun");
     // Criar checkpoints com timestamp atual para todos os chats.
     // chat.lastMessage.timestamp já está disponível no objeto — sem fetchMessages.
     for (const chat of chats) {

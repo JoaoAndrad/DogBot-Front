@@ -43,7 +43,7 @@ class FlowManager {
       throw new Error(`Flow ${flowId} not found. Did you register it?`);
     }
 
-    logger.info(`[FlowManager] Iniciando flow ${flowId} para ${userId}`);
+    logger.debug(`[FlowManager] Iniciando flow ${flowId} para ${userId}`);
 
     const initialPath =
       typeof options.initialPath === "string" && options.initialPath.startsWith("/")

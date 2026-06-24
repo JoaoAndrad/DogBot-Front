@@ -34,7 +34,7 @@ function parseListKind(body) {
 async function handleListFlow(userId, body, state, reply, context) {
   const { step, data } = state;
 
-  logger.info(`[ListFlow] step=${step}, body="${body}" userId=${userId}`);
+  logger.debug(`[ListFlow] step=${step}, body="${body}" userId=${userId}`);
 
   // Step 0: legado (texto); fluxo novo usa enquete em /listas
   if (step === 0) {

@@ -68,7 +68,7 @@ async function getUserLists(
         "&page=" +
         page +
         kindQs;
-      console.log(`[ListClient] 🔍 Query group lists: ${query}`);
+      console.debug(`[ListClient] 🔍 Query group lists: ${query}`);
     } else {
       query =
         "/api/lists?userId=" +
@@ -76,11 +76,11 @@ async function getUserLists(
         "&page=" +
         page +
         kindQs;
-      console.log(`[ListClient] 🔍 Query user lists: ${query}`);
+      console.debug(`[ListClient] 🔍 Query user lists: ${query}`);
     }
 
     const response = await sendToBackend(query, null, "GET");
-    console.log(
+    console.debug(
       `[ListClient] ✅ Response: ${response.lists?.length || 0} lists received`,
     );
     return response.lists || [];
@@ -152,7 +152,7 @@ async function createList(
   },
 ) {
   try {
-    console.log(
+    console.debug(
       `[ListClient] Creating list: title="${title}", userId=${userId}, groupChatId=${groupChatId}, isPublic=${isPublic}, listKind=${listKind}`,
     );
 
@@ -167,13 +167,13 @@ async function createList(
 
     if (groupChatId) {
       payload.groupChatId = groupChatId;
-      console.log(
+      console.debug(
         `[ListClient] ✅ Including groupChatId in payload: ${groupChatId}`,
       );
     }
 
     const response = await sendToBackend("/api/lists", payload);
-    console.log(`[ListClient] ✅ List created successfully: ${response.id}`);
+    console.debug(`[ListClient] ✅ List created successfully: ${response.id}`);
     return response;
   } catch (err) {
     console.error("[ListClient] ❌ Create list error:", err.message);
@@ -217,7 +217,7 @@ async function addToList(listId, tmdbId, userId, options = {}) {
       tmdbId,
       ...options,
     });
-    console.log("[ListClient] ✅ Item added to list", { listId, tmdbId });
+    console.debug("[ListClient] ✅ Item added to list", { listId, tmdbId });
     return response;
   } catch (err) {
     console.error("[ListClient] ❌ Add to list error:", err.message, err.body);

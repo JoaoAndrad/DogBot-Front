@@ -31,7 +31,7 @@ module.exports = {
           "GET",
         );
         if (!settings || !settings.workoutTrackingEnabled) {
-          logger.info(
+          logger.debug(
             `[treinei] Grupo ${from} sem treinos ativados, ignorando.`,
           );
           return;
@@ -56,12 +56,12 @@ module.exports = {
         senderNumber = resolvedAuthor.replace(/@c\.us$/i, "");
         displayName =
           contact?.pushname || contact?.name || contact?.notify || null;
-        logger.info(
+        logger.debug(
           `[treinei] Autor resolvido: ${author} → ${resolvedAuthor} → ${senderNumber} (${displayName})`,
         );
       } catch (err) {
         senderNumber = author.replace(/@(c\.us|lid)$/i, "");
-        logger.info(`[treinei] Fallback do autor: ${author} → ${senderNumber}`);
+        logger.debug(`[treinei] Fallback do autor: ${author} → ${senderNumber}`);
       }
 
       // Extract note: remove "/treinei" command
@@ -72,7 +72,7 @@ module.exports = {
           .replace(/^(\/|!)treinei\s*/i, "") // Remove command
           .trim() || null;
 
-      logger.info(`[treinei] Processando treino de ${senderNumber} em ${from}`);
+      logger.debug(`[treinei] Processando treino de ${senderNumber} em ${from}`);
 
       // Send to backend
       const workoutNotificationService = require("../../services/workoutNotificationService");

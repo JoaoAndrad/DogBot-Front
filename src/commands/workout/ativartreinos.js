@@ -62,7 +62,7 @@ module.exports = {
         isAdmin = true;
       }
 
-      logger.info(
+      logger.debug(
         `[ativartreinos] Usuário ${senderNumber.replace(/@c\.us$/i, "")} tentou executar comando. isAdmin: ${!!lookup?.isAdmin}`,
       );
     } catch (err) {
@@ -130,7 +130,7 @@ module.exports = {
         setTimeout(async () => {
           try {
             await groupRankingService.updateGroupRanking(chatId);
-            logger.info(
+            logger.debug(
               `[ativartreinos] Atualização inicial de ranking concluída para ${chatId}`,
             );
           } catch (err) {

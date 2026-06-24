@@ -91,7 +91,7 @@ module.exports = {
         "Use */placar* para ver o ranking do bolão.",
       ];
       await client.sendMessage(chatId, lines.join("\n"));
-      logger.info(`[bolao] criado ${bolao.id} no grupo ${chatId} por ${senderJid}`);
+      logger.debug(`[bolao] criado ${bolao.id} no grupo ${chatId} por ${senderJid}`);
     } catch (e) {
       logger.error("[bolao]", e.message);
       await client.sendMessage(chatId, "❌ Não foi possível criar o bolão: " + e.message);

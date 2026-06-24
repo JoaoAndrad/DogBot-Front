@@ -49,7 +49,7 @@ module.exports = {
         client,
       });
 
-      logger.info(`[Voto] Iniciando votação para adicionar no grupo ${chatId}`);
+      logger.debug(`[Voto] Iniciando votação para adicionar no grupo ${chatId}`);
 
       if (!initiatorLookup || !initiatorLookup.found) {
         return reply(
@@ -75,7 +75,7 @@ module.exports = {
         userId: initiatorUserId,
       });
 
-      logger.info(
+      logger.debug(
         `[Voto] Iniciador: ${initiatorDisplayName} (${initiatorUserId})`,
       );
 
@@ -108,7 +108,7 @@ module.exports = {
         );
       }
 
-      logger.info(`[Voto] 👥 Membros do grupo: ${memberIds.length}`);
+      logger.debug(`[Voto] 👥 Membros do grupo: ${memberIds.length}`);
 
       // Get active listeners to check if initiator is playing and get their current track
       const listenersRes = await backendClient.sendToBackend(
@@ -118,7 +118,7 @@ module.exports = {
       );
 
       const listeners = (listenersRes && listenersRes.listeners) || [];
-      logger.info(`[Voto] 🎵 Usuários ouvindo música: ${listeners.length}`);
+      logger.debug(`[Voto] 🎵 Usuários ouvindo música: ${listeners.length}`);
 
       // Find initiator in listeners by userId (backend should return userId in listener object)
       let initiatorTrack = null;
@@ -171,7 +171,7 @@ module.exports = {
         spotifyMembers = [];
       }
 
-      logger.info(
+      logger.debug(
         `[Voto] Usuários do grupo com Spotify conectado: ${spotifyMembers.length}`,
       );
 
@@ -190,7 +190,7 @@ module.exports = {
         return reply("⚠️ Não consegui identificar a música atual.");
       }
 
-      logger.info(
+      logger.debug(
         `[Voto] Música: ${currentTrack.trackName} (${currentTrack.trackId})`,
       );
 
@@ -517,7 +517,7 @@ module.exports = {
           );
         }
 
-        logger.info(`[Voto] Poll criada para votação ${vote.id}`);
+        logger.debug(`[Voto] Poll criada para votação ${vote.id}`);
       }
     } catch (err) {
       logger.error("[Voto] Erro:", err);
@@ -702,7 +702,7 @@ async function handleAddVote(
     // 0 = Sim, 1 = Não
     const isFor = selectedIndexes.includes(0);
 
-    logger.info(
+    logger.debug(
       `[Voto] Voto recebido: voter=${voter} isFor=${isFor} voteId=${collaborativeVoteId}`,
     );
 
@@ -760,7 +760,7 @@ async function handleAddVote(
     const updatedVote = castRes.vote;
     const stats = castRes.stats;
 
-    logger.info(
+    logger.debug(
       `[Voto] Voto registrado. Status: ${updatedVote.status}, Stats: ${stats.votesFor}/${stats.needed}`,
     );
 

@@ -301,7 +301,7 @@ async function _saveChampion(stateKey, userId, team, flag, reply) {
     await worldcupClient.submitChampionPrediction(userId, team);
     conversationState.clearState(stateKey);
     await reply(`✅ *Palpite salvo!*\n\n🏆 Campeão: *${flag} ${team}*\n\nPode alterar até o fim da fase de grupos.`);
-    logger.info(`[copa-champion] ${userId.split("@")[0]} → ${team}`);
+    logger.debug(`[copa-champion] ${userId.split("@")[0]} → ${team}`);
   } catch (e) {
     conversationState.clearState(stateKey);
     const msg = e.message === "group_stage_over"
@@ -354,7 +354,7 @@ async function _saveZebra(stateKey, userId, team, flag, reply) {
     await worldcupClient.submitZebraPrediction(userId, team);
     conversationState.clearState(stateKey);
     await reply(`✅ *Zebra salva!*\n\n🦓 Sua zebra: *${flag} ${team}*\n\nPode alterar até o fim da fase de grupos.`);
-    logger.info(`[copa-zebra] ${userId.split("@")[0]} → ${team}`);
+    logger.debug(`[copa-zebra] ${userId.split("@")[0]} → ${team}`);
   } catch (e) {
     conversationState.clearState(stateKey);
     const msg = e.message === "group_stage_over"
@@ -381,7 +381,7 @@ async function handleCopaMvpFlow(stateKey, body, state, reply) {
     await worldcupClient.submitMvpPrediction(userId, playerName);
     conversationState.clearState(stateKey);
     await reply(`✅ *Craque salvo!*\n\n⭐ Seu craque: *${playerName}*\n\nPode alterar até o fim da fase de grupos.`);
-    logger.info(`[copa-mvp] ${userId.split("@")[0]} → ${playerName}`);
+    logger.debug(`[copa-mvp] ${userId.split("@")[0]} → ${playerName}`);
   } catch (e) {
     conversationState.clearState(stateKey);
     const msg = e.message === "group_stage_over"

@@ -84,7 +84,7 @@ module.exports = {
       const text = (msg.body || "").trim();
       const query = text.replace(/^\/(livro|book|livros)\s*/i, "").trim();
 
-      console.log("[Livro] execute", {
+      console.debug("[Livro] execute", {
         query: query || "(vazio)",
         chatId,
         userId,
@@ -103,7 +103,7 @@ module.exports = {
 
       const directWorkId = extractDirectBookIdFromQuery(query);
       if (directWorkId) {
-        console.log("[Livro] ramo ID direto", { directWorkId, ms: Date.now() - t0 });
+        console.debug("[Livro] ramo ID direto", { directWorkId, ms: Date.now() - t0 });
         let bookInfo;
         try {
           bookInfo = await bookClient.getBookInfoWithAllRatings(
@@ -163,7 +163,7 @@ module.exports = {
         throw e;
       }
       const searchResults = searchResp.results || [];
-      console.log("[Livro] searchBooks ok", {
+      console.debug("[Livro] searchBooks ok", {
         query,
         resultCount: searchResults.length,
         ms: Date.now() - tSearch,
@@ -171,13 +171,13 @@ module.exports = {
       });
 
       if (!searchResults.length) {
-        console.log("[Livro] sem resultados — a terminar");
+        console.debug("[Livro] sem resultados — a terminar");
         return reply(`❌ Nenhum livro encontrado para: ${query}`);
       }
 
       const ambiguous = searchResults.length >= 2 && query.length <= 20;
       if (ambiguous) {
-        console.log("[Livro] ramo desambiguação (enquete)", {
+        console.debug("[Livro] ramo desambiguação (enquete)", {
           candidatos: Math.min(uniqueCandidatesByWorkId(searchResults).length, 5),
         });
         const candidates = uniqueCandidatesByWorkId(searchResults)
@@ -253,11 +253,11 @@ module.exports = {
         } catch (err) {
           logger.warn(`[Livro] book-search: ${err.message}`);
         }
-        console.log("[Livro] book-search flow iniciado", { ms: Date.now() - t0 });
+        console.debug("[Livro] book-search flow iniciado", { ms: Date.now() - t0 });
         return;
       }
 
-      console.log("[Livro] ramo resultado único", {
+      console.debug("[Livro] ramo resultado único", {
         workId: searchResults[0]?.workId,
         title: searchResults[0]?.title,
       });

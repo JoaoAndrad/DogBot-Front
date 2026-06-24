@@ -67,7 +67,7 @@ module.exports = {
       return reply("❌ Não consegui identificar seu número. Tente novamente.");
     }
 
-    logger.info(`[Cadastro] Verificando usuário existente: ${actualNumber}`);
+    logger.debug(`[Cadastro] Verificando usuário existente: ${actualNumber}`);
     const lookupRes = await lookupByIdentifier(actualNumber);
 
     if (lookupRes === null) {
@@ -77,7 +77,7 @@ module.exports = {
       );
     }
 
-    logger.info(`[Cadastro] Resposta do lookup:`, lookupRes);
+    logger.debug(`[Cadastro] Resposta do lookup:`, lookupRes);
 
     if (lookupRes.found) {
       return reply(
@@ -89,7 +89,7 @@ module.exports = {
       );
     }
 
-    logger.info(
+    logger.debug(
       `[Cadastro] Usuário não encontrado, iniciando cadastro para: ${actualNumber}`
     );
 
@@ -103,7 +103,7 @@ module.exports = {
       isGroup,
     });
 
-    logger.info(`[Cadastro] Iniciando fluxo para ${actualNumber}`);
+    logger.debug(`[Cadastro] Iniciando fluxo para ${actualNumber}`);
 
     return reply(
       `👋 Olá! Vamos iniciar o seu cadastro.\n\n` +

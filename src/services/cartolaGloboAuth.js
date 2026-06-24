@@ -86,7 +86,7 @@ async function loginGloboWithPuppeteer(email, password) {
       password,
     );
 
-    logger.info(`[cartolaGloboAuth] API status=${apiResult.status} text=${apiResult.text.slice(0, 120)}`);
+    logger.debug(`[cartolaGloboAuth] API status=${apiResult.status} text=${apiResult.text.slice(0, 120)}`);
 
     if (apiResult.status === 406 || apiResult.text === "captchaBlank") {
       throw Object.assign(new Error("captcha_required"), { status: 406 });
@@ -136,7 +136,7 @@ async function loginGloboWithPuppeteer(email, password) {
       .join("; ");
 
     const names = [...cookieMap.keys()];
-    logger.info(`[cartolaGloboAuth] ok — cookies: [${names.join(", ")}]`);
+    logger.debug(`[cartolaGloboAuth] ok — cookies: [${names.join(", ")}]`);
 
     if (!glbId && !cookieMap.has("glb_uid_jwt")) {
       logger.warn("[cartolaGloboAuth] sem GLBID nem glb_uid_jwt após login");

@@ -39,7 +39,7 @@ function formatWhatsAppId(jid) {
 async function handleCadastroFlow(userId, body, state, reply, context) {
   const { step, data } = state;
 
-  logger.info(
+  logger.debug(
     `[CadastroFlow] Handler chamado para userId=${userId}, step=${step}, body="${body}"`,
   );
 
@@ -61,7 +61,7 @@ async function handleCadastroFlow(userId, body, state, reply, context) {
     conversationState.nextStep(userId);
 
     // Log data to be sent (frontend console)
-    logger.info(`[Cadastro] Dados coletados para ${userId}:`, {
+    logger.debug(`[Cadastro] Dados coletados para ${userId}:`, {
       identifier: data.identifier,
       userName: userName,
       push_name: data.push_name,

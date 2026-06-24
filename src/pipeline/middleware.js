@@ -10,7 +10,7 @@ async function run(context) {
   for (const mw of middlewares) {
     const ok = await mw(context);
     if (!ok) {
-      console.log("middleware short-circuit");
+      console.debug("middleware short-circuit");
       return false;
     }
   }

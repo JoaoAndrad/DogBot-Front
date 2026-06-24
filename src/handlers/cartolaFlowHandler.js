@@ -126,7 +126,7 @@ async function handleCartolaTeamFlow(stateKey, body, state, reply, opts = {}) {
     if (result.shield_url && client && chatId) {
       await _sendShieldSticker(client, chatId, result.shield_url);
     }
-    logger.info(`[cartola-team] ${stateKey.split("@")[0]} → ${id} (${tipo})`);
+    logger.debug(`[cartola-team] ${stateKey.split("@")[0]} → ${id} (${tipo})`);
   } catch (e) {
     const hint = tipo === "copa"
       ? `_cartola.globo.com/#!/copa/time/*50271939*_`
@@ -179,7 +179,7 @@ async function handleCartolaLeagueFlow(stateKey, body, state, reply) {
     await reply(
       `✅ *Liga vinculada ao grupo!*\n\n🏆 *${nome}*\n\nUse */cartola → Ranking da liga* para ver a classificação.`,
     );
-    logger.info(`[cartola-league] ${groupId} → ${slug} (${tipo || "auto"})`);
+    logger.debug(`[cartola-league] ${groupId} → ${slug} (${tipo || "auto"})`);
   } catch (e) {
     conversationState.clearState(stateKey);
     const msg = e.message?.includes("league_not_found")

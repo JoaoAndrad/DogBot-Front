@@ -154,7 +154,7 @@ async function restoreCallbacksFromDatabase() {
       if (voteType && voteHandlers[voteType]) {
         callbacks.set(msgId, voteHandlers[voteType]);
         restoredCount++;
-        logger.info(
+        logger.debug(
           `[PollComponent] Callback restaurado: msgId=${msgId}, voteType=${voteType}`,
         );
       } else if (poll.metadata) {
@@ -172,7 +172,7 @@ async function restoreCallbacksFromDatabase() {
         if (inferredType && voteHandlers[inferredType]) {
           callbacks.set(msgId, voteHandlers[inferredType]);
           restoredCount++;
-          logger.info(
+          logger.debug(
             `[PollComponent] Callback restaurado (inferido): msgId=${msgId}, voteType=${inferredType}`,
           );
         }
@@ -537,7 +537,7 @@ async function handleVoteUpdate(vote) {
     } else if (storedPoll && (storedPoll.voteId || storedPoll.vote_id)) {
       // Fallback: If callback not in memory but we have voteId (e.g., after bot restart),
       // send vote directly to backend
-      logger.info(
+      logger.debug(
         `[PollComponent] Callback não encontrado em memória, enviando voto ao backend`,
       );
       try {
@@ -553,7 +553,7 @@ async function handleVoteUpdate(vote) {
           pollId: messageId,
         });
 
-        logger.info(`[PollComponent] Voto enviado ao backend: ${voteId}`);
+        logger.debug(`[PollComponent] Voto enviado ao backend: ${voteId}`);
       } catch (err) {
         logger.error(
           "[PollComponent] Erro ao enviar voto ao backend:",

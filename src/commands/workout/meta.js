@@ -64,7 +64,7 @@ module.exports = {
       isGroup,
     });
 
-    logger.info(`[Meta] Iniciando fluxo para ${actualNumber}`);
+    logger.debug(`[Meta] Iniciando fluxo para ${actualNumber}`);
 
     // Flow will continue in metaFlowHandler (step 0)
     // Just return here - handler will show the poll

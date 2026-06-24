@@ -34,7 +34,7 @@ module.exports = {
         whatsappId = msg.author || msg.from;
       }
 
-      logger.info(`[Host] Iniciando transferência no grupo ${chatId}`);
+      logger.debug(`[Host] Iniciando transferência no grupo ${chatId}`);
 
       const userRes = await lookupByIdentifier(whatsappId);
 
@@ -77,7 +77,7 @@ module.exports = {
         );
       }
 
-      logger.info(
+      logger.debug(
         `[Host] ${activeListeners.length} ouvintes disponíveis para transferência`,
       );
 
@@ -112,7 +112,7 @@ module.exports = {
             try {
               const voter = voteData.voter;
 
-              logger.info(
+              logger.debug(
                 `[Host] Voto recebido - Voter: ${voter}, Host esperado: ${whatsappId}`,
               );
 
@@ -129,7 +129,7 @@ module.exports = {
               const selectedIndex =
                 selectedIndexRaw != null ? Number(selectedIndexRaw) : null;
 
-              logger.info(
+              logger.debug(
                 `[Host] Índice selecionado: ${selectedIndex}, voteData completo:`,
                 JSON.stringify(voteData),
               );
@@ -153,7 +153,7 @@ module.exports = {
                 return;
               }
 
-              logger.info(
+              logger.debug(
                 `[Host] Transferindo jam ${jam.id} para usuário ${newHostUserId}`,
               );
 
@@ -200,7 +200,7 @@ module.exports = {
                   `Agora ${newHostName} controla a música e pode gerenciar a jam.`,
               );
 
-              logger.info(`[Host] Transferência concluída com sucesso`);
+              logger.debug(`[Host] Transferência concluída com sucesso`);
             } catch (err) {
               logger.error("[Host] Erro no callback de votação:", err);
               await client.sendMessage(
@@ -217,7 +217,7 @@ module.exports = {
         return reply("❌ Erro ao criar votação para transferência.");
       }
 
-      logger.info(`[Host] Poll criado com sucesso`);
+      logger.debug(`[Host] Poll criado com sucesso`);
     } catch (err) {
       logger.error("[Host] Erro ao processar comando:", err);
       return reply(

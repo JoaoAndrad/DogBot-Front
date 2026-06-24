@@ -411,7 +411,7 @@ module.exports = {
               { userId, isFor: true },
               "POST",
             );
-            logger.info(
+            logger.debug(
               `[AdicionarCommand] Auto-voted YES for requester: ${userId}`,
             );
           } catch (err) {

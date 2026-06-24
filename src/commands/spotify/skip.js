@@ -57,7 +57,7 @@ module.exports = {
         whatsappId = msg.author || msg.from;
       }
 
-      logger.info(`[Skip] Iniciando votação no grupo ${chatId}`);
+      logger.debug(`[Skip] Iniciando votação no grupo ${chatId}`);
 
       const userRes = await lookupByIdentifier(whatsappId);
 
@@ -86,7 +86,7 @@ module.exports = {
       const jam = jamStatusRes.jam;
       const jamId = jam.id;
 
-      logger.info(
+      logger.debug(
         `[Skip] Jam encontrada: ${jamId}, track: ${jam.currentTrackId}`,
       );
 
@@ -117,7 +117,7 @@ module.exports = {
         }
       }
 
-      logger.info(
+      logger.debug(
         `[Skip] Votantes elegíveis (${eligibleUserIds.length}): ${eligibleWhatsAppIds.join(", ")}`,
       );
 
@@ -157,7 +157,7 @@ module.exports = {
       const vote = castRes.vote;
       const collaborativeVoteId = vote.id;
 
-      logger.info(`[Skip] Votação criada: ${collaborativeVoteId}`);
+      logger.debug(`[Skip] Votação criada: ${collaborativeVoteId}`);
 
       // Create handler for vote updates with closure capturing context
       const handleSkipVote = async (voteData) => {
@@ -169,7 +169,7 @@ module.exports = {
           // 0 = Sim, 1 = Não
           const isFor = selectedIndexes.includes(0);
 
-          logger.info(
+          logger.debug(
             `[Skip] Voto recebido: voter=${voter} isFor=${isFor} voteId=${collaborativeVoteId}`,
           );
 
@@ -230,7 +230,7 @@ module.exports = {
           const updatedVote = voteCastRes.vote;
           const stats = voteCastRes.stats;
 
-          logger.info(
+          logger.debug(
             `[Skip] Voto registrado. Status: ${updatedVote.status}, Stats: ${stats.votesFor}/${stats.totalEligible}`,
           );
 
@@ -398,7 +398,7 @@ module.exports = {
         },
       );
 
-      logger.info(`[Skip] Poll criado: ${pollResult?.msgId || pollResult}`);
+      logger.debug(`[Skip] Poll criado: ${pollResult?.msgId || pollResult}`);
 
       if (pollResult && pollResult.msgId) {
         try {
@@ -411,7 +411,7 @@ module.exports = {
             },
             "POST",
           );
-          logger.info(`[Skip] Voto automático do iniciador registrado`);
+          logger.debug(`[Skip] Voto automático do iniciador registrado`);
         } catch (err) {
           logger.warn(`[Skip] Erro ao registrar voto automático:`, err);
         }

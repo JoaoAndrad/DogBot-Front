@@ -146,7 +146,7 @@ module.exports = {
       // Send poster as sticker if available
       if (movieInfo.posterUrl) {
         try {
-          logger.info(`[Filme] Sending poster sticker for ${movieInfo.title}`);
+          logger.debug(`[Filme] Sending poster sticker for ${movieInfo.title}`);
           const posterBuffer = await downloadImageToBuffer(movieInfo.posterUrl);
           if (posterBuffer) {
             await sendBufferAsSticker(client, msg.from, posterBuffer, {

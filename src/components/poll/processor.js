@@ -398,7 +398,7 @@ async function executeAction(result, client) {
             .filter(Boolean)
             .join("; ");
           if (summary) {
-            logger.info(`[processor] routine_checkin_group: ${summary}`);
+            logger.debug(`[processor] routine_checkin_group: ${summary}`);
           }
         }
 
@@ -629,7 +629,7 @@ async function executeAction(result, client) {
             // Copa: apenas quem invocou o comando pode interagir com os polls
             if (data.flowId === "copa" || data.flowId === "copa-palpite") {
               if (!sameWaPhoneNum(data.userId, result.voterId)) {
-                logger.info(
+                logger.debug(
                   `[processor] Copa: voto ignorado de ${result.voterId} (dono: ${data.userId})`,
                 );
                 break;
@@ -639,7 +639,7 @@ async function executeAction(result, client) {
             // Cartola: apenas quem invocou o comando pode interagir com os polls
             if (data.flowId === "cartola") {
               if (!sameWaPhoneNum(data.userId, result.voterId)) {
-                logger.info(
+                logger.debug(
                   `[processor] Cartola: voto ignorado de ${result.voterId} (dono: ${data.userId})`,
                 );
                 break;

@@ -416,7 +416,7 @@ async function updateAllGroupRankings() {
       return;
     }
 
-    logger.info("[groupRanking] Starting periodic ranking updates...");
+    logger.debug("[groupRanking] Starting periodic ranking updates...");
 
     // Get all chats
     const chats = await client.getChats();
@@ -438,7 +438,7 @@ async function updateAllGroupRankings() {
       }
     }
 
-    logger.info("[groupRanking] Periodic ranking updates completed");
+    logger.debug("[groupRanking] Periodic ranking updates completed");
   } catch (error) {
     logger.error("[groupRanking] Error in updateAllGroupRankings:", error);
   }

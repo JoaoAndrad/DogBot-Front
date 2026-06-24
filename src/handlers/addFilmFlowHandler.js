@@ -17,7 +17,7 @@ async function handleAddFilmFlow(userId, body, state, reply, context) {
   const isGroup = chatId && String(chatId).endsWith("@g.us");
   const groupChatId = isGroup ? chatId : null;
 
-  logger.info(
+  logger.debug(
     `[AddFilmFlow] Handler chamado para userId=${userId}, step=${step}, body="${body}", isGroup=${isGroup}, groupChatId=${groupChatId}`,
   );
 
@@ -31,7 +31,7 @@ async function handleAddFilmFlow(userId, body, state, reply, context) {
     }
 
     try {
-      logger.info(`[AddFilmFlow] Buscando filme: "${filmName}"`);
+      logger.debug(`[AddFilmFlow] Buscando filme: "${filmName}"`);
 
       // Search for film
       const searchResults = await movieClient.searchMovies(filmName, {
@@ -56,11 +56,11 @@ async function handleAddFilmFlow(userId, body, state, reply, context) {
       });
 
       // Get user or group lists
-      logger.info(
+      logger.debug(
         `[AddFilmFlow] 📋 Fetching lists... isGroup=${isGroup}, groupChatId=${groupChatId}, userId=${userId}`,
       );
       const lists = await listClient.getUserLists(userId, 1, groupChatId);
-      logger.info(
+      logger.debug(
         `[AddFilmFlow] ✅ Fetched ${lists.length} lists. isGroup=${isGroup}`,
       );
 
@@ -84,7 +84,7 @@ async function handleAddFilmFlow(userId, body, state, reply, context) {
               return `  👤 ${owner}: ${listTitles}`;
             })
             .join("\n");
-          logger.info(`📋 Listas de usuários do grupo:\n${groupSummary}`);
+          logger.debug(`📋 Listas de usuários do grupo:\n${groupSummary}`);
         } else {
           logger.warn(
             `[AddFilmFlow] ⚠️ Nenhuma lista encontrada no grupo ${groupChatId}`,
@@ -138,7 +138,7 @@ async function handleAddFilmFlow(userId, body, state, reply, context) {
     const selectedList = lists[listIndex - 1];
 
     try {
-      logger.info(
+      logger.debug(
         `[AddFilmFlow] Adicionando filme ${tmdbId} à lista ${selectedList.id}`,
       );
 
