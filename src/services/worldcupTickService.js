@@ -555,16 +555,17 @@ async function handleReminder1h(client, action) {
     `Você ainda não fez seu palpite para este jogo.`,
     `Envie */palpite* agora para participar! 🎯`,
     ``,
-    `💡 *Atalho rápido:* */palpite ${homePt} 1x0 ${awayPt}*`,
-    ``,
     `Ou */alertaoff* para parar de receber esse tipo de notificação`,
   ].join("\n");
+
+  const dmAtalhText = `💡 *Atalho rápido:* */palpite ${homePt} 1x0 ${awayPt}*`;
 
   for (const jid of allUnpredictedJids) {
     if (dmOptedOut.has(jid)) continue;
     if (palpiteiros.size > 0 && !palpiteiros.has(jid)) continue;
     try {
       await client.sendMessage(jid, dmText);
+      await client.sendMessage(jid, dmAtalhText);
 
       // Registra alerta ignorado; auto-desativa após MAX_IGNORED jogos consecutivos sem palpite
       const count = dmAlertState.recordAlert(jid, match.id);
