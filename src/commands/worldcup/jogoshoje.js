@@ -28,8 +28,8 @@ function formatMeta(m) {
   const stage = groupLetter ? `Grupo ${groupLetter}` : "";
   const venue = m.venue || "";
   const meta = [stage, venue].filter(Boolean).join(" · ");
-  const palpites = m.predictionCount > 0 ? ` · 🎯 ${m.predictionCount} palpite${m.predictionCount !== 1 ? "s" : ""}` : "";
-  return meta ? `🏟️ ${meta}${palpites}` : palpites ? `🎯${palpites.slice(2)}` : "";
+  const palpites = m.predictionCount > 0 ? `🎯 ${m.predictionCount} palpite${m.predictionCount !== 1 ? "s" : ""}` : "";
+  return [meta ? `🏟️ ${meta}` : "", palpites].filter(Boolean).join("\n");
 }
 
 function formatMatch(m) {

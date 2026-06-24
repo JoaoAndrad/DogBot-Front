@@ -40,18 +40,19 @@ function formatMatch(m, index) {
   const stage = m.group_name ? `Grupo ${m.group_name.replace("GROUP_", "").replace("Group ", "")}` : formatStage(m.stage);
   const venue = m.venue || "";
   const meta  = [stage, venue].filter(Boolean).join(" · ");
-  const palpites = m.predictionCount > 0 ? ` · 🎯 ${m.predictionCount} palpite${m.predictionCount !== 1 ? "s" : ""}` : "";
+  const palpites = m.predictionCount > 0 ? `🎯 ${m.predictionCount} palpite${m.predictionCount !== 1 ? "s" : ""}` : "";
 
   if (m.status === "live") {
     const score = m.home_score != null ? `${m.home_score} x ${m.away_score}` : "0 x 0";
-    return [`🔴 *${withFlag(m.home_team)} ${score} ${withFlag(m.away_team)}* — AO VIVO`, `🏟️ ${meta}${palpites}`].join("\n");
+    return [`🔴 *${withFlag(m.home_team)} ${score} ${withFlag(m.away_team)}* — AO VIVO`, `🏟️ ${meta}`, palpites].filter(Boolean).join("\n");
   }
 
   return [
     `*${index + 1}.* ${matchup(m.home_team, m.away_team)}`,
     `📅 ${label} às ${time}`,
-    `🏟️ ${meta}${palpites}`,
-  ].join("\n");
+    `🏟️ ${meta}`,
+    palpites,
+  ].filter(Boolean).join("\n");
 }
 
 module.exports = {
