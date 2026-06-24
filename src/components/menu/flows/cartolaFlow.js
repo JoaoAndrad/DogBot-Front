@@ -150,30 +150,24 @@ const cartolaFlow = createFlow("cartola", {
     dynamic: true,
     handler: async (ctx) => {
       const isGroup = String(ctx.chatId).endsWith("@g.us");
+
+      // Verifica partidas ao vivo para o label do botão
+      let hasLive = false;
+      try {
+        const worldcupClient = require("../../../services/worldcupClient");
+        const { matches } = await worldcupClient.getMatchesToday();
+        hasLive = (matches || []).some((m) => m.status === "live" || m.status === "paused");
+      } catch {}
+      const jogandoLabel = hasLive ? "Jogando agora 🟢" : "Jogando agora 🔴";
+
       const options = isGroup
         ? [
             { label: "🏠 Meu time", action: "exec", handler: "showMyTeam" },
-            { label: "Jogando agora 🟢", action: "exec", handler: "showJogandoAgora" },
-            {
-              label: "🔍 Scouts do meu time",
-              action: "exec",
-              handler: "showScout",
-            },
-            {
-              label: "📊 Parcial do grupo",
-              action: "exec",
-              handler: "showGroupParcial",
-            },
-            {
-              label: "⭐ Destaques do grupo",
-              action: "exec",
-              handler: "showDestaques",
-            },
-            {
-              label: "🏆 Ranking da liga",
-              action: "exec",
-              handler: "showLeagueRanking",
-            },
+            { label: jogandoLabel, action: "exec", handler: "showJogandoAgora" },
+            { label: "🔍 Scouts do meu time", action: "exec", handler: "showScout" },
+            { label: "📊 Parcial do grupo", action: "exec", handler: "showGroupParcial" },
+            { label: "⭐ Destaques do grupo", action: "exec", handler: "showDestaques" },
+            { label: "🏆 Ranking da liga", action: "exec", handler: "showLeagueRanking" },
             { label: "📊 Rodada atual", action: "exec", handler: "showRodada" },
             { label: "❓ Dúvidas", action: "goto", target: "/duvidas" },
             { label: "⚙️ Configurações", action: "goto", target: "/config" },
@@ -181,12 +175,8 @@ const cartolaFlow = createFlow("cartola", {
           ]
         : [
             { label: "🏠 Meu time", action: "exec", handler: "showMyTeam" },
-            { label: "Jogando agora 🟢", action: "exec", handler: "showJogandoAgora" },
-            {
-              label: "🔍 Scouts do meu time",
-              action: "exec",
-              handler: "showScout",
-            },
+            { label: jogandoLabel, action: "exec", handler: "showJogandoAgora" },
+            { label: "🔍 Scouts do meu time", action: "exec", handler: "showScout" },
             { label: "📊 Rodada atual", action: "exec", handler: "showRodada" },
             { label: "❓ Dúvidas", action: "goto", target: "/duvidas" },
             { label: "⚙️ Configurações", action: "goto", target: "/config" },
@@ -519,30 +509,27 @@ const cartolaFlow = createFlow("cartola", {
 
       if (!data.liveMatches || !data.liveMatches.length) {
         await ctx.reply(
-          `🟢 *Jogando agora*\n\nNenhum jogo ao vivo no momento.\n_Rodada ${data.rodada} · ${data.tipo === "copa" ? "Copa" : "Brasileirão"}_`,
+          `*Jogando agora*\n\nNenhum jogo ao vivo no momento.\n_Rodada ${data.rodada} · ${data.tipo === "copa" ? "Copa" : "Brasileirão"}_`,
         );
         return { noRender: true };
       }
+
+      const matchLines = data.liveMatches
+        .map((m) => `🟢 ${m.home_team} ${m.home_score ?? 0}x${m.away_score ?? 0} ${m.away_team}`)
+        .join("\n");
 
       if (!data.athletes || !data.athletes.length) {
-        const matchLabels = data.liveMatches
-          .map((m) => `${m.home_team} ${m.home_score ?? 0}x${m.away_score ?? 0} ${m.away_team}`)
-          .join("  |  ");
-        await ctx.reply(
-          `🟢 *Jogando agora*\n\n🔴 Ao vivo: ${matchLabels}\n\nNenhum atleta do grupo está jogando.`,
-        );
+        await ctx.reply(`*Jogando agora*\n\n${matchLines}\n\nNenhum atleta do grupo está jogando.`);
         return { noRender: true };
       }
-
-      const matchLabels = data.liveMatches
-        .map((m) => `${m.home_team} ${m.home_score ?? 0}x${m.away_score ?? 0} ${m.away_team}`)
-        .join("  |  ");
 
       const tipo = data.tipo === "copa" ? "copa" : "brasileirao";
       const lines = [
-        `=== Cartola em campo (${tipo} · rodada ${data.rodada}) ===`,
+        `*Jogando agora*`,
         "",
-        `🔴 Ao vivo: ${matchLabels}`,
+        matchLines,
+        "",
+        `_${tipo === "copa" ? "Copa" : "Brasileirão"} · Rodada ${data.rodada}_`,
         "",
       ];
 
