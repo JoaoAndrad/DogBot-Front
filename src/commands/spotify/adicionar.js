@@ -125,7 +125,12 @@ async function searchSpotifyTrack(query) {
       tracks: data.tracks,
     };
   } catch (err) {
-    logger.error("[AdicionarCommand] Error searching Spotify:", err);
+    const isOffline = err && (err.status === 502 || err.status === 503 || err.status === 504);
+    if (isOffline) {
+      logger.warn(`[AdicionarCommand] backend offline ao buscar Spotify (${err.status})`);
+    } else {
+      logger.error("[AdicionarCommand] Error searching Spotify:", err);
+    }
     return { success: false, error: err.message };
   }
 }

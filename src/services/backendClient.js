@@ -70,14 +70,19 @@ async function sendToBackend(path, body, method = "POST", opts = {}) {
       errorBody?.message ||
       res.statusText ||
       "Unknown error";
+    const isGatewayDown = res.status === 502 || res.status === 503 || res.status === 504;
     if (!silentHttpStatuses.includes(res.status)) {
-      console.error("[backendClient] resposta HTTP não OK", {
-        method,
-        path: path.slice(0, 200),
-        status: res.status,
-        message: msg,
-        body: errorBody,
-      });
+      if (isGatewayDown) {
+        console.warn(`[backendClient] backend indisponível (${res.status}) ${method} ${path.slice(0, 100)}`);
+      } else {
+        console.error("[backendClient] resposta HTTP não OK", {
+          method,
+          path: path.slice(0, 200),
+          status: res.status,
+          message: msg,
+          body: errorBody,
+        });
+      }
     }
     const err = new Error(`HTTP ${res.status}: ${msg}`);
     err.status = res.status;

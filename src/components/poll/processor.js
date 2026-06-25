@@ -242,7 +242,7 @@ async function processVoteViaBackend(pollId, vote, client) {
 
     const selectedIndexes = selectedIndexesFromVoteAndPoll(vote, storedPoll);
     if (!selectedIndexes.length) {
-      logger.warn(
+      logger.debug(
         `[processor] process-vote: nenhum índice de opção (pollId=${String(pollId).slice(0, 96)})`,
       );
       return;
