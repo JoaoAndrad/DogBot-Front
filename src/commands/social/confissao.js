@@ -665,7 +665,7 @@ module.exports = {
         const _res = await createPollPromise(
           client,
           pollChatId,
-          `Detectei ${mentionTokens.length} menção(ões) na sua mensagem. Deseja mencionar usuário(s)?`,
+          `Detectei ${mentionTokens.length} ${mentionTokens.length === 1 ? "menção" : "menções"} na sua mensagem. Deseja mencionar ${mentionTokens.length === 1 ? "o usuário" : "os usuários"}?`,
           ["Sim", "Não"],
           {},
         );
