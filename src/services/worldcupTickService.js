@@ -306,9 +306,9 @@ function getGoalText({
   if (isKnockout && scoringTeamPrev === otherTeamPrev - 1)
     return `🔥 ${by(`empata para ${flag}!*${timing}`)} Caminho para os pênaltis...`;
 
-  // 11. Knockout + toma a frente (virada)
+  // 11. Knockout + toma a frente do empate
   if (isKnockout && scoringTeamPrev === otherTeamPrev)
-    return `🚨 ${by(`vira o jogo!*${timing}`)} ${flag} na frente na ${formatStage(stage)}.`;
+    return `🚨 ${by(`coloca ${flag} na frente!*${timing}`)} Gol decisivo na ${formatStage(stage)}!`;
 
   // 9 (alt). Knockout + abre
   if (isKnockout && isFirst)
