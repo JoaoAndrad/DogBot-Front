@@ -887,16 +887,17 @@ async function handlePenalties(client, action) {
   }
 }
 
+// Chaves em lowercase — lookup feito com .toLowerCase() para tolerar variações da API
 const VAR_PT = {
-  "Goal cancelled": "Gol anulado",
-  "Goal Disallowed": "Gol anulado",
-  "Goal Disallowed - offside": "Gol anulado · impedimento",
-  "Goal Disallowed - handball": "Gol anulado · mão na bola",
-  "Goal Disallowed - foul": "Gol anulado · falta",
-  "Penalty confirmed": "Pênalti confirmado",
-  "Penalty cancelled": "Pênalti cancelado",
-  "Card upgrade": "Cartão revisado",
-  "Card cancelled": "Cartão cancelado",
+  "goal cancelled": "Gol anulado",
+  "goal disallowed": "Gol anulado",
+  "goal disallowed - offside": "Gol anulado · impedimento",
+  "goal disallowed - handball": "Gol anulado · mão na bola",
+  "goal disallowed - foul": "Gol anulado · falta",
+  "penalty confirmed": "Pênalti confirmado",
+  "penalty cancelled": "Pênalti cancelado",
+  "card upgrade": "Cartão revisado",
+  "card cancelled": "Cartão cancelado",
 };
 
 async function handleMiss(client, action) {
@@ -985,21 +986,28 @@ async function handleVarRevert(client, action) {
 }
 
 async function handleVar(client, action) {
-  const { varEvent, groupIds } = action;
+  const { varEvent, match, groupIds } = action;
   if (!groupIds || !groupIds.length) return;
 
-  const isGoalCancel =
-    varEvent.detail && varEvent.detail.toLowerCase().includes("goal");
-  const label = VAR_PT[varEvent.detail] || varEvent.detail || "Decisão";
+  const detailKey = (varEvent.detail || "").toLowerCase();
+  const isGoalCancel = detailKey.includes("goal");
+  const label = VAR_PT[detailKey] || varEvent.detail || "Decisão";
   const icon = isGoalCancel ? "🚫" : "📺";
+
   const minuteTag = varEvent.minute ? ` ${varEvent.minute}'` : "";
   const teamFlag = varEvent.team ? withFlag(varEvent.team) : "";
-  const playerLine = varEvent.player
-    ? `\n${varEvent.player}${minuteTag}${teamFlag ? ` — ${teamFlag}` : ""}`
-    : teamFlag
-      ? `\n${teamFlag}`
-      : "";
-  const msg = `${icon} *VAR — ${label}*${playerLine}`;
+
+  const lines = [`${icon} *VAR — ${label}*`];
+  if (varEvent.player) {
+    lines.push(`${varEvent.player}${minuteTag}${teamFlag ? ` — ${teamFlag}` : ""}`);
+  } else if (teamFlag) {
+    lines.push(teamFlag);
+  }
+  if (match) {
+    const score = `${match.home_score ?? 0} x ${match.away_score ?? 0}`;
+    lines.push(`*${withFlag(match.home_team)} ${score} ${withFlag(match.away_team)}*`);
+  }
+  const msg = lines.join("\n");
 
   for (const groupId of groupIds) {
     try {
