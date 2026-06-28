@@ -111,10 +111,10 @@ async function handleInlinePalpite(client, chatId, userId, teamAQuery, goalsA, g
   const { date, time } = fmtKickoff(match.kickoff_at);
   const stateKey = userId;
 
-  // Empate em eliminatória → precisa saber quem avança
+  // Empate em eliminatória → oferecer palpite opcional de prorrogação
   if (isDraw && isKnockout) {
     conversationState.startFlow(stateKey, "copa-palpite-input", {
-      step: "await_advancing",
+      step: "await_et_opt",
       matchId: match.id,
       homeTeam: match.home_team,
       awayTeam: match.away_team,
@@ -126,24 +126,21 @@ async function handleInlinePalpite(client, chatId, userId, teamAQuery, goalsA, g
       userId,
     });
 
-    const options = [
-      `${withFlag(match.home_team)} avança`,
-      `${withFlag(match.away_team)} avança`,
-    ];
+    const etOptions = ["⏱️ Sim, quero palpitar a prorrogação", "⏩ Não, pular para confirmação"];
     const pollMeta = {
       actionType: "menu",
       flowId: "copa-palpite",
-      path: "/advancing",
+      path: "/et-opt",
       userId: stateKey,
       options: [
-        { index: 0, label: options[0], action: "exec", handler: "setAdvancingTeam", data: { team: match.home_team, stateKey } },
-        { index: 1, label: options[1], action: "exec", handler: "setAdvancingTeam", data: { team: match.away_team, stateKey } },
+        { index: 0, label: etOptions[0], action: "exec", handler: "acceptEtPrediction", data: { stateKey } },
+        { index: 1, label: etOptions[1], action: "exec", handler: "skipEtPrediction",   data: { stateKey } },
       ],
     };
     await polls.createPoll(
       client, chatId,
-      `🔮 Empate! ${matchup(match.home_team, match.away_team)}\nQuem avança nos pênaltis?`,
-      options, { metadata: pollMeta },
+      `🎯 Empate! Quer palpitar o placar da *prorrogação*? (+1 pt bônus)`,
+      etOptions, { metadata: pollMeta },
     );
     return;
   }

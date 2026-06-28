@@ -734,7 +734,7 @@ const worldcupPalpiteFlow = createFlow("copa-palpite", {
           action: "exec",
           handler: isEditable ? "selectMatch" : "showPredictionDetail",
           data: isEditable
-            ? { matchId: m.id, homeTeam: m.home_team, awayTeam: m.away_team, kickoffAt: m.kickoff_at, venue: m.venue }
+            ? { matchId: m.id, homeTeam: m.home_team, awayTeam: m.away_team, kickoffAt: m.kickoff_at, venue: m.venue, stage: m.stage }
             : { homeTeam: m.home_team, awayTeam: m.away_team, finalHome: m.home_score, finalAway: m.away_score, predictedHome: p.predicted_home, predictedAway: p.predicted_away, points: p.points, status: m.status },
         });
       }
@@ -966,6 +966,7 @@ const worldcupPalpiteFlow = createFlow("copa-palpite", {
         awayTeam: data.awayTeam,
         kickoffAt: data.kickoffAt,
         venue: data.venue,
+        stage: data.stage,
         userId,
       });
       const kickoff = new Date(data.kickoffAt);

@@ -96,7 +96,7 @@ async function handleCopaFlow(stateKey, body, state, reply, opts) {
           action: "exec", handler: "correctPrediction",
           data: {
             matchId: data.matchId, homeTeam: data.homeTeam, awayTeam: data.awayTeam,
-            kickoffAt: data.kickoffAt, venue: data.venue,
+            kickoffAt: data.kickoffAt, venue: data.venue, stage: data.stage,
             userId: data.userId || stateKey,
           },
         },
