@@ -1,7 +1,7 @@
 "use strict";
 
-const flowManager = require("../components/menu/flowManager");
-const logger = require("../utils/logger");
+const flowManager = require("../../components/menu/flowManager");
+const logger = require("../../utils/logger");
 
 module.exports = {
   name: "financeiro",
