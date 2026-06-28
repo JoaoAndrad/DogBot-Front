@@ -28,20 +28,106 @@ async function _get(path, params) {
   try { return JSON.parse(text); } catch { return { status: res.status, text }; }
 }
 
-/**
- * Creates a one-time auth link for the user to connect their Google account.
- * Returns { token, authUrl }
- */
 async function startAuth(userId) {
   return _post("/api/financial/auth/start", { userId });
 }
 
-/**
- * Checks whether a user has completed OAuth and has a vault.
- * Returns { linked: boolean }
- */
 async function checkAuthStatus(userId) {
   return _get("/api/financial/auth/status", { userId });
 }
 
-module.exports = { startAuth, checkAuthStatus };
+// Accounts
+
+async function listAccounts(userId) {
+  return _get("/api/financial/accounts", { userId });
+}
+
+async function createAccount(userId, { name, type, balance = 0, isDefault = false }) {
+  return _post("/api/financial/accounts", { userId, name, type, balance, isDefault });
+}
+
+async function updateAccount(userId, accountId, fields) {
+  const res = await fetch(`${BACKEND_URL}/api/financial/accounts/${accountId}`, {
+    method: "PATCH",
+    headers: authHeaders(),
+    body: JSON.stringify({ userId, ...fields }),
+  });
+  const text = await res.text();
+  try { return JSON.parse(text); } catch { return { status: res.status, text }; }
+}
+
+async function deleteAccount(userId, accountId) {
+  const res = await fetch(`${BACKEND_URL}/api/financial/accounts/${accountId}?userId=${encodeURIComponent(userId)}`, {
+    method: "DELETE",
+    headers: authHeaders(),
+  });
+  const text = await res.text();
+  try { return JSON.parse(text); } catch { return { status: res.status, text }; }
+}
+
+// Categories
+
+async function listCategories(userId) {
+  return _get("/api/financial/categories", { userId });
+}
+
+async function createCategory(userId, { name, parentId }) {
+  return _post("/api/financial/categories", { userId, name, parentId });
+}
+
+async function deleteCategory(userId, categoryId) {
+  const res = await fetch(`${BACKEND_URL}/api/financial/categories/${categoryId}?userId=${encodeURIComponent(userId)}`, {
+    method: "DELETE",
+    headers: authHeaders(),
+  });
+  const text = await res.text();
+  try { return JSON.parse(text); } catch { return { status: res.status, text }; }
+}
+
+// Transactions
+
+async function listTransactions(userId, { period = "current", accountId, limit = 30, skip = 0 } = {}) {
+  const params = { userId, period, limit, skip };
+  if (accountId) params.accountId = accountId;
+  return _get("/api/financial/transactions", params);
+}
+
+async function createTransaction(userId, { accountId, amount, description, type, date, categoryId, status }) {
+  return _post("/api/financial/transactions", { userId, accountId, amount, description, type, date, categoryId, status });
+}
+
+async function deleteTransaction(userId, transactionId) {
+  const res = await fetch(`${BACKEND_URL}/api/financial/transactions/${transactionId}?userId=${encodeURIComponent(userId)}`, {
+    method: "DELETE",
+    headers: authHeaders(),
+  });
+  const text = await res.text();
+  try { return JSON.parse(text); } catch { return { status: res.status, text }; }
+}
+
+// Budgets
+
+async function listBudgets(userId) {
+  return _get("/api/financial/budgets", { userId });
+}
+
+async function createBudget(userId, { categoryId, limit, period = "monthly" }) {
+  return _post("/api/financial/budgets", { userId, categoryId, limit, period });
+}
+
+async function deleteBudget(userId, budgetId) {
+  const res = await fetch(`${BACKEND_URL}/api/financial/budgets/${budgetId}?userId=${encodeURIComponent(userId)}`, {
+    method: "DELETE",
+    headers: authHeaders(),
+  });
+  const text = await res.text();
+  try { return JSON.parse(text); } catch { return { status: res.status, text }; }
+}
+
+module.exports = {
+  startAuth, checkAuthStatus,
+  listAccounts, createAccount, updateAccount, deleteAccount,
+  listCategories, createCategory, deleteCategory,
+  listTransactions, createTransaction, deleteTransaction,
+  listBudgets, createBudget, deleteBudget,
+};

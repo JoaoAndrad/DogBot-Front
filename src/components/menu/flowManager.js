@@ -376,6 +376,86 @@ class FlowManager {
   }
 
   /**
+   * Processa input de texto livre do flow financeiro (add conta, categoria, orçamento).
+   * @private
+   * @returns {Promise<boolean>} true se consumido
+   */
+  async _handleFinancialTextInput(client, chatId, userId, textBody, candidateIds) {
+    const flowId = "financeiro";
+    let state = null;
+    let stateUserId = null;
+    for (const id of candidateIds) {
+      const s = await storage.getState(id, flowId);
+      if (s?.context?.awaitingAccountName || s?.context?.awaitingAccountBalance ||
+          s?.context?.awaitingCategoryName || s?.context?.awaitingBudgetLimit) {
+        state = s;
+        stateUserId = id;
+        break;
+      }
+    }
+    if (!state || !stateUserId) return false;
+
+    const { parseAmount } = require("./flows/financialFlow");
+    const trimmed = String(textBody || "").trim();
+
+    if (state.context.awaitingAccountName) {
+      if (!trimmed) {
+        await client.sendMessage(chatId, "❌ Nome inválido. Envie o nome da conta:");
+        return true;
+      }
+      state.context.pendingAccountName = trimmed;
+      state.context.awaitingAccountName = false;
+      state.context.awaitingAccountBalance = true;
+      await storage.saveState(stateUserId, flowId, state);
+      await client.sendMessage(chatId, "✏️ Digite o *saldo inicial* em R$ (ex: 1500 ou 0 para começar do zero):");
+      return true;
+    }
+
+    if (state.context.awaitingAccountBalance) {
+      const amount = parseAmount(trimmed);
+      if (amount === null) {
+        await client.sendMessage(chatId, "❌ Valor inválido. Digite o saldo em R$ (ex: 1500 ou 0):");
+        return true;
+      }
+      state.context.pendingAccountBalance = amount;
+      state.context.awaitingAccountBalance = false;
+      state.path = "/contas/confirmar";
+      await storage.saveState(stateUserId, flowId, state);
+      await this._renderNode(client, chatId, stateUserId, flowId, "/contas/confirmar");
+      return true;
+    }
+
+    if (state.context.awaitingCategoryName) {
+      if (!trimmed) {
+        await client.sendMessage(chatId, "❌ Nome inválido. Envie o nome da categoria:");
+        return true;
+      }
+      state.context.pendingCategoryName = trimmed;
+      state.context.awaitingCategoryName = false;
+      state.path = "/categorias/confirmar";
+      await storage.saveState(stateUserId, flowId, state);
+      await this._renderNode(client, chatId, stateUserId, flowId, "/categorias/confirmar");
+      return true;
+    }
+
+    if (state.context.awaitingBudgetLimit) {
+      const amount = parseAmount(trimmed);
+      if (amount === null || amount <= 0) {
+        await client.sendMessage(chatId, "❌ Valor inválido. Digite o limite em R$ (ex: 1500):");
+        return true;
+      }
+      state.context.pendingBudgetLimit = amount;
+      state.context.awaitingBudgetLimit = false;
+      state.path = "/orcamentos/confirmar";
+      await storage.saveState(stateUserId, flowId, state);
+      await this._renderNode(client, chatId, stateUserId, flowId, "/orcamentos/confirmar");
+      return true;
+    }
+
+    return false;
+  }
+
+  /**
    * Processa texto livre para ajuste de data de visualização (fluxo film-card).
    * O processador de mensagens do bot deve chamar isto para mensagens que não são comandos.
    * @returns {Promise<boolean>} true se a mensagem foi consumida
@@ -409,6 +489,9 @@ class FlowManager {
       }
     }
     if (!state || !stateUserId) {
+      // Check financial flow text input before giving up
+      const financialHandled = await this._handleFinancialTextInput(client, chatId, userId, textBody, candidateIds);
+      if (financialHandled) return true;
       return false;
     }
 
