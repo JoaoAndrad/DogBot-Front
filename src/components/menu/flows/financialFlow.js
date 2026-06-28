@@ -169,6 +169,75 @@ const financialFlow = createFlow("financeiro", {
     }),
   },
 
+  "/extrato/ver": {
+    dynamic: true,
+    options: [],
+    handler: async (ctx) => {
+      const { extratoPeriod = "current", extratoPage = 0 } = ctx.state.context;
+      const limit = 10;
+      const skip = extratoPage * limit;
+      const periodLabel = extratoPeriod === "last" ? "Mês passado" : "Este mês";
+
+      try {
+        const res = await financialClient.listTransactions(ctx.userId, {
+          period: extratoPeriod,
+          limit: limit + 1,
+          skip,
+        });
+
+        if (!res?.transactions?.length) {
+          await ctx.reply(`📋 Nenhuma transação em *${periodLabel.toLowerCase()}*.`);
+          return {
+            title: "Extrato vazio",
+            options: [
+              { label: "🔄 Trocar período", action: "goto", target: "/extrato" },
+              { label: "↩️ Voltar ao menu", action: "goto", target: "/" },
+            ],
+          };
+        }
+
+        const { transactions, summary } = res;
+        const hasNext = transactions.length > limit;
+        const hasPrev = extratoPage > 0;
+        const txs = transactions.slice(0, limit);
+
+        const lines = [`📋 *Extrato — ${periodLabel}* (pág. ${extratoPage + 1})\n`];
+        if (extratoPage === 0 && summary) {
+          lines.push(
+            `🟢 Entradas: R$ ${formatMoney(summary.income)}`,
+            `🔴 Saídas:   R$ ${formatMoney(summary.expense)}`,
+            `💰 Saldo:    R$ ${formatMoney(summary.net)}\n`,
+          );
+        }
+        for (const t of txs) {
+          const emoji = t.type === "income" ? "🟢" : "🔴";
+          const sign = t.type === "income" ? "+" : "-";
+          const desc = t.description || (t.type === "income" ? "Receita" : "Despesa");
+          const cat = t.categoryName ? ` [${t.categoryName}]` : "";
+          lines.push(`${emoji} ${formatDate(t.date)}  ${sign}R$ ${formatMoney(t.amount)}  ${desc}${cat}`);
+        }
+        await ctx.reply(lines.join("\n"));
+
+        const options = [];
+        if (hasPrev) options.push({ label: "⬅️ Página anterior", action: "exec", handler: "extratoPagePrev" });
+        if (hasNext) options.push({ label: "➡️ Próxima página", action: "exec", handler: "extratoPageNext" });
+        options.push({ label: "🔄 Trocar período", action: "goto", target: "/extrato" });
+        options.push({ label: "↩️ Voltar ao menu", action: "goto", target: "/" });
+        return { title: `Extrato — página ${extratoPage + 1}`, options };
+      } catch (e) {
+        logger.error("[financialFlow] extrato/ver error:", e.message);
+        await ctx.reply("❌ Erro ao carregar extrato. Tente novamente.");
+        return {
+          title: "Erro",
+          options: [
+            { label: "🔄 Tentar novamente", action: "exec", handler: "extratoReload" },
+            { label: "↩️ Voltar", action: "back" },
+          ],
+        };
+      }
+    },
+  },
+
   // ── Contas ────────────────────────────────────────────────────────────────
 
   "/contas": {
@@ -226,13 +295,71 @@ const financialFlow = createFlow("financeiro", {
     }),
   },
 
+  "/categorias/tipo": {
+    dynamic: true,
+    options: [],
+    handler: async (ctx) => {
+      const name = ctx.state.context.pendingCategoryName || "Nova categoria";
+      return {
+        title: `*${name}* — Tipo:`,
+        options: [
+          { label: "📁 Categoria raiz", action: "goto", target: "/categorias/confirmar" },
+          { label: "↳ Subcategoria de...", action: "goto", target: "/categorias/escolher-pai" },
+          { label: "❌ Cancelar", action: "goto", target: "/categorias" },
+        ],
+      };
+    },
+  },
+
+  "/categorias/escolher-pai": {
+    dynamic: true,
+    options: [],
+    handler: async (ctx) => {
+      try {
+        const res = await financialClient.listCategories(ctx.userId);
+        const roots = (res?.categories || []).filter(c => !c.parentId);
+        if (!roots.length) {
+          await ctx.reply("❌ Nenhuma categoria raiz disponível. Crie primeiro uma categoria raiz.");
+          return {
+            title: "Sem categorias raiz",
+            options: [
+              { label: "↩️ Voltar", action: "back" },
+              { label: "❌ Cancelar", action: "goto", target: "/categorias" },
+            ],
+          };
+        }
+        const options = roots.map(r => ({
+          label: r.name,
+          action: "exec",
+          handler: "setParentCategory",
+          data: { categoryId: r.id, categoryName: r.name },
+        }));
+        options.push({ label: "❌ Cancelar", action: "goto", target: "/categorias" });
+        return { title: "Selecione a categoria pai:", options };
+      } catch (e) {
+        logger.error("[financialFlow] escolher-pai error:", e.message);
+        await ctx.reply("❌ Erro ao carregar categorias.");
+        return {
+          title: "Erro",
+          options: [
+            { label: "↩️ Voltar", action: "back" },
+            { label: "❌ Cancelar", action: "goto", target: "/categorias" },
+          ],
+        };
+      }
+    },
+  },
+
   "/categorias/confirmar": {
     dynamic: true,
     options: [],
     handler: async (ctx) => {
-      const { pendingCategoryName } = ctx.state.context;
+      const { pendingCategoryName, pendingCategoryParentName } = ctx.state.context;
+      const subtitle = pendingCategoryParentName
+        ? ` (subcategoria de *${pendingCategoryParentName}*)`
+        : " (categoria raiz)";
       return {
-        title: `Criar categoria *${pendingCategoryName}*?`,
+        title: `Criar *${pendingCategoryName}*${subtitle}?`,
         options: [
           { label: "✅ Confirmar", action: "exec", handler: "confirmarCategoria" },
           { label: "❌ Cancelar", action: "back" },
@@ -256,13 +383,61 @@ const financialFlow = createFlow("financeiro", {
     }),
   },
 
+  "/orcamentos/categoria": {
+    dynamic: true,
+    options: [],
+    handler: async (ctx) => {
+      try {
+        const res = await financialClient.listCategories(ctx.userId);
+        const cats = res?.categories || [];
+        const options = [
+          {
+            label: "💼 Total de despesas (geral)",
+            action: "exec",
+            handler: "setOrcamentoCategoria",
+            data: { categoryId: null, categoryName: null },
+          },
+        ];
+        for (const cat of cats) {
+          options.push({
+            label: cat.name,
+            action: "exec",
+            handler: "setOrcamentoCategoria",
+            data: { categoryId: cat.id, categoryName: cat.name },
+          });
+          for (const sub of (cat.children || [])) {
+            options.push({
+              label: `↳ ${sub.name}`,
+              action: "exec",
+              handler: "setOrcamentoCategoria",
+              data: { categoryId: sub.id, categoryName: sub.name },
+            });
+          }
+        }
+        options.push({ label: "❌ Cancelar", action: "back" });
+        return { title: "Para qual categoria?", options };
+      } catch (e) {
+        logger.error("[financialFlow] orcamentos/categoria error:", e.message);
+        await ctx.reply("❌ Erro ao carregar categorias.");
+        return {
+          title: "Erro",
+          options: [
+            { label: "🔄 Tentar novamente", action: "goto", target: "/orcamentos/categoria" },
+            { label: "↩️ Voltar", action: "back" },
+          ],
+        };
+      }
+    },
+  },
+
   "/orcamentos/confirmar": {
     dynamic: true,
     options: [],
     handler: async (ctx) => {
-      const { pendingBudgetLimit } = ctx.state.context;
+      const { pendingBudgetLimit, pendingBudgetCategoryName } = ctx.state.context;
+      const catLabel = pendingBudgetCategoryName || "total de despesas";
       return {
-        title: `Criar orçamento mensal de R$ ${formatMoney(pendingBudgetLimit || 0)} para todas as despesas?`,
+        title: `Criar orçamento de R$ ${formatMoney(pendingBudgetLimit || 0)} / mês para *${catLabel}*?`,
         options: [
           { label: "✅ Confirmar", action: "exec", handler: "confirmarOrcamento" },
           { label: "❌ Cancelar", action: "back" },
@@ -445,40 +620,23 @@ const financialFlow = createFlow("financeiro", {
     // ── Extrato ─────────────────────────────────────────────────────────────
 
     extratoMes: async (ctx, data) => {
-      const period = data?.period || "current";
-      try {
-        const res = await financialClient.listTransactions(ctx.userId, { period });
-        const periodLabel = period === "last" ? "Mês passado" : "Este mês";
+      ctx.state.context.extratoPeriod = data?.period || "current";
+      ctx.state.context.extratoPage = 0;
+      ctx.state.path = "/extrato/ver";
+    },
 
-        if (!res?.transactions?.length) {
-          await ctx.reply(`📋 Nenhuma transação em *${periodLabel.toLowerCase()}*.`);
-          return { noRender: true };
-        }
+    extratoPageNext: async (ctx) => {
+      ctx.state.context.extratoPage = (ctx.state.context.extratoPage || 0) + 1;
+      return { rerenderCurrent: true };
+    },
 
-        const { transactions, summary } = res;
-        const lines = [
-          `📋 *Extrato — ${periodLabel}*\n`,
-          `🟢 Entradas: R$ ${formatMoney(summary.income)}`,
-          `🔴 Saídas:   R$ ${formatMoney(summary.expense)}`,
-          `💰 Saldo:    R$ ${formatMoney(summary.net)}\n`,
-        ];
+    extratoPagePrev: async (ctx) => {
+      ctx.state.context.extratoPage = Math.max(0, (ctx.state.context.extratoPage || 0) - 1);
+      return { rerenderCurrent: true };
+    },
 
-        for (const t of transactions.slice(0, 15)) {
-          const emoji = t.type === "income" ? "🟢" : "🔴";
-          const sign = t.type === "income" ? "+" : "-";
-          const desc = t.description || (t.type === "income" ? "Receita" : "Despesa");
-          lines.push(`${emoji} ${formatDate(t.date)}  ${sign}R$ ${formatMoney(t.amount)}  ${desc}`);
-        }
-        if (transactions.length > 15) {
-          lines.push(`\n_... e mais ${transactions.length - 15} transações_`);
-        }
-
-        await ctx.reply(lines.join("\n"));
-      } catch (e) {
-        logger.error("[financialFlow] extratoMes error:", e.message);
-        await ctx.reply("❌ Erro ao carregar extrato. Tente novamente.");
-      }
-      return { noRender: true };
+    extratoReload: async (ctx) => {
+      return { rerenderCurrent: true };
     },
 
     // ── Categorias ──────────────────────────────────────────────────────────
@@ -512,12 +670,26 @@ const financialFlow = createFlow("financeiro", {
       return { noRender: true };
     },
 
+    setParentCategory: async (ctx, data) => {
+      ctx.state.context.pendingCategoryParentId = data.categoryId;
+      ctx.state.context.pendingCategoryParentName = data.categoryName;
+      ctx.state.path = "/categorias/confirmar";
+    },
+
     confirmarCategoria: async (ctx) => {
-      const { pendingCategoryName } = ctx.state.context;
+      const { pendingCategoryName, pendingCategoryParentId, pendingCategoryParentName } = ctx.state.context;
       try {
-        await financialClient.createCategory(ctx.userId, { name: pendingCategoryName });
-        await ctx.reply(`✅ Categoria *${pendingCategoryName}* criada com sucesso!`);
+        await financialClient.createCategory(ctx.userId, {
+          name: pendingCategoryName,
+          parentId: pendingCategoryParentId || undefined,
+        });
+        const label = pendingCategoryParentName
+          ? `Subcategoria *${pendingCategoryName}* (em *${pendingCategoryParentName}*) criada!`
+          : `Categoria *${pendingCategoryName}* criada!`;
+        await ctx.reply(`✅ ${label}`);
         ctx.state.context.pendingCategoryName = null;
+        ctx.state.context.pendingCategoryParentId = null;
+        ctx.state.context.pendingCategoryParentName = null;
         ctx.state.path = "/categorias";
       } catch (e) {
         logger.error("[financialFlow] confirmarCategoria error:", e.message);
@@ -564,12 +736,25 @@ const financialFlow = createFlow("financeiro", {
       return { noRender: true };
     },
 
+    setOrcamentoCategoria: async (ctx, data) => {
+      ctx.state.context.pendingBudgetCategoryId = data.categoryId || null;
+      ctx.state.context.pendingBudgetCategoryName = data.categoryName || null;
+      ctx.state.path = "/orcamentos/confirmar";
+    },
+
     confirmarOrcamento: async (ctx) => {
-      const { pendingBudgetLimit } = ctx.state.context;
+      const { pendingBudgetLimit, pendingBudgetCategoryId, pendingBudgetCategoryName } = ctx.state.context;
       try {
-        await financialClient.createBudget(ctx.userId, { limit: pendingBudgetLimit, period: "monthly" });
-        await ctx.reply(`✅ Orçamento de R$ ${formatMoney(pendingBudgetLimit)} / mês criado!`);
+        await financialClient.createBudget(ctx.userId, {
+          categoryId: pendingBudgetCategoryId || undefined,
+          limit: pendingBudgetLimit,
+          period: "monthly",
+        });
+        const catLabel = pendingBudgetCategoryName || "total de despesas";
+        await ctx.reply(`✅ Orçamento de R$ ${formatMoney(pendingBudgetLimit)} / mês para *${catLabel}* criado!`);
         ctx.state.context.pendingBudgetLimit = null;
+        ctx.state.context.pendingBudgetCategoryId = null;
+        ctx.state.context.pendingBudgetCategoryName = null;
         ctx.state.path = "/orcamentos";
       } catch (e) {
         logger.error("[financialFlow] confirmarOrcamento error:", e.message);

@@ -494,9 +494,11 @@ class FlowManager {
       }
       state.context.pendingCategoryName = trimmed;
       state.context.awaitingCategoryName = false;
-      state.path = "/categorias/confirmar";
+      state.context.pendingCategoryParentId = null;
+      state.context.pendingCategoryParentName = null;
+      state.path = "/categorias/tipo";
       await storage.saveState(stateUserId, flowId, state);
-      await this._renderNode(client, chatId, stateUserId, flowId, "/categorias/confirmar");
+      await this._renderNode(client, chatId, stateUserId, flowId, "/categorias/tipo");
       return true;
     }
 
@@ -508,9 +510,11 @@ class FlowManager {
       }
       state.context.pendingBudgetLimit = amount;
       state.context.awaitingBudgetLimit = false;
-      state.path = "/orcamentos/confirmar";
+      state.context.pendingBudgetCategoryId = null;
+      state.context.pendingBudgetCategoryName = null;
+      state.path = "/orcamentos/categoria";
       await storage.saveState(stateUserId, flowId, state);
-      await this._renderNode(client, chatId, stateUserId, flowId, "/orcamentos/confirmar");
+      await this._renderNode(client, chatId, stateUserId, flowId, "/orcamentos/categoria");
       return true;
     }
 
