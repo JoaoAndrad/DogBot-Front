@@ -162,7 +162,7 @@ async function handleCopaFlow(stateKey, body, state, reply, opts) {
     };
     await polls.createPoll(client || { sendPoll: async () => null }, from || data.userId || stateKey,
       `✅ Prorrogação: *${etHome} x ${etAway}*\n\n🔮 ${matchup(data.homeTeam, data.awayTeam)}\nQuem avança?`,
-      options, { metadata: pollMeta, sender: client });
+      options, { metadata: pollMeta });
     if (!client || !from) await reply("⚽ Vote na enquete acima.");
     return true;
   }
