@@ -13,6 +13,7 @@
  */
 
 const AMOUNT_RE = /R?\$?\s*(\d{1,3}(?:[.,]\d{3})*(?:[.,]\d{1,2})?)/i;
+const INSTALLMENT_RE = /\b(\d+)\s*[xX×]\b|\bem\s+(\d+)\s+(?:vezes?|parcelas?)\b|\bparcelad[ao]\s+em\s+(\d+)\b|\b(\d+)\s+parcelas?\b/i;
 
 // How much / what / when patterns
 const EXPENSE_TRIGGERS = /\b(gast[eouia]i?|paguei|debit[ao]u?|comprei|sa[íi]u|saiu|saindo|devo|tive que pagar)\b/i;
@@ -77,6 +78,13 @@ function parseDate(text) {
   return null; // caller defaults to today
 }
 
+function parseInstallments(text) {
+  const m = text.match(INSTALLMENT_RE);
+  if (!m) return null;
+  const n = parseInt(m[1] || m[2] || m[3] || m[4], 10);
+  return (n >= 2 && n <= 60) ? n : null;
+}
+
 function extractDescription(text) {
   // Remove triggers, amount, date words, filler words
   let desc = text
@@ -98,10 +106,11 @@ function parse(text) {
 
   const date = parseDate(t);
   const description = extractDescription(t);
+  const installmentCount = parseInstallments(t);
 
   const isTransfer = TRANSFER_TRIGGERS.test(t);
   if (isTransfer) {
-    return { intent: "transfer", amount, description, date, isPending: false, raw: t };
+    return { intent: "transfer", amount, description, date, isPending: false, installmentCount, raw: t };
   }
 
   const isFuture = FUTURE_MARKERS.test(t) && !INCOME_TRIGGERS.test(t);
@@ -111,15 +120,15 @@ function parse(text) {
   if (!isIncome && !isExpense && !isFuture) return null;
 
   if (isFuture && isExpense) {
-    return { intent: "future_expense", amount, description, date, isPending: true, raw: t };
+    return { intent: "future_expense", amount, description, date, isPending: true, installmentCount, raw: t };
   }
   if (isFuture && !isIncome) {
-    return { intent: "future_expense", amount, description, date, isPending: true, raw: t };
+    return { intent: "future_expense", amount, description, date, isPending: true, installmentCount, raw: t };
   }
   if (isIncome) {
-    return { intent: "income", amount, description, date, isPending: false, raw: t };
+    return { intent: "income", amount, description, date, isPending: false, installmentCount, raw: t };
   }
-  return { intent: "expense", amount, description, date, isPending: false, raw: t };
+  return { intent: "expense", amount, description, date, isPending: false, installmentCount, raw: t };
 }
 
 module.exports = { parse };

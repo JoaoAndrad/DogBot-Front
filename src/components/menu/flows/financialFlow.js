@@ -122,6 +122,7 @@ const financialFlow = createFlow("financeiro", {
           { label: "🏦 Contas", action: "goto", target: "/contas" },
           { label: "🏷️ Categorias", action: "goto", target: "/categorias" },
           { label: "📊 Orçamentos", action: "goto", target: "/orcamentos" },
+          { label: "💳 Cartões", action: "goto", target: "/cartoes" },
           { label: "⚙️ Configurações", action: "goto", target: "/config" },
           { label: "❓ Dúvidas", action: "goto", target: "/duvidas" },
           { label: "✖️ Fechar", action: "exec", handler: "close" },
@@ -606,11 +607,204 @@ const financialFlow = createFlow("financeiro", {
       const dateLabel = formatDate(new Date(tx.date));
       const desc = tx.description ? ` — *${tx.description}*` : "";
       const pendingNote = tx.isPending ? " _(pendente)_" : "";
+      const installNote = tx.installmentCount
+        ? ` em *${tx.installmentCount}x* de R$ ${formatMoney(tx.amount / tx.installmentCount)}`
+        : "";
       return {
-        title: `Registrar R$ ${formatMoney(tx.amount)}${desc} como ${typeLabel} em *${tx.accountName}* (${dateLabel})${pendingNote}?`,
+        title: `Registrar R$ ${formatMoney(tx.amount)}${installNote}${desc} como ${typeLabel} em *${tx.accountName}* (${dateLabel})${pendingNote}?`,
         options: [
           { label: "✅ Sim, registrar", action: "exec", handler: "confirmarNlp" },
           { label: "❌ Cancelar", action: "exec", handler: "cancelarNlp" },
+        ],
+      };
+    },
+  },
+
+  // ── Cartões ───────────────────────────────────────────────────────────────
+
+  "/cartoes": {
+    dynamic: true,
+    options: [],
+    handler: async (ctx) => {
+      let cards = [];
+      try {
+        const res = await financialClient.listCards(ctx.userId);
+        cards = res?.cards || [];
+      } catch (e) {
+        logger.warn("[financialFlow] /cartoes check error:", e.message);
+      }
+      const options = [];
+      for (const card of cards) {
+        const total = card.currentInvoice ? card.currentInvoice.totalAmount : 0;
+        const limit = card.limit || 0;
+        options.push({
+          label: `💳 ${card.name} — R$ ${formatMoney(total)} de R$ ${formatMoney(limit)}`,
+          action: "exec",
+          handler: "verCartao",
+          data: { cardId: card.id },
+        });
+      }
+      options.push({ label: "➕ Adicionar cartão", action: "exec", handler: "iniciarCriarCartao" });
+      options.push({ label: "↩️ Voltar", action: "back" });
+      return { title: "💳 Cartões de crédito", options };
+    },
+  },
+
+  "/cartoes/ver": {
+    dynamic: true,
+    options: [],
+    handler: async (ctx) => {
+      const { currentCardId } = ctx.state.context;
+      try {
+        const res = await financialClient.getCurrentInvoice(ctx.userId, currentCardId);
+        if (!res || !res.invoice) {
+          await ctx.reply("❌ Não foi possível carregar a fatura.");
+          return {
+            title: "Erro",
+            options: [
+              { label: "↩️ Voltar", action: "back" },
+            ],
+          };
+        }
+        const { invoice, totalAmount, available, limit } = res;
+        const dueStr = invoice.dueDate
+          ? (() => {
+              const d = new Date(invoice.dueDate);
+              return `${String(d.getUTCDate()).padStart(2, "0")}/${String(d.getUTCMonth() + 1).padStart(2, "0")}/${d.getUTCFullYear()}`;
+            })()
+          : "—";
+        const [y, m] = invoice.period.split("-");
+        const monthNames = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"];
+        const monthLabel = `${monthNames[parseInt(m, 10) - 1]} ${y}`;
+
+        await ctx.reply(
+          `💳 *${ctx.state.context.currentCardName || "Cartão"} — ${monthLabel}*\n\n` +
+          `Fatura: R$ ${formatMoney(totalAmount)} | Disponível: R$ ${formatMoney(available)}\n` +
+          `Vence: ${dueStr}`
+        );
+        return {
+          title: `Fatura ${monthLabel}`,
+          options: [
+            { label: "📋 Ver lançamentos", action: "exec", handler: "verLancamentos" },
+            { label: "💰 Pagar fatura", action: "exec", handler: "pagarFatura" },
+            { label: "↩️ Voltar", action: "back" },
+          ],
+        };
+      } catch (e) {
+        logger.error("[financialFlow] /cartoes/ver error:", e.message);
+        await ctx.reply("❌ Erro ao carregar fatura.");
+        return {
+          title: "Erro",
+          options: [
+            { label: "↩️ Voltar", action: "back" },
+          ],
+        };
+      }
+    },
+  },
+
+  "/cartoes/vincular": {
+    dynamic: true,
+    options: [],
+    handler: async (ctx) => {
+      let accounts = [];
+      try {
+        const res = await financialClient.listAccounts(ctx.userId);
+        accounts = (res?.accounts || []).filter(a => ["corrente", "poupanca"].includes(a.type));
+      } catch (e) {
+        logger.warn("[financialFlow] /cartoes/vincular error:", e.message);
+      }
+      const options = accounts.map(a => ({
+        label: `🏦 ${a.name}`,
+        action: "exec",
+        handler: "vincularContaCartao",
+        data: { accountId: a.id },
+      }));
+      options.push({ label: "➕ Criar nova conta", action: "exec", handler: "criarContaParaCartao" });
+      options.push({ label: "⏭️ Pular (sem conta vinculada)", action: "exec", handler: "pularVinculo" });
+      return { title: "🏦 Vincular conta para pagamento?", options };
+    },
+  },
+
+  "/cartoes/confirmar": {
+    dynamic: true,
+    options: [],
+    handler: async (ctx) => {
+      const { pendingCardName, pendingCardLimit, pendingCardClosingDay, pendingCardDueDay, pendingCardLinkedAccountId } = ctx.state.context;
+      const linkedLabel = pendingCardLinkedAccountId ? "Com conta vinculada" : "Sem conta vinculada";
+      return {
+        title: `Criar cartão *${pendingCardName}*?\n\nLimite: R$ ${formatMoney(pendingCardLimit)}\nFechamento: dia ${pendingCardClosingDay} | Vencimento: dia ${pendingCardDueDay}\n${linkedLabel}`,
+        options: [
+          { label: "✅ Confirmar", action: "exec", handler: "confirmarCriarCartao" },
+          { label: "❌ Cancelar", action: "goto", target: "/cartoes" },
+        ],
+      };
+    },
+  },
+
+  "/cartoes/pagar/conta": {
+    dynamic: true,
+    options: [],
+    handler: async (ctx) => {
+      let accounts = [];
+      try {
+        const res = await financialClient.listAccounts(ctx.userId);
+        accounts = (res?.accounts || []).filter(a => ["corrente", "poupanca", "carteira"].includes(a.type));
+      } catch (e) {
+        logger.warn("[financialFlow] /cartoes/pagar/conta error:", e.message);
+      }
+      const options = accounts.map(a => ({
+        label: `🏦 ${a.name} — R$ ${formatMoney(a.balance)}`,
+        action: "exec",
+        handler: "selecionarContaPagamento",
+        data: { accountId: a.id },
+      }));
+      options.push({ label: "❌ Cancelar", action: "back" });
+      return { title: "💳 De qual conta pagar?", options };
+    },
+  },
+
+  "/cartoes/pagar/valor": {
+    dynamic: true,
+    options: [],
+    handler: async (ctx) => {
+      const { currentCardId } = ctx.state.context;
+      try {
+        const res = await financialClient.getCurrentInvoice(ctx.userId, currentCardId);
+        const total = res?.totalAmount || 0;
+        ctx.state.context.currentInvoiceId = res?.invoice?.id;
+        ctx.state.context.currentInvoiceTotal = total;
+        await ctx.reply(
+          `💰 *Pagamento de fatura*\n\n` +
+          `Total da fatura: R$ ${formatMoney(total)}\n\n` +
+          `Digite o valor a pagar (ou *${formatMoney(total)}* para pagar tudo):`
+        );
+      } catch (e) {
+        logger.error("[financialFlow] /cartoes/pagar/valor error:", e.message);
+        await ctx.reply("❌ Erro ao carregar fatura.");
+      }
+      ctx.state.context.awaitingPaymentAmount = true;
+      return {
+        title: "Digite o valor no chat",
+        options: [
+          { label: "❌ Cancelar", action: "goto", target: "/cartoes/ver" },
+        ],
+      };
+    },
+  },
+
+  "/cartoes/pagar/confirmar": {
+    dynamic: true,
+    options: [],
+    handler: async (ctx) => {
+      const { pendingPaymentAmount, currentInvoiceTotal, currentCardName } = ctx.state.context;
+      const isParcial = pendingPaymentAmount < (currentInvoiceTotal || 0) - 0.01;
+      const notice = isParcial ? "\n⚠️ Pagamento parcial — saldo devedor vai para próxima fatura." : "";
+      return {
+        title: `Pagar R$ ${formatMoney(pendingPaymentAmount)} da fatura de *${currentCardName || "cartão"}*?${notice}`,
+        options: [
+          { label: "✅ Confirmar pagamento", action: "exec", handler: "confirmarPagamento" },
+          { label: "❌ Cancelar", action: "back" },
         ],
       };
     },
@@ -876,18 +1070,48 @@ const financialFlow = createFlow("financeiro", {
 
     listarCategorias: async (ctx) => {
       try {
-        const res = await financialClient.listCategories(ctx.userId);
-        if (!res?.categories?.length) {
+        const [catsRes, budgetsRes, txRes] = await Promise.all([
+          financialClient.listCategories(ctx.userId),
+          financialClient.listBudgets(ctx.userId),
+          financialClient.listTransactions(ctx.userId, { period: "current", limit: 500 }),
+        ]);
+
+        if (!catsRes?.categories?.length) {
           await ctx.reply("🏷️ Nenhuma categoria encontrada.");
           return { noRender: true };
         }
-        const lines = ["🏷️ *Categorias:*\n"];
-        for (const cat of res.categories) {
-          lines.push(`• *${cat.name}*`);
+
+        // gasto por categoryId este mês
+        const spentById = {};
+        for (const t of (txRes?.transactions || [])) {
+          if (t.type !== "expense" || !t.categoryId) continue;
+          spentById[t.categoryId] = (spentById[t.categoryId] || 0) + (t.amount || 0);
+        }
+
+        // limite de orçamento por categoryId
+        const budgetById = {};
+        for (const b of (budgetsRes?.budgets || [])) {
+          if (b.categoryId) budgetById[b.categoryId] = b.limit;
+        }
+
+        function suffix(spent, budget) {
+          if (budget !== undefined && spent > 0) return ` (R$ ${formatMoney(spent)}/R$ ${formatMoney(budget)})`;
+          if (budget !== undefined) return ` (R$ 0/R$ ${formatMoney(budget)})`;
+          if (spent > 0) return ` (R$ ${formatMoney(spent)})`;
+          return "";
+        }
+
+        const lines = ["🏷️ *Categorias — este mês:*\n"];
+        for (const cat of catsRes.categories) {
+          const ownSpent = spentById[cat.id] || 0;
+          const subSpent = (cat.children || []).reduce((s, c) => s + (spentById[c.id] || 0), 0);
+          const totalSpent = ownSpent + subSpent;
+          lines.push(`• *${cat.name}*${suffix(totalSpent, budgetById[cat.id])}`);
           for (const sub of (cat.children || [])) {
-            lines.push(`  ↳ ${sub.name}`);
+            lines.push(`  ↳ ${sub.name}${suffix(spentById[sub.id] || 0, budgetById[sub.id])}`);
           }
         }
+
         await ctx.reply(lines.join("\n"));
       } catch (e) {
         logger.error("[financialFlow] listarCategorias error:", e.message);
@@ -1021,25 +1245,43 @@ const financialFlow = createFlow("financeiro", {
       const tx = ctx.state.context.pendingNlpTransaction;
       if (!tx) return { end: true };
       try {
-        const result = await financialClient.createTransaction(ctx.userId, {
-          accountId: tx.accountId,
-          amount: tx.amount,
-          description: tx.description,
-          type: tx.type,
-          date: tx.date,
-          status: tx.isPending ? "pending" : "confirmed",
-        });
-        const typeLabel = tx.type === "income" ? "Receita" : "Despesa";
-        const sign = tx.type === "income" ? "+" : "-";
-        const balanceText = result.newBalance !== undefined
-          ? `\n\nSaldo *${tx.accountName}*: R$ ${formatMoney(result.newBalance)}`
-          : "";
-        await ctx.reply(
-          `✅ *${typeLabel} registrada!*\n\n` +
-          `${sign}R$ ${formatMoney(tx.amount)}` +
-          (tx.description ? ` — ${tx.description}` : "") +
-          balanceText
-        );
+        if (tx.installmentCount && tx.installmentCount >= 2) {
+          await financialClient.createInstallment(ctx.userId, {
+            accountId: tx.accountId,
+            amount: tx.amount,
+            description: tx.description,
+            type: tx.type,
+            date: tx.date,
+            installmentCount: tx.installmentCount,
+          });
+          const amountEach = tx.amount / tx.installmentCount;
+          await ctx.reply(
+            `✅ *Parcelamento registrado!*\n\n` +
+            `${tx.installmentCount}x de R$ ${formatMoney(amountEach)}` +
+            (tx.description ? ` — ${tx.description}` : "") +
+            `\n\nTotal: R$ ${formatMoney(tx.amount)}`
+          );
+        } else {
+          const result = await financialClient.createTransaction(ctx.userId, {
+            accountId: tx.accountId,
+            amount: tx.amount,
+            description: tx.description,
+            type: tx.type,
+            date: tx.date,
+            status: tx.isPending ? "pending" : "confirmed",
+          });
+          const typeLabel = tx.type === "income" ? "Receita" : "Despesa";
+          const sign = tx.type === "income" ? "+" : "-";
+          const balanceText = result.newBalance !== undefined
+            ? `\n\nSaldo *${tx.accountName}*: R$ ${formatMoney(result.newBalance)}`
+            : "";
+          await ctx.reply(
+            `✅ *${typeLabel} registrada!*\n\n` +
+            `${sign}R$ ${formatMoney(tx.amount)}` +
+            (tx.description ? ` — ${tx.description}` : "") +
+            balanceText
+          );
+        }
         ctx.state.context.pendingNlpTransaction = null;
       } catch (e) {
         logger.error("[financialFlow] confirmarNlp error:", e.message);
@@ -1059,6 +1301,146 @@ const financialFlow = createFlow("financeiro", {
     configNotifHour: async (ctx) => {
       await ctx.reply("⚙️ Configuração de notificações disponível em breve!");
       return { noRender: true };
+    },
+
+    // ── Cartões ──────────────────────────────────────────────────────────────
+
+    verCartao: async (ctx, data) => {
+      const cards = (await financialClient.listCards(ctx.userId))?.cards || [];
+      const card = cards.find(c => c.id === data.cardId) || null;
+      ctx.state.context.currentCardId = data.cardId;
+      ctx.state.context.currentCardLinkedAccountId = card ? card.linkedAccountId : null;
+      ctx.state.context.currentCardName = card ? card.name : null;
+      ctx.state.path = "/cartoes/ver";
+    },
+
+    iniciarCriarCartao: async (ctx) => {
+      ctx.state.context.pendingCardName = null;
+      ctx.state.context.pendingCardLimit = null;
+      ctx.state.context.pendingCardClosingDay = null;
+      ctx.state.context.pendingCardDueDay = null;
+      ctx.state.context.pendingCardLinkedAccountId = null;
+      ctx.state.context.awaitingCardName = true;
+      await ctx.reply("✏️ Digite o *nome* do cartão (ex: Nubank, C6, Inter):");
+      return { noRender: true };
+    },
+
+    vincularContaCartao: async (ctx, data) => {
+      ctx.state.context.pendingCardLinkedAccountId = data.accountId;
+      ctx.state.path = "/cartoes/confirmar";
+    },
+
+    criarContaParaCartao: async (ctx) => {
+      try {
+        const name = ctx.state.context.pendingCardName || "Conta cartão";
+        const result = await financialClient.createAccount(ctx.userId, {
+          name,
+          type: "corrente",
+          balance: 0,
+          isDefault: false,
+        });
+        ctx.state.context.pendingCardLinkedAccountId = result.id;
+        ctx.state.path = "/cartoes/confirmar";
+      } catch (e) {
+        logger.error("[financialFlow] criarContaParaCartao error:", e.message);
+        await ctx.reply("❌ Erro ao criar conta. Tente novamente.");
+        return { noRender: true };
+      }
+    },
+
+    pularVinculo: async (ctx) => {
+      ctx.state.context.pendingCardLinkedAccountId = null;
+      ctx.state.path = "/cartoes/confirmar";
+    },
+
+    confirmarCriarCartao: async (ctx) => {
+      const { pendingCardName, pendingCardLimit, pendingCardClosingDay, pendingCardDueDay, pendingCardLinkedAccountId } = ctx.state.context;
+      try {
+        await financialClient.createCard(ctx.userId, {
+          name: pendingCardName,
+          limit: pendingCardLimit,
+          closingDay: pendingCardClosingDay,
+          dueDay: pendingCardDueDay,
+          linkedAccountId: pendingCardLinkedAccountId || undefined,
+        });
+        await ctx.reply(
+          `✅ *Cartão criado!*\n\n💳 ${pendingCardName}\n` +
+          `Limite: R$ ${formatMoney(pendingCardLimit)}\n` +
+          `Fechamento: dia ${pendingCardClosingDay} | Vencimento: dia ${pendingCardDueDay}`
+        );
+        ctx.state.context.pendingCardName = null;
+        ctx.state.context.pendingCardLimit = null;
+        ctx.state.context.pendingCardClosingDay = null;
+        ctx.state.context.pendingCardDueDay = null;
+        ctx.state.context.pendingCardLinkedAccountId = null;
+        ctx.state.path = "/cartoes";
+      } catch (e) {
+        logger.error("[financialFlow] confirmarCriarCartao error:", e.message);
+        await ctx.reply("❌ Erro ao criar cartão. Tente novamente.");
+        return { noRender: true };
+      }
+    },
+
+    verLancamentos: async (ctx) => {
+      const { currentCardId } = ctx.state.context;
+      try {
+        const res = await financialClient.getCurrentInvoice(ctx.userId, currentCardId);
+        const txs = res?.transactions || [];
+        if (!txs.length) {
+          await ctx.reply("📋 Nenhum lançamento nesta fatura.");
+          return { noRender: true };
+        }
+        const lines = [`📋 *Lançamentos — fatura ${res.invoice.period}:*\n`];
+        for (const t of txs) {
+          const emoji = t.type === "income" ? "🟢" : "🔴";
+          const sign = t.type === "income" ? "+" : "-";
+          const desc = t.description || "Lançamento";
+          const d = new Date(t.date);
+          const dateStr = `${String(d.getUTCDate()).padStart(2, "0")}/${String(d.getUTCMonth() + 1).padStart(2, "0")}`;
+          lines.push(`${emoji} ${dateStr}  ${sign}R$ ${formatMoney(t.amount)}  ${desc}`);
+        }
+        lines.push(`\n💰 *Total: R$ ${formatMoney(res.totalAmount)}*`);
+        await ctx.reply(lines.join("\n"));
+      } catch (e) {
+        logger.error("[financialFlow] verLancamentos error:", e.message);
+        await ctx.reply("❌ Erro ao carregar lançamentos.");
+      }
+      return { noRender: true };
+    },
+
+    pagarFatura: async (ctx) => {
+      const { currentCardLinkedAccountId } = ctx.state.context;
+      if (currentCardLinkedAccountId) {
+        ctx.state.context.pendingPaymentAccountId = currentCardLinkedAccountId;
+        ctx.state.path = "/cartoes/pagar/valor";
+      } else {
+        ctx.state.path = "/cartoes/pagar/conta";
+      }
+    },
+
+    selecionarContaPagamento: async (ctx, data) => {
+      ctx.state.context.pendingPaymentAccountId = data.accountId;
+      ctx.state.path = "/cartoes/pagar/valor";
+    },
+
+    confirmarPagamento: async (ctx) => {
+      const { currentCardId, currentInvoiceId, pendingPaymentAccountId, pendingPaymentAmount } = ctx.state.context;
+      try {
+        await financialClient.payInvoice(ctx.userId, currentCardId, currentInvoiceId, {
+          accountId: pendingPaymentAccountId,
+          amount: pendingPaymentAmount,
+        });
+        await ctx.reply(`✅ *Pagamento registrado!*\n\nR$ ${formatMoney(pendingPaymentAmount)} debitados da conta.`);
+        ctx.state.context.pendingPaymentAccountId = null;
+        ctx.state.context.pendingPaymentAmount = null;
+        ctx.state.context.currentInvoiceId = null;
+        ctx.state.context.currentInvoiceTotal = null;
+        ctx.state.path = "/cartoes";
+      } catch (e) {
+        logger.error("[financialFlow] confirmarPagamento error:", e.message);
+        await ctx.reply("❌ Erro ao registrar pagamento. Tente novamente.");
+        return { noRender: true };
+      }
     },
   },
 });

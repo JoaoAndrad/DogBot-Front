@@ -96,6 +96,10 @@ async function createTransaction(userId, { accountId, amount, description, type,
   return _post("/api/financial/transactions", { userId, accountId, amount, description, type, date, categoryId, status });
 }
 
+async function createInstallment(userId, { accountId, amount, description, type, date, categoryId, installmentCount }) {
+  return _post("/api/financial/transactions/installment", { userId, accountId, amount, description, type, date, categoryId, installmentCount });
+}
+
 async function deleteTransaction(userId, transactionId) {
   const res = await fetch(`${BACKEND_URL}/api/financial/transactions/${transactionId}?userId=${encodeURIComponent(userId)}`, {
     method: "DELETE",
@@ -103,6 +107,37 @@ async function deleteTransaction(userId, transactionId) {
   });
   const text = await res.text();
   try { return JSON.parse(text); } catch { return { status: res.status, text }; }
+}
+
+// Cards
+
+async function listCards(userId) {
+  return _get("/api/financial/cards", { userId });
+}
+
+async function createCard(userId, { name, limit, closingDay, dueDay, linkedAccountId }) {
+  return _post("/api/financial/cards", { userId, name, limit, closingDay, dueDay, linkedAccountId });
+}
+
+async function deleteCard(userId, cardId) {
+  const res = await fetch(`${BACKEND_URL}/api/financial/cards/${cardId}?userId=${encodeURIComponent(userId)}`, {
+    method: "DELETE",
+    headers: authHeaders(),
+  });
+  const text = await res.text();
+  try { return JSON.parse(text); } catch { return { status: res.status, text }; }
+}
+
+async function getCurrentInvoice(userId, cardId) {
+  return _get(`/api/financial/cards/${cardId}/invoices/current`, { userId });
+}
+
+async function listInvoices(userId, cardId) {
+  return _get(`/api/financial/cards/${cardId}/invoices`, { userId });
+}
+
+async function payInvoice(userId, cardId, invoiceId, { accountId, amount }) {
+  return _post(`/api/financial/cards/${cardId}/invoices/${invoiceId}/pay`, { userId, accountId, amount });
 }
 
 // Budgets
@@ -128,6 +163,8 @@ module.exports = {
   startAuth, checkAuthStatus,
   listAccounts, createAccount, updateAccount, deleteAccount,
   listCategories, createCategory, deleteCategory,
-  listTransactions, createTransaction, deleteTransaction,
+  listTransactions, createTransaction, createInstallment, deleteTransaction,
   listBudgets, createBudget, deleteBudget,
+  listCards, createCard, deleteCard,
+  getCurrentInvoice, listInvoices, payInvoice,
 };

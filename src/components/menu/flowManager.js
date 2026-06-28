@@ -285,6 +285,9 @@ class FlowManager {
           await storage.deleteState(userId, flowId);
           return;
         }
+
+        // Persiste qualquer modificação que o handler dinâmico tenha feito no contexto
+        await storage.saveState(userId, flowId, state);
       } catch (err) {
         logger.error(`[FlowManager] Erro no handler de nó dinâmico:`, err);
         await client.sendMessage(chatId, "❌ Erro ao carregar opções");
@@ -413,12 +416,14 @@ class FlowManager {
 
     const type = parsed.intent.includes("income") ? "income" : "expense";
     const isPending = !!parsed.isPending;
+    const installmentCount = (parsed.installmentCount && parsed.installmentCount >= 2) ? parsed.installmentCount : null;
     const pendingNlpTransaction = {
       type,
       amount: parsed.amount,
       description: parsed.description || null,
       date: (parsed.date || new Date()).toISOString(),
       isPending,
+      installmentCount,
       accountId: defaultAccount.id,
       accountName: defaultAccount.name,
     };
@@ -450,7 +455,10 @@ class FlowManager {
       const s = await storage.getState(id, flowId);
       if (s?.context?.awaitingAccountName || s?.context?.awaitingAccountBalance ||
           s?.context?.awaitingCategoryName || s?.context?.awaitingBudgetLimit ||
-          s?.context?.awaitingEditName || s?.context?.awaitingEditBalance) {
+          s?.context?.awaitingEditName || s?.context?.awaitingEditBalance ||
+          s?.context?.awaitingCardName || s?.context?.awaitingCardLimit ||
+          s?.context?.awaitingCardClosingDay || s?.context?.awaitingCardDueDay ||
+          s?.context?.awaitingPaymentAmount) {
         state = s;
         stateUserId = id;
         break;
@@ -541,6 +549,77 @@ class FlowManager {
       state.path = "/orcamentos/confirmar";
       await storage.saveState(stateUserId, flowId, state);
       await this._renderNode(client, chatId, stateUserId, flowId, "/orcamentos/confirmar");
+      return true;
+    }
+
+    // ── Cartões ────────────────────────────────────────────────────────────
+
+    if (state.context.awaitingCardName) {
+      if (!trimmed) {
+        await client.sendMessage(chatId, "❌ Nome inválido. Envie o nome do cartão:");
+        return true;
+      }
+      state.context.pendingCardName = trimmed;
+      state.context.awaitingCardName = false;
+      state.context.awaitingCardLimit = true;
+      await storage.saveState(stateUserId, flowId, state);
+      await client.sendMessage(chatId, "✏️ Digite o *limite* do cartão em R$ (ex: 5000 ou 5.000,00):");
+      return true;
+    }
+
+    if (state.context.awaitingCardLimit) {
+      const amount = parseAmount(trimmed);
+      if (amount === null || amount <= 0) {
+        await client.sendMessage(chatId, "❌ Valor inválido. Digite o limite em R$ (ex: 5000):");
+        return true;
+      }
+      state.context.pendingCardLimit = amount;
+      state.context.awaitingCardLimit = false;
+      state.context.awaitingCardClosingDay = true;
+      await storage.saveState(stateUserId, flowId, state);
+      await client.sendMessage(chatId, "📅 Dia de *fechamento* da fatura (1–31):");
+      return true;
+    }
+
+    if (state.context.awaitingCardClosingDay) {
+      const day = parseInt(trimmed, 10);
+      if (isNaN(day) || day < 1 || day > 31) {
+        await client.sendMessage(chatId, "❌ Dia inválido. Digite um número entre 1 e 31:");
+        return true;
+      }
+      state.context.pendingCardClosingDay = day;
+      state.context.awaitingCardClosingDay = false;
+      state.context.awaitingCardDueDay = true;
+      await storage.saveState(stateUserId, flowId, state);
+      await client.sendMessage(chatId, "📅 Dia de *vencimento* da fatura (1–31):");
+      return true;
+    }
+
+    if (state.context.awaitingCardDueDay) {
+      const day = parseInt(trimmed, 10);
+      if (isNaN(day) || day < 1 || day > 31) {
+        await client.sendMessage(chatId, "❌ Dia inválido. Digite um número entre 1 e 31:");
+        return true;
+      }
+      state.context.pendingCardDueDay = day;
+      state.context.awaitingCardDueDay = false;
+      state.path = "/cartoes/vincular";
+      await storage.saveState(stateUserId, flowId, state);
+      await this._renderNode(client, chatId, stateUserId, flowId, "/cartoes/vincular");
+      return true;
+    }
+
+    if (state.context.awaitingPaymentAmount) {
+      const amount = parseAmount(trimmed);
+      if (amount === null || amount <= 0) {
+        await client.sendMessage(chatId, "❌ Valor inválido. Digite o valor a pagar em R$ (ex: 320 ou 320,00):");
+        return true;
+      }
+      state.context.pendingPaymentAmount = amount;
+      state.context.awaitingPaymentAmount = false;
+      state.path = "/cartoes/pagar/confirmar";
+      await storage.saveState(stateUserId, flowId, state);
+      await this._renderNode(client, chatId, stateUserId, flowId, "/cartoes/pagar/confirmar");
       return true;
     }
 
