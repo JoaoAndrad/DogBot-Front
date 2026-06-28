@@ -15,6 +15,46 @@
 const AMOUNT_RE = /R?\$?\s*(\d{1,3}(?:[.,]\d{3})*(?:[.,]\d{1,2})?)/i;
 const INSTALLMENT_RE = /\b(\d+)\s*[xX×]\b|\bem\s+(\d+)\s+(?:vezes?|parcelas?)\b|\bparcelad[ao]\s+em\s+(\d+)\b|\b(\d+)\s+parcelas?\b/i;
 
+const MONTHLY_RE = /\btodo\s+(dia\s+(\d{1,2})|m[eê]s)\b|\bmensalmente\b|\btodo\s+m[eê]s\b/i;
+const WEEKLY_RE = /\btoda\s+(semana|(\w+feira|\w+feiras?)|segunda|ter[cç]a|quarta|quinta|sexta|s[aá]bado|domingo)\b|\bsemanalmente\b/i;
+
+const WEEKDAY_NAME_MAP = {
+  segunda: 1, "segunda-feira": 1,
+  terca: 2, terça: 2, "terca-feira": 2, "terça-feira": 2,
+  quarta: 3, "quarta-feira": 3,
+  quinta: 4, "quinta-feira": 4,
+  sexta: 5, "sexta-feira": 5,
+  sabado: 6, sábado: 6,
+  domingo: 0,
+};
+
+function parseRecurrence(text) {
+  const monthlyMatch = text.match(MONTHLY_RE);
+  if (monthlyMatch) {
+    // Check for "todo dia N"
+    const dayMatch = text.match(/\btodo\s+dia\s+(\d{1,2})\b/i);
+    const recurrenceDay = dayMatch ? parseInt(dayMatch[1], 10) : null;
+    return { recurrence: "monthly", recurrenceDay };
+  }
+
+  const weeklyMatch = text.match(WEEKLY_RE);
+  if (weeklyMatch) {
+    // Try to extract day of week name
+    const inner = weeklyMatch[1] || "";
+    const normalized = inner.toLowerCase().replace(/-/g, "-").replace(/feiras?$/, "-feira");
+    let recurrenceDay = null;
+    for (const [name, dow] of Object.entries(WEEKDAY_NAME_MAP)) {
+      if (normalized.startsWith(name)) {
+        recurrenceDay = dow;
+        break;
+      }
+    }
+    return { recurrence: "weekly", recurrenceDay };
+  }
+
+  return null;
+}
+
 // How much / what / when patterns
 const EXPENSE_TRIGGERS = /\b(gast[eouia]i?|paguei|debit[ao]u?|comprei|sa[íi]u|saiu|saindo|devo|tive que pagar)\b/i;
 const INCOME_TRIGGERS  = /\b(recebi|entrou|recebendo|ganhei|me pagaram|depositaram|caiu)\b/i;
@@ -107,28 +147,34 @@ function parse(text) {
   const date = parseDate(t);
   const description = extractDescription(t);
   const installmentCount = parseInstallments(t);
+  const recurrenceInfo = parseRecurrence(t);
+  const recurrence = recurrenceInfo ? recurrenceInfo.recurrence : null;
+  const recurrenceDay = recurrenceInfo ? recurrenceInfo.recurrenceDay : null;
 
   const isTransfer = TRANSFER_TRIGGERS.test(t);
   if (isTransfer) {
-    return { intent: "transfer", amount, description, date, isPending: false, installmentCount, raw: t };
+    return { intent: "transfer", amount, description, date, isPending: false, installmentCount, recurrence, recurrenceDay, raw: t };
   }
 
   const isFuture = FUTURE_MARKERS.test(t) && !INCOME_TRIGGERS.test(t);
   const isIncome = INCOME_TRIGGERS.test(t);
   const isExpense = EXPENSE_TRIGGERS.test(t);
 
-  if (!isIncome && !isExpense && !isFuture) return null;
+  // Recurrence implies pending (future) if not already a past income/expense
+  const isRecurrent = !!recurrence;
+
+  if (!isIncome && !isExpense && !isFuture && !isRecurrent) return null;
 
   if (isFuture && isExpense) {
-    return { intent: "future_expense", amount, description, date, isPending: true, installmentCount, raw: t };
+    return { intent: "future_expense", amount, description, date, isPending: true, installmentCount, recurrence, recurrenceDay, raw: t };
   }
   if (isFuture && !isIncome) {
-    return { intent: "future_expense", amount, description, date, isPending: true, installmentCount, raw: t };
+    return { intent: "future_expense", amount, description, date, isPending: true, installmentCount, recurrence, recurrenceDay, raw: t };
   }
   if (isIncome) {
-    return { intent: "income", amount, description, date, isPending: false, installmentCount, raw: t };
+    return { intent: "income", amount, description, date, isPending: isRecurrent && !isIncome, installmentCount, recurrence, recurrenceDay, raw: t };
   }
-  return { intent: "expense", amount, description, date, isPending: false, installmentCount, raw: t };
+  return { intent: "expense", amount, description, date, isPending: false, installmentCount, recurrence, recurrenceDay, raw: t };
 }
 
-module.exports = { parse };
+module.exports = { parse, parseRecurrence };

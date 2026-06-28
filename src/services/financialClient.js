@@ -92,8 +92,20 @@ async function listTransactions(userId, { period = "current", accountId, limit =
   return _get("/api/financial/transactions", params);
 }
 
-async function createTransaction(userId, { accountId, amount, description, type, date, categoryId, status }) {
-  return _post("/api/financial/transactions", { userId, accountId, amount, description, type, date, categoryId, status });
+async function createTransaction(userId, { accountId, amount, description, type, date, categoryId, status, recurrence, recurrenceDay }) {
+  return _post("/api/financial/transactions", { userId, accountId, amount, description, type, date, categoryId, status, recurrence, recurrenceDay });
+}
+
+async function listScheduled(userId) {
+  return _get("/api/financial/transactions/scheduled", { userId });
+}
+
+async function confirmTransaction(userId, transactionId) {
+  return _post(`/api/financial/transactions/${transactionId}/confirm`, { userId });
+}
+
+async function skipTransaction(userId, transactionId) {
+  return _post(`/api/financial/transactions/${transactionId}/skip`, { userId });
 }
 
 async function createInstallment(userId, { accountId, amount, description, type, date, categoryId, installmentCount }) {
@@ -164,6 +176,7 @@ module.exports = {
   listAccounts, createAccount, updateAccount, deleteAccount,
   listCategories, createCategory, deleteCategory,
   listTransactions, createTransaction, createInstallment, deleteTransaction,
+  listScheduled, confirmTransaction, skipTransaction,
   listBudgets, createBudget, deleteBudget,
   listCards, createCard, deleteCard,
   getCurrentInvoice, listInvoices, payInvoice,

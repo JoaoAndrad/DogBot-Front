@@ -122,6 +122,7 @@ const financialFlow = createFlow("financeiro", {
           { label: "🏦 Contas", action: "goto", target: "/contas" },
           { label: "🏷️ Categorias", action: "goto", target: "/categorias" },
           { label: "📊 Orçamentos", action: "goto", target: "/orcamentos" },
+          { label: "📅 Agendamentos", action: "goto", target: "/agendamentos" },
           { label: "💳 Cartões", action: "goto", target: "/cartoes" },
           { label: "⚙️ Configurações", action: "goto", target: "/config" },
           { label: "❓ Dúvidas", action: "goto", target: "/duvidas" },
@@ -610,11 +611,184 @@ const financialFlow = createFlow("financeiro", {
       const installNote = tx.installmentCount
         ? ` em *${tx.installmentCount}x* de R$ ${formatMoney(tx.amount / tx.installmentCount)}`
         : "";
+      let recurrenceNote = "";
+      if (tx.recurrence === "monthly") {
+        recurrenceNote = tx.recurrenceDay
+          ? `\n🔁 Recorrente mensalmente (dia ${tx.recurrenceDay})`
+          : "\n🔁 Recorrente mensalmente";
+      } else if (tx.recurrence === "weekly") {
+        recurrenceNote = "\n🔁 Recorrente semanalmente";
+      }
       return {
-        title: `Registrar R$ ${formatMoney(tx.amount)}${installNote}${desc} como ${typeLabel} em *${tx.accountName}* (${dateLabel})${pendingNote}?`,
+        title: `Registrar R$ ${formatMoney(tx.amount)}${installNote}${desc} como ${typeLabel} em *${tx.accountName}* (${dateLabel})${pendingNote}?${recurrenceNote}`,
         options: [
           { label: "✅ Sim, registrar", action: "exec", handler: "confirmarNlp" },
           { label: "❌ Cancelar", action: "exec", handler: "cancelarNlp" },
+        ],
+      };
+    },
+  },
+
+  // ── Agendamentos ──────────────────────────────────────────────────────────
+
+  "/agendamentos": {
+    dynamic: true,
+    options: [],
+    handler: async (ctx) => {
+      try {
+        const res = await financialClient.listScheduled(ctx.userId);
+        const txs = res?.transactions || [];
+        const options = [];
+        for (const t of txs) {
+          const emoji = t.type === "income" ? "🟢" : "🔴";
+          const sign = t.type === "income" ? "+" : "-";
+          const desc = t.description || (t.type === "income" ? "Receita" : "Despesa");
+          const dateLabel = formatDate(new Date(t.date));
+          const recLabel = t.recurrence ? " 🔁" : "";
+          options.push({
+            label: `${emoji} ${sign}R$ ${formatMoney(t.amount)} ${desc} — ${dateLabel}${recLabel}`,
+            action: "exec",
+            handler: "verAgendamento",
+            data: { transactionId: t.id },
+          });
+        }
+        options.push({ label: "➕ Novo agendamento", action: "exec", handler: "iniciarNovoAgendamento" });
+        options.push({ label: "↩️ Voltar", action: "back" });
+        return { title: txs.length ? "📅 Agendamentos pendentes" : "📅 Agendamentos\n\nNenhum pendente ainda.", options };
+      } catch (e) {
+        logger.error("[financialFlow] /agendamentos error:", e.message);
+        await ctx.reply("❌ Erro ao carregar agendamentos.");
+        return {
+          title: "Erro",
+          options: [
+            { label: "🔄 Tentar novamente", action: "goto", target: "/agendamentos" },
+            { label: "↩️ Voltar", action: "back" },
+          ],
+        };
+      }
+    },
+  },
+
+  "/agendamentos/ver": {
+    dynamic: true,
+    options: [],
+    handler: async (ctx) => {
+      const t = ctx.state.context.currentScheduledTx;
+      if (!t) {
+        return {
+          title: "📅 Agendamento",
+          options: [
+            { label: "↩️ Voltar", action: "back" },
+          ],
+        };
+      }
+      const typeLabel = t.type === "income" ? "🟢 Receita" : "🔴 Despesa";
+      const desc = t.description || (t.type === "income" ? "Receita" : "Despesa");
+      const d = new Date(t.date);
+      const dateStr = `${String(d.getUTCDate()).padStart(2, "0")}/${String(d.getUTCMonth() + 1).padStart(2, "0")}/${d.getUTCFullYear()}`;
+      let recLabel = "";
+      if (t.recurrence === "monthly") {
+        recLabel = t.recurrenceDay ? `\n🔁 Recorrente — Todo dia ${t.recurrenceDay} do mês` : "\n🔁 Recorrente — Mensal";
+      } else if (t.recurrence === "weekly") {
+        const DAYS = ["Domingo", "Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado"];
+        recLabel = t.recurrenceDay != null
+          ? `\n🔁 Recorrente — Toda ${DAYS[t.recurrenceDay]}`
+          : "\n🔁 Recorrente — Semanal";
+      }
+      await ctx.reply(
+        `📅 *${desc}*\nR$ ${formatMoney(t.amount)} — ${typeLabel}\nData: ${dateStr}${recLabel}`
+      );
+      const options = [
+        { label: "✅ Confirmar pagamento/recebimento", action: "exec", handler: "confirmarAgendamento" },
+      ];
+      if (t.recurrence) {
+        options.push({ label: "⏭️ Pular esta ocorrência", action: "exec", handler: "pularAgendamento" });
+      }
+      options.push({ label: "↩️ Voltar", action: "back" });
+      return {
+        title: `📅 ${desc} — R$ ${formatMoney(t.amount)}`,
+        options,
+      };
+    },
+  },
+
+  "/agendamentos/novo/tipo": {
+    dynamic: false,
+    options: [
+      { label: "🔴 Despesa", action: "exec", handler: "setScheduleTipo", data: { type: "expense" } },
+      { label: "🟢 Receita", action: "exec", handler: "setScheduleTipo", data: { type: "income" } },
+      { label: "❌ Cancelar", action: "goto", target: "/agendamentos" },
+    ],
+    title: "📅 Novo agendamento\n\nQual o tipo?",
+  },
+
+  "/agendamentos/novo/recorrencia": {
+    dynamic: false,
+    options: [
+      { label: "⏭️ Não repetir (único)", action: "exec", handler: "setScheduleRecorrencia", data: { recurrence: "none" } },
+      { label: "🔁 Mensalmente", action: "exec", handler: "setScheduleRecorrencia", data: { recurrence: "monthly" } },
+      { label: "🔁 Semanalmente", action: "exec", handler: "setScheduleRecorrencia", data: { recurrence: "weekly" } },
+      { label: "❌ Cancelar", action: "goto", target: "/agendamentos" },
+    ],
+    title: "🔁 Repetir agendamento?",
+  },
+
+  "/agendamentos/novo/dia-semana": {
+    dynamic: false,
+    options: [
+      { label: "Domingo", action: "exec", handler: "setScheduleDiaSemana", data: { dow: 0 } },
+      { label: "Segunda-Feira", action: "exec", handler: "setScheduleDiaSemana", data: { dow: 1 } },
+      { label: "Terça-Feira", action: "exec", handler: "setScheduleDiaSemana", data: { dow: 2 } },
+      { label: "Quarta-Feira", action: "exec", handler: "setScheduleDiaSemana", data: { dow: 3 } },
+      { label: "Quinta-Feira", action: "exec", handler: "setScheduleDiaSemana", data: { dow: 4 } },
+      { label: "Sexta-Feira", action: "exec", handler: "setScheduleDiaSemana", data: { dow: 5 } },
+      { label: "Sábado", action: "exec", handler: "setScheduleDiaSemana", data: { dow: 6 } },
+    ],
+    title: "📅 Qual dia da semana?",
+  },
+
+  "/agendamentos/novo/conta": {
+    dynamic: true,
+    options: [],
+    handler: async (ctx) => {
+      let accounts = [];
+      try {
+        const res = await financialClient.listAccounts(ctx.userId);
+        accounts = res?.accounts || [];
+      } catch (e) {
+        logger.warn("[financialFlow] /agendamentos/novo/conta error:", e.message);
+      }
+      const options = accounts.map(a => ({
+        label: `🏦 ${a.name} — R$ ${formatMoney(a.balance)}`,
+        action: "exec",
+        handler: "setScheduleConta",
+        data: { accountId: a.id },
+      }));
+      options.push({ label: "❌ Cancelar", action: "goto", target: "/agendamentos" });
+      return { title: "🏦 Em qual conta?", options };
+    },
+  },
+
+  "/agendamentos/novo/confirmar": {
+    dynamic: true,
+    options: [],
+    handler: async (ctx) => {
+      const DOW_LABELS = ["Domingo","Segunda-Feira","Terça-Feira","Quarta-Feira","Quinta-Feira","Sexta-Feira","Sábado"];
+      const { pendingScheduleType, pendingScheduleDesc, pendingScheduleAmount,
+              pendingScheduleRecurrence, pendingScheduleDay, pendingScheduleAccountName } = ctx.state.context;
+      const typeLabel = pendingScheduleType === "income" ? "🟢 Receita" : "🔴 Despesa";
+      let recLabel = "Único (não repetir)";
+      if (pendingScheduleRecurrence === "monthly") {
+        recLabel = pendingScheduleDay ? `🔁 Todo dia ${pendingScheduleDay}` : "🔁 Mensalmente";
+      } else if (pendingScheduleRecurrence === "weekly") {
+        const dowName = pendingScheduleDay != null ? DOW_LABELS[pendingScheduleDay] : "—";
+        recLabel = `🔁 Toda ${dowName}`;
+      }
+      return {
+        title: `📅 Confirmar agendamento?\n\n${typeLabel}\n${pendingScheduleDesc || "Sem descrição"}\nR$ ${formatMoney(pendingScheduleAmount)}\n${recLabel}\nConta: ${pendingScheduleAccountName || "—"}`,
+        options: [
+          { label: "✅ Confirmar", action: "exec", handler: "confirmarNovoAgendamento" },
+          { label: "❌ Cancelar", action: "goto", target: "/agendamentos" },
         ],
       };
     },
@@ -1269,6 +1443,8 @@ const financialFlow = createFlow("financeiro", {
             type: tx.type,
             date: tx.date,
             status: tx.isPending ? "pending" : "confirmed",
+            recurrence: tx.recurrence || undefined,
+            recurrenceDay: tx.recurrenceDay != null ? tx.recurrenceDay : undefined,
           });
           const typeLabel = tx.type === "income" ? "Receita" : "Despesa";
           const sign = tx.type === "income" ? "+" : "-";
@@ -1294,6 +1470,187 @@ const financialFlow = createFlow("financeiro", {
       ctx.state.context.pendingNlpTransaction = null;
       await ctx.reply("❌ Transação cancelada.");
       return { end: true };
+    },
+
+    // ── Agendamentos ──────────────────────────────────────────────────────────
+
+    iniciarNovoAgendamento: async (ctx) => {
+      ctx.state.context.pendingScheduleType = null;
+      ctx.state.context.pendingScheduleDesc = null;
+      ctx.state.context.pendingScheduleAmount = null;
+      ctx.state.context.pendingScheduleRecurrence = null;
+      ctx.state.context.pendingScheduleDay = null;
+      ctx.state.context.pendingScheduleAccountId = null;
+      ctx.state.context.pendingScheduleAccountName = null;
+      ctx.state.path = "/agendamentos/novo/tipo";
+    },
+
+    setScheduleTipo: async (ctx, data) => {
+      ctx.state.context.pendingScheduleType = data.type;
+      ctx.state.context.awaitingScheduleDesc = true;
+      const label = data.type === "income" ? "receita" : "despesa";
+      await ctx.reply(`✏️ Digite a *descrição* do agendamento (ex: Aluguel, Salário, Academia):`);
+      return { noRender: true };
+    },
+
+    setScheduleRecorrencia: async (ctx, data) => {
+      const recurrence = data.recurrence === "none" ? null : data.recurrence;
+      ctx.state.context.pendingScheduleRecurrence = recurrence;
+      if (recurrence === "monthly") {
+        ctx.state.context.awaitingScheduleDay = true;
+        await ctx.reply("📅 Qual o *dia do mês* para repetir? (1–31):");
+        return { noRender: true };
+      }
+      if (recurrence === "weekly") {
+        ctx.state.context.pendingScheduleDay = null;
+        ctx.state.path = "/agendamentos/novo/dia-semana";
+        return;
+      }
+      ctx.state.path = "/agendamentos/novo/conta";
+    },
+
+    setScheduleDiaSemana: async (ctx, data) => {
+      ctx.state.context.pendingScheduleDay = data.dow;
+      ctx.state.path = "/agendamentos/novo/conta";
+    },
+
+    setScheduleConta: async (ctx, data) => {
+      try {
+        const res = await financialClient.listAccounts(ctx.userId);
+        const account = (res?.accounts || []).find(a => a.id === data.accountId);
+        ctx.state.context.pendingScheduleAccountId = data.accountId;
+        ctx.state.context.pendingScheduleAccountName = account ? account.name : data.accountId;
+      } catch (e) {
+        ctx.state.context.pendingScheduleAccountId = data.accountId;
+      }
+      ctx.state.path = "/agendamentos/novo/confirmar";
+    },
+
+    confirmarNovoAgendamento: async (ctx) => {
+      const { pendingScheduleType, pendingScheduleDesc, pendingScheduleAmount,
+              pendingScheduleRecurrence, pendingScheduleDay, pendingScheduleAccountId } = ctx.state.context;
+      try {
+        // Calcular data inicial
+        const now = new Date();
+        let scheduleDate = new Date();
+        if (pendingScheduleRecurrence === "monthly" && pendingScheduleDay) {
+          const thisMonth = new Date(now.getFullYear(), now.getMonth(), pendingScheduleDay);
+          scheduleDate = thisMonth > now ? thisMonth : new Date(now.getFullYear(), now.getMonth() + 1, pendingScheduleDay);
+        } else if (pendingScheduleRecurrence === "weekly" && pendingScheduleDay != null) {
+          // Próxima ocorrência do dia da semana informado
+          const diff = (pendingScheduleDay - now.getDay() + 7) % 7 || 7;
+          scheduleDate = new Date(now);
+          scheduleDate.setDate(now.getDate() + diff);
+        }
+
+        await financialClient.createTransaction(ctx.userId, {
+          accountId: pendingScheduleAccountId,
+          amount: pendingScheduleAmount,
+          description: pendingScheduleDesc,
+          type: pendingScheduleType,
+          date: scheduleDate.toISOString(),
+          status: "pending",
+          recurrence: pendingScheduleRecurrence || null,
+          recurrenceDay: pendingScheduleDay || null,
+        });
+
+        const DOW_LABELS = ["Domingo","Segunda-Feira","Terça-Feira","Quarta-Feira","Quinta-Feira","Sexta-Feira","Sábado"];
+        const recLabel = pendingScheduleRecurrence === "monthly"
+          ? `\n🔁 Repete todo dia ${pendingScheduleDay || "—"}`
+          : pendingScheduleRecurrence === "weekly"
+          ? `\n🔁 Repete toda ${pendingScheduleDay != null ? DOW_LABELS[pendingScheduleDay] : "semana"}`
+          : "";
+        await ctx.reply(
+          `✅ *Agendamento criado!*\n\n` +
+          `${pendingScheduleType === "income" ? "🟢" : "🔴"} ${pendingScheduleDesc}\n` +
+          `R$ ${formatMoney(pendingScheduleAmount)}${recLabel}`
+        );
+        // limpar context
+        ctx.state.context.pendingScheduleType = null;
+        ctx.state.context.pendingScheduleDesc = null;
+        ctx.state.context.pendingScheduleAmount = null;
+        ctx.state.context.pendingScheduleRecurrence = null;
+        ctx.state.context.pendingScheduleDay = null;
+        ctx.state.context.pendingScheduleAccountId = null;
+        ctx.state.context.pendingScheduleAccountName = null;
+        ctx.state.path = "/agendamentos";
+      } catch (e) {
+        logger.error("[financialFlow] confirmarNovoAgendamento error:", e.message);
+        await ctx.reply("❌ Erro ao criar agendamento. Tente novamente.");
+        return { noRender: true };
+      }
+    },
+
+    verAgendamento: async (ctx, data) => {
+      try {
+        const res = await financialClient.listScheduled(ctx.userId);
+        const txs = res?.transactions || [];
+        const tx = txs.find(t => t.id === data.transactionId) || null;
+        if (!tx) {
+          await ctx.reply("❌ Agendamento não encontrado.");
+          ctx.state.path = "/agendamentos";
+          return;
+        }
+        ctx.state.context.currentScheduledId = data.transactionId;
+        ctx.state.context.currentScheduledTx = tx;
+        ctx.state.path = "/agendamentos/ver";
+      } catch (e) {
+        logger.error("[financialFlow] verAgendamento error:", e.message);
+        await ctx.reply("❌ Erro ao carregar agendamento.");
+        return { noRender: true };
+      }
+    },
+
+    confirmarAgendamento: async (ctx) => {
+      const { currentScheduledId, currentScheduledTx } = ctx.state.context;
+      if (!currentScheduledId) {
+        await ctx.reply("❌ Nenhum agendamento selecionado.");
+        ctx.state.path = "/agendamentos";
+        return;
+      }
+      try {
+        const result = await financialClient.confirmTransaction(ctx.userId, currentScheduledId);
+        if (!result || !result.ok) {
+          await ctx.reply("❌ Erro ao confirmar agendamento. Tente novamente.");
+          return { noRender: true };
+        }
+        const desc = currentScheduledTx?.description || (currentScheduledTx?.type === "income" ? "Receita" : "Despesa");
+        const balanceText = result.newBalance !== undefined
+          ? `\n\nSaldo atualizado: R$ ${formatMoney(result.newBalance)}`
+          : "";
+        await ctx.reply(`✅ *${desc}* confirmado!${balanceText}`);
+        ctx.state.context.currentScheduledId = null;
+        ctx.state.context.currentScheduledTx = null;
+        ctx.state.path = "/agendamentos";
+      } catch (e) {
+        logger.error("[financialFlow] confirmarAgendamento error:", e.message);
+        await ctx.reply("❌ Erro ao confirmar. Tente novamente.");
+        return { noRender: true };
+      }
+    },
+
+    pularAgendamento: async (ctx) => {
+      const { currentScheduledId } = ctx.state.context;
+      if (!currentScheduledId) {
+        await ctx.reply("❌ Nenhum agendamento selecionado.");
+        ctx.state.path = "/agendamentos";
+        return;
+      }
+      try {
+        const result = await financialClient.skipTransaction(ctx.userId, currentScheduledId);
+        if (!result || !result.ok) {
+          await ctx.reply("❌ Erro ao pular ocorrência. Tente novamente.");
+          return { noRender: true };
+        }
+        await ctx.reply("⏭️ Ocorrência pulada.");
+        ctx.state.context.currentScheduledId = null;
+        ctx.state.context.currentScheduledTx = null;
+        ctx.state.path = "/agendamentos";
+      } catch (e) {
+        logger.error("[financialFlow] pularAgendamento error:", e.message);
+        await ctx.reply("❌ Erro ao pular. Tente novamente.");
+        return { noRender: true };
+      }
     },
 
     // ── Config ───────────────────────────────────────────────────────────────

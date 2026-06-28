@@ -417,6 +417,8 @@ class FlowManager {
     const type = parsed.intent.includes("income") ? "income" : "expense";
     const isPending = !!parsed.isPending;
     const installmentCount = (parsed.installmentCount && parsed.installmentCount >= 2) ? parsed.installmentCount : null;
+    const recurrence = parsed.recurrence || null;
+    const recurrenceDay = parsed.recurrenceDay != null ? parsed.recurrenceDay : null;
     const pendingNlpTransaction = {
       type,
       amount: parsed.amount,
@@ -424,6 +426,8 @@ class FlowManager {
       date: (parsed.date || new Date()).toISOString(),
       isPending,
       installmentCount,
+      recurrence,
+      recurrenceDay,
       accountId: defaultAccount.id,
       accountName: defaultAccount.name,
     };
@@ -458,7 +462,9 @@ class FlowManager {
           s?.context?.awaitingEditName || s?.context?.awaitingEditBalance ||
           s?.context?.awaitingCardName || s?.context?.awaitingCardLimit ||
           s?.context?.awaitingCardClosingDay || s?.context?.awaitingCardDueDay ||
-          s?.context?.awaitingPaymentAmount) {
+          s?.context?.awaitingPaymentAmount ||
+          s?.context?.awaitingScheduleDesc || s?.context?.awaitingScheduleAmount ||
+          s?.context?.awaitingScheduleDay) {
         state = s;
         stateUserId = id;
         break;
@@ -620,6 +626,49 @@ class FlowManager {
       state.path = "/cartoes/pagar/confirmar";
       await storage.saveState(stateUserId, flowId, state);
       await this._renderNode(client, chatId, stateUserId, flowId, "/cartoes/pagar/confirmar");
+      return true;
+    }
+
+    // ── Novo agendamento ───────────────────────────────────────────────────
+
+    if (state.context.awaitingScheduleDesc) {
+      if (!trimmed) {
+        await client.sendMessage(chatId, "❌ Descrição inválida. Envie o nome do agendamento:");
+        return true;
+      }
+      state.context.pendingScheduleDesc = trimmed;
+      state.context.awaitingScheduleDesc = false;
+      state.context.awaitingScheduleAmount = true;
+      await storage.saveState(stateUserId, flowId, state);
+      await client.sendMessage(chatId, "💰 Digite o *valor* em R$ (ex: 1500 ou 1.500,00):");
+      return true;
+    }
+
+    if (state.context.awaitingScheduleAmount) {
+      const amount = parseAmount(trimmed);
+      if (amount === null || amount <= 0) {
+        await client.sendMessage(chatId, "❌ Valor inválido. Digite o valor em R$ (ex: 1500):");
+        return true;
+      }
+      state.context.pendingScheduleAmount = amount;
+      state.context.awaitingScheduleAmount = false;
+      state.path = "/agendamentos/novo/recorrencia";
+      await storage.saveState(stateUserId, flowId, state);
+      await this._renderNode(client, chatId, stateUserId, flowId, "/agendamentos/novo/recorrencia");
+      return true;
+    }
+
+    if (state.context.awaitingScheduleDay) {
+      const day = parseInt(trimmed, 10);
+      if (isNaN(day) || day < 1 || day > 31) {
+        await client.sendMessage(chatId, "❌ Dia inválido. Digite um número entre 1 e 31:");
+        return true;
+      }
+      state.context.pendingScheduleDay = day;
+      state.context.awaitingScheduleDay = false;
+      state.path = "/agendamentos/novo/conta";
+      await storage.saveState(stateUserId, flowId, state);
+      await this._renderNode(client, chatId, stateUserId, flowId, "/agendamentos/novo/conta");
       return true;
     }
 
