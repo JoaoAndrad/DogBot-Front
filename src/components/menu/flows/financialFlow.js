@@ -271,6 +271,36 @@ const financialFlow = createFlow("financeiro", {
     },
   },
 
+  // ── NLP: confirmação de transação via texto livre ─────────────────────────
+
+  "/nlp-confirm": {
+    dynamic: true,
+    options: [],
+    handler: async (ctx) => {
+      const tx = ctx.state.context.pendingNlpTransaction;
+      if (!tx) {
+        return {
+          title: "💰 Assistente Financeiro",
+          options: [
+            { label: "↩️ Ir ao menu", action: "goto", target: "/" },
+            { label: "✖️ Fechar", action: "exec", handler: "close" },
+          ],
+        };
+      }
+      const typeLabel = tx.type === "income" ? "receita 🟢" : "despesa 🔴";
+      const dateLabel = formatDate(new Date(tx.date));
+      const desc = tx.description ? ` — *${tx.description}*` : "";
+      const pendingNote = tx.isPending ? " _(pendente)_" : "";
+      return {
+        title: `Registrar R$ ${formatMoney(tx.amount)}${desc} como ${typeLabel} em *${tx.accountName}* (${dateLabel})${pendingNote}?`,
+        options: [
+          { label: "✅ Sim, registrar", action: "exec", handler: "confirmarNlp" },
+          { label: "❌ Cancelar", action: "exec", handler: "cancelarNlp" },
+        ],
+      };
+    },
+  },
+
   // ── Configurações ─────────────────────────────────────────────────────────
 
   "/config": {
@@ -546,6 +576,45 @@ const financialFlow = createFlow("financeiro", {
         await ctx.reply("❌ Erro ao criar orçamento. Tente novamente.");
       }
       return { noRender: true };
+    },
+
+    // ── NLP ───────────────────────────────────────────────────────────────────
+
+    confirmarNlp: async (ctx) => {
+      const tx = ctx.state.context.pendingNlpTransaction;
+      if (!tx) return { end: true };
+      try {
+        const result = await financialClient.createTransaction(ctx.userId, {
+          accountId: tx.accountId,
+          amount: tx.amount,
+          description: tx.description,
+          type: tx.type,
+          date: tx.date,
+          status: tx.isPending ? "pending" : "confirmed",
+        });
+        const typeLabel = tx.type === "income" ? "Receita" : "Despesa";
+        const sign = tx.type === "income" ? "+" : "-";
+        const balanceText = result.newBalance !== undefined
+          ? `\n\nSaldo *${tx.accountName}*: R$ ${formatMoney(result.newBalance)}`
+          : "";
+        await ctx.reply(
+          `✅ *${typeLabel} registrada!*\n\n` +
+          `${sign}R$ ${formatMoney(tx.amount)}` +
+          (tx.description ? ` — ${tx.description}` : "") +
+          balanceText
+        );
+        ctx.state.context.pendingNlpTransaction = null;
+      } catch (e) {
+        logger.error("[financialFlow] confirmarNlp error:", e.message);
+        await ctx.reply("❌ Erro ao registrar. Tente novamente com */financeiro*.");
+      }
+      return { end: true };
+    },
+
+    cancelarNlp: async (ctx) => {
+      ctx.state.context.pendingNlpTransaction = null;
+      await ctx.reply("❌ Transação cancelada.");
+      return { end: true };
     },
 
     // ── Config ───────────────────────────────────────────────────────────────

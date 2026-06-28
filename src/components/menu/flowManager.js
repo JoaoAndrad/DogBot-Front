@@ -376,6 +376,68 @@ class FlowManager {
   }
 
   /**
+   * Intercepta mensagens que se parecem com comandos financeiros (NLP).
+   * Roda DEPOIS de _handleFinancialTextInput (que tem prioridade quando há awaiting flags).
+   * @private
+   * @returns {Promise<boolean>} true se consumido
+   */
+  async _handleFinancialNlp(client, chatId, userId, textBody, candidateIds) {
+    const { parse } = require("../../utils/parses/parseFinancialCommandPtBr");
+    const parsed = parse(String(textBody || "").trim());
+    if (!parsed) return false;
+    if (!["expense", "income", "future_expense", "future_income"].includes(parsed.intent)) return false;
+    if (!parsed.amount || parsed.amount <= 0) return false;
+
+    const financialClient = require("../../services/financialClient");
+
+    // Find the first candidate ID that has a linked vault
+    let resolvedId = null;
+    for (const id of candidateIds) {
+      try {
+        const s = await financialClient.checkAuthStatus(id);
+        if (s?.linked) { resolvedId = id; break; }
+      } catch (e) { /* continue */ }
+    }
+    if (!resolvedId) return false;
+
+    // Get accounts to find default
+    let defaultAccount = null;
+    try {
+      const res = await financialClient.listAccounts(resolvedId);
+      const accounts = res?.accounts || [];
+      if (!accounts.length) return false;
+      defaultAccount = accounts.find(a => a.isDefault) || accounts[0];
+    } catch (e) {
+      return false;
+    }
+
+    const type = parsed.intent.includes("income") ? "income" : "expense";
+    const isPending = !!parsed.isPending;
+    const pendingNlpTransaction = {
+      type,
+      amount: parsed.amount,
+      description: parsed.description || null,
+      date: (parsed.date || new Date()).toISOString(),
+      isPending,
+      accountId: defaultAccount.id,
+      accountName: defaultAccount.name,
+    };
+
+    // Upsert financeiro flow state pointing at /nlp-confirm
+    const existing = await storage.getState(resolvedId, "financeiro") || {
+      path: "/nlp-confirm",
+      history: [],
+      context: {},
+      expiresAt: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
+    };
+    existing.context.pendingNlpTransaction = pendingNlpTransaction;
+    existing.path = "/nlp-confirm";
+    await storage.saveState(resolvedId, "financeiro", existing);
+    await this._renderNode(client, chatId, resolvedId, "financeiro", "/nlp-confirm");
+    return true;
+  }
+
+  /**
    * Processa input de texto livre do flow financeiro (add conta, categoria, orçamento).
    * @private
    * @returns {Promise<boolean>} true se consumido
@@ -489,9 +551,10 @@ class FlowManager {
       }
     }
     if (!state || !stateUserId) {
-      // Check financial flow text input before giving up
       const financialHandled = await this._handleFinancialTextInput(client, chatId, userId, textBody, candidateIds);
       if (financialHandled) return true;
+      const nlpHandled = await this._handleFinancialNlp(client, chatId, userId, textBody, candidateIds);
+      if (nlpHandled) return true;
       return false;
     }
 
