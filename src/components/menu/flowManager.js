@@ -449,7 +449,8 @@ class FlowManager {
     for (const id of candidateIds) {
       const s = await storage.getState(id, flowId);
       if (s?.context?.awaitingAccountName || s?.context?.awaitingAccountBalance ||
-          s?.context?.awaitingCategoryName || s?.context?.awaitingBudgetLimit) {
+          s?.context?.awaitingCategoryName || s?.context?.awaitingBudgetLimit ||
+          s?.context?.awaitingEditName || s?.context?.awaitingEditBalance) {
         state = s;
         stateUserId = id;
         break;
@@ -499,6 +500,33 @@ class FlowManager {
       state.path = "/categorias/tipo";
       await storage.saveState(stateUserId, flowId, state);
       await this._renderNode(client, chatId, stateUserId, flowId, "/categorias/tipo");
+      return true;
+    }
+
+    if (state.context.awaitingEditName) {
+      if (!trimmed) {
+        await client.sendMessage(chatId, "❌ Nome inválido. Envie o novo nome:");
+        return true;
+      }
+      state.context.pendingEditName = trimmed;
+      state.context.awaitingEditName = false;
+      state.path = "/contas/editar/confirmar";
+      await storage.saveState(stateUserId, flowId, state);
+      await this._renderNode(client, chatId, stateUserId, flowId, "/contas/editar/confirmar");
+      return true;
+    }
+
+    if (state.context.awaitingEditBalance) {
+      const amount = parseAmount(trimmed);
+      if (amount === null) {
+        await client.sendMessage(chatId, "❌ Valor inválido. Digite o novo saldo em R$ (ex: 1500 ou 0):");
+        return true;
+      }
+      state.context.pendingEditBalance = amount;
+      state.context.awaitingEditBalance = false;
+      state.path = "/contas/editar/saldo-ajuste";
+      await storage.saveState(stateUserId, flowId, state);
+      await this._renderNode(client, chatId, stateUserId, flowId, "/contas/editar/saldo-ajuste");
       return true;
     }
 

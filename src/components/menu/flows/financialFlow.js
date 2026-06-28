@@ -270,9 +270,124 @@ const financialFlow = createFlow("financeiro", {
       }
       const options = [];
       if (hasAccounts) options.push({ label: "📋 Ver contas", action: "exec", handler: "listarContas" });
+      if (hasAccounts) options.push({ label: "✏️ Editar conta", action: "goto", target: "/contas/editar" });
       options.push({ label: "➕ Adicionar conta", action: "goto", target: "/contas/tipo" });
       options.push({ label: "↩️ Voltar", action: "back" });
       return { title: "🏦 Contas bancárias", options };
+    },
+  },
+
+  "/contas/editar": {
+    dynamic: true,
+    options: [],
+    handler: async (ctx) => {
+      try {
+        const res = await financialClient.listAccounts(ctx.userId);
+        const accounts = res?.accounts || [];
+        if (!accounts.length) {
+          await ctx.reply("🏦 Nenhuma conta para editar.");
+          return {
+            title: "Contas",
+            options: [
+              { label: "➕ Adicionar conta", action: "goto", target: "/contas/tipo" },
+              { label: "↩️ Voltar", action: "back" },
+            ],
+          };
+        }
+        const options = accounts.map(a => ({
+          label: a.name,
+          action: "exec",
+          handler: "selectContaEditar",
+          data: { accountId: a.id, accountName: a.name, accountType: a.type, accountBalance: a.balance },
+        }));
+        options.push({ label: "❌ Cancelar", action: "back" });
+        return { title: "✏️ Qual conta editar?", options };
+      } catch (e) {
+        logger.error("[financialFlow] /contas/editar error:", e.message);
+        await ctx.reply("❌ Erro ao carregar contas.");
+        return {
+          title: "Erro",
+          options: [
+            { label: "🔄 Tentar novamente", action: "goto", target: "/contas/editar" },
+            { label: "↩️ Voltar", action: "back" },
+          ],
+        };
+      }
+    },
+  },
+
+  "/contas/editar/opcoes": {
+    dynamic: true,
+    options: [],
+    handler: async (ctx) => {
+      const { editingAccountName, editingAccountType, editingAccountBalance } = ctx.state.context;
+      const typeName = ACCOUNT_TYPES.find(t => t.key === editingAccountType)?.label || editingAccountType;
+      const sign = (editingAccountBalance || 0) < 0 ? "🔴" : "🟢";
+      return {
+        title: `✏️ *${editingAccountName}* (${typeName})\n${sign} R$ ${formatMoney(editingAccountBalance)}`,
+        options: [
+          { label: "✏️ Renomear", action: "exec", handler: "editarNome" },
+          { label: "🏦 Alterar tipo", action: "goto", target: "/contas/editar/tipo" },
+          { label: "💰 Ajustar saldo", action: "exec", handler: "editarSaldo" },
+          { label: "❌ Cancelar", action: "goto", target: "/contas" },
+        ],
+      };
+    },
+  },
+
+  "/contas/editar/tipo": {
+    title: "🏦 Novo tipo de conta?",
+    options: [
+      { label: "🏦 Conta corrente", action: "exec", handler: "setEditTipo", data: { type: "corrente" } },
+      { label: "🐖 Poupança", action: "exec", handler: "setEditTipo", data: { type: "poupanca" } },
+      { label: "👛 Carteira / Dinheiro", action: "exec", handler: "setEditTipo", data: { type: "carteira" } },
+      { label: "📈 Investimento", action: "exec", handler: "setEditTipo", data: { type: "investimento" } },
+      { label: "❌ Cancelar", action: "back" },
+    ],
+  },
+
+  "/contas/editar/confirmar": {
+    dynamic: true,
+    options: [],
+    handler: async (ctx) => {
+      const { editingAccountName, pendingEditName, pendingEditType } = ctx.state.context;
+      let title;
+      if (pendingEditName) {
+        title = `Renomear *${editingAccountName}* para *${pendingEditName}*?`;
+      } else if (pendingEditType) {
+        const typeName = ACCOUNT_TYPES.find(t => t.key === pendingEditType)?.label || pendingEditType;
+        title = `Alterar tipo de *${editingAccountName}* para *${typeName}*?`;
+      } else {
+        title = `Confirmar edição de *${editingAccountName}*?`;
+      }
+      return {
+        title,
+        options: [
+          { label: "✅ Confirmar", action: "exec", handler: "confirmarEdicaoConta" },
+          { label: "❌ Cancelar", action: "back" },
+        ],
+      };
+    },
+  },
+
+  "/contas/editar/saldo-ajuste": {
+    dynamic: true,
+    options: [],
+    handler: async (ctx) => {
+      const { editingAccountName, editingAccountBalance, pendingEditBalance } = ctx.state.context;
+      const current = editingAccountBalance || 0;
+      const next = pendingEditBalance || 0;
+      const diff = next - current;
+      const diffLabel = diff >= 0 ? `+R$ ${formatMoney(diff)}` : `-R$ ${formatMoney(Math.abs(diff))}`;
+      const entradaOuSaida = diff >= 0 ? "entrada" : "saída";
+      return {
+        title: `*${editingAccountName}*: R$ ${formatMoney(current)} → R$ ${formatMoney(next)} (${diffLabel})\n\nComo registrar essa diferença?`,
+        options: [
+          { label: "⚖️ Ajuste de saldo (sem categoria)", action: "exec", handler: "confirmarAjusteSaldo", data: { via: "adjustment" } },
+          { label: `📝 Registrar como ${entradaOuSaida}`, action: "exec", handler: "confirmarAjusteSaldo", data: { via: "transaction" } },
+          { label: "❌ Cancelar", action: "goto", target: "/contas" },
+        ],
+      };
     },
   },
 
@@ -631,8 +746,8 @@ const financialFlow = createFlow("financeiro", {
       } catch (e) {
         logger.error("[financialFlow] confirmarConta error:", e.message);
         await ctx.reply("❌ Erro ao criar conta. Tente novamente.");
+        return { noRender: true };
       }
-      return { noRender: true };
     },
 
     cancelarAddConta: async (ctx) => {
@@ -640,6 +755,99 @@ const financialFlow = createFlow("financeiro", {
       ctx.state.context.pendingAccountName = null;
       ctx.state.context.pendingAccountBalance = null;
       ctx.state.path = "/contas";
+    },
+
+    // ── Editar conta ─────────────────────────────────────────────────────────
+
+    selectContaEditar: async (ctx, data) => {
+      ctx.state.context.editingAccountId = data.accountId;
+      ctx.state.context.editingAccountName = data.accountName;
+      ctx.state.context.editingAccountType = data.accountType;
+      ctx.state.context.editingAccountBalance = data.accountBalance;
+      ctx.state.context.pendingEditName = null;
+      ctx.state.context.pendingEditType = null;
+      ctx.state.context.pendingEditBalance = null;
+      ctx.state.path = "/contas/editar/opcoes";
+    },
+
+    editarNome: async (ctx) => {
+      ctx.state.context.pendingEditName = null;
+      ctx.state.context.awaitingEditName = true;
+      await ctx.reply(`✏️ Digite o *novo nome* para *${ctx.state.context.editingAccountName}*:`);
+      return { noRender: true };
+    },
+
+    editarSaldo: async (ctx) => {
+      ctx.state.context.pendingEditBalance = null;
+      ctx.state.context.awaitingEditBalance = true;
+      await ctx.reply(
+        `💰 Saldo atual de *${ctx.state.context.editingAccountName}*: R$ ${formatMoney(ctx.state.context.editingAccountBalance)}\n\n` +
+        `Digite o *novo saldo* em R$:`
+      );
+      return { noRender: true };
+    },
+
+    setEditTipo: async (ctx, data) => {
+      ctx.state.context.pendingEditType = data.type;
+      ctx.state.context.pendingEditName = null;
+      ctx.state.path = "/contas/editar/confirmar";
+    },
+
+    confirmarEdicaoConta: async (ctx) => {
+      const { editingAccountId, editingAccountName, pendingEditName, pendingEditType } = ctx.state.context;
+      try {
+        const fields = {};
+        if (pendingEditName) fields.name = pendingEditName;
+        if (pendingEditType) fields.type = pendingEditType;
+        await financialClient.updateAccount(ctx.userId, editingAccountId, fields);
+        const label = pendingEditName
+          ? `Conta renomeada para *${pendingEditName}*!`
+          : `Tipo de *${editingAccountName}* alterado!`;
+        await ctx.reply(`✅ ${label}`);
+        ctx.state.context.editingAccountId = null;
+        ctx.state.context.editingAccountName = null;
+        ctx.state.context.editingAccountType = null;
+        ctx.state.context.editingAccountBalance = null;
+        ctx.state.context.pendingEditName = null;
+        ctx.state.context.pendingEditType = null;
+        ctx.state.path = "/contas";
+      } catch (e) {
+        logger.error("[financialFlow] confirmarEdicaoConta error:", e.message);
+        await ctx.reply("❌ Erro ao editar conta. Tente novamente.");
+        return { noRender: true };
+      }
+    },
+
+    confirmarAjusteSaldo: async (ctx, data) => {
+      const { editingAccountId, editingAccountName, editingAccountBalance, pendingEditBalance } = ctx.state.context;
+      const diff = (pendingEditBalance || 0) - (editingAccountBalance || 0);
+      try {
+        const type = data.via === "adjustment"
+          ? "balance_adjustment"
+          : diff >= 0 ? "income" : "expense";
+        await financialClient.createTransaction(ctx.userId, {
+          accountId: editingAccountId,
+          amount: Math.abs(diff),
+          description: "Ajuste de saldo",
+          type,
+          date: new Date().toISOString(),
+          status: "confirmed",
+        });
+        await ctx.reply(
+          `✅ Saldo de *${editingAccountName}* atualizado!\n\n` +
+          `R$ ${formatMoney(editingAccountBalance)} → R$ ${formatMoney(pendingEditBalance)}`
+        );
+        ctx.state.context.editingAccountId = null;
+        ctx.state.context.editingAccountName = null;
+        ctx.state.context.editingAccountType = null;
+        ctx.state.context.editingAccountBalance = null;
+        ctx.state.context.pendingEditBalance = null;
+        ctx.state.path = "/contas";
+      } catch (e) {
+        logger.error("[financialFlow] confirmarAjusteSaldo error:", e.message);
+        await ctx.reply("❌ Erro ao ajustar saldo. Tente novamente.");
+        return { noRender: true };
+      }
     },
 
     // ── Extrato ─────────────────────────────────────────────────────────────
