@@ -699,20 +699,21 @@ async function handleGoal(client, action) {
   }
 }
 
+// Chaves em lowercase — a API retorna capitalização inconsistente (ex: "Red card" vs "Red Card")
 const CARD_PT = {
-  "Yellow Card": "Cartão Amarelo",
-  "Red Card": "Cartão Vermelho",
-  "Second Yellow card": "Segundo Amarelo",
+  "yellow card":        "Cartão Amarelo",
+  "red card":           "Cartão Vermelho",
+  "second yellow card": "Segundo Amarelo",
 };
 
 async function handleCard(client, action) {
   const { match, card, groupIds } = action;
   if (!groupIds || !groupIds.length) return;
 
-  const isRed =
-    card.detail === "Red Card" || card.detail === "Second Yellow card";
+  const detailKey = (card.detail || "").toLowerCase();
+  const isRed = detailKey === "red card" || detailKey === "second yellow card";
   const icon = isRed ? "🟥" : "🟨";
-  const label = CARD_PT[card.detail] || card.detail;
+  const label = CARD_PT[detailKey] || card.detail;
   const minuteTag = card.minute ? ` ${card.minute}'` : "";
   const teamFlag = withFlag(card.team) || card.team;
 
@@ -888,16 +889,37 @@ async function handlePenalties(client, action) {
 }
 
 // Chaves em lowercase — lookup feito com .toLowerCase() para tolerar variações da API
+// (a API retorna capitalização inconsistente, ex: "Foul" vs "foul")
 const VAR_PT = {
-  "goal cancelled": "Gol anulado",
-  "goal disallowed": "Gol anulado",
-  "goal disallowed - offside": "Gol anulado · impedimento",
-  "goal disallowed - handball": "Gol anulado · mão na bola",
-  "goal disallowed - foul": "Gol anulado · falta",
-  "penalty confirmed": "Pênalti confirmado",
-  "penalty cancelled": "Pênalti cancelado",
-  "card upgrade": "Cartão revisado",
-  "card cancelled": "Cartão cancelado",
+  // Gol anulado
+  "goal cancelled":                  "Gol anulado",
+  "goal disallowed":                 "Gol anulado",
+  "goal disallowed - offside":       "Gol anulado · impedimento",
+  "goal disallowed - foul":          "Gol anulado · falta",
+  "goal disallowed - handball":      "Gol anulado · mão na bola",
+  "goal disallowed - violent conduct": "Gol anulado · conduta violenta",
+  // Gol confirmado
+  "goal confirmed":                  "Gol confirmado",
+  // Pênalti
+  "penalty confirmed":               "Pênalti confirmado",
+  "penalty cancelled":               "Pênalti cancelado",
+  // Cartão
+  "card upgrade":                    "Cartão revisado (amarelo → vermelho)",
+  "card cancelled":                  "Cartão cancelado",
+};
+
+const VAR_ICON = {
+  "goal cancelled":                  "🚫",
+  "goal disallowed":                 "🚫",
+  "goal disallowed - offside":       "🚫",
+  "goal disallowed - foul":          "🚫",
+  "goal disallowed - handball":      "🚫",
+  "goal disallowed - violent conduct": "🚫",
+  "goal confirmed":                  "✅",
+  "penalty confirmed":               "✅",
+  "penalty cancelled":               "❌",
+  "card upgrade":                    "🟥",
+  "card cancelled":                  "📺",
 };
 
 async function handleMiss(client, action) {
@@ -990,9 +1012,8 @@ async function handleVar(client, action) {
   if (!groupIds || !groupIds.length) return;
 
   const detailKey = (varEvent.detail || "").toLowerCase();
-  const isGoalCancel = detailKey.includes("goal");
-  const label = VAR_PT[detailKey] || varEvent.detail || "Decisão";
-  const icon = isGoalCancel ? "🚫" : "📺";
+  const label = VAR_PT[detailKey] || varEvent.detail || "Decisão VAR";
+  const icon = VAR_ICON[detailKey] || "📺";
 
   const minuteTag = varEvent.minute ? ` ${varEvent.minute}'` : "";
   const teamFlag = varEvent.team ? withFlag(varEvent.team) : "";
@@ -1001,11 +1022,14 @@ async function handleVar(client, action) {
   if (varEvent.player) {
     lines.push(`${varEvent.player}${minuteTag}${teamFlag ? ` — ${teamFlag}` : ""}`);
   } else if (teamFlag) {
-    lines.push(teamFlag);
+    lines.push(teamFlag + minuteTag);
   }
   if (match) {
     const score = `${match.home_score ?? 0} x ${match.away_score ?? 0}`;
     lines.push(`*${withFlag(match.home_team)} ${score} ${withFlag(match.away_team)}*`);
+  }
+  if (varEvent.comments) {
+    lines.push(`_${varEvent.comments}_`);
   }
   const msg = lines.join("\n");
 
