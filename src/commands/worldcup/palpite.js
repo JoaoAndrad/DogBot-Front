@@ -127,8 +127,8 @@ async function handleInlinePalpite(client, chatId, userId, teamAQuery, goalsA, g
     });
 
     const options = [
-      `${withFlag(match.home_team)} ${localize(match.home_team).pt} avança`,
-      `${withFlag(match.away_team)} ${localize(match.away_team).pt} avança`,
+      `${withFlag(match.home_team)} avança`,
+      `${withFlag(match.away_team)} avança`,
     ];
     const pollMeta = {
       actionType: "menu",

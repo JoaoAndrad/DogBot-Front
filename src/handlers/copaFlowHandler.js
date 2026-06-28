@@ -145,10 +145,9 @@ async function handleCopaFlow(stateKey, body, state, reply, opts) {
       predicted_extra_away: etAway,
     });
 
-    const { withFlag: wf } = require("../utils/teamLocale");
     const options = [
-      `${wf(data.homeTeam)} ${data.homeTeam} avança`,
-      `${wf(data.awayTeam)} ${data.awayTeam} avança`,
+      `${withFlag(data.homeTeam)} avança`,
+      `${withFlag(data.awayTeam)} avança`,
     ];
     const pollMeta = {
       actionType: "menu",
@@ -205,6 +204,12 @@ async function _submitPrediction(stateKey, data, reply) {
       `📅 ${date} às ${time}`,
     ];
     if (data.venue) lines.push(`🏟 ${data.venue}`);
+    if (data.predicted_extra_home != null && data.predicted_extra_away != null)
+      lines.push(`⏱️ Prorrogação: *${data.predicted_extra_home} x ${data.predicted_extra_away}*`);
+    if (data.penalties_winner)
+      lines.push(`🥅 Pênaltis: *${withFlag(data.penalties_winner)} avança*`);
+    else if (data.advancingTeam)
+      lines.push(`🔮 Avança: *${withFlag(data.advancingTeam)}*`);
     lines.push(
       "",
       "Use */palpite* para fazer mais palpites ou editar este até o início do jogo.",
