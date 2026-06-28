@@ -510,26 +510,15 @@ async function handle(context) {
     }
   }
 
-  // Film card: texto com data após "Sim" na enquete (conversationState + /api/menu/state)
+  // Interceptor de texto livre: film-card, financial awaiting inputs, NLP financeiro
   if (body && !isGroup && !(body.startsWith("/") || body.startsWith("!"))) {
-    const filmDateCandidates = [flowUserId, from, actualNumber].filter(Boolean);
-    let filmViewingDateWait = false;
-    for (const k of [...new Set(filmDateCandidates)]) {
-      const s = conversationState.getState(k);
-      if (s?.flowType === "film-viewing-date") {
-        filmViewingDateWait = true;
-        break;
-      }
-    }
-    if (filmViewingDateWait) {
-      const handled = await handleIncomingTextMessage(
-        context.client,
-        from,
-        flowUserId || actualNumber,
-        body,
-      );
-      if (handled) return;
-    }
+    const handled = await handleIncomingTextMessage(
+      context.client,
+      from,
+      flowUserId || actualNumber,
+      body,
+    );
+    if (handled) return;
   }
 
   // Forward a normalized message record to backend for storage/processing (no chat fallback)
