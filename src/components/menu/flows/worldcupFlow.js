@@ -128,8 +128,10 @@ const worldcupFlow = createFlow("copa", {
         "",
         "📋 *Como funciona o palpite:*",
         "1️⃣ Você palpita o placar dos 90min normalmente",
-        "2️⃣ Se palpitar empate, será perguntado se quer palpitar a prorrogação _(opcional, +1 pt se acertar o placar exato)_",
-        "3️⃣ Uma enquete pergunta quem avança (+1 pt se acertar)",
+        "2️⃣ Se palpitar empate, será perguntado se quer palpitar a prorrogação _(opcional, +1 pt bônus)_",
+        "   • Digite o placar *final* já incluindo os gols dos 90min",
+        "   • Se a prorrogação também terminar empatada, uma enquete pergunta quem vence nos pênaltis (+1 pt)",
+        "3️⃣ Se a prorrogação tiver um vencedor, o palpite é confirmado direto",
         "",
         "🏅 *Pontuação:*",
         "• Placar exato nos 90min → *3 pts*",
@@ -875,8 +877,8 @@ const worldcupPalpiteFlow = createFlow("copa-palpite", {
       });
       await ctx.reply(
         `⏱️ *Placar da prorrogação — ${matchup(matchData.homeTeam, matchData.awayTeam)}*\n\n` +
-        `Digite o placar no formato *H-A* (apenas gols na prorrogação, sem os dos 90min)\n` +
-        `Ex: se você acha que o 2º tempo extra termina *2-1*, escreva *2-1*\n\n` +
+        `Digite o placar *final após a prorrogação* no formato *H-A* _(incluindo já o placar do tempo regular)_\n` +
+        `Ex: se você acha que após o 2º tempo extra termina *2-1*, escreva *2-1*\n\n` +
         `_(ou /cancelar para sair)_`,
       );
       return { end: true };

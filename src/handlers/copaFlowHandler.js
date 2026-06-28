@@ -137,32 +137,87 @@ async function handleCopaFlow(stateKey, body, state, reply, opts) {
     const etHome = parseInt(m[1], 10);
     const etAway = parseInt(m[2], 10);
 
-    // Salva o placar da prorrogação e vai para a seleção do vencedor
-    conversationState.startFlow(stateKey, "copa-palpite-input", {
+    // Placar ET deve ser >= placar dos 90min para cada time
+    if (etHome < data.predictedHome || etAway < data.predictedAway) {
+      await reply(
+        `❌ O placar da prorrogação deve ser maior ou igual ao dos 90min (*${data.predictedHome} x ${data.predictedAway}*).\n\n` +
+        `Digite o placar *final* já incluindo os gols dos 90min.\n_(ou /cancelar para sair)_`,
+      );
+      return true;
+    }
+
+    const etIsDraw = etHome === etAway;
+
+    if (etIsDraw) {
+      // Prorrogação empatada → pênaltis, pergunta quem avança
+      conversationState.startFlow(stateKey, "copa-palpite-input", {
+        ...data,
+        step: "await_advancing",
+        predicted_extra_home: etHome,
+        predicted_extra_away: etAway,
+      });
+
+      const options = [
+        `${withFlag(data.homeTeam)} avança`,
+        `${withFlag(data.awayTeam)} avança`,
+      ];
+      const pollMeta = {
+        actionType: "menu",
+        flowId: "copa-palpite",
+        path: "/advancing",
+        userId: stateKey,
+        options: [
+          { index: 0, label: options[0], action: "exec", handler: "setAdvancingTeam", data: { team: data.homeTeam, stateKey } },
+          { index: 1, label: options[1], action: "exec", handler: "setAdvancingTeam", data: { team: data.awayTeam, stateKey } },
+        ],
+      };
+      await polls.createPoll(client || { sendPoll: async () => null }, from || data.userId || stateKey,
+        `⏱️ Prorrogação: *${etHome} x ${etAway}* — empate!\n\n🥅 ${matchup(data.homeTeam, data.awayTeam)}\nQuem avança nos pênaltis?`,
+        options, { metadata: pollMeta });
+      if (!client || !from) await reply("⚽ Vote na enquete acima.");
+      return true;
+    }
+
+    // Prorrogação com vencedor → confirmação direta (sem enquete de pênaltis)
+    const newData = {
       ...data,
-      step: "await_advancing",
+      step: "await_confirmation",
       predicted_extra_home: etHome,
       predicted_extra_away: etAway,
-    });
+      advancingTeam: null,
+    };
+    conversationState.startFlow(stateKey, "copa-palpite-input", newData);
 
-    const options = [
-      `${withFlag(data.homeTeam)} avança`,
-      `${withFlag(data.awayTeam)} avança`,
-    ];
+    const kickoff = new Date(data.kickoffAt);
+    const date = kickoff.toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo", day: "2-digit", month: "2-digit" });
+    const time = kickoff.toLocaleTimeString("pt-BR", { timeZone: "America/Sao_Paulo", hour: "2-digit", minute: "2-digit" });
+
+    const title =
+      `🎯 Confirmar palpite?\n${matchup(data.homeTeam, data.awayTeam)}\n` +
+      `*${data.predictedHome} x ${data.predictedAway}* · ${date} ${time}\n` +
+      `⏱️ Prorrogação: *${etHome} x ${etAway}*`;
+    const confirmOptions = ["✅ Confirmar", "✏️ Corrigir placar", "❌ Cancelar"];
     const pollMeta = {
       actionType: "menu",
       flowId: "copa-palpite",
-      path: "/advancing",
+      path: "/confirm",
       userId: stateKey,
       options: [
-        { index: 0, label: options[0], action: "exec", handler: "setAdvancingTeam", data: { team: data.homeTeam, stateKey } },
-        { index: 1, label: options[1], action: "exec", handler: "setAdvancingTeam", data: { team: data.awayTeam, stateKey } },
+        {
+          index: 0, label: "✅ Confirmar", action: "exec", handler: "confirmPrediction",
+          data: { ...newData, userId: data.userId || stateKey },
+        },
+        {
+          index: 1, label: "✏️ Corrigir placar", action: "exec", handler: "correctPrediction",
+          data: { matchId: data.matchId, homeTeam: data.homeTeam, awayTeam: data.awayTeam, kickoffAt: data.kickoffAt, venue: data.venue, stage: data.stage, userId: data.userId || stateKey },
+        },
+        {
+          index: 2, label: "❌ Cancelar", action: "exec", handler: "cancelPrediction",
+          data: { userId: data.userId || stateKey },
+        },
       ],
     };
-    await polls.createPoll(client || { sendPoll: async () => null }, from || data.userId || stateKey,
-      `✅ Prorrogação: *${etHome} x ${etAway}*\n\n🔮 ${matchup(data.homeTeam, data.awayTeam)}\nQuem avança?`,
-      options, { metadata: pollMeta });
-    if (!client || !from) await reply("⚽ Vote na enquete acima.");
+    await polls.createPoll(client, from, title, confirmOptions, { metadata: pollMeta });
     return true;
   }
 
@@ -182,7 +237,7 @@ async function _submitPrediction(stateKey, data, reply) {
     await worldcupClient.submitPrediction(userId, data.matchId, data.predictedHome, data.predictedAway, data.advancingTeam || null, {
       predictedExtraHome: data.predicted_extra_home ?? null,
       predictedExtraAway: data.predicted_extra_away ?? null,
-      penaltiesWinner:    data.penalties_winner    ?? null,
+      penaltiesWinner:    data.penalties_winner ?? data.advancingTeam ?? null,
     });
     conversationState.clearState(stateKey);
     const wasAutoDisabled = dmAlertState.clearUser(userId);

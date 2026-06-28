@@ -36,8 +36,9 @@ function fmtStage(match) {
   if (match.group_name)
     return `Grupo ${match.group_name.replace("GROUP_", "").replace("Group ", "")}`;
   const map = {
-    round_of_16: "16 avos",
-    quarter_final: "Quartas",
+    round_of_32: "16 avos de Final",
+    round_of_16: "Oitavas de Final",
+    quarter_final: "Quartas de Final",
     semi_final: "Semifinal",
     third_place: "3º Lugar",
     final: "Final",
