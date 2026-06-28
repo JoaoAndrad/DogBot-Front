@@ -285,8 +285,11 @@ function getGoalText({
   const flag = withFlag(scoringTeam);
 
   // Prefixo: com nome do marcador, ou com flag do time como fallback
-  const by = (text) => (name ? `*${name} ${text}` : `${flag} *${text}`);
-  const gol = (text) => (name ? `⚽ *${name} ${text}` : `${flag} *${text}`);
+  const by = (text) => (name ? `*${name} ${text}` : `⚽ ${flag} *${text}`);
+  const gol = (text) =>
+    name
+      ? `⚽ *${name} ${text}`
+      : `⚽ Gooooooool!! ${flag}${minute ? ` — ${minute}'` : ""}`;
 
   // Priority order ─────────────────────────────────
 
@@ -338,7 +341,7 @@ function getGoalText({
 
   return name
     ? `⚽ *Gol de ${name}!*${timing}`
-    : `⚽ *Goooool de ${flag}!*${timing}`;
+    : `⚽ Gooooooool!! ${flag}${minute ? ` — ${minute}'` : ""}`;
 }
 
 function formatStage(stage) {
