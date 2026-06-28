@@ -159,14 +159,31 @@ const financialFlow = createFlow("financeiro", {
   "/extrato": {
     dynamic: true,
     options: [],
-    handler: async (ctx) => ({
-      title: "📋 Extrato — período",
-      options: [
-        { label: "📅 Este mês", action: "exec", handler: "extratoMes", data: { period: "current" } },
-        { label: "📅 Mês anterior", action: "exec", handler: "extratoMes", data: { period: "last" } },
-        { label: "↩️ Voltar", action: "back" },
-      ],
-    }),
+    handler: async (ctx) => {
+      try {
+        const res = await financialClient.listTransactions(ctx.userId, { period: "all", limit: 1 });
+        if (!res?.transactions?.length) {
+          await ctx.reply("📋 Você ainda não tem nenhuma transação registrada.");
+          return {
+            title: "O que deseja fazer?",
+            options: [
+              { label: "↩️ Voltar ao menu", action: "goto", target: "/" },
+              { label: "✖️ Fechar", action: "exec", handler: "close" },
+            ],
+          };
+        }
+      } catch (e) {
+        logger.warn("[financialFlow] /extrato check error:", e.message);
+      }
+      return {
+        title: "📋 Extrato — período",
+        options: [
+          { label: "📅 Este mês", action: "exec", handler: "extratoMes", data: { period: "current" } },
+          { label: "📅 Mês anterior", action: "exec", handler: "extratoMes", data: { period: "last" } },
+          { label: "↩️ Voltar", action: "back" },
+        ],
+      };
+    },
   },
 
   "/extrato/ver": {
@@ -243,14 +260,20 @@ const financialFlow = createFlow("financeiro", {
   "/contas": {
     dynamic: true,
     options: [],
-    handler: async (ctx) => ({
-      title: "🏦 Contas bancárias",
-      options: [
-        { label: "📋 Ver contas", action: "exec", handler: "listarContas" },
-        { label: "➕ Adicionar conta", action: "goto", target: "/contas/tipo" },
-        { label: "↩️ Voltar", action: "back" },
-      ],
-    }),
+    handler: async (ctx) => {
+      let hasAccounts = false;
+      try {
+        const res = await financialClient.listAccounts(ctx.userId);
+        hasAccounts = !!(res?.accounts?.length);
+      } catch (e) {
+        logger.warn("[financialFlow] /contas check error:", e.message);
+      }
+      const options = [];
+      if (hasAccounts) options.push({ label: "📋 Ver contas", action: "exec", handler: "listarContas" });
+      options.push({ label: "➕ Adicionar conta", action: "goto", target: "/contas/tipo" });
+      options.push({ label: "↩️ Voltar", action: "back" });
+      return { title: "🏦 Contas bancárias", options };
+    },
   },
 
   "/contas/tipo": {
@@ -387,42 +410,44 @@ const financialFlow = createFlow("financeiro", {
     dynamic: true,
     options: [],
     handler: async (ctx) => {
+      const PAGE_SIZE = 8;
+      const page = ctx.state.context.orcamentoCatPage || 0;
+
       try {
         const res = await financialClient.listCategories(ctx.userId);
-        const cats = res?.categories || [];
-        const options = [
-          {
-            label: "💼 Total de despesas (geral)",
-            action: "exec",
-            handler: "setOrcamentoCategoria",
-            data: { categoryId: null, categoryName: null },
-          },
+        const roots = (res?.categories || []).filter(c => !c.parentId);
+
+        const allItems = [
+          { label: "💼 Total de despesas (geral)", categoryId: null, categoryName: null },
+          ...roots.map(r => ({ label: r.name, categoryId: r.id, categoryName: r.name })),
         ];
-        for (const cat of cats) {
-          options.push({
-            label: cat.name,
-            action: "exec",
-            handler: "setOrcamentoCategoria",
-            data: { categoryId: cat.id, categoryName: cat.name },
-          });
-          for (const sub of (cat.children || [])) {
-            options.push({
-              label: `↳ ${sub.name}`,
-              action: "exec",
-              handler: "setOrcamentoCategoria",
-              data: { categoryId: sub.id, categoryName: sub.name },
-            });
-          }
-        }
+
+        const totalPages = Math.ceil(allItems.length / PAGE_SIZE);
+        const clampedPage = Math.min(page, Math.max(0, totalPages - 1));
+        const pageItems = allItems.slice(clampedPage * PAGE_SIZE, (clampedPage + 1) * PAGE_SIZE);
+        const hasPrev = clampedPage > 0;
+        const hasNext = clampedPage < totalPages - 1;
+
+        const options = pageItems.map(item => ({
+          label: item.label,
+          action: "exec",
+          handler: "setOrcamentoCategoria",
+          data: { categoryId: item.categoryId, categoryName: item.categoryName },
+        }));
+
+        if (hasPrev) options.push({ label: "⬅️ Anterior", action: "exec", handler: "orcamentoCatPagePrev" });
+        if (hasNext) options.push({ label: "➡️ Próxima →", action: "exec", handler: "orcamentoCatPageNext" });
         options.push({ label: "❌ Cancelar", action: "back" });
-        return { title: "Para qual categoria?", options };
+
+        const pageLabel = totalPages > 1 ? ` (${clampedPage + 1}/${totalPages})` : "";
+        return { title: `Para qual categoria?${pageLabel}`, options };
       } catch (e) {
         logger.error("[financialFlow] orcamentos/categoria error:", e.message);
         await ctx.reply("❌ Erro ao carregar categorias.");
         return {
           title: "Erro",
           options: [
-            { label: "🔄 Tentar novamente", action: "goto", target: "/orcamentos/categoria" },
+            { label: "🔄 Tentar novamente", action: "exec", handler: "orcamentoCatReload" },
             { label: "↩️ Voltar", action: "back" },
           ],
         };
@@ -731,15 +756,34 @@ const financialFlow = createFlow("financeiro", {
 
     iniciarCriarOrcamento: async (ctx) => {
       ctx.state.context.pendingBudgetLimit = null;
-      ctx.state.context.awaitingBudgetLimit = true;
-      await ctx.reply("✏️ Digite o *limite mensal* em R$ (ex: 1500 ou 1.500,00):");
-      return { noRender: true };
+      ctx.state.context.pendingBudgetCategoryId = null;
+      ctx.state.context.pendingBudgetCategoryName = null;
+      ctx.state.context.orcamentoCatPage = 0;
+      ctx.state.path = "/orcamentos/categoria";
     },
 
     setOrcamentoCategoria: async (ctx, data) => {
       ctx.state.context.pendingBudgetCategoryId = data.categoryId || null;
       ctx.state.context.pendingBudgetCategoryName = data.categoryName || null;
-      ctx.state.path = "/orcamentos/confirmar";
+      ctx.state.context.orcamentoCatPage = 0;
+      ctx.state.context.awaitingBudgetLimit = true;
+      const catLabel = data.categoryName || "total de despesas";
+      await ctx.reply(`✏️ Orçamento para *${catLabel}*.\n\nDigite o *limite mensal* em R$ (ex: 1500 ou 1.500,00):`);
+      return { noRender: true };
+    },
+
+    orcamentoCatPageNext: async (ctx) => {
+      ctx.state.context.orcamentoCatPage = (ctx.state.context.orcamentoCatPage || 0) + 1;
+      return { rerenderCurrent: true };
+    },
+
+    orcamentoCatPagePrev: async (ctx) => {
+      ctx.state.context.orcamentoCatPage = Math.max(0, (ctx.state.context.orcamentoCatPage || 0) - 1);
+      return { rerenderCurrent: true };
+    },
+
+    orcamentoCatReload: async (ctx) => {
+      return { rerenderCurrent: true };
     },
 
     confirmarOrcamento: async (ctx) => {

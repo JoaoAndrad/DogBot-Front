@@ -510,11 +510,9 @@ class FlowManager {
       }
       state.context.pendingBudgetLimit = amount;
       state.context.awaitingBudgetLimit = false;
-      state.context.pendingBudgetCategoryId = null;
-      state.context.pendingBudgetCategoryName = null;
-      state.path = "/orcamentos/categoria";
+      state.path = "/orcamentos/confirmar";
       await storage.saveState(stateUserId, flowId, state);
-      await this._renderNode(client, chatId, stateUserId, flowId, "/orcamentos/categoria");
+      await this._renderNode(client, chatId, stateUserId, flowId, "/orcamentos/confirmar");
       return true;
     }
 
