@@ -20,25 +20,47 @@ async function checkLinked(userId) {
   }
 }
 
-function pollAuthStatus(client, chatId, userId, maxAttempts = 36, intervalMs = 10000) {
+async function notifyLinked(client, chatId, userId) {
+  const flowManager = require("../flowManager");
+  await client.sendMessage(
+    chatId,
+    "✅ *Conta vinculada com sucesso!*\n\nSeu cofre financeiro foi criado com categorias padrão configuradas.\n\nAbrindo o menu financeiro…"
+  );
+  try {
+    await flowManager.startFlow(client, chatId, userId, "financeiro");
+  } catch (e) {
+    logger.warn("[financialFlow] startFlow after link error:", e.message);
+  }
+}
+
+function pollAuthStatus(client, chatId, userId, maxAttempts = 36, intervalMs = 5000) {
   let attempts = 0;
-  const timer = setInterval(async () => {
-    attempts++;
+  let done = false;
+
+  async function check() {
+    if (done) return;
     try {
       const linked = await checkLinked(userId);
       if (linked) {
+        done = true;
         clearInterval(timer);
-        await client.sendMessage(
-          chatId,
-          "✅ *Conta vinculada com sucesso!*\n\nSeu cofre financeiro foi criado e as categorias padrão foram configuradas.\n\nEnvie */financeiro* para acessar o menu."
-        );
+        await notifyLinked(client, chatId, userId);
       }
     } catch (e) {
       logger.warn("[financialFlow] poll error:", e.message);
     }
     if (attempts >= maxAttempts) {
+      done = true;
       clearInterval(timer);
     }
+  }
+
+  // Verifica imediatamente (não espera o primeiro interval)
+  check();
+
+  const timer = setInterval(() => {
+    attempts++;
+    check();
   }, intervalMs);
 }
 
