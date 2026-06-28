@@ -14,6 +14,7 @@ const FLOW_ENTRY_COMMAND_NAMES = new Set([
   "vinculo360",
   "copa",
   "palpite",
+  "cartola",
 ]);
 
 function isFlowEntryCommand(canonicalName) {
