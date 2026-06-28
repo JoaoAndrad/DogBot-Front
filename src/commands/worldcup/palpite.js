@@ -143,7 +143,7 @@ async function handleInlinePalpite(client, chatId, userId, teamAQuery, goalsA, g
     await polls.createPoll(
       client, chatId,
       `🔮 Empate! ${matchup(match.home_team, match.away_team)}\nQuem avança nos pênaltis?`,
-      options, { metadata: pollMeta, sender: client },
+      options, { metadata: pollMeta },
     );
     return;
   }
