@@ -53,7 +53,7 @@ async function handleCopaFlow(stateKey, body, state, reply, opts) {
       };
       await polls.createPoll(client || { sendPoll: async () => null }, from || data.userId || stateKey,
         `🎯 Empate! Quer palpitar o placar da *prorrogação*? (+1 pt bônus)`,
-        etOptions, { metadata: pollMeta, sender: client });
+        etOptions, { metadata: pollMeta });
       if (!client || !from) {
         await reply("⏱️ Responda na enquete acima.");
       }
