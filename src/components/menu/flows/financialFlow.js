@@ -1948,7 +1948,7 @@ const financialFlow = createFlow("financeiro", {
       try {
         await financialClient.updateAccount(ctx.userId, accountId, { isDefault: true });
         ctx.state.context.editingAccountIsDefault = true;
-        await ctx.reply("⭐ Conta definida como padrão para transações NLP!");
+        await ctx.reply("⭐ Conta definida como padrão!");
         ctx.state.path = fromConfig ? "/config" : "/contas";
       } catch (e) {
         logger.error("[financialFlow] definirContaPadrao error:", e.message);
