@@ -72,14 +72,15 @@ async function processEvent(context) {
 
     await dedupe.markProcessed(context);
 
-    // Marca o chat como lido e apaga a mensagem recebida da nossa sessão
+    // Marca como lido e apaga o chat inteiro da nossa sessão (só para nós)
     if (msg && !msg.fromMe) {
       if (chatId && context.client && typeof context.client.sendSeen === "function") {
         context.client.sendSeen(chatId).catch(() => {});
       }
-      if (typeof msg.delete === "function") {
-        msg.delete(false).catch(() => {});
-      }
+      try {
+        const chat = await msg.getChat();
+        if (chat && typeof chat.delete === "function") chat.delete().catch(() => {});
+      } catch (_) {}
     }
 
     return true;
