@@ -484,12 +484,7 @@ class FlowManager {
   async _handleFinancialQuery(client, chatId, candidateIds, queryType) {
     const financialClient = require("../../services/financialClient");
 
-    // Mensagens NLP financeiras são apagadas da nossa sessão após 30s
-    const send = async (text) => {
-      const sent = await send( text);
-      if (sent) setTimeout(() => sent.delete(false).catch(() => {}), 30_000);
-      return sent;
-    };
+    const send = (text) => client.sendMessage(chatId, text);
 
     let resolvedId = null;
     for (const id of candidateIds) {
