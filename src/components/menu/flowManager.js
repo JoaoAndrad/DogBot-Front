@@ -3,6 +3,7 @@ const logger = require("../../utils/logger");
 const bootLog = require("../../lib/bootLog");
 const { validateFlow } = require("./flowBuilder");
 const resolveUserUuidForMenu = require("../../utils/whatsapp/resolveUserUuidForMenu");
+const { logFinancialError } = require("../../services/financialErrorLogger");
 
 /**
  * FlowManager - Core engine for interactive menu navigation
@@ -224,7 +225,8 @@ class FlowManager {
         }
       } catch (err) {
         logger.error(`[FlowManager] Erro no handler:`, err);
-        await client.sendMessage(chatId, "�R Erro ao executar ação");
+        if (flowId === "financeiro") logFinancialError({ userId, source: "handler", error: err });
+        await client.sendMessage(chatId, "❌ Erro ao executar ação");
       }
     }
   }
@@ -290,7 +292,8 @@ class FlowManager {
         await storage.saveState(userId, flowId, state);
       } catch (err) {
         logger.error(`[FlowManager] Erro no handler de nó dinâmico:`, err);
-        await client.sendMessage(chatId, "�R Erro ao carregar opções");
+        if (flowId === "financeiro") logFinancialError({ userId, source: "dynamic_node", action: path, error: err });
+        await client.sendMessage(chatId, "❌ Erro ao carregar opções");
         return;
       }
     }
@@ -595,6 +598,7 @@ class FlowManager {
       }
     } catch (e) {
       logger.warn("[FlowManager] _handleFinancialQuery error:", e.message);
+      logFinancialError({ userId: resolvedId, source: "nlp_query", action: queryType, error: e });
     }
     return false;
   }
@@ -860,9 +864,10 @@ class FlowManager {
         await financialClient.updateTransaction(stateUserId, state.context.editingTxId, { amount });
         state.context.editingTxAmount = amount;
         await storage.saveState(stateUserId, flowId, state);
-        await client.sendMessage(chatId, "�S& Valor atualizado.");
+        await client.sendMessage(chatId, "✅ Valor atualizado.");
       } catch (e) {
-        await client.sendMessage(chatId, "�R Erro ao atualizar valor.");
+        logFinancialError({ userId: stateUserId, source: "text_input", action: "awaitingEditTxAmount", error: e });
+        await client.sendMessage(chatId, "❌ Erro ao atualizar valor.");
       }
       return true;
     }
@@ -879,9 +884,10 @@ class FlowManager {
         await financialClient.updateTransaction(stateUserId, state.context.editingTxId, { description: trimmed });
         state.context.editingTxDescription = trimmed;
         await storage.saveState(stateUserId, flowId, state);
-        await client.sendMessage(chatId, "�S& Descrição atualizada.");
+        await client.sendMessage(chatId, "✅ Descrição atualizada.");
       } catch (e) {
-        await client.sendMessage(chatId, "�R Erro ao atualizar descrição.");
+        logFinancialError({ userId: stateUserId, source: "text_input", action: "awaitingEditTxDesc", error: e });
+        await client.sendMessage(chatId, "❌ Erro ao atualizar descrição.");
       }
       return true;
     }
@@ -904,9 +910,10 @@ class FlowManager {
         });
         state.context.editingTxAmount = amount;
         await storage.saveState(stateUserId, flowId, state);
-        await client.sendMessage(chatId, "�S& Valor das parcelas atualizado.");
+        await client.sendMessage(chatId, "✅ Valor das parcelas atualizado.");
       } catch (e) {
-        await client.sendMessage(chatId, "�R Erro ao atualizar parcelas.");
+        logFinancialError({ userId: stateUserId, source: "text_input", action: "awaitingEditInstallmentAmount", error: e });
+        await client.sendMessage(chatId, "❌ Erro ao atualizar parcelas.");
       }
       return true;
     }
@@ -930,9 +937,10 @@ class FlowManager {
       try {
         await financialClient.updateVault(stateUserId, { notificationHour: h, notificationMinute: m });
         const label = `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
-        await client.sendMessage(chatId, `�S& Notificações configuradas para *${label}* todos os dias.`);
+        await client.sendMessage(chatId, `✅ Notificações configuradas para *${label}* todos os dias.`);
       } catch (e) {
-        await client.sendMessage(chatId, "�R Erro ao salvar horário.");
+        logFinancialError({ userId: stateUserId, source: "text_input", action: "awaitingNotifHour", error: e });
+        await client.sendMessage(chatId, "❌ Erro ao salvar horário.");
       }
       state.path = "/config";
       await storage.saveState(stateUserId, flowId, state);
