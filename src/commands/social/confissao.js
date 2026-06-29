@@ -50,72 +50,27 @@ module.exports = {
     // Array to collect poll messages for cleanup
     const pollMessages = [];
 
-    // Helper function to delete messages and polls after confession is sent
-    const cleanupAfterConfession = async (originalMsg, confirmationMsg) => {
+    // Apaga enquetes do fluxo de confissão (só da nossa sessão).
+    // Mensagens recebidas → pipeline/index.js (msg.delete(false) após handler).
+    // Mensagens enviadas  → bot/index.js wrapper (delete imediato, exceto polls).
+    // Polls são excluídos do wrapper global, por isso precisam de cleanup próprio.
+    const cleanupAfterConfession = async () => {
       try {
-        // Wait 2 seconds so user can see confirmation
         await new Promise((resolve) => setTimeout(resolve, 2000));
 
-        // Delete all poll messages
-        for (let i = 0; i < pollMessages.length; i++) {
-          const entry = pollMessages[i];
-          // entry is { pollMsg, chatId }
-          const pollMsg = entry && entry.pollMsg ? entry.pollMsg : entry;
-          const entryChatId = entry && entry.chatId ? entry.chatId : null;
+        for (const entry of pollMessages) {
           try {
-            // createPoll returns { sent, msgId }, so we need to access sent property
-            const messageToDelete =
-              pollMsg && pollMsg.sent ? pollMsg.sent : pollMsg;
-
-            if (
-              messageToDelete &&
-              typeof messageToDelete.delete === "function"
-            ) {
-              await messageToDelete.delete(false); // delete only for sender, not for everyone
-            } else if (pollMsg && pollMsg.msgId && entryChatId) {
-              // Fallback: attempt to delete by msgId via chat.deleteMessage
-              try {
-                const chat = await client.getChatById(entryChatId);
-                if (chat && typeof chat.deleteMessage === "function") {
-                  await chat.deleteMessage(pollMsg.msgId);
-                } else if (
-                  client &&
-                  typeof client.deleteMessage === "function"
-                ) {
-                  // some client wrappers expose deleteMessage(chatId, msgId)
-                  await client.deleteMessage(entryChatId, pollMsg.msgId);
-                }
-              } catch (err) {
-                // Silently fail fallback deletion
-              }
+            const pollMsg = entry && entry.pollMsg ? entry.pollMsg : entry;
+            const msgToDelete = pollMsg && pollMsg.sent ? pollMsg.sent : pollMsg;
+            if (msgToDelete && typeof msgToDelete.delete === "function") {
+              await msgToDelete.delete(false);
             }
-          } catch (err) {
-            // Silently fail poll deletion
+          } catch (_) {
+            // silently fail
           }
         }
-
-        // Delete confirmation message (only for sender, not for everyone)
-        if (confirmationMsg && typeof confirmationMsg.delete === "function") {
-          try {
-            await confirmationMsg.delete(false); // delete only for sender
-          } catch (err) {
-            // Silently fail confirmation deletion
-          }
-        }
-
-        // Delete original message
-        if (originalMsg && typeof originalMsg.delete === "function") {
-          try {
-            await originalMsg.delete(true);
-          } catch (err) {
-            console.error("[confissao] ERRO ao deletar mensagem original:", {
-              error: err?.message || err,
-              stack: err?.stack,
-            });
-          }
-        }
-      } catch (err) {
-        // Silently fail cleanup
+      } catch (_) {
+        // silently fail
       }
     };
 
@@ -931,7 +886,7 @@ module.exports = {
                 } catch (e) {
                   // ignore reply errors
                 }
-                await cleanupAfterConfession(message, confirmMsg);
+                await cleanupAfterConfession();
               } catch (err) {
                 console.error(
                   "Erro ao notificar backend sobre consumo de confissão (menção):",
@@ -1117,7 +1072,7 @@ module.exports = {
         } catch (e) {
           // ignore reply errors
         }
-        await cleanupAfterConfession(message, confirmMsg);
+        await cleanupAfterConfession();
       } catch (err) {
         console.error(
           "Erro ao notificar backend sobre consumo de confissão (único grupo):",
@@ -1323,7 +1278,7 @@ module.exports = {
               );
             }
           } catch (e) {}
-          await cleanupAfterConfession(message, confirmMsg);
+          await cleanupAfterConfession();
         } catch (err) {
           console.error(
             "Erro ao notificar backend sobre consumo de confissão:",
