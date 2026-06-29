@@ -42,15 +42,17 @@ async function start() {
   });
 
   // Wrap sendMessage: desabilita sendSeen e agenda deleção da mensagem enviada (só para nós).
+  // Deleção é diferida 30s para não competir com o próximo sendMessage na fila do Puppeteer.
   // Enquetes são excluídas — o delete local pode invalidar o vote_update; elas têm delay próprio no flowManager.
   const originalSendMessage = client.sendMessage.bind(client);
   const { Poll } = require("whatsapp-web.js");
+  const DELETE_SENT_DELAY_MS = 30_000;
   client.sendMessage = async function (chatId, content, options = {}) {
     const mergedOptions = { ...options, sendSeen: false };
     const sent = await originalSendMessage(chatId, content, mergedOptions);
     const isPoll = Poll && content instanceof Poll;
     if (sent && !isPoll && typeof sent.delete === "function") {
-      sent.delete(false).catch(() => {});
+      setTimeout(() => sent.delete(false).catch(() => {}), DELETE_SENT_DELAY_MS);
     }
     return sent;
   };

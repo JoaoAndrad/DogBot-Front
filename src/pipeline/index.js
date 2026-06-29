@@ -72,13 +72,14 @@ async function processEvent(context) {
 
     await dedupe.markProcessed(context);
 
-    // Marca como lido e apaga a mensagem recebida da nossa sessão (só para nós)
+    // Marca como lido (imediato) e apaga a mensagem recebida da nossa sessão após delay
+    // para não competir com operações de envio na fila do Puppeteer.
     if (msg && !msg.fromMe) {
       if (chatId && context.client && typeof context.client.sendSeen === "function") {
         context.client.sendSeen(chatId).catch(() => {});
       }
       if (typeof msg.delete === "function") {
-        msg.delete(false).catch(() => {});
+        setTimeout(() => msg.delete(false).catch(() => {}), 5_000);
       }
     }
 
