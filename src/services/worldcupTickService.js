@@ -53,19 +53,25 @@ function fmtStage(match) {
  */
 function categorizePredictions(predictions, currentHome, currentAway, isOvertime = false) {
   const competing = [];
+  const guaranteed = []; // draw predictors with no OT prediction — guaranteed 1 pt
   const lost = [];
   for (const p of predictions || []) {
     const isDraw = p.predictedHome === p.predictedAway;
-    if (isOvertime && !isDraw) {
-      // Na prorrogação apenas quem apostou empate ainda concorre
-      lost.push(p);
+    if (isOvertime) {
+      if (!isDraw) {
+        lost.push(p);
+      } else if (p.predictedExtraHome != null) {
+        competing.push(p); // drew + submitted OT prediction — still competing for bonus
+      } else {
+        guaranteed.push(p); // drew correctly but didn't submit OT prediction
+      }
     } else if (currentHome > p.predictedHome || currentAway > p.predictedAway) {
       lost.push(p);
     } else {
       competing.push(p);
     }
   }
-  return { competing, lost };
+  return { competing, guaranteed, lost };
 }
 
 /**
@@ -136,7 +142,7 @@ function formatPredictionsBlockWithMentions(
 
   const { homeTeam, awayTeam, isOvertime = false } = opts;
   const nameMap = buildNameMap(predictions);
-  const { competing, lost } = categorizePredictions(
+  const { competing, guaranteed, lost } = categorizePredictions(
     predictions,
     currentHome,
     currentAway,
@@ -170,6 +176,16 @@ function formatPredictionsBlockWithMentions(
     return `  • ${nameMap[p.userId]} — ${p.predictedHome}x${p.predictedAway}`;
   }
 
+  function renderOtPred(p) {
+    // Overtime competing: show ET prediction with mention
+    const jid = toJid(p.senderNumber);
+    if (jid) {
+      mentionIds.push(jid);
+      return `  • @${String(p.senderNumber).split("@")[0]} — prorr. ${p.predictedExtraHome}x${p.predictedExtraAway}`;
+    }
+    return `  • ${nameMap[p.userId]} — prorr. ${p.predictedExtraHome}x${p.predictedExtraAway}`;
+  }
+
   function renderOutcomeGroups(preds, asMention) {
     const lines = [];
     const { homeWin, draw, awayWin } = byOutcome(preds);
@@ -189,20 +205,34 @@ function formatPredictionsBlockWithMentions(
   }
 
   const lines = ["", "📊 *Palpites:*"];
+  const hasLosers = lost.length > 0 || guaranteed.length > 0;
 
-  if (!lost.length) {
+  if (!hasLosers) {
     // Todos ainda concorrem (início do jogo): sem cabeçalho de seção
     lines.push(...renderOutcomeGroups(competing, true));
   } else {
     if (competing.length) {
-      lines.push("\n✅ *Ainda concorrendo:*");
-      lines.push(...renderOutcomeGroups(competing, true));
+      if (isOvertime) {
+        lines.push("\n✅ *Ainda concorrendo (palpitaram prorrogação):*");
+        competing.forEach((p) => lines.push(renderOtPred(p)));
+      } else {
+        lines.push("\n✅ *Ainda concorrendo:*");
+        lines.push(...renderOutcomeGroups(competing, true));
+      }
+    }
+    if (guaranteed.length) {
+      lines.push("\n🏅 *Garantiram 1 ponto (empate correto):*");
+      guaranteed.forEach((p) => lines.push(renderPred(p, false)));
     }
     if (lost.length) {
       lines.push(
         `\n❌ *${lost.length === 1 ? "Já perdeu" : "Já perderam"} 🤣:*`,
       );
-      lines.push(...renderOutcomeGroups(lost, false));
+      if (isOvertime) {
+        lost.forEach((p) => lines.push(renderPred(p, false)));
+      } else {
+        lines.push(...renderOutcomeGroups(lost, false));
+      }
     }
   }
 
@@ -213,38 +243,65 @@ function formatFinishedBlock(predictions, finalHome, finalAway) {
   if (!predictions || !predictions.length) return null;
 
   const nameMap = buildNameMap(predictions);
-  const { exact, winner, wrong } = categorizeFinished(
-    predictions,
-    finalHome,
-    finalAway,
-  );
-  const isDraw = finalHome === finalAway;
   const lines = ["", "🏆 *Palpites:*"];
 
-  if (exact.length) {
-    lines.push("🎯 *Placar exato — 3 pts*");
-    for (const p of exact)
-      lines.push(
-        `  • ${nameMap[p.userId]} — ${p.predictedHome}x${p.predictedAway} ✓`,
-      );
-  }
+  // Use backend-scored points when available (includes ET/penalties bonuses).
+  // Fall back to score-based calculation only when points haven't been scored yet.
+  const hasScores = predictions.some((p) => p.points != null);
 
-  if (winner.length) {
-    lines.push(
-      isDraw ? "✓ *Acertou o empate — 1 pt*" : "✓ *Vencedor certo — 1 pt*",
-    );
-    for (const p of winner)
-      lines.push(
-        `  • ${nameMap[p.userId]} — ${p.predictedHome}x${p.predictedAway}`,
-      );
-  }
+  if (hasScores) {
+    // Sort by points desc then by predicted score for display consistency
+    const sorted = [...predictions].sort((a, b) => (b.points ?? 0) - (a.points ?? 0));
 
-  if (wrong.length) {
-    lines.push("❌ *Sem pontos*");
-    for (const p of wrong)
-      lines.push(
-        `  • ${nameMap[p.userId]} — ${p.predictedHome}x${p.predictedAway}`,
-      );
+    // Group by point value
+    const byPts = {};
+    for (const p of sorted) {
+      const pts = p.points ?? 0;
+      if (!byPts[pts]) byPts[pts] = [];
+      byPts[pts].push(p);
+    }
+
+    // Labels ordered highest → lowest
+    const ptLabels = {
+      5: "⭐ *5 pts — Placar exato + prorrogação exata + pênaltis:*",
+      4: "🎯 *4 pts — Placar exato + prorrogação:*",
+      3: "🎯 *3 pts — Placar exato:*",
+      2: "✓ *2 pts — Resultado + prorrogação exata:*",
+      1: "✓ *1 pt — Resultado certo:*",
+      0: "❌ *Sem pontos:*",
+    };
+
+    for (const pts of [5, 4, 3, 2, 1, 0]) {
+      const group = byPts[pts];
+      if (!group || !group.length) continue;
+      lines.push(ptLabels[pts] || `✓ *${pts} pts:*`);
+      for (const p of group) {
+        const extra = p.predictedExtraHome != null
+          ? ` (prorr. ${p.predictedExtraHome}x${p.predictedExtraAway})`
+          : "";
+        lines.push(`  • ${nameMap[p.userId]} — ${p.predictedHome}x${p.predictedAway}${extra}`);
+      }
+    }
+  } else {
+    // Fallback: calculate from 90min score only
+    const { exact, winner, wrong } = categorizeFinished(predictions, finalHome, finalAway);
+    const isDraw = finalHome === finalAway;
+
+    if (exact.length) {
+      lines.push("🎯 *Placar exato — 3 pts*");
+      for (const p of exact)
+        lines.push(`  • ${nameMap[p.userId]} — ${p.predictedHome}x${p.predictedAway} ✓`);
+    }
+    if (winner.length) {
+      lines.push(isDraw ? "✓ *Acertou o empate — 1 pt*" : "✓ *Vencedor certo — 1 pt*");
+      for (const p of winner)
+        lines.push(`  • ${nameMap[p.userId]} — ${p.predictedHome}x${p.predictedAway}`);
+    }
+    if (wrong.length) {
+      lines.push("❌ *Sem pontos*");
+      for (const p of wrong)
+        lines.push(`  • ${nameMap[p.userId]} — ${p.predictedHome}x${p.predictedAway}`);
+    }
   }
 
   return lines.join("\n");
@@ -819,7 +876,7 @@ async function handleExtraTime(client, action) {
       const memberJids = await getGroupMemberJids(client, groupId);
       const groupPreds = filterForGroup(predictions, memberJids);
 
-      // Main preds block (90-min scores) — na prorrogação vitórias já perderam
+      // Preds block — vitórias já perderam; empate+OT concorre; empate puro garantiu 1pt
       const { text: predBlock, mentionIds: predMentions } = groupPreds.length
         ? formatPredictionsBlockWithMentions(
             groupPreds,
@@ -829,29 +886,14 @@ async function handleExtraTime(client, action) {
           )
         : { text: null, mentionIds: [] };
 
-      // ET-specific preds block
-      const etPreds = groupPreds.filter((p) => p.predictedExtraHome != null);
-      const etMentions = [];
-      let etBlock = null;
-      if (etPreds.length) {
-        const etLines = etPreds.map((p) => {
-          const jid = toJid(p.senderNumber);
-          if (jid) etMentions.push(jid);
-          return `  • @${String(p.senderNumber || "").split("@")[0]} — prorr. ${p.predictedExtraHome}x${p.predictedExtraAway}`;
-        });
-        etBlock = `⏱️ *Palpites de prorrogação:*\n${etLines.join("\n")}`;
-      }
-
       const lines = [
         `⏱️ *Prorrogação!*`,
         `${withFlag(match.home_team)} *${score}* ${withFlag(match.away_team)} — empate nos 90min`,
         `Agora são mais 30 minutos!`,
       ];
       if (predBlock) lines.push(predBlock);
-      if (etBlock) lines.push(etBlock);
 
-      const allMentions = [...new Set([...predMentions, ...etMentions])];
-      await sendWithMentions(client, groupId, lines.join("\n"), allMentions);
+      await sendWithMentions(client, groupId, lines.join("\n"), predMentions);
     } catch (e) {
       logger.warn(`[worldcupTick] extra_time → ${groupId}:`, e.message);
     }
@@ -875,7 +917,7 @@ async function handlePenalties(client, action) {
       const memberJids = await getGroupMemberJids(client, groupId);
       const groupPreds = filterForGroup(predictions, memberJids);
 
-      // Bloco de palpites dos 90min — vitórias já perderam (isOvertime: true)
+      // Preds block — vitórias já perderam; empate+OT concorre; empate puro garantiu 1pt
       const { text: predBlock, mentionIds: predMentions } = groupPreds.length
         ? formatPredictionsBlockWithMentions(
             groupPreds,
@@ -885,7 +927,7 @@ async function handlePenalties(client, action) {
           )
         : { text: null, mentionIds: [] };
 
-      // Pen-winner preds block
+      // Penalty-winner predictions (subset of OT bettors — additional info)
       const penPreds = groupPreds.filter((p) => p.penaltiesWinner);
       const penMentions = [];
       let penBlock = null;
@@ -1089,11 +1131,19 @@ async function handleResultNotification(client, action) {
         ? formatFinishedBlock(groupPreds, finalHome, finalAway)
         : null;
 
+      const hasEt = match.extra_time_home != null;
+      const etScore = hasEt ? `${match.extra_time_home} x ${match.extra_time_away}` : null;
+      const advancing = match.actual_advancing_team || null;
+
       const lines = [
         `🏁 *Fim de jogo!*`,
         ``,
         `${matchup(match.home_team, match.away_team)} — *${score}*`,
       ];
+      if (etScore) lines.push(`Prorrogação: *${etScore}*`);
+      if (advancing) {
+        lines.push(`🏅 *${withFlag(advancing)} ${advancing} avança!*`);
+      }
       if (predBlock) lines.push(predBlock);
 
       await client.sendMessage(groupId, lines.join("\n"));
