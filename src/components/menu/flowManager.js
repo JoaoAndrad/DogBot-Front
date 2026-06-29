@@ -173,7 +173,7 @@ class FlowManager {
         userId,
         chatId,
         client,
-        reply: (text) => client.sendMessage(chatId, text),
+        reply: this._makeReply(client, chatId, flowId),
         flowId,
         state,
         data: option.data || {},
@@ -258,7 +258,7 @@ class FlowManager {
         userId,
         chatId,
         client,
-        reply: (text) => client.sendMessage(chatId, text),
+        reply: this._makeReply(client, chatId, flowId),
         flowId,
         state,
       };
@@ -307,7 +307,7 @@ class FlowManager {
           userId,
           chatId,
           client,
-          reply: (text) => client.sendMessage(chatId, text),
+          reply: this._makeReply(client, chatId, flowId),
           flowId,
           state,
         };
@@ -347,7 +347,7 @@ class FlowManager {
       data: opt.data, // additional data for handler
     }));
 
-    await polls.createPoll(client, chatId, renderTitle, optionLabels, {
+    const pollResult = await polls.createPoll(client, chatId, renderTitle, optionLabels, {
       metadata: {
         actionType: "menu",
         flowId,
@@ -357,6 +357,26 @@ class FlowManager {
       },
       // onVote removed - now processed via backend through processor.js
     });
+
+    // Enquetes do flow financeiro são apagadas da nossa sessão após 2 minutos
+    if (flowId === "financeiro" && pollResult?.sent) {
+      setTimeout(() => pollResult.sent.delete(false).catch(() => {}), 2 * 60 * 1000);
+    }
+  }
+
+  /**
+   * Constrói a função `reply` para o ctx de handlers.
+   * Para o flow financeiro, agenda deleção da mensagem enviada (só para nós) após 30s.
+   * @private
+   */
+  _makeReply(client, chatId, flowId) {
+    const base = (text) => client.sendMessage(chatId, text);
+    if (flowId !== "financeiro") return base;
+    return async (text) => {
+      const sent = await base(text);
+      if (sent) setTimeout(() => sent.delete(false).catch(() => {}), 30_000);
+      return sent;
+    };
   }
 
   /**
@@ -461,6 +481,13 @@ class FlowManager {
   async _handleFinancialQuery(client, chatId, candidateIds, queryType) {
     const financialClient = require("../../services/financialClient");
 
+    // Mensagens NLP financeiras são apagadas da nossa sessão após 30s
+    const send = async (text) => {
+      const sent = await send( text);
+      if (sent) setTimeout(() => sent.delete(false).catch(() => {}), 30_000);
+      return sent;
+    };
+
     let resolvedId = null;
     for (const id of candidateIds) {
       try {
@@ -469,7 +496,7 @@ class FlowManager {
       } catch (e) { /* continue */ }
     }
     if (!resolvedId) {
-      await client.sendMessage(chatId, "💰 Para consultar suas finanças, primeiro vincule uma conta. Envie */financeiro* para começar.");
+      await send("💰 Para consultar suas finanças, primeiro vincule uma conta. Envie */financeiro* para começar.");
       return true;
     }
 
@@ -486,7 +513,7 @@ class FlowManager {
         const res = await financialClient.listAccounts(resolvedId);
         const accounts = res?.accounts || [];
         if (!accounts.length) {
-          await client.sendMessage(chatId, "�x�� Você ainda não tem contas cadastradas.");
+          await send( "�x�� Você ainda não tem contas cadastradas.");
           return true;
         }
         const total = accounts.reduce((s, a) => s + (a.balance || 0), 0);
@@ -500,7 +527,7 @@ class FlowManager {
           return line;
         });
         const hasPending = Math.abs(totalProjected - total) >= 0.01;
-        await client.sendMessage(chatId,
+        await send(
           `�x�� *Seus saldos:*\n\n${lines.join("\n")}\n\n` +
           `�x� *Total: R$ ${fmt(total)}*` +
           (hasPending ? `\n�x� *Projetado: R$ ${fmt(totalProjected)}*` : "")
@@ -516,7 +543,7 @@ class FlowManager {
         const emoji = queryType === "expenses" ? "�x�" : "�xx�";
         const label = queryType === "expenses" ? "Gastos" : "Receitas";
         if (!filtered.length) {
-          await client.sendMessage(chatId, `${emoji} Nenhuma ${label.toLowerCase().slice(0, -1)} registrada este mês.`);
+          await send( `${emoji} Nenhuma ${label.toLowerCase().slice(0, -1)} registrada este mês.`);
           return true;
         }
         const top5 = filtered.slice(0, 5).map(t => {
@@ -524,7 +551,7 @@ class FlowManager {
           return `⬢ ${fmtDate(t.date)}  R$ ${fmt(t.amount)}  ${desc}`;
         });
         const more = filtered.length > 5 ? `\n_...e mais ${filtered.length - 5} lançamento(s)_` : "";
-        await client.sendMessage(chatId,
+        await send(
           `${emoji} *${label} deste mês:*\n\n${top5.join("\n")}${more}\n\n` +
           `*Total: R$ ${fmt(total)}*`
         );
@@ -535,7 +562,7 @@ class FlowManager {
         const res = await financialClient.listScheduled(resolvedId);
         const txs = res?.transactions || [];
         if (!txs.length) {
-          await client.sendMessage(chatId, "�x& Nenhum agendamento pendente.");
+          await send( "�x& Nenhum agendamento pendente.");
           return true;
         }
         const lines = txs.slice(0, 8).map(t => {
@@ -545,7 +572,7 @@ class FlowManager {
           return `${emoji} ${fmtDate(t.date)}  ${sign}R$ ${fmt(t.amount)}  ${desc}`;
         });
         const more = txs.length > 8 ? `\n_...e mais ${txs.length - 8}_` : "";
-        await client.sendMessage(chatId, `�x& *Agendamentos pendentes:*\n\n${lines.join("\n")}${more}`);
+        await send( `�x& *Agendamentos pendentes:*\n\n${lines.join("\n")}${more}`);
         return true;
       }
 
@@ -553,7 +580,7 @@ class FlowManager {
         const res = await financialClient.listBudgets(resolvedId);
         const budgets = res?.budgets || [];
         if (!budgets.length) {
-          await client.sendMessage(chatId, "📊 Você ainda não tem orçamentos configurados.");
+          await send( "📊 Você ainda não tem orçamentos configurados.");
           return true;
         }
         const lines = budgets.map(b => {
@@ -563,7 +590,7 @@ class FlowManager {
           const cat = b.categoryName ? ` [${b.categoryName}]` : " [geral]";
           return `${emoji} ${bar} ${pct}%${cat}  R$ ${fmt(b.spent)} / R$ ${fmt(b.limit)}`;
         });
-        await client.sendMessage(chatId, `📊 *Orçamentos deste mês:*\n\n${lines.join("\n")}`);
+        await send( `📊 *Orçamentos deste mês:*\n\n${lines.join("\n")}`);
         return true;
       }
     } catch (e) {

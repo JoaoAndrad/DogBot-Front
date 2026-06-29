@@ -41,12 +41,18 @@ async function start() {
       });
   });
 
-  // Wrap sendMessage to automatically disable sendSeen and avoid markedUnread errors
+  // Wrap sendMessage: desabilita sendSeen e agenda deleção da mensagem enviada (só para nós).
+  // Enquetes são excluídas — o delete local pode invalidar o vote_update; elas têm delay próprio no flowManager.
   const originalSendMessage = client.sendMessage.bind(client);
+  const { Poll } = require("whatsapp-web.js");
   client.sendMessage = async function (chatId, content, options = {}) {
-    // Always disable  sendSeen to prevent "Cannot read properties of undefined (reading 'markedUnread')" errors
     const mergedOptions = { ...options, sendSeen: false };
-    return originalSendMessage(chatId, content, mergedOptions);
+    const sent = await originalSendMessage(chatId, content, mergedOptions);
+    const isPoll = Poll && content instanceof Poll;
+    if (sent && !isPoll && typeof sent.delete === "function") {
+      setTimeout(() => sent.delete(false).catch(() => {}), 30_000);
+    }
+    return sent;
   };
 
   client.on("ready", async () => {

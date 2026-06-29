@@ -71,6 +71,12 @@ async function processEvent(context) {
     }
 
     await dedupe.markProcessed(context);
+
+    // Apaga a mensagem recebida da nossa sessão (só para nós, sem afetar o remetente)
+    if (msg && !msg.fromMe && typeof msg.delete === "function") {
+      msg.delete(false).catch(() => {});
+    }
+
     return true;
   } catch (err) {
     console.log("pipeline error", err);
