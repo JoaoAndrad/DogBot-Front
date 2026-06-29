@@ -36,6 +36,27 @@ async function checkAuthStatus(userId) {
   return _get("/api/financial/auth/status", { userId });
 }
 
+// Vault
+
+async function updateVault(userId, fields) { // fields: { notificationHour, notificationMinute }
+  const res = await fetch(`${BACKEND_URL}/api/financial/vault`, {
+    method: "PATCH",
+    headers: authHeaders(),
+    body: JSON.stringify({ userId, ...fields }),
+  });
+  const text = await res.text();
+  try { return JSON.parse(text); } catch { return { status: res.status, text }; }
+}
+
+async function deleteVault(userId) {
+  const res = await fetch(`${BACKEND_URL}/api/financial/vault?userId=${encodeURIComponent(userId)}`, {
+    method: "DELETE",
+    headers: authHeaders(),
+  });
+  const text = await res.text();
+  try { return JSON.parse(text); } catch { return { status: res.status, text }; }
+}
+
 // Accounts
 
 async function listAccounts(userId) {
@@ -207,6 +228,7 @@ async function deleteBudget(userId, budgetId) {
 
 module.exports = {
   startAuth, checkAuthStatus,
+  updateVault, deleteVault,
   listAccounts, createAccount, updateAccount, deleteAccount,
   listCategories, createCategory, deleteCategory,
   listTransactions, createTransaction, createInstallment, deleteTransaction,

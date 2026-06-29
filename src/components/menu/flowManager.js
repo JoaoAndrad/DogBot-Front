@@ -590,7 +590,8 @@ class FlowManager {
           s?.context?.awaitingScheduleDay ||
           s?.context?.awaitingTransferAmount ||
           s?.context?.awaitingEditTxAmount || s?.context?.awaitingEditTxDesc ||
-          s?.context?.awaitingEditInstallmentAmount) {
+          s?.context?.awaitingEditInstallmentAmount ||
+          s?.context?.awaitingNotifHour) {
         state = s;
         stateUserId = id;
         break;
@@ -877,6 +878,35 @@ class FlowManager {
       } catch (e) {
         await client.sendMessage(chatId, "❌ Erro ao atualizar parcelas.");
       }
+      return true;
+    }
+
+    // ── Horário de notificações ────────────────────────────────────────────
+
+    if (state.context.awaitingNotifHour) {
+      // Accept "HH:MM", "H:MM" or plain "H" (defaults to :00)
+      const match = trimmed.match(/^(\d{1,2})(?::(\d{2}))?$/);
+      const h = match ? parseInt(match[1], 10) : NaN;
+      const m = match && match[2] != null ? parseInt(match[2], 10) : 0;
+      if (!match || isNaN(h) || h < 0 || h > 23 || m < 0 || m > 59) {
+        await client.sendMessage(chatId, "❌ Horário inválido. Use o formato *HH:MM* (ex: 9:00 ou 12:30):");
+        return true;
+      }
+      state.context.awaitingNotifHour = false;
+      state.context.notificationHour = h;
+      state.context.notificationMinute = m;
+      await storage.saveState(stateUserId, flowId, state);
+      const financialClient = require("../../services/financialClient");
+      try {
+        await financialClient.updateVault(stateUserId, { notificationHour: h, notificationMinute: m });
+        const label = `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+        await client.sendMessage(chatId, `✅ Notificações configuradas para *${label}* todos os dias.`);
+      } catch (e) {
+        await client.sendMessage(chatId, "❌ Erro ao salvar horário.");
+      }
+      state.path = "/config";
+      await storage.saveState(stateUserId, flowId, state);
+      await this._renderNode(client, chatId, stateUserId, flowId, "/config");
       return true;
     }
 

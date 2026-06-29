@@ -134,11 +134,10 @@ const financialFlow = createFlow("financeiro", {
         options: [
           { label: "📋 Extrato", action: "goto", target: "/extrato" },
           { label: "🏦 Contas", action: "goto", target: "/contas" },
+          { label: "💳 Cartões", action: "goto", target: "/cartoes" },
+          { label: "📅 Lançamentos futuros", action: "goto", target: "/agendamentos" },
           { label: "🏷️ Categorias", action: "goto", target: "/categorias" },
           { label: "📊 Orçamentos", action: "goto", target: "/orcamentos" },
-          { label: "📅 Agendamentos", action: "goto", target: "/agendamentos" },
-          { label: "🔄 Transferir", action: "goto", target: "/transferencia" },
-          { label: "💳 Cartões", action: "goto", target: "/cartoes" },
           { label: "⚙️ Configurações", action: "goto", target: "/config" },
           { label: "❓ Dúvidas", action: "goto", target: "/duvidas" },
           { label: "✖️ Fechar", action: "exec", handler: "close" },
@@ -301,6 +300,7 @@ const financialFlow = createFlow("financeiro", {
       const options = [];
       if (hasAccounts) options.push({ label: "📋 Ver contas", action: "exec", handler: "listarContas" });
       if (hasAccounts) options.push({ label: "✏️ Editar conta", action: "goto", target: "/contas/editar" });
+      if (hasAccounts) options.push({ label: "🔄 Transferir saldo entre contas", action: "goto", target: "/transferencia" });
       options.push({ label: "➕ Adicionar conta", action: "goto", target: "/contas/tipo" });
       options.push({ label: "↩️ Voltar", action: "back" });
       return { title: "🏦 Contas bancárias", options };
@@ -1181,13 +1181,80 @@ const financialFlow = createFlow("financeiro", {
   "/config": {
     dynamic: true,
     options: [],
-    handler: async (ctx) => ({
-      title: "⚙️ Configurações",
-      options: [
-        { label: "🔔 Horário de notificações", action: "exec", handler: "configNotifHour" },
-        { label: "↩️ Voltar", action: "back" },
-      ],
-    }),
+    handler: async (ctx) => {
+      let notifHour = 9;
+      try {
+        const res = await financialClient.listAccounts(ctx.userId);
+        // listAccounts triggers vault resolution; grab notificationHour separately via a budget call
+        // We store it in context when set; otherwise show default
+        notifHour = ctx.state.context.notificationHour ?? 9;
+      } catch (e) { /* ignore */ }
+      const notifMin = ctx.state.context.notificationMinute ?? 0;
+      const notifLabel = `${String(notifHour).padStart(2, "0")}:${String(notifMin).padStart(2, "0")}`;
+      return {
+        title: "⚙️ Configurações",
+        options: [
+          { label: "⭐ Conta padrão", action: "goto", target: "/config/conta-padrao" },
+          { label: `🔔 Notificações — ${notifLabel}`, action: "goto", target: "/config/notificacoes" },
+          { label: "🔗 Desvincular conta Google", action: "goto", target: "/config/desvincular" },
+          { label: "↩️ Voltar", action: "back" },
+        ],
+      };
+    },
+  },
+
+  "/config/conta-padrao": {
+    dynamic: true,
+    options: [],
+    handler: async (ctx) => {
+      let accounts = [];
+      try {
+        const res = await financialClient.listAccounts(ctx.userId);
+        accounts = res?.accounts || [];
+      } catch (e) {
+        logger.warn("[financialFlow] /config/conta-padrao error:", e.message);
+      }
+      if (!accounts.length) {
+        await ctx.reply("🏦 Nenhuma conta cadastrada ainda.");
+        return {
+          title: "Conta padrão",
+          options: [{ label: "↩️ Voltar", action: "back" }, { label: "➕ Adicionar conta", action: "goto", target: "/contas/tipo" }],
+        };
+      }
+      const options = accounts.map(a => ({
+        label: `${a.isDefault ? "⭐ " : ""}${a.name}`,
+        action: "exec",
+        handler: "definirContaPadrao",
+        data: { accountId: a.id, fromConfig: true },
+      }));
+      options.push({ label: "↩️ Voltar", action: "back" });
+      return { title: "⭐ Qual conta usar como padrão?", options };
+    },
+  },
+
+  "/config/notificacoes": {
+    dynamic: true,
+    options: [],
+    handler: async (ctx) => {
+      const hour = ctx.state.context.notificationHour ?? 9;
+      const min = ctx.state.context.notificationMinute ?? 0;
+      const current = `${String(hour).padStart(2, "0")}:${String(min).padStart(2, "0")}`;
+      await ctx.reply(
+        `🔔 *Horário de notificações*\n\n` +
+        `Atualmente: *${current}*\n\n` +
+        `Digite o novo horário no formato *HH:MM* (ex: 9:00, 12:30, 20:00):`
+      );
+      ctx.state.context.awaitingNotifHour = true;
+      return { noRender: true };
+    },
+  },
+
+  "/config/desvincular": {
+    title: "⚠️ Desvincular conta Google?",
+    options: [
+      { label: "✅ Sim, desvincular", action: "exec", handler: "confirmarDesvincular" },
+      { label: "❌ Cancelar", action: "back" },
+    ],
   },
 
   // ── Dúvidas ───────────────────────────────────────────────────────────────
@@ -1198,16 +1265,34 @@ const financialFlow = createFlow("financeiro", {
     handler: async (ctx) => {
       await ctx.reply(
         "❓ *Dúvidas — Assistente Financeiro*\n\n" +
-        "*Como registrar uma transação?*\n" +
-        "Envie frases naturais como:\n" +
+
+        "📝 *Registrar transação*\n" +
+        "Envie uma frase natural:\n" +
         "• \"Gastei 50 reais de uber\"\n" +
         "• \"Recebi 3200 de salário\"\n" +
         "• \"Paguei 120 de mercado ontem\"\n\n" +
-        "*Como ver meu saldo?*\n" +
-        "Use o menu 🏦 Contas.\n\n" +
-        "*Os dados são seguros?*\n" +
-        "Sim. Tudo é criptografado com sua chave pessoal. Nem o desenvolvedor tem acesso.\n\n" +
-        "Para mais ajuda, entre em contato com o suporte."
+
+        "🔁 *Parcelamento*\n" +
+        "• \"Comprei notebook por 3000 em 12x\"\n\n" +
+
+        "📅 *Lançamento futuro / recorrente*\n" +
+        "• \"Vou pagar 800 de aluguel todo dia 5\"\n" +
+        "• \"Recebi 3200 de salário toda segunda\"\n\n" +
+
+        "🔄 *Transferência entre contas*\n" +
+        "Use o menu *Contas › Transferir saldo entre contas*.\n\n" +
+
+        "🔍 *Consultas rápidas* (sem abrir o menu)\n" +
+        "• \"Qual meu saldo?\"\n" +
+        "• \"Quanto gastei esse mês?\"\n" +
+        "• \"Meus agendamentos\"\n" +
+        "• \"Como está meu orçamento?\"\n\n" +
+
+        "🏦 *Saldo projetado*\n" +
+        "Em *Contas › Ver contas*, o saldo projetado considera todos os lançamentos futuros pendentes.\n\n" +
+
+        "🔒 *Segurança*\n" +
+        "Tudo é criptografado com sua chave pessoal. Nem o desenvolvedor tem acesso."
       );
       return {
         title: "Continuar?",
@@ -1857,13 +1942,14 @@ const financialFlow = createFlow("financeiro", {
 
     // ── Definir conta padrão ─────────────────────────────────────────────────
 
-    definirContaPadrao: async (ctx) => {
-      const accountId = ctx.state.context.editingAccountId;
+    definirContaPadrao: async (ctx, data) => {
+      const accountId = data?.accountId || ctx.state.context.editingAccountId;
+      const fromConfig = data?.fromConfig || false;
       try {
         await financialClient.updateAccount(ctx.userId, accountId, { isDefault: true });
         ctx.state.context.editingAccountIsDefault = true;
         await ctx.reply("⭐ Conta definida como padrão para transações NLP!");
-        ctx.state.path = "/contas";
+        ctx.state.path = fromConfig ? "/config" : "/contas";
       } catch (e) {
         logger.error("[financialFlow] definirContaPadrao error:", e.message);
         await ctx.reply("❌ Erro ao definir conta padrão.");
@@ -1999,9 +2085,20 @@ const financialFlow = createFlow("financeiro", {
 
     // ── Config ───────────────────────────────────────────────────────────────
 
-    configNotifHour: async (ctx) => {
-      await ctx.reply("⚙️ Configuração de notificações disponível em breve!");
-      return { noRender: true };
+    confirmarDesvincular: async (ctx) => {
+      try {
+        await financialClient.deleteVault(ctx.userId);
+        await ctx.reply(
+          "🔗 *Conta Google desvinculada.*\n\n" +
+          "Seus dados financeiros foram removidos. " +
+          "Você pode criar um novo cofre a qualquer momento pelo menu financeiro."
+        );
+        return { end: true };
+      } catch (e) {
+        logger.error("[financialFlow] confirmarDesvincular error:", e.message);
+        await ctx.reply("❌ Erro ao desvincular. Tente novamente.");
+        return { noRender: true };
+      }
     },
 
     // ── Cartões ──────────────────────────────────────────────────────────────
