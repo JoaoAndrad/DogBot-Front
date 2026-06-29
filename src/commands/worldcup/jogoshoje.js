@@ -42,8 +42,22 @@ function formatMatch(m) {
   const goals = formatGoals(m.goals);
 
   if (m.status === "finished") {
-    const header = `✅ ${withFlag(m.home_team)} *${m.home_score} x ${m.away_score}* ${withFlag(m.away_team)}`;
-    return [header, meta, goals].filter(Boolean).join("\n");
+    const hasET = m.extra_time_home != null;
+    const wentToPen = hasET && m.extra_time_home === m.extra_time_away;
+    const wentToET = hasET && !wentToPen;
+
+    const tag = wentToPen ? " _(pênaltis)_" : wentToET ? " _(prorrogação)_" : "";
+    const header = `✅ ${withFlag(m.home_team)} *${m.home_score} x ${m.away_score}* ${withFlag(m.away_team)}${tag}`;
+
+    let advancing = null;
+    if (m.actual_advancing_team) {
+      const advFlag = withFlag(m.actual_advancing_team);
+      advancing = wentToPen
+        ? `🏅 ${advFlag} ${m.actual_advancing_team} avança nos pênaltis`
+        : `🏅 ${advFlag} ${m.actual_advancing_team} avança`;
+    }
+
+    return [header, advancing, meta, goals].filter(Boolean).join("\n");
   }
 
   if (m.status === "live" || m.status === "paused" || m.status === "extra_time" || m.status === "penalties") {
