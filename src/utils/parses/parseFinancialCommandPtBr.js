@@ -151,9 +151,23 @@ function parse(text) {
   const recurrence = recurrenceInfo ? recurrenceInfo.recurrence : null;
   const recurrenceDay = recurrenceInfo ? recurrenceInfo.recurrenceDay : null;
 
+  // Fuzzy category detection from description
+  let suggestedCategoryName = null;
+  let categoryConfidence = 0;
+  if (description) {
+    try {
+      const { matchCategory } = require("./categoryMatcher");
+      const match = matchCategory(description);
+      if (match) {
+        suggestedCategoryName = match.name;
+        categoryConfidence = match.confidence;
+      }
+    } catch (_) {}
+  }
+
   const isTransfer = TRANSFER_TRIGGERS.test(t);
   if (isTransfer) {
-    return { intent: "transfer", amount, description, date, isPending: false, installmentCount, recurrence, recurrenceDay, raw: t };
+    return { intent: "transfer", amount, description, date, isPending: false, installmentCount, recurrence, recurrenceDay, suggestedCategoryName, categoryConfidence, raw: t };
   }
 
   const isFuture = FUTURE_MARKERS.test(t) && !INCOME_TRIGGERS.test(t);
@@ -166,15 +180,15 @@ function parse(text) {
   if (!isIncome && !isExpense && !isFuture && !isRecurrent) return null;
 
   if (isFuture && isExpense) {
-    return { intent: "future_expense", amount, description, date, isPending: true, installmentCount, recurrence, recurrenceDay, raw: t };
+    return { intent: "future_expense", amount, description, date, isPending: true, installmentCount, recurrence, recurrenceDay, suggestedCategoryName, categoryConfidence, raw: t };
   }
   if (isFuture && !isIncome) {
-    return { intent: "future_expense", amount, description, date, isPending: true, installmentCount, recurrence, recurrenceDay, raw: t };
+    return { intent: "future_expense", amount, description, date, isPending: true, installmentCount, recurrence, recurrenceDay, suggestedCategoryName, categoryConfidence, raw: t };
   }
   if (isIncome) {
-    return { intent: "income", amount, description, date, isPending: isRecurrent && !isIncome, installmentCount, recurrence, recurrenceDay, raw: t };
+    return { intent: "income", amount, description, date, isPending: isRecurrent && !isIncome, installmentCount, recurrence, recurrenceDay, suggestedCategoryName, categoryConfidence, raw: t };
   }
-  return { intent: "expense", amount, description, date, isPending: false, installmentCount, recurrence, recurrenceDay, raw: t };
+  return { intent: "expense", amount, description, date, isPending: false, installmentCount, recurrence, recurrenceDay, suggestedCategoryName, categoryConfidence, raw: t };
 }
 
 // ─── Query intents (sem valor monetário) ─────────────────────────────────────

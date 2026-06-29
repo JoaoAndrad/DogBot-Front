@@ -449,6 +449,26 @@ class FlowManager {
     const installmentCount = (parsed.installmentCount && parsed.installmentCount >= 2) ? parsed.installmentCount : null;
     const recurrence = parsed.recurrence || null;
     const recurrenceDay = parsed.recurrenceDay != null ? parsed.recurrenceDay : null;
+    // Resolve suggested category to an actual category ID from the user's vault
+    let suggestedCategoryId = null;
+    let suggestedCategoryName = parsed.suggestedCategoryName || null;
+    if (suggestedCategoryName && (parsed.categoryConfidence || 0) >= 0.4) {
+      try {
+        const catsRes = await financialClient.listCategories(resolvedId);
+        const allCats = (catsRes?.categories || []).flatMap((c) => [c, ...(c.children || [])]);
+        const { matchCategory } = require("../../utils/parses/categoryMatcher");
+        const catNames = allCats.map((c) => c.name);
+        const refined = matchCategory(suggestedCategoryName, catNames) || matchCategory(parsed.description, catNames);
+        if (refined) {
+          const found = allCats.find((c) => c.name === refined.name);
+          if (found) {
+            suggestedCategoryId = found.id;
+            suggestedCategoryName = found.name;
+          }
+        }
+      } catch (_) {}
+    }
+
     const pendingNlpTransaction = {
       type,
       amount: parsed.amount,
@@ -460,6 +480,9 @@ class FlowManager {
       recurrenceDay,
       accountId: defaultAccount.id,
       accountName: defaultAccount.name,
+      suggestedCategoryId,
+      suggestedCategoryName,
+      categoryConfidence: parsed.categoryConfidence || 0,
     };
 
     // Upsert financeiro flow state pointing at /nlp-confirm

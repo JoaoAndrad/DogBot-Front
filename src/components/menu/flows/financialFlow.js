@@ -650,8 +650,11 @@ const financialFlow = createFlow("financeiro", {
       } else if (tx.recurrence === "weekly") {
         recurrenceNote = "\n🔁 Recorrente semanalmente";
       }
+      const catNote = tx.suggestedCategoryName
+        ? `\n🏷️ Categoria sugerida: *${tx.suggestedCategoryName}*`
+        : "";
       return {
-        title: `Registrar R$ ${formatMoney(tx.amount)}${installNote}${desc} como ${typeLabel} em *${tx.accountName}* (${dateLabel})${pendingNote}?${recurrenceNote}`,
+        title: `Registrar R$ ${formatMoney(tx.amount)}${installNote}${desc} como ${typeLabel} em *${tx.accountName}* (${dateLabel})${pendingNote}?${recurrenceNote}${catNote}`,
         options: [
           { label: "✅ Sim, registrar", action: "exec", handler: "confirmarNlp" },
           { label: "❌ Cancelar", action: "exec", handler: "cancelarNlp" },
@@ -1528,10 +1531,11 @@ const financialFlow = createFlow("financeiro", {
 
     listarCategorias: async (ctx) => {
       try {
-        const [catsRes, budgetsRes, txRes] = await Promise.all([
+        const [catsRes, budgetsRes, txCurrentRes, txAllRes] = await Promise.all([
           financialClient.listCategories(ctx.userId),
           financialClient.listBudgets(ctx.userId),
           financialClient.listTransactions(ctx.userId, { period: "current", limit: 500 }),
+          financialClient.listTransactions(ctx.userId, { limit: 2000 }),
         ]);
 
         if (!catsRes?.categories?.length) {
@@ -1539,14 +1543,20 @@ const financialFlow = createFlow("financeiro", {
           return { noRender: true };
         }
 
-        // gasto por categoryId este mês
+        // Gasto por categoryId este mês
         const spentById = {};
-        for (const t of (txRes?.transactions || [])) {
+        for (const t of (txCurrentRes?.transactions || [])) {
           if (t.type !== "expense" || !t.categoryId) continue;
           spentById[t.categoryId] = (spentById[t.categoryId] || 0) + (t.amount || 0);
         }
 
-        // limite de orçamento por categoryId
+        // Categorias já usadas em alguma transação (all-time)
+        const usedCategoryIds = new Set();
+        for (const t of (txAllRes?.transactions || [])) {
+          if (t.categoryId) usedCategoryIds.add(t.categoryId);
+        }
+
+        // Limite de orçamento por categoryId
         const budgetById = {};
         for (const b of (budgetsRes?.budgets || [])) {
           if (b.categoryId) budgetById[b.categoryId] = b.limit;
@@ -1561,13 +1571,26 @@ const financialFlow = createFlow("financeiro", {
 
         const lines = ["🏷️ *Categorias — este mês:*\n"];
         for (const cat of catsRes.categories) {
+          // Subcategorias: só exibe as que foram usadas em pelo menos uma transação
+          const usedSubs = (cat.children || []).filter(
+            (sub) => usedCategoryIds.has(sub.id) || budgetById[sub.id] !== undefined
+          );
           const ownSpent = spentById[cat.id] || 0;
-          const subSpent = (cat.children || []).reduce((s, c) => s + (spentById[c.id] || 0), 0);
+          const subSpent = usedSubs.reduce((s, c) => s + (spentById[c.id] || 0), 0);
           const totalSpent = ownSpent + subSpent;
+
+          // Exibe categoria pai se tiver uso próprio, orçamento, ou subcategorias usadas
+          if (ownSpent === 0 && budgetById[cat.id] === undefined && usedSubs.length === 0) continue;
+
           lines.push(`• *${cat.name}*${suffix(totalSpent, budgetById[cat.id])}`);
-          for (const sub of (cat.children || [])) {
+          for (const sub of usedSubs) {
             lines.push(`  ↳ ${sub.name}${suffix(spentById[sub.id] || 0, budgetById[sub.id])}`);
           }
+        }
+
+        if (lines.length === 1) {
+          await ctx.reply("🏷️ Nenhuma categoria com transações ainda.\n\nRegistre uma despesa ou receita para começar.");
+          return { noRender: true };
         }
 
         await ctx.reply(lines.join("\n"));
@@ -1729,6 +1752,7 @@ const financialFlow = createFlow("financeiro", {
             status: tx.isPending ? "pending" : "confirmed",
             recurrence: tx.recurrence || undefined,
             recurrenceDay: tx.recurrenceDay != null ? tx.recurrenceDay : undefined,
+            categoryId: tx.suggestedCategoryId || undefined,
           });
           const typeLabel = tx.type === "income" ? "Receita" : "Despesa";
           const sign = tx.type === "income" ? "+" : "-";
