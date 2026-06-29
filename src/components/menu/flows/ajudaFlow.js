@@ -149,6 +149,8 @@ const COPY = {
     "",
     "🥇 Placar exato → *3 pts*",
     "✅ Vencedor/empate certo → *1 pt*",
+    "➕ Resultado certo na prorrogação → *+1 pt bônus*",
+    "➕ Placar exato na prorrogação → *+2 pts bônus*",
     "➕ Acertou quem avança nos pênaltis → *+1 pt bônus*",
     "",
     "🏆 *Campeão da Copa* → *20 pts*",

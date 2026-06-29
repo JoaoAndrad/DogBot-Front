@@ -261,17 +261,18 @@ function formatFinishedBlock(predictions, finalHome, finalAway) {
       byPts[pts].push(p);
     }
 
-    // Labels ordered highest → lowest
+    // Labels ordered highest → lowest (max 6: exact90 + exactET + pen)
     const ptLabels = {
-      5: "⭐ *5 pts — Placar exato + prorrogação exata + pênaltis:*",
-      4: "🎯 *4 pts — Placar exato + prorrogação:*",
-      3: "🎯 *3 pts — Placar exato:*",
-      2: "✓ *2 pts — Resultado + prorrogação exata:*",
-      1: "✓ *1 pt — Resultado certo:*",
+      6: "⭐ *6 pts:*",
+      5: "⭐ *5 pts:*",
+      4: "🎯 *4 pts:*",
+      3: "🎯 *3 pts:*",
+      2: "✓ *2 pts:*",
+      1: "✓ *1 pt:*",
       0: "❌ *Sem pontos:*",
     };
 
-    for (const pts of [5, 4, 3, 2, 1, 0]) {
+    for (const pts of [6, 5, 4, 3, 2, 1, 0]) {
       const group = byPts[pts];
       if (!group || !group.length) continue;
       lines.push(ptLabels[pts] || `✓ *${pts} pts:*`);
