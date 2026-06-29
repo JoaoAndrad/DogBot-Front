@@ -94,6 +94,20 @@ function pollAuthStatus(client, chatId, userId, maxAttempts = 36, intervalMs = 5
   }, intervalMs);
 }
 
+// ─── Budget Alert Helper ──────────────────────────────────────────────────────
+
+async function handleBudgetAlerts(ctx, result) {
+  const alerts = result?.budgetAlerts || [];
+  for (const a of alerts) {
+    const catLabel = a.categoryId ? `categoria *${a.categoryName || "—"}*` : "orçamento geral";
+    if (a.level === "100") {
+      await ctx.reply(`🚨 Você ultrapassou o ${catLabel}! Gasto: R$ ${formatMoney(a.spent)} / Limite: R$ ${formatMoney(a.limit)}`);
+    } else {
+      await ctx.reply(`⚠️ Você usou 80% do ${catLabel}. Gasto: R$ ${formatMoney(a.spent)} / Limite: R$ ${formatMoney(a.limit)}`);
+    }
+  }
+}
+
 // ─── Flow ────────────────────────────────────────────────────────────────────
 
 const financialFlow = createFlow("financeiro", {
@@ -123,6 +137,7 @@ const financialFlow = createFlow("financeiro", {
           { label: "🏷️ Categorias", action: "goto", target: "/categorias" },
           { label: "📊 Orçamentos", action: "goto", target: "/orcamentos" },
           { label: "📅 Agendamentos", action: "goto", target: "/agendamentos" },
+          { label: "🔄 Transferir", action: "goto", target: "/transferencia" },
           { label: "💳 Cartões", action: "goto", target: "/cartoes" },
           { label: "⚙️ Configurações", action: "goto", target: "/config" },
           { label: "❓ Dúvidas", action: "goto", target: "/duvidas" },
@@ -237,9 +252,22 @@ const financialFlow = createFlow("financeiro", {
         }
         await ctx.reply(lines.join("\n"));
 
+        // Save transactions for editing
+        ctx.state.context.extratoTransacoes = txs.map(t => ({
+          id: t.id,
+          amount: t.amount,
+          description: t.description,
+          type: t.type,
+          date: t.date,
+          installmentGroupId: t.installmentGroupId || null,
+          installmentNumber: t.installmentNumber || null,
+          installmentTotal: t.installmentTotal || null,
+        }));
+
         const options = [];
         if (hasPrev) options.push({ label: "⬅️ Página anterior", action: "exec", handler: "extratoPagePrev" });
         if (hasNext) options.push({ label: "➡️ Próxima página", action: "exec", handler: "extratoPageNext" });
+        options.push({ label: "✏️ Editar lançamento", action: "exec", handler: "iniciarEditarLancamento" });
         options.push({ label: "🔄 Trocar período", action: "goto", target: "/extrato" });
         options.push({ label: "↩️ Voltar ao menu", action: "goto", target: "/" });
         return { title: `Extrato — página ${extratoPage + 1}`, options };
@@ -300,7 +328,7 @@ const financialFlow = createFlow("financeiro", {
           label: a.name,
           action: "exec",
           handler: "selectContaEditar",
-          data: { accountId: a.id, accountName: a.name, accountType: a.type, accountBalance: a.balance },
+          data: { accountId: a.id, accountName: a.name, accountType: a.type, accountBalance: a.balance, accountIsDefault: a.isDefault },
         }));
         options.push({ label: "❌ Cancelar", action: "back" });
         return { title: "✏️ Qual conta editar?", options };
@@ -322,17 +350,21 @@ const financialFlow = createFlow("financeiro", {
     dynamic: true,
     options: [],
     handler: async (ctx) => {
-      const { editingAccountName, editingAccountType, editingAccountBalance } = ctx.state.context;
+      const { editingAccountName, editingAccountType, editingAccountBalance, editingAccountIsDefault } = ctx.state.context;
       const typeName = ACCOUNT_TYPES.find(t => t.key === editingAccountType)?.label || editingAccountType;
       const sign = (editingAccountBalance || 0) < 0 ? "🔴" : "🟢";
+      const options = [
+        { label: "✏️ Renomear", action: "exec", handler: "editarNome" },
+        { label: "🏦 Alterar tipo", action: "goto", target: "/contas/editar/tipo" },
+        { label: "💰 Ajustar saldo", action: "exec", handler: "editarSaldo" },
+      ];
+      if (!editingAccountIsDefault) {
+        options.push({ label: "⭐ Definir como padrão", action: "exec", handler: "definirContaPadrao" });
+      }
+      options.push({ label: "❌ Cancelar", action: "goto", target: "/contas" });
       return {
         title: `✏️ *${editingAccountName}* (${typeName})\n${sign} R$ ${formatMoney(editingAccountBalance)}`,
-        options: [
-          { label: "✏️ Renomear", action: "exec", handler: "editarNome" },
-          { label: "🏦 Alterar tipo", action: "goto", target: "/contas/editar/tipo" },
-          { label: "💰 Ajustar saldo", action: "exec", handler: "editarSaldo" },
-          { label: "❌ Cancelar", action: "goto", target: "/contas" },
-        ],
+        options,
       };
     },
   },
@@ -984,6 +1016,166 @@ const financialFlow = createFlow("financeiro", {
     },
   },
 
+  // ── Transferência ─────────────────────────────────────────────────────────
+
+  "/transferencia": {
+    dynamic: true,
+    options: [],
+    handler: async (ctx) => {
+      let accounts = [];
+      try {
+        const res = await financialClient.listAccounts(ctx.userId);
+        accounts = res?.accounts || [];
+      } catch (e) {
+        logger.warn("[financialFlow] /transferencia error:", e.message);
+      }
+      if (!accounts.length) {
+        await ctx.reply("🏦 Nenhuma conta disponível para transferência.");
+        return {
+          title: "Transferência",
+          options: [
+            { label: "↩️ Voltar", action: "back" },
+            { label: "↩️ Ir ao menu", action: "goto", target: "/" },
+          ],
+        };
+      }
+      const options = accounts.map(a => ({
+        label: `🏦 ${a.name} — R$ ${formatMoney(a.balance)}`,
+        action: "exec",
+        handler: "selecionarContaOrigem",
+        data: { accountId: a.id, accountName: a.name },
+      }));
+      options.push({ label: "↩️ Voltar", action: "back" });
+      return { title: "🔄 De qual conta?", options };
+    },
+  },
+
+  "/transferencia/destino": {
+    dynamic: true,
+    options: [],
+    handler: async (ctx) => {
+      const { pendingTransferFrom } = ctx.state.context;
+      let accounts = [];
+      try {
+        const res = await financialClient.listAccounts(ctx.userId);
+        accounts = (res?.accounts || []).filter(a => a.id !== pendingTransferFrom);
+      } catch (e) {
+        logger.warn("[financialFlow] /transferencia/destino error:", e.message);
+      }
+      if (!accounts.length) {
+        await ctx.reply("🏦 Nenhuma outra conta disponível como destino.");
+        return {
+          title: "Destino",
+          options: [
+            { label: "↩️ Voltar", action: "back" },
+            { label: "↩️ Ir ao menu", action: "goto", target: "/" },
+          ],
+        };
+      }
+      const options = accounts.map(a => ({
+        label: `🏦 ${a.name} — R$ ${formatMoney(a.balance)}`,
+        action: "exec",
+        handler: "selecionarContaDestino",
+        data: { accountId: a.id, accountName: a.name },
+      }));
+      options.push({ label: "↩️ Voltar", action: "back" });
+      return { title: "🔄 Para qual conta?", options };
+    },
+  },
+
+  "/transferencia/confirmar": {
+    dynamic: true,
+    options: [],
+    handler: async (ctx) => {
+      const { pendingTransferFromName, pendingTransferToName, pendingTransferAmount } = ctx.state.context;
+      return {
+        title: `Transferir R$ ${formatMoney(pendingTransferAmount)} de *${pendingTransferFromName}* para *${pendingTransferToName}*?`,
+        options: [
+          { label: "✅ Confirmar", action: "exec", handler: "confirmarTransferencia" },
+          { label: "❌ Cancelar", action: "goto", target: "/transferencia" },
+        ],
+      };
+    },
+  },
+
+  // ── Edição de lançamentos ─────────────────────────────────────────────────
+
+  "/lancamentos/editar": {
+    dynamic: true,
+    options: [],
+    handler: async (ctx) => {
+      const txs = ctx.state.context.extratoTransacoes || [];
+      if (!txs.length) {
+        await ctx.reply("📋 Nenhum lançamento disponível para edição.");
+        return {
+          title: "Lançamentos",
+          options: [
+            { label: "↩️ Voltar", action: "back" },
+            { label: "↩️ Ir ao extrato", action: "goto", target: "/extrato" },
+          ],
+        };
+      }
+      const options = txs.map(t => {
+        const emoji = t.type === "income" ? "🟢" : "🔴";
+        const sign = t.type === "income" ? "+" : "-";
+        const desc = t.description || (t.type === "income" ? "Receita" : "Despesa");
+        const dateLabel = formatDate(t.date);
+        return {
+          label: `${emoji} ${sign}R$ ${formatMoney(t.amount)} — ${desc} (${dateLabel})`,
+          action: "exec",
+          handler: "selecionarLancamentoEditar",
+          data: {
+            txId: t.id,
+            amount: t.amount,
+            description: t.description,
+            type: t.type,
+            date: t.date,
+            installmentGroupId: t.installmentGroupId,
+            installmentNumber: t.installmentNumber,
+            installmentTotal: t.installmentTotal,
+          },
+        };
+      });
+      options.push({ label: "↩️ Voltar", action: "back" });
+      return { title: "✏️ Qual lançamento editar?", options };
+    },
+  },
+
+  "/lancamentos/editar/opcoes": {
+    dynamic: true,
+    options: [],
+    handler: async (ctx) => {
+      const { editingTxInstallmentGroupId, editingTxInstallmentNumber, editingTxInstallmentTotal } = ctx.state.context;
+      const options = [
+        { label: "💰 Editar valor", action: "exec", handler: "awaitEditTxAmount" },
+        { label: "📝 Editar descrição", action: "exec", handler: "awaitEditTxDesc" },
+        { label: "🗑️ Excluir", action: "exec", handler: "excluirLancamento" },
+      ];
+      if (editingTxInstallmentGroupId) {
+        options.push({ label: `🗂️ Gerenciar parcelas (${editingTxInstallmentNumber}/${editingTxInstallmentTotal})`, action: "goto", target: "/lancamentos/parcelas" });
+      }
+      options.push({ label: "↩️ Voltar", action: "back" });
+      return { title: "✏️ O que deseja fazer?", options };
+    },
+  },
+
+  "/lancamentos/parcelas": {
+    dynamic: true,
+    options: [],
+    handler: async (ctx) => {
+      const { editingTxInstallmentNumber, editingTxInstallmentTotal } = ctx.state.context;
+      const nextNum = (editingTxInstallmentNumber || 0) + 1;
+      const options = [];
+      if (nextNum <= (editingTxInstallmentTotal || 0)) {
+        options.push({ label: `❌ Cancelar parcelas futuras (${nextNum} em diante)`, action: "exec", handler: "cancelarParcelasFuturas" });
+      }
+      options.push({ label: "❌ Cancelar todas as parcelas", action: "exec", handler: "cancelarTodasParcelas" });
+      options.push({ label: "✏️ Editar valor desta em diante", action: "exec", handler: "awaitEditInstallmentAmount" });
+      options.push({ label: "↩️ Voltar", action: "back" });
+      return { title: `🗂️ Gerenciar parcelas (${editingTxInstallmentNumber}/${editingTxInstallmentTotal})`, options };
+    },
+  },
+
   // ── Configurações ─────────────────────────────────────────────────────────
 
   "/config": {
@@ -1069,14 +1261,21 @@ const financialFlow = createFlow("financeiro", {
           return { noRender: true };
         }
         const total = res.accounts.reduce((s, a) => s + (a.balance || 0), 0);
+        const totalProjected = res.accounts.reduce((s, a) => s + (a.projectedBalance ?? a.balance ?? 0), 0);
         const lines = res.accounts.map(a => {
           const type = ACCOUNT_TYPES.find(t => t.key === a.type)?.label || a.type;
           const sign = a.balance < 0 ? "🔴" : "🟢";
-          return `${sign} *${a.name}* (${type}): R$ ${formatMoney(a.balance)}`;
+          let line = `${sign} *${a.name}* (${type}): R$ ${formatMoney(a.balance)}`;
+          if (a.projectedBalance != null && Math.abs(a.projectedBalance - a.balance) >= 0.01) {
+            line += `\n   📈 Projetado: R$ ${formatMoney(a.projectedBalance)}`;
+          }
+          return line;
         });
+        const hasPending = Math.abs(totalProjected - total) >= 0.01;
         await ctx.reply(
           `🏦 *Suas contas:*\n\n${lines.join("\n")}\n\n` +
-          `💰 *Total: R$ ${formatMoney(total)}*`
+          `💰 *Total: R$ ${formatMoney(total)}*` +
+          (hasPending ? `\n📈 *Projetado: R$ ${formatMoney(totalProjected)}*` : "")
         );
       } catch (e) {
         logger.error("[financialFlow] listarContas error:", e.message);
@@ -1132,6 +1331,7 @@ const financialFlow = createFlow("financeiro", {
       ctx.state.context.editingAccountName = data.accountName;
       ctx.state.context.editingAccountType = data.accountType;
       ctx.state.context.editingAccountBalance = data.accountBalance;
+      ctx.state.context.editingAccountIsDefault = data.accountIsDefault || false;
       ctx.state.context.pendingEditName = null;
       ctx.state.context.pendingEditType = null;
       ctx.state.context.pendingEditBalance = null;
@@ -1457,6 +1657,7 @@ const financialFlow = createFlow("financeiro", {
             (tx.description ? ` — ${tx.description}` : "") +
             balanceText
           );
+          await handleBudgetAlerts(ctx, result);
         }
         ctx.state.context.pendingNlpTransaction = null;
       } catch (e) {
@@ -1619,6 +1820,7 @@ const financialFlow = createFlow("financeiro", {
           ? `\n\nSaldo atualizado: R$ ${formatMoney(result.newBalance)}`
           : "";
         await ctx.reply(`✅ *${desc}* confirmado!${balanceText}`);
+        await handleBudgetAlerts(ctx, result);
         ctx.state.context.currentScheduledId = null;
         ctx.state.context.currentScheduledTx = null;
         ctx.state.path = "/agendamentos";
@@ -1651,6 +1853,148 @@ const financialFlow = createFlow("financeiro", {
         await ctx.reply("❌ Erro ao pular. Tente novamente.");
         return { noRender: true };
       }
+    },
+
+    // ── Definir conta padrão ─────────────────────────────────────────────────
+
+    definirContaPadrao: async (ctx) => {
+      const accountId = ctx.state.context.editingAccountId;
+      try {
+        await financialClient.updateAccount(ctx.userId, accountId, { isDefault: true });
+        ctx.state.context.editingAccountIsDefault = true;
+        await ctx.reply("⭐ Conta definida como padrão para transações NLP!");
+        ctx.state.path = "/contas";
+      } catch (e) {
+        logger.error("[financialFlow] definirContaPadrao error:", e.message);
+        await ctx.reply("❌ Erro ao definir conta padrão.");
+        return { noRender: true };
+      }
+    },
+
+    // ── Transferência ────────────────────────────────────────────────────────
+
+    selecionarContaOrigem: async (ctx, data) => {
+      ctx.state.context.pendingTransferFrom = data.accountId;
+      ctx.state.context.pendingTransferFromName = data.accountName;
+      ctx.state.path = "/transferencia/destino";
+    },
+
+    selecionarContaDestino: async (ctx, data) => {
+      ctx.state.context.pendingTransferTo = data.accountId;
+      ctx.state.context.pendingTransferToName = data.accountName;
+      ctx.state.context.awaitingTransferAmount = true;
+      await ctx.reply("💰 Valor a transferir (ex: 500):");
+      return { noRender: true };
+    },
+
+    confirmarTransferencia: async (ctx) => {
+      const { pendingTransferFrom, pendingTransferTo, pendingTransferAmount, pendingTransferFromName, pendingTransferToName } = ctx.state.context;
+      try {
+        const result = await financialClient.createTransfer(ctx.userId, {
+          fromAccountId: pendingTransferFrom,
+          toAccountId: pendingTransferTo,
+          amount: pendingTransferAmount,
+          description: "Transferência",
+          date: new Date().toISOString(),
+        });
+        await ctx.reply(
+          `✅ *Transferência realizada!*\n\n` +
+          `R$ ${formatMoney(pendingTransferAmount)} de *${pendingTransferFromName}* → *${pendingTransferToName}*\n\n` +
+          `Saldo *${pendingTransferFromName}*: R$ ${formatMoney(result.newFromBalance)}\n` +
+          `Saldo *${pendingTransferToName}*: R$ ${formatMoney(result.newToBalance)}`
+        );
+        ctx.state.context.pendingTransferFrom = null;
+        ctx.state.context.pendingTransferFromName = null;
+        ctx.state.context.pendingTransferTo = null;
+        ctx.state.context.pendingTransferToName = null;
+        ctx.state.context.pendingTransferAmount = null;
+        ctx.state.path = "/";
+      } catch (e) {
+        logger.error("[financialFlow] confirmarTransferencia error:", e.message);
+        await ctx.reply("❌ Erro ao realizar transferência. Tente novamente.");
+        return { noRender: true };
+      }
+    },
+
+    // ── Edição de lançamentos ─────────────────────────────────────────────────
+
+    iniciarEditarLancamento: async (ctx) => {
+      ctx.state.path = "/lancamentos/editar";
+    },
+
+    selecionarLancamentoEditar: async (ctx, data) => {
+      ctx.state.context.editingTxId = data.txId;
+      ctx.state.context.editingTxAmount = data.amount;
+      ctx.state.context.editingTxDescription = data.description;
+      ctx.state.context.editingTxInstallmentGroupId = data.installmentGroupId || null;
+      ctx.state.context.editingTxInstallmentNumber = data.installmentNumber || null;
+      ctx.state.context.editingTxInstallmentTotal = data.installmentTotal || null;
+      ctx.state.path = "/lancamentos/editar/opcoes";
+    },
+
+    awaitEditTxAmount: async (ctx) => {
+      ctx.state.context.awaitingEditTxAmount = true;
+      await ctx.reply(`💰 Digite o novo valor em R$ (atual: R$ ${formatMoney(ctx.state.context.editingTxAmount)}):`);
+      return { noRender: true };
+    },
+
+    awaitEditTxDesc: async (ctx) => {
+      ctx.state.context.awaitingEditTxDesc = true;
+      await ctx.reply(`📝 Digite a nova descrição (atual: ${ctx.state.context.editingTxDescription || "sem descrição"}):`);
+      return { noRender: true };
+    },
+
+    excluirLancamento: async (ctx) => {
+      const { editingTxId } = ctx.state.context;
+      try {
+        await financialClient.deleteTransaction(ctx.userId, editingTxId);
+        await ctx.reply("🗑️ Lançamento excluído.");
+        ctx.state.context.editingTxId = null;
+        ctx.state.path = "/extrato";
+      } catch (e) {
+        logger.error("[financialFlow] excluirLancamento error:", e.message);
+        await ctx.reply("❌ Erro ao excluir lançamento.");
+        return { noRender: true };
+      }
+    },
+
+    // ── Parcelas ─────────────────────────────────────────────────────────────
+
+    cancelarParcelasFuturas: async (ctx) => {
+      const { editingTxInstallmentGroupId, editingTxInstallmentNumber } = ctx.state.context;
+      const fromNum = (editingTxInstallmentNumber || 0) + 1;
+      try {
+        await financialClient.deleteInstallments(ctx.userId, editingTxInstallmentGroupId, fromNum);
+        await ctx.reply("✅ Parcelas futuras canceladas.");
+        ctx.state.context.editingTxId = null;
+        ctx.state.context.editingTxInstallmentGroupId = null;
+        ctx.state.path = "/extrato";
+      } catch (e) {
+        logger.error("[financialFlow] cancelarParcelasFuturas error:", e.message);
+        await ctx.reply("❌ Erro ao cancelar parcelas.");
+        return { noRender: true };
+      }
+    },
+
+    cancelarTodasParcelas: async (ctx) => {
+      const { editingTxInstallmentGroupId } = ctx.state.context;
+      try {
+        await financialClient.deleteInstallments(ctx.userId, editingTxInstallmentGroupId);
+        await ctx.reply("✅ Todas as parcelas canceladas.");
+        ctx.state.context.editingTxId = null;
+        ctx.state.context.editingTxInstallmentGroupId = null;
+        ctx.state.path = "/extrato";
+      } catch (e) {
+        logger.error("[financialFlow] cancelarTodasParcelas error:", e.message);
+        await ctx.reply("❌ Erro ao cancelar parcelas.");
+        return { noRender: true };
+      }
+    },
+
+    awaitEditInstallmentAmount: async (ctx) => {
+      ctx.state.context.awaitingEditInstallmentAmount = true;
+      await ctx.reply(`💰 Novo valor para as parcelas em R$ (atual: R$ ${formatMoney(ctx.state.context.editingTxAmount)}):`);
+      return { noRender: true };
     },
 
     // ── Config ───────────────────────────────────────────────────────────────

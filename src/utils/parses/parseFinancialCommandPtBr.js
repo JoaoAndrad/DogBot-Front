@@ -177,4 +177,25 @@ function parse(text) {
   return { intent: "expense", amount, description, date, isPending: false, installmentCount, recurrence, recurrenceDay, raw: t };
 }
 
-module.exports = { parse, parseRecurrence };
+// ─── Query intents (sem valor monetário) ─────────────────────────────────────
+
+const QUERY_BALANCE_RE   = /\b(qual|quanto|me\s+mostra?|ver|mostra?|exib[ae])\b.{0,40}\b(saldo|dinheiro|disponível|disponivel|contas?|tenho)\b|\bquanto\s+tenho\b|\bmeu\s+saldo\b|\bsaldo\s+atual\b/i;
+const QUERY_EXPENSE_RE   = /\b(quanto|qual|o\s+que)\b.{0,40}\b(gast[eouia]i?|sa[íi]u|despesas?|gastos?)\b|\bquanto\s+gast[eouia]i?\b|\bmeus?\s+gastos?\b/i;
+const QUERY_INCOME_RE    = /\b(quanto|qual|o\s+que)\b.{0,40}\b(receb[ei]i?|entrou|receitas?|recebid[ao])\b|\bquanto\s+receb[ei]i?\b|\bminhas?\s+receitas?\b/i;
+const QUERY_SCHEDULED_RE = /\b(meus?|quais?|ver|mostra?)\b.{0,40}\b(agendamentos?|recorrentes?|pendentes?|programad[ao]s?)\b|\bagendamentos?\b/i;
+const QUERY_BUDGET_RE    = /\b(meu|minha|como\s+(está|tá|ta))\b.{0,40}\b(orçamento|budget)\b|\borçamento\b/i;
+
+function parseQuery(text) {
+  if (!text || typeof text !== "string") return null;
+  const t = text.trim();
+  // Don't treat as query if it has a transaction trigger — those are handled by parse()
+  if (EXPENSE_TRIGGERS.test(t) || INCOME_TRIGGERS.test(t)) return null;
+  if (QUERY_BALANCE_RE.test(t))   return { intent: "query", queryType: "balance", raw: t };
+  if (QUERY_EXPENSE_RE.test(t))   return { intent: "query", queryType: "expenses", raw: t };
+  if (QUERY_INCOME_RE.test(t))    return { intent: "query", queryType: "income", raw: t };
+  if (QUERY_SCHEDULED_RE.test(t)) return { intent: "query", queryType: "scheduled", raw: t };
+  if (QUERY_BUDGET_RE.test(t))    return { intent: "query", queryType: "budget", raw: t };
+  return null;
+}
+
+module.exports = { parse, parseRecurrence, parseQuery };

@@ -385,9 +385,16 @@ class FlowManager {
    * @returns {Promise<boolean>} true se consumido
    */
   async _handleFinancialNlp(client, chatId, userId, textBody, candidateIds) {
-    const { parse } = require("../../utils/parses/parseFinancialCommandPtBr");
-    const parsed = parse(String(textBody || "").trim());
+    const { parse, parseQuery } = require("../../utils/parses/parseFinancialCommandPtBr");
+    const raw = String(textBody || "").trim();
+    const parsed = parse(raw) || parseQuery(raw);
     if (!parsed) return false;
+
+    // ── Consultas NLP ──────────────────────────────────────────────────────────
+    if (parsed.intent === "query") {
+      return this._handleFinancialQuery(client, chatId, candidateIds, parsed.queryType);
+    }
+
     if (!["expense", "income", "future_expense", "future_income"].includes(parsed.intent)) return false;
     if (!parsed.amount || parsed.amount <= 0) return false;
 
@@ -447,6 +454,122 @@ class FlowManager {
   }
 
   /**
+   * Responde consultas NLP financeiras diretamente como texto, sem abrir menu.
+   * @private
+   * @returns {Promise<boolean>} true se consumido
+   */
+  async _handleFinancialQuery(client, chatId, candidateIds, queryType) {
+    const financialClient = require("../../services/financialClient");
+
+    let resolvedId = null;
+    for (const id of candidateIds) {
+      try {
+        const s = await financialClient.checkAuthStatus(id);
+        if (s?.linked) { resolvedId = id; break; }
+      } catch (e) { /* continue */ }
+    }
+    if (!resolvedId) return false;
+
+    function fmt(n) {
+      return Number(n || 0).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+    function fmtDate(d) {
+      const dt = new Date(d);
+      return `${String(dt.getDate()).padStart(2, "0")}/${String(dt.getMonth() + 1).padStart(2, "0")}`;
+    }
+
+    try {
+      if (queryType === "balance") {
+        const res = await financialClient.listAccounts(resolvedId);
+        const accounts = res?.accounts || [];
+        if (!accounts.length) {
+          await client.sendMessage(chatId, "🏦 Você ainda não tem contas cadastradas.");
+          return true;
+        }
+        const total = accounts.reduce((s, a) => s + (a.balance || 0), 0);
+        const totalProjected = accounts.reduce((s, a) => s + (a.projectedBalance ?? a.balance ?? 0), 0);
+        const lines = accounts.map(a => {
+          const sign = a.balance < 0 ? "🔴" : "🟢";
+          let line = `${sign} *${a.name}*: R$ ${fmt(a.balance)}`;
+          if (a.projectedBalance != null && Math.abs(a.projectedBalance - a.balance) >= 0.01) {
+            line += `  _(projetado: R$ ${fmt(a.projectedBalance)})_`;
+          }
+          return line;
+        });
+        const hasPending = Math.abs(totalProjected - total) >= 0.01;
+        await client.sendMessage(chatId,
+          `🏦 *Seus saldos:*\n\n${lines.join("\n")}\n\n` +
+          `💰 *Total: R$ ${fmt(total)}*` +
+          (hasPending ? `\n📈 *Projetado: R$ ${fmt(totalProjected)}*` : "")
+        );
+        return true;
+      }
+
+      if (queryType === "expenses" || queryType === "income") {
+        const res = await financialClient.listTransactions(resolvedId, { period: "current", limit: 500 });
+        const txs = (res?.transactions || []).filter(t => t.status === "confirmed");
+        const filtered = txs.filter(t => t.type === (queryType === "expenses" ? "expense" : "income"));
+        const total = filtered.reduce((s, t) => s + (t.amount || 0), 0);
+        const emoji = queryType === "expenses" ? "🔴" : "🟢";
+        const label = queryType === "expenses" ? "Gastos" : "Receitas";
+        if (!filtered.length) {
+          await client.sendMessage(chatId, `${emoji} Nenhuma ${label.toLowerCase().slice(0, -1)} registrada este mês.`);
+          return true;
+        }
+        const top5 = filtered.slice(0, 5).map(t => {
+          const desc = t.description || (queryType === "expenses" ? "Despesa" : "Receita");
+          return `• ${fmtDate(t.date)}  R$ ${fmt(t.amount)}  ${desc}`;
+        });
+        const more = filtered.length > 5 ? `\n_...e mais ${filtered.length - 5} lançamento(s)_` : "";
+        await client.sendMessage(chatId,
+          `${emoji} *${label} deste mês:*\n\n${top5.join("\n")}${more}\n\n` +
+          `*Total: R$ ${fmt(total)}*`
+        );
+        return true;
+      }
+
+      if (queryType === "scheduled") {
+        const res = await financialClient.listScheduled(resolvedId);
+        const txs = res?.transactions || [];
+        if (!txs.length) {
+          await client.sendMessage(chatId, "📅 Nenhum agendamento pendente.");
+          return true;
+        }
+        const lines = txs.slice(0, 8).map(t => {
+          const emoji = t.type === "income" ? "🟢" : "🔴";
+          const sign = t.type === "income" ? "+" : "-";
+          const desc = t.description || (t.type === "income" ? "Receita" : "Despesa");
+          return `${emoji} ${fmtDate(t.date)}  ${sign}R$ ${fmt(t.amount)}  ${desc}`;
+        });
+        const more = txs.length > 8 ? `\n_...e mais ${txs.length - 8}_` : "";
+        await client.sendMessage(chatId, `📅 *Agendamentos pendentes:*\n\n${lines.join("\n")}${more}`);
+        return true;
+      }
+
+      if (queryType === "budget") {
+        const res = await financialClient.listBudgets(resolvedId);
+        const budgets = res?.budgets || [];
+        if (!budgets.length) {
+          await client.sendMessage(chatId, "📊 Você ainda não tem orçamentos configurados.");
+          return true;
+        }
+        const lines = budgets.map(b => {
+          const pct = b.limit > 0 ? Math.round((b.spent / b.limit) * 100) : 0;
+          const bar = "█".repeat(Math.min(Math.round(pct / 12.5), 8)) + "░".repeat(8 - Math.min(Math.round(pct / 12.5), 8));
+          const emoji = pct >= 100 ? "🚨" : pct >= 80 ? "⚠️" : "✅";
+          const cat = b.categoryName ? ` [${b.categoryName}]` : " [geral]";
+          return `${emoji} ${bar} ${pct}%${cat}  R$ ${fmt(b.spent)} / R$ ${fmt(b.limit)}`;
+        });
+        await client.sendMessage(chatId, `📊 *Orçamentos deste mês:*\n\n${lines.join("\n")}`);
+        return true;
+      }
+    } catch (e) {
+      logger.warn("[FlowManager] _handleFinancialQuery error:", e.message);
+    }
+    return false;
+  }
+
+  /**
    * Processa input de texto livre do flow financeiro (add conta, categoria, orçamento).
    * @private
    * @returns {Promise<boolean>} true se consumido
@@ -464,7 +587,10 @@ class FlowManager {
           s?.context?.awaitingCardClosingDay || s?.context?.awaitingCardDueDay ||
           s?.context?.awaitingPaymentAmount ||
           s?.context?.awaitingScheduleDesc || s?.context?.awaitingScheduleAmount ||
-          s?.context?.awaitingScheduleDay) {
+          s?.context?.awaitingScheduleDay ||
+          s?.context?.awaitingTransferAmount ||
+          s?.context?.awaitingEditTxAmount || s?.context?.awaitingEditTxDesc ||
+          s?.context?.awaitingEditInstallmentAmount) {
         state = s;
         stateUserId = id;
         break;
@@ -669,6 +795,88 @@ class FlowManager {
       state.path = "/agendamentos/novo/conta";
       await storage.saveState(stateUserId, flowId, state);
       await this._renderNode(client, chatId, stateUserId, flowId, "/agendamentos/novo/conta");
+      return true;
+    }
+
+    // ── Transferência ──────────────────────────────────────────────────────
+
+    if (state.context.awaitingTransferAmount) {
+      const amount = parseAmount(trimmed);
+      if (amount === null || amount <= 0) {
+        await client.sendMessage(chatId, "❌ Valor inválido. Digite o valor a transferir em R$ (ex: 500):");
+        return true;
+      }
+      state.context.pendingTransferAmount = amount;
+      state.context.awaitingTransferAmount = false;
+      state.path = "/transferencia/confirmar";
+      await storage.saveState(stateUserId, flowId, state);
+      await this._renderNode(client, chatId, stateUserId, flowId, "/transferencia/confirmar");
+      return true;
+    }
+
+    // ── Edição de lançamentos ──────────────────────────────────────────────
+
+    if (state.context.awaitingEditTxAmount) {
+      const amount = parseAmount(trimmed);
+      if (amount === null || amount <= 0) {
+        await client.sendMessage(chatId, "❌ Valor inválido. Digite o valor em R$ (ex: 150):");
+        return true;
+      }
+      state.context.awaitingEditTxAmount = false;
+      await storage.saveState(stateUserId, flowId, state);
+      const financialClient = require("../../services/financialClient");
+      try {
+        await financialClient.updateTransaction(stateUserId, state.context.editingTxId, { amount });
+        state.context.editingTxAmount = amount;
+        await storage.saveState(stateUserId, flowId, state);
+        await client.sendMessage(chatId, "✅ Valor atualizado.");
+      } catch (e) {
+        await client.sendMessage(chatId, "❌ Erro ao atualizar valor.");
+      }
+      return true;
+    }
+
+    if (state.context.awaitingEditTxDesc) {
+      if (!trimmed) {
+        await client.sendMessage(chatId, "❌ Descrição inválida. Envie a nova descrição:");
+        return true;
+      }
+      state.context.awaitingEditTxDesc = false;
+      await storage.saveState(stateUserId, flowId, state);
+      const financialClient = require("../../services/financialClient");
+      try {
+        await financialClient.updateTransaction(stateUserId, state.context.editingTxId, { description: trimmed });
+        state.context.editingTxDescription = trimmed;
+        await storage.saveState(stateUserId, flowId, state);
+        await client.sendMessage(chatId, "✅ Descrição atualizada.");
+      } catch (e) {
+        await client.sendMessage(chatId, "❌ Erro ao atualizar descrição.");
+      }
+      return true;
+    }
+
+    // ── Edição de parcelas ─────────────────────────────────────────────────
+
+    if (state.context.awaitingEditInstallmentAmount) {
+      const amount = parseAmount(trimmed);
+      if (amount === null || amount <= 0) {
+        await client.sendMessage(chatId, "❌ Valor inválido. Digite o valor em R$ (ex: 150):");
+        return true;
+      }
+      state.context.awaitingEditInstallmentAmount = false;
+      await storage.saveState(stateUserId, flowId, state);
+      const financialClient = require("../../services/financialClient");
+      try {
+        await financialClient.updateInstallments(stateUserId, state.context.editingTxInstallmentGroupId, {
+          from: state.context.editingTxInstallmentNumber,
+          amount,
+        });
+        state.context.editingTxAmount = amount;
+        await storage.saveState(stateUserId, flowId, state);
+        await client.sendMessage(chatId, "✅ Valor das parcelas atualizado.");
+      } catch (e) {
+        await client.sendMessage(chatId, "❌ Erro ao atualizar parcelas.");
+      }
       return true;
     }
 

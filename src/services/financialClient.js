@@ -121,6 +121,40 @@ async function deleteTransaction(userId, transactionId) {
   try { return JSON.parse(text); } catch { return { status: res.status, text }; }
 }
 
+async function updateTransaction(userId, transactionId, fields) {
+  const res = await fetch(`${BACKEND_URL}/api/financial/transactions/${transactionId}`, {
+    method: "PATCH",
+    headers: authHeaders(),
+    body: JSON.stringify({ userId, ...fields }),
+  });
+  const text = await res.text();
+  try { return JSON.parse(text); } catch { return { status: res.status, text }; }
+}
+
+async function createTransfer(userId, { fromAccountId, toAccountId, amount, description, date }) {
+  return _post("/api/financial/transactions/transfer", { userId, fromAccountId, toAccountId, amount, description, date });
+}
+
+async function deleteInstallments(userId, groupId, from) {
+  const qs = `userId=${encodeURIComponent(userId)}${from != null ? `&from=${from}` : ""}`;
+  const res = await fetch(`${BACKEND_URL}/api/financial/transactions/installments/${groupId}?${qs}`, {
+    method: "DELETE",
+    headers: authHeaders(),
+  });
+  const text = await res.text();
+  try { return JSON.parse(text); } catch { return { status: res.status, text }; }
+}
+
+async function updateInstallments(userId, groupId, { from, amount, description }) {
+  const res = await fetch(`${BACKEND_URL}/api/financial/transactions/installments/${groupId}`, {
+    method: "PATCH",
+    headers: authHeaders(),
+    body: JSON.stringify({ userId, from, amount, description }),
+  });
+  const text = await res.text();
+  try { return JSON.parse(text); } catch { return { status: res.status, text }; }
+}
+
 // Cards
 
 async function listCards(userId) {
@@ -176,6 +210,7 @@ module.exports = {
   listAccounts, createAccount, updateAccount, deleteAccount,
   listCategories, createCategory, deleteCategory,
   listTransactions, createTransaction, createInstallment, deleteTransaction,
+  updateTransaction, createTransfer, deleteInstallments, updateInstallments,
   listScheduled, confirmTransaction, skipTransaction,
   listBudgets, createBudget, deleteBudget,
   listCards, createCard, deleteCard,
