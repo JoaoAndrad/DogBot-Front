@@ -51,11 +51,15 @@ function fmtStage(match) {
  * Um palpite ainda é possível se nenhum time já marcou MAIS do que o apostado.
  * Já perdeu se home > predictedHome OU away > predictedAway.
  */
-function categorizePredictions(predictions, currentHome, currentAway) {
+function categorizePredictions(predictions, currentHome, currentAway, isOvertime = false) {
   const competing = [];
   const lost = [];
   for (const p of predictions || []) {
-    if (currentHome > p.predictedHome || currentAway > p.predictedAway) {
+    const isDraw = p.predictedHome === p.predictedAway;
+    if (isOvertime && !isDraw) {
+      // Na prorrogação apenas quem apostou empate ainda concorre
+      lost.push(p);
+    } else if (currentHome > p.predictedHome || currentAway > p.predictedAway) {
       lost.push(p);
     } else {
       competing.push(p);
@@ -130,12 +134,13 @@ function formatPredictionsBlockWithMentions(
   if (!predictions || !predictions.length)
     return { text: null, mentionIds: [] };
 
-  const { homeTeam, awayTeam } = opts;
+  const { homeTeam, awayTeam, isOvertime = false } = opts;
   const nameMap = buildNameMap(predictions);
   const { competing, lost } = categorizePredictions(
     predictions,
     currentHome,
     currentAway,
+    isOvertime,
   );
   const mentionIds = [];
 
@@ -670,12 +675,13 @@ async function handleGoal(client, action) {
       const memberJids = await getGroupMemberJids(client, groupId);
       const groupPreds = filterForGroup(predictions, memberJids);
 
+      const goalIsInOvertime = minute != null && minute > 90;
       const { text: predBlock, mentionIds } = groupPreds.length
         ? formatPredictionsBlockWithMentions(
             groupPreds,
             match.home_score,
             match.away_score,
-            { homeTeam: match.home_team, awayTeam: match.away_team },
+            { homeTeam: match.home_team, awayTeam: match.away_team, isOvertime: goalIsInOvertime },
           )
         : { text: null, mentionIds: [] };
 
@@ -813,13 +819,13 @@ async function handleExtraTime(client, action) {
       const memberJids = await getGroupMemberJids(client, groupId);
       const groupPreds = filterForGroup(predictions, memberJids);
 
-      // Main preds block (90-min scores)
+      // Main preds block (90-min scores) — na prorrogação vitórias já perderam
       const { text: predBlock, mentionIds: predMentions } = groupPreds.length
         ? formatPredictionsBlockWithMentions(
             groupPreds,
             match.home_score ?? 0,
             match.away_score ?? 0,
-            { homeTeam: match.home_team, awayTeam: match.away_team },
+            { homeTeam: match.home_team, awayTeam: match.away_team, isOvertime: true },
           )
         : { text: null, mentionIds: [] };
 
@@ -860,10 +866,24 @@ async function handlePenalties(client, action) {
     ? `${match.extra_time_home} x ${match.extra_time_away}`
     : `${match.home_score ?? 0} x ${match.away_score ?? 0}`;
 
+  // Score a usar para categorizar os palpites dos 90min (placar da prorrogação ou dos 90min)
+  const penHome = match.extra_time_home ?? match.home_score ?? 0;
+  const penAway = match.extra_time_away ?? match.away_score ?? 0;
+
   for (const groupId of groupIds) {
     try {
       const memberJids = await getGroupMemberJids(client, groupId);
       const groupPreds = filterForGroup(predictions, memberJids);
+
+      // Bloco de palpites dos 90min — vitórias já perderam (isOvertime: true)
+      const { text: predBlock, mentionIds: predMentions } = groupPreds.length
+        ? formatPredictionsBlockWithMentions(
+            groupPreds,
+            penHome,
+            penAway,
+            { homeTeam: match.home_team, awayTeam: match.away_team, isOvertime: true },
+          )
+        : { text: null, mentionIds: [] };
 
       // Pen-winner preds block
       const penPreds = groupPreds.filter((p) => p.penaltiesWinner);
@@ -883,9 +903,11 @@ async function handlePenalties(client, action) {
         `${withFlag(match.home_team)} *${etScore}* ${withFlag(match.away_team)} — empate na prorrogação`,
         `Vai para a disputa de pênaltis!`,
       ];
+      if (predBlock) lines.push(predBlock);
       if (penBlock) lines.push(penBlock);
 
-      await sendWithMentions(client, groupId, lines.join("\n"), penMentions);
+      const allMentions = [...new Set([...predMentions, ...penMentions])];
+      await sendWithMentions(client, groupId, lines.join("\n"), allMentions);
     } catch (e) {
       logger.warn(`[worldcupTick] penalties → ${groupId}:`, e.message);
     }
@@ -990,10 +1012,12 @@ async function handleVarRevert(client, action) {
       const memberJids = await getGroupMemberJids(client, groupId);
       const groupPreds = filterForGroup(predictions, memberJids);
 
+      const varIsOvertime = goal.minute != null && goal.minute > 90;
       const { text: predBlock, mentionIds } = groupPreds.length
         ? formatPredictionsBlockWithMentions(groupPreds, h, a, {
             homeTeam: goal.homeTeam,
             awayTeam: goal.awayTeam,
+            isOvertime: varIsOvertime,
           })
         : { text: null, mentionIds: [] };
 
