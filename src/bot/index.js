@@ -50,7 +50,7 @@ async function start() {
     const sent = await originalSendMessage(chatId, content, mergedOptions);
     const isPoll = Poll && content instanceof Poll;
     if (sent && !isPoll && typeof sent.delete === "function") {
-      setTimeout(() => sent.delete(false).catch(() => {}), 30_000);
+      sent.delete(false).catch(() => {});
     }
     return sent;
   };
