@@ -1,4 +1,4 @@
-const logger = require("../utils/logger");
+﻿const logger = require("../utils/logger");
 const commands = require("../commands");
 const backendClient = require("../services/backendClient");
 const spotifyService = require("../services/spotifyService");
@@ -26,7 +26,7 @@ const groupDisplayNameSync = require("../services/groupDisplayNameSync");
 const GROUP_DISPLAY_SYNC_TTL_MS = 6 * 60 * 60 * 1000;
 
 const FALLBACK_REPLY_TTL_MS = 30 * 1000;
-const fallbackReplyCache = new Map(); // identifier → lastSentAt
+const fallbackReplyCache = new Map(); // identifier â†’ lastSentAt
 const groupDisplaySyncCache = new Map();
 
 function maybeSyncGroupDisplayName(chatId, name) {
@@ -70,12 +70,12 @@ const commandPolicyService = require("../services/commandPolicyService");
 const groupFeatureFlagClient = require("../services/groupFeatureFlagClient");
 
 /**
- * Comandos utilizáveis sem utilizador pré-registado na BD (fluxo /cadastro).
- * As políticas enabled/vip do painel aplicam-se a estes e a todos os outros.
+ * Comandos utilizÃ¡veis sem utilizador prÃ©-registado na BD (fluxo /cadastro).
+ * As polÃ­ticas enabled/vip do painel aplicam-se a estes e a todos os outros.
  */
 const PUBLIC_COMMANDS = new Set(["cadastro", "ajuda", "help", "app"]);
 
-// Cache de lookup por identificador (evita muitos GET /api/users/lookup para o mesmo usuário em sequência)
+// Cache de lookup por identificador (evita muitos GET /api/users/lookup para o mesmo usuÃ¡rio em sequÃªncia)
 const USER_LOOKUP_CACHE_TTL_MS = 60 * 1000; // 1 minuto
 const userLookupCache = new Map(); // identifier -> { userId, confessions_vip?, ts }
 
@@ -133,9 +133,9 @@ async function handle(context) {
     (from && String(from).endsWith("@g.us"))
   );
 
-  // Sincroniza nome de exibição do grupo (sem log por mensagem)
+  // Sincroniza nome de exibiÃ§Ã£o do grupo (sem log por mensagem)
   try {
-    const isConfissao = body && /^\s*\/?confiss[aã]o\b/i.test(body);
+    const isConfissao = body && /^\s*\/?confiss[aÃ£]o\b/i.test(body);
 
     if (!isConfissao && isGroup) {
       const msgType = msg.type || info.type || "text";
@@ -144,7 +144,7 @@ async function handle(context) {
         from &&
         loadIgnoredChats().has(String(from))
       ) {
-        // Grupo órfão (cache): não sincronizar em cada e2e
+        // Grupo Ã³rfÃ£o (cache): nÃ£o sincronizar em cada e2e
       } else {
         try {
           const chat = await msg.getChat();
@@ -230,7 +230,7 @@ async function handle(context) {
             if (isGif || isAnimatedWebp) {
               try {
                 await reply(
-                  "Desculpe, figurinhas animadas não são suportadas.",
+                  "Desculpe, figurinhas animadas nÃ£o sÃ£o suportadas.",
                 );
               } catch (e) {}
               return;
@@ -270,7 +270,7 @@ async function handle(context) {
               if (!ok) {
                 try {
                   await reply(
-                    "Não consegui enviar a figurinha, tente novamente mais tarde.",
+                    "NÃ£o consegui enviar a figurinha, tente novamente mais tarde.",
                   );
                 } catch (e) {}
               }
@@ -296,7 +296,7 @@ async function handle(context) {
 
   // prepare reply helper
   // Real-time replies go through the MessageGate (rate limiting + queue).
-  // Catchup replies bypass the gate — they're already rate-limited by the
+  // Catchup replies bypass the gate â€” they're already rate-limited by the
   // 150ms delay in catchup.js and must not block the gate's real-time queue.
   const _rawSend = () => {
     if (typeof msg.reply === "function") return msg.reply.bind(msg);
@@ -382,12 +382,12 @@ async function handle(context) {
       });
       await reply(
         cleared
-          ? "Operação cancelada."
-          : "Não havia fluxos pendentes para cancelar.",
+          ? "OperaÃ§Ã£o cancelada."
+          : "NÃ£o havia fluxos pendentes para cancelar.",
       );
     } catch (e) {
       logger.warn("[Handler] cancel global:", e && e.message);
-      await reply("❌ Não foi possível cancelar. Tente novamente.");
+      await reply("âŒ NÃ£o foi possÃ­vel cancelar. Tente novamente.");
     }
     return;
   }
@@ -406,7 +406,7 @@ async function handle(context) {
       `[Handler] Fluxo ativo detectado para ${stateKey}: ${state.flowType}`,
     );
 
-    if (state.flowType === "cadastro") {
+    if (state.flowType === "cadastro" && !isGroup) {
       return await handleCadastroFlow(stateKey, body, state, reply, {
         author,
         isGroup,
@@ -416,7 +416,7 @@ async function handle(context) {
       });
     }
 
-    if (state.flowType === "meta") {
+    if (state.flowType === "meta" && !isGroup) {
       return await handleMetaFlow(stateKey, body, state, reply, {
         author,
         isGroup,
@@ -437,7 +437,7 @@ async function handle(context) {
       });
     }
 
-    if (state.flowType === "add-film") {
+    if (state.flowType === "add-film" && !isGroup) {
       return await handleAddFilmFlow(stateKey, body, state, reply, {
         author,
         isGroup,
@@ -449,12 +449,13 @@ async function handle(context) {
     }
 
     if (
-      state.flowType === "copa-palpite-input" ||
-      state.flowType === "copa-champion-input" ||
-      state.flowType === "copa-zebra-input" ||
-      state.flowType === "copa-mvp-input"
+      !isGroup && (
+        state.flowType === "copa-palpite-input" ||
+        state.flowType === "copa-champion-input" ||
+        state.flowType === "copa-zebra-input" ||
+        state.flowType === "copa-mvp-input"
+      )
     ) {
-      if (isGroup) return; // flows copa são exclusivos do privado — ignora mensagens de grupo
 
       if (state.flowType === "copa-palpite-input") {
         return await handleCopaFlow(stateKey, body, state, reply, {
@@ -479,8 +480,7 @@ async function handle(context) {
       }
     }
 
-    if (state.flowType === "cartola-team-input") {
-      if (isGroup) return;
+    if (state.flowType === "cartola-team-input" && !isGroup) {
       return await handleCartolaTeamFlow(stateKey, body, state, reply, {
         client: context.client,
         chatId: from,
@@ -563,12 +563,12 @@ async function handle(context) {
     if (isGroup && normalized.includes("pix")) {
       try {
         const styled =
-          "Opa! Alguém disse pix? 👋\n\n" +
-          "Que bom que você mostrou interesse em ajudar com os custos de manutenção do DogBot. 🐶\n" +
+          "Opa! AlguÃ©m disse pix? ðŸ‘‹\n\n" +
+          "Que bom que vocÃª mostrou interesse em ajudar com os custos de manutenÃ§Ã£o do DogBot. ðŸ¶\n" +
           "Segue nossa chave PIX:\n\n" +
           "pixdeandrade@gmail.com\n\n" +
-          "Banco: C6 Bank 🏦\n\n" +
-          "Agradecemos muito pelo apoio! 🐾";
+          "Banco: C6 Bank ðŸ¦\n\n" +
+          "Agradecemos muito pelo apoio! ðŸ¾";
 
         await reply(styled);
       } catch (e) {
@@ -599,7 +599,7 @@ async function handle(context) {
           const contact = await context.client.getContactById(mentionedId);
           const resolvedId = contact?.id?._serialized || mentionedId;
 
-          logger.debug(`[workoutHandler] Resolved: ${mentionedId} → ${resolvedId}`);
+          logger.debug(`[workoutHandler] Resolved: ${mentionedId} â†’ ${resolvedId}`);
 
           if (resolvedId === botId) {
             botWasMentioned = true;
@@ -651,11 +651,11 @@ async function handle(context) {
             senderNumber = resolvedAuthor.replace(/@c\.us$/i, "");
             displayName =
               contact?.pushname || contact?.name || contact?.notify || null;
-            logger.debug(`[workoutHandler] Author resolved: ${author} → ${resolvedAuthor} → ${senderNumber} (${displayName})`);
+            logger.debug(`[workoutHandler] Author resolved: ${author} â†’ ${resolvedAuthor} â†’ ${senderNumber} (${displayName})`);
           } catch (err) {
             // Fallback to original author
             senderNumber = author.replace(/@(c\.us|lid)$/i, "");
-            logger.debug(`[workoutHandler] Author fallback: ${author} → ${senderNumber}`);
+            logger.debug(`[workoutHandler] Author fallback: ${author} â†’ ${senderNumber}`);
           }
 
           // Extract note: remove bot mention and "treinei" word
@@ -687,10 +687,10 @@ async function handle(context) {
 
           if (result.success) {
             if (isGroup) {
-              await msg.reply(result.message || "🔥 Treino registrado!");
+              await msg.reply(result.message || "ðŸ”¥ Treino registrado!");
             }
 
-            // JID canónico do grupo (alinha com getChats) para não duplicar notificação no mesmo grupo
+            // JID canÃ³nico do grupo (alinha com getChats) para nÃ£o duplicar notificaÃ§Ã£o no mesmo grupo
             let excludeGroupChatId = from;
             try {
               if (typeof msg.getChat === "function") {
@@ -747,7 +747,7 @@ async function handle(context) {
               }
             }, 1000);
           } else if (result.error === "workout_already_logged_today") {
-            await msg.reply("Você já registrou treino hoje! 💪");
+            await msg.reply("VocÃª jÃ¡ registrou treino hoje! ðŸ’ª");
           }
         } catch (err) {
           logger.error("[workoutHandler] Error processing workout:", err);
@@ -758,7 +758,7 @@ async function handle(context) {
   }
 
   // detect command: prefix-based (! or /) or exact keyword fallback (e.g. 'ping')
-  // normalize by removing diacritics so 'confissão' or 'Confissao' match 'confissao'
+  // normalize by removing diacritics so 'confissÃ£o' or 'Confissao' match 'confissao'
   let isCommand = false;
   let cmdName = null;
   function normalizeCmdName(s) {
@@ -804,9 +804,9 @@ async function handle(context) {
   if (isCommand && cmdName) {
     const cmd = commands.getCommand(cmdName);
     if (!cmd) {
-      logger.debug("Comando não encontrado:", cmdName);
+      logger.debug("Comando nÃ£o encontrado:", cmdName);
       await reply(
-        `Comando desconhecido.\n\nUse */ajuda* no privado para ver os comandos disponíveis.`,
+        `Comando desconhecido.\n\nUse */ajuda* no privado para ver os comandos disponÃ­veis.`,
       );
       return;
     }
@@ -819,7 +819,7 @@ async function handle(context) {
       policyForCmd =
         policies && policies[canonical] ? policies[canonical] : null;
       if (policyForCmd && policyForCmd.enabled === false) {
-        await reply("Este comando está temporariamente desativado.");
+        await reply("Este comando estÃ¡ temporariamente desativado.");
         return;
       }
     } catch (e) {
@@ -851,7 +851,7 @@ async function handle(context) {
                 ? earlyCached.isAdmin
                 : undefined,
           };
-          const isConfissao = body && /^\s*\/?confiss[aã]o\b/i.test(body);
+          const isConfissao = body && /^\s*\/?confiss[aÃ£]o\b/i.test(body);
           if (!isConfissao) {
             logger.debug(`[Handler] Reutilizando lookup: ${lookupResult}`);
           }
@@ -860,7 +860,7 @@ async function handle(context) {
           const isGroup = !!(msg && msg.isGroup) || !!info.is_group;
 
           // Check if it's confissao command to skip debug logs
-          const isConfissao = body && /^\s*\/?confiss[aã]o\b/i.test(body);
+          const isConfissao = body && /^\s*\/?confiss[aÃ£]o\b/i.test(body);
 
           // Try to get actual phone number from contact
           let cmdActualNumber = null;
@@ -869,7 +869,7 @@ async function handle(context) {
             if (contact && contact.id && contact.id._serialized) {
               cmdActualNumber = contact.id._serialized;
               if (!isConfissao) {
-                logger.debug(`[Handler] Número do contato: ${cmdActualNumber}`);
+                logger.debug(`[Handler] NÃºmero do contato: ${cmdActualNumber}`);
               }
             }
           } catch (err) {
@@ -973,17 +973,17 @@ async function handle(context) {
             const isGroup = !!(msg && msg.isGroup) || !!info.is_group;
             if (isGroup) {
               await reply(
-                "Hmmm, parece que não te conheço... venha no meu privado e digite /cadastro",
+                "Hmmm, parece que nÃ£o te conheÃ§o... venha no meu privado e digite /cadastro",
               );
             } else {
               await reply(
-                "É necessário enviar /cadastro no privado antes de utilizar qualquer comando",
+                "Ã‰ necessÃ¡rio enviar /cadastro no privado antes de utilizar qualquer comando",
               );
             }
           } else if (policyForCmd && policyForCmd.adminOnly) {
-            await reply("Este comando é exclusivo para administradores.");
+            await reply("Este comando Ã© exclusivo para administradores.");
           } else {
-            await reply("Este comando é exclusivo para usuários VIP.");
+            await reply("Este comando Ã© exclusivo para usuÃ¡rios VIP.");
           }
           return;
         }
@@ -995,7 +995,7 @@ async function handle(context) {
           lookupResult.found &&
           lookupResult.confessions_vip !== true
         ) {
-          await reply("Este comando é exclusivo para usuários VIP.");
+          await reply("Este comando Ã© exclusivo para usuÃ¡rios VIP.");
           return;
         }
 
@@ -1006,11 +1006,11 @@ async function handle(context) {
           lookupResult.found &&
           lookupResult.isAdmin !== true
         ) {
-          await reply("Este comando é exclusivo para administradores.");
+          await reply("Este comando Ã© exclusivo para administradores.");
           return;
         }
       } catch (err) {
-        logger.error("Erro ao verificar usuário:", err);
+        logger.error("Erro ao verificar usuÃ¡rio:", err);
         // Continue execution on lookup error to avoid blocking legitimate users
       }
     }
@@ -1121,8 +1121,8 @@ async function handle(context) {
 
           await reply(
             rating > 0
-              ? `⭐ Nota atualizada para ${rating}/5`
-              : "⭐ Nota removida",
+              ? `â­ Nota atualizada para ${rating}/5`
+              : "â­ Nota removida",
           );
 
           await flowManager._renderNode(
@@ -1136,7 +1136,7 @@ async function handle(context) {
         }
       } catch (ratingErr) {
         logger.error(
-          "Erro ao processar nota numérica do flow lists:",
+          "Erro ao processar nota numÃ©rica do flow lists:",
           ratingErr,
         );
       }
@@ -1184,7 +1184,7 @@ async function handle(context) {
   } catch (err) {
     // swallow fallback errors
     logger.debug(
-      "Erro ao processar fallback numérico de poll",
+      "Erro ao processar fallback numÃ©rico de poll",
       err && err.message,
     );
   }
@@ -1208,16 +1208,16 @@ async function handle(context) {
       try {
         if (!dbUserId) {
           await reply(
-            "Olá! 🐶 Ainda não te conheço por aqui.\n\nUse */cadastro* para se registrar ou */ajuda* para ver o que posso fazer.",
+            "OlÃ¡! ðŸ¶ Ainda nÃ£o te conheÃ§o por aqui.\n\nUse */cadastro* para se registrar ou */ajuda* para ver o que posso fazer.",
           );
         } else {
           await reply(
-            "Não entendi a solicitação. 🐾\n\nUse */ajuda* para ver os comandos disponíveis.",
+            "NÃ£o entendi a solicitaÃ§Ã£o. ðŸ¾\n\nUse */ajuda* para ver os comandos disponÃ­veis.",
           );
         }
       } catch (err) {
         logger.debug(
-          "[fallback] erro ao enviar mensagem padrão:",
+          "[fallback] erro ao enviar mensagem padrÃ£o:",
           err && err.message,
         );
       }
@@ -1226,3 +1226,4 @@ async function handle(context) {
 }
 
 module.exports = { handle };
+
