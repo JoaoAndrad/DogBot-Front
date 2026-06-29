@@ -156,7 +156,6 @@ const financialFlow = createFlow("financeiro", {
         "💰 *Assistente Financeiro — Primeiros passos*\n\n" +
         "Para proteger seus dados financeiros, usamos criptografia de ponta a ponta vinculada à sua conta Google.\n\n" +
         "• Seus dados ficam criptografados no servidor\n" +
-        "• Nenhum desenvolvedor pode acessá-los\n" +
         "• O login Google é feito apenas uma vez\n\n" +
         "Quer conectar sua conta Google agora?"
       );
@@ -1292,7 +1291,7 @@ const financialFlow = createFlow("financeiro", {
         "Em *Contas › Ver contas*, o saldo projetado considera todos os lançamentos futuros pendentes.\n\n" +
 
         "🔒 *Segurança*\n" +
-        "Tudo é criptografado com sua chave pessoal. Nem o desenvolvedor tem acesso."
+        "Tudo é criptografado com sua chave pessoal."
       );
       return {
         title: "Continuar?",

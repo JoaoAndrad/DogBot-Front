@@ -212,7 +212,7 @@ const COPY = {
   financeiro: [
     "💰 *Assistente Financeiro*",
     "",
-    "Controle suas finanças pelo WhatsApp com segurança total. Seus dados são criptografados com sua chave pessoal — nem o desenvolvedor tem acesso.",
+    "Controle suas finanças pelo WhatsApp com segurança total. Seus dados são criptografados com sua chave pessoal",
     "",
     "*Como abrir:*",
     "Envie *financeiro* (ou *finanças*) aqui no privado, ou use o menu que o bot oferecer.",
