@@ -956,11 +956,12 @@ class FlowManager {
    * O processador de mensagens do bot deve chamar isto para mensagens que não são comandos.
    * @returns {Promise<boolean>} true se a mensagem foi consumida
    */
-  async handleOptionalTextMessage(client, chatId, userId, textBody) {
+  async handleOptionalTextMessage(client, chatId, userId, textBody, rawContactId = null) {
     const flowId = "film-card";
     const candidateIds = [];
     if (userId) candidateIds.push(userId);
     if (chatId && chatId !== userId) candidateIds.push(chatId);
+    if (rawContactId && !candidateIds.includes(rawContactId)) candidateIds.push(rawContactId);
 
     const resolvedUuid = await resolveUserUuidForMenu(userId);
     if (resolvedUuid && !candidateIds.includes(resolvedUuid)) {

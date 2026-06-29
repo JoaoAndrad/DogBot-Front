@@ -16,7 +16,7 @@ const conversationState = require("../../services/conversationState");
  * Se há espera de data registada em conversationState, força o userId do storage do menu.
  * @returns {Promise<boolean>}
  */
-async function tryFilmViewingDateFromConversation(client, chatId, userId, text) {
+async function tryFilmViewingDateFromConversation(client, chatId, userId, text, rawContactId) {
   const candidates = [userId, chatId].filter(Boolean);
   let conv = null;
   for (const k of [...new Set(candidates)]) {
@@ -37,21 +37,23 @@ async function tryFilmViewingDateFromConversation(client, chatId, userId, text) 
     chatId,
     storageUserId,
     text,
+    rawContactId,
   );
 }
 
 /**
  * @returns {Promise<boolean>} true se a mensagem foi tratada (não propagar)
  */
-async function handleIncomingTextMessage(client, chatId, userId, text) {
+async function handleIncomingTextMessage(client, chatId, userId, text, rawContactId) {
   const fromConv = await tryFilmViewingDateFromConversation(
     client,
     chatId,
     userId,
     text,
+    rawContactId,
   );
   if (fromConv) return true;
-  return flowManager.handleOptionalTextMessage(client, chatId, userId, text);
+  return flowManager.handleOptionalTextMessage(client, chatId, userId, text, rawContactId);
 }
 
 module.exports = { handleIncomingTextMessage };
