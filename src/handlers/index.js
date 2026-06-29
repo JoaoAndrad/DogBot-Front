@@ -387,7 +387,7 @@ async function handle(context) {
       );
     } catch (e) {
       logger.warn("[Handler] cancel global:", e && e.message);
-      await reply("�R Não foi possível cancelar. Tente novamente.");
+      await reply("❌ Não foi possível cancelar. Tente novamente.");
     }
     return;
   }
@@ -563,12 +563,12 @@ async function handle(context) {
     if (isGroup && normalized.includes("pix")) {
       try {
         const styled =
-          "Opa! Alguém disse pix? �x9\n\n" +
-          "Que bom que você mostrou interesse em ajudar com os custos de manutenção do DogBot. �x��\n" +
+          "Opa! Alguém disse pix? 💸\n\n" +
+          "Que bom que você mostrou interesse em ajudar com os custos de manutenção do DogBot. 🙏\n" +
           "Segue nossa chave PIX:\n\n" +
           "pixdeandrade@gmail.com\n\n" +
-          "Banco: C6 Bank �x��\n\n" +
-          "Agradecemos muito pelo apoio! �x��";
+          "Banco: C6 Bank 💙\n\n" +
+          "Agradecemos muito pelo apoio! 🐾";
 
         await reply(styled);
       } catch (e) {
@@ -687,7 +687,7 @@ async function handle(context) {
 
           if (result.success) {
             if (isGroup) {
-              await msg.reply(result.message || "�x� Treino registrado!");
+              await msg.reply(result.message || "✅ Treino registrado!");
             }
 
             // JID canónico do grupo (alinha com getChats) para não duplicar notificação no mesmo grupo
@@ -747,7 +747,7 @@ async function handle(context) {
               }
             }, 1000);
           } else if (result.error === "workout_already_logged_today") {
-            await msg.reply("Você já registrou treino hoje! �x�");
+            await msg.reply("Você já registrou treino hoje! ⚠️");
           }
         } catch (err) {
           logger.error("[workoutHandler] Error processing workout:", err);
@@ -977,7 +977,7 @@ async function handle(context) {
               );
             } else {
               await reply(
-                "�0 necessário enviar /cadastro no privado antes de utilizar qualquer comando",
+                "ℹ️ necessário enviar /cadastro no privado antes de utilizar qualquer comando",
               );
             }
           } else if (policyForCmd && policyForCmd.adminOnly) {
@@ -1208,11 +1208,11 @@ async function handle(context) {
       try {
         if (!dbUserId) {
           await reply(
-            "Olá! �x�� Ainda não te conheço por aqui.\n\nUse */cadastro* para se registrar ou */ajuda* para ver o que posso fazer.",
+            "Olá! 🐶 Ainda não te conheço por aqui.\n\nUse */cadastro* para se registrar ou */ajuda* para ver o que posso fazer.",
           );
         } else {
           await reply(
-            "Não entendi a solicitação. �x��\n\nUse */ajuda* para ver os comandos disponíveis.",
+            "Não entendi a solicitação. 🐾\n\nUse */ajuda* para ver os comandos disponíveis.",
           );
         }
       } catch (err) {
