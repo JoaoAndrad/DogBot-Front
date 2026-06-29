@@ -1,4 +1,4 @@
-�const storage = require("./storage");
+const storage = require("./storage");
 const logger = require("../../utils/logger");
 const bootLog = require("../../lib/bootLog");
 const { validateFlow } = require("./flowBuilder");
@@ -553,7 +553,7 @@ class FlowManager {
         const res = await financialClient.listBudgets(resolvedId);
         const budgets = res?.budgets || [];
         if (!budgets.length) {
-          await client.sendMessage(chatId, "�x` Você ainda não tem orçamentos configurados.");
+          await client.sendMessage(chatId, "📊 Você ainda não tem orçamentos configurados.");
           return true;
         }
         const lines = budgets.map(b => {
@@ -563,7 +563,7 @@ class FlowManager {
           const cat = b.categoryName ? ` [${b.categoryName}]` : " [geral]";
           return `${emoji} ${bar} ${pct}%${cat}  R$ ${fmt(b.spent)} / R$ ${fmt(b.limit)}`;
         });
-        await client.sendMessage(chatId, `�x` *Orçamentos deste mês:*\n\n${lines.join("\n")}`);
+        await client.sendMessage(chatId, `📊 *Orçamentos deste mês:*\n\n${lines.join("\n")}`);
         return true;
       }
     } catch (e) {

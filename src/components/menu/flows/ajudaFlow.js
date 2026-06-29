@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Flow /ajuda — menu de ajuda (só faz sentido no privado; o comando valida).
  */
 

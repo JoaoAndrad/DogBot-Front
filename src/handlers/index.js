@@ -1,4 +1,4 @@
-�const logger = require("../utils/logger");
+const logger = require("../utils/logger");
 const commands = require("../commands");
 const backendClient = require("../services/backendClient");
 const spotifyService = require("../services/spotifyService");
