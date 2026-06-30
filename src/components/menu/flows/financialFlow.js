@@ -1846,18 +1846,41 @@ const financialFlow = createFlow("financeiro", {
             recurrenceDay: tx.recurrenceDay != null ? tx.recurrenceDay : undefined,
             categoryId: tx.suggestedCategoryId || undefined,
           });
-          const typeLabel = tx.type === "income" ? "Receita" : "Despesa";
           const sign = tx.type === "income" ? "+" : "-";
-          const balanceText = result.newBalance !== undefined
-            ? `\n\nSaldo *${tx.accountName}*: R$ ${formatMoney(result.newBalance)}`
-            : "";
-          await ctx.reply(
-            `✅ *${typeLabel} registrada!*\n\n` +
-            `${sign}R$ ${formatMoney(tx.amount)}` +
-            (tx.description ? ` — ${tx.description}` : "") +
-            balanceText
-          );
-          await handleBudgetAlerts(ctx, result);
+          const descLine = tx.description ? ` — ${tx.description}` : "";
+          const amountLine = `${sign}R$ ${formatMoney(tx.amount)}${descLine}`;
+
+          let msg;
+          if (tx.recurrence === "monthly") {
+            const action = tx.type === "income" ? "recebimento" : "pagamento";
+            const dayLabel = tx.recurrenceDay ? `dia ${tx.recurrenceDay}` : "todo mês";
+            msg = `📅 *${tx.type === "income" ? "Receita" : "Despesa"} recorrente agendada!*\n\n` +
+              `${amountLine}\n` +
+              `🔁 Todo ${dayLabel} do mês\n` +
+              `📲 Vou te notificar no ${dayLabel} para confirmar o ${action}`;
+          } else if (tx.recurrence === "weekly") {
+            const action = tx.type === "income" ? "recebimento" : "pagamento";
+            msg = `📅 *${tx.type === "income" ? "Receita" : "Despesa"} recorrente agendada!*\n\n` +
+              `${amountLine}\n` +
+              `🔁 Toda semana\n` +
+              `📲 Vou te notificar semanalmente para confirmar o ${action}`;
+          } else if (tx.isPending) {
+            const action = tx.type === "income" ? "recebimento" : "pagamento";
+            const dateLabel = formatDate(new Date(tx.date));
+            msg = `⏳ *${tx.type === "income" ? "Receita" : "Despesa"} pendente registrada!*\n\n` +
+              `${amountLine}\n` +
+              `📆 Previsto para ${dateLabel}\n` +
+              `📲 Vou te notificar na data para confirmar o ${action}`;
+          } else {
+            const typeLabel = tx.type === "income" ? "Receita" : "Despesa";
+            const balanceText = result.newBalance !== undefined
+              ? `\n\nSaldo *${tx.accountName}*: R$ ${formatMoney(result.newBalance)}`
+              : "";
+            msg = `✅ *${typeLabel} registrada!*\n\n${amountLine}${balanceText}`;
+          }
+
+          await ctx.reply(msg);
+          if (!tx.recurrence && !tx.isPending) await handleBudgetAlerts(ctx, result);
         }
         ctx.state.context.pendingNlpTransaction = null;
       } catch (e) {
