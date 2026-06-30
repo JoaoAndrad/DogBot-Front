@@ -67,7 +67,9 @@ function formatMatch(m) {
     if (hasET) {
       // Split goals into regular / ET / penalty sections
       const regularCount = (m.home_score ?? 0) + (m.away_score ?? 0);
-      const etGoalCount = ((m.extra_time_home ?? 0) + (m.extra_time_away ?? 0)) - regularCount;
+      // extra_time fields may be cumulative (includes 90min) or was reset to 0 by the API during
+      // the penalty period. Guard against negative values.
+      const etGoalCount = Math.max(0, ((m.extra_time_home ?? 0) + (m.extra_time_away ?? 0)) - regularCount);
       const allGoals = (m.goals || []);
       const regularGoals = allGoals.slice(0, regularCount);
       const etGoals = allGoals.slice(regularCount, regularCount + etGoalCount);
