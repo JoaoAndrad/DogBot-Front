@@ -315,6 +315,12 @@ async function executeAction(result, client) {
     return;
   }
 
+  if (action === "menu_policy_block") {
+    const msg = result.policyMessage || "⏸ Esta opção não está disponível.";
+    await client.sendMessage(poll.chatId, msg);
+    return;
+  }
+
   try {
     // Get chat
     const chat = await client.getChatById(poll.chatId);
