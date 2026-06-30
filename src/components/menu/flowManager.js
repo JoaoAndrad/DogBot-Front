@@ -396,6 +396,21 @@ class FlowManager {
       return;
     }
 
+    // Filtra opções desativadas pela política (enabled=false).
+    // Opções VIP/admin-only são mantidas e bloqueadas apenas ao selecionar.
+    if (renderOptions && renderOptions.length > 0) {
+      try {
+        const policies = await _getFlowOptionPolicies();
+        renderOptions = renderOptions.filter((opt) => {
+          if (!opt.optionKey) return true;
+          const p = policies[`${flowId}:${opt.optionKey}`];
+          return !p || p.enabled !== false;
+        });
+      } catch (e) {
+        logger.warn("[FlowManager] falha ao filtrar opções por política (fail-open):", e && e.message);
+      }
+    }
+
     // Create poll with metadata for backend processing (WhatsApp requires at least 2 options)
     if (!renderOptions || renderOptions.length < 2) {
       await client.sendMessage(
