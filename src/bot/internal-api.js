@@ -247,6 +247,33 @@ function createApp(client) {
     }
   });
 
+  router.post("/internal/financial/import-notify", express.json(), async (req, res) => {
+    try {
+      const { waJid, dbUserId, txId, summary } = req.body || {};
+      if (!waJid || !dbUserId || !txId) {
+        return res.status(400).json({ ok: false, error: "waJid, dbUserId and txId are required" });
+      }
+      const storage = require("../components/menu/storage");
+      const flowManager = require("../components/menu/flowManager");
+
+      const state = await storage.getState(dbUserId, "financeiro") || { path: "/", history: [], context: {} };
+      state.context.importedTxId = txId;
+      state.context.importedAmount = summary?.amount || 0;
+      state.context.importedType = summary?.type || "expense";
+      state.context.importedDescription = summary?.description || null;
+      state.context.importedBankName = summary?.bankName || null;
+      state.context.importedAccountName = summary?.accountName || null;
+      state.path = "/financeiro/importado";
+      await storage.saveState(dbUserId, "financeiro", state);
+
+      await flowManager._renderNode(client, waJid, dbUserId, "financeiro", "/financeiro/importado");
+      res.json({ ok: true });
+    } catch (err) {
+      logger.error("[internal-api] financial import-notify error:", err && err.message);
+      res.status(500).json({ ok: false, error: err && err.message });
+    }
+  });
+
   router.get("/internal/bot-groups", async (_req, res) => {
     try {
       const ignored = loadIgnoredChats();

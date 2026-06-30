@@ -1493,6 +1493,82 @@ const financialFlow = createFlow("financeiro", {
     },
   },
 
+  // ── Importação automática (DogBubble) ─────────────────────────────────────
+
+  "/financeiro/importado": {
+    dynamic: true,
+    options: [],
+    handler: async (ctx) => {
+      const { importedTxId, importedAmount, importedType, importedDescription, importedBankName, importedAccountName } = ctx.state.context;
+      if (!importedTxId) {
+        return { title: "Nenhuma transação pendente.", options: [{ label: "✖️ Fechar", action: "exec", handler: "close" }] };
+      }
+      const emoji = importedType === "income" ? "🟢" : "🔴";
+      const sign = importedType === "income" ? "+" : "-";
+      const typeLabel = importedType === "income" ? "Receita" : "Despesa";
+      const bankLine = importedBankName ? `📱 ${importedBankName}` : "";
+      const accountLine = importedAccountName ? `🏦 ${importedAccountName}` : "";
+      const desc = importedDescription || typeLabel;
+      const details = [bankLine, accountLine].filter(Boolean).join(" · ");
+      const title = `💳 *Transação detectada*\n\n${emoji} *${sign}R$ ${formatMoney(importedAmount)}* — ${desc}${details ? `\n${details}` : ""}`;
+      return {
+        title,
+        options: [
+          { label: "✅ Confirmar", action: "exec", handler: "confirmarTransacaoImportada" },
+          { label: "💰 Editar valor", action: "exec", handler: "iniciarImportEditAmount" },
+          { label: "📝 Editar descrição", action: "exec", handler: "iniciarImportEditDesc" },
+          { label: "🏷️ Categorizar", action: "goto", target: "/financeiro/importado/categoria" },
+          { label: "🏦 Mudar conta", action: "goto", target: "/financeiro/importado/conta" },
+          { label: "🗑️ Ignorar", action: "exec", handler: "ignorarTransacaoImportada" },
+        ],
+      };
+    },
+  },
+
+  "/financeiro/importado/conta": {
+    dynamic: true,
+    options: [],
+    handler: async (ctx) => {
+      let accounts = [];
+      try {
+        const res = await financialClient.listAccounts(ctx.userId);
+        accounts = res?.accounts || [];
+      } catch (e) {
+        logger.warn("[financialFlow] /financeiro/importado/conta error:", e.message);
+      }
+      const options = accounts.map(a => ({
+        label: `🏦 ${a.name} — R$ ${formatMoney(a.balance)}`,
+        action: "exec",
+        handler: "setImportConta",
+        data: { accountId: a.id, accountName: a.name },
+      }));
+      options.push({ label: "↩️ Voltar", action: "back" });
+      return { title: "🏦 Em qual conta registrar?", options };
+    },
+  },
+
+  "/financeiro/importado/categoria": {
+    dynamic: true,
+    options: [],
+    handler: async (ctx) => {
+      let categories = [];
+      try {
+        const res = await financialClient.listCategories(ctx.userId);
+        categories = res?.categories || [];
+      } catch (e) {
+        logger.warn("[financialFlow] /financeiro/importado/categoria error:", e.message);
+      }
+      const options = categories.slice(0, 9).map(c => ({
+        label: `🏷️ ${c.name}`,
+        action: "exec",
+        handler: "setImportCategoria",
+        data: { categoryId: c.id, categoryName: c.name },
+      }));
+      options.push({ label: "↩️ Voltar", action: "back" });
+      return { title: "🏷️ Qual a categoria?", options };
+    },
+  },
+
   // ── Handlers ──────────────────────────────────────────────────────────────
 
   handlers: {
@@ -2575,6 +2651,86 @@ const financialFlow = createFlow("financeiro", {
       } catch (e) {
         logger.error("[financialFlow] confirmarPagamento error:", e.message);
         await ctx.reply("❌ Erro ao registrar pagamento. Tente novamente.");
+        return { noRender: true };
+      }
+    },
+
+    // ── Importação automática (DogBubble) ──────────────────────────────────
+
+    confirmarTransacaoImportada: async (ctx) => {
+      const { importedTxId, importedAmount, importedType, importedDescription } = ctx.state.context;
+      try {
+        await financialClient.confirmTransaction(ctx.userId, importedTxId);
+        const emoji = importedType === "income" ? "🟢" : "🔴";
+        const sign = importedType === "income" ? "+" : "-";
+        await ctx.reply(`✅ *Transação confirmada!*\n\n${emoji} ${sign}R$ ${formatMoney(importedAmount)} — ${importedDescription || ""}`);
+        ctx.state.context.importedTxId = null;
+        ctx.state.context.importedAmount = null;
+        ctx.state.context.importedType = null;
+        ctx.state.context.importedDescription = null;
+        ctx.state.context.importedBankName = null;
+        ctx.state.context.importedAccountName = null;
+        ctx.state.path = "/";
+      } catch (e) {
+        logger.error("[financialFlow] confirmarTransacaoImportada error:", e.message);
+        await ctx.reply("❌ Erro ao confirmar transação.");
+        return { noRender: true };
+      }
+    },
+
+    ignorarTransacaoImportada: async (ctx) => {
+      const { importedTxId } = ctx.state.context;
+      try {
+        if (importedTxId) await financialClient.deleteTransaction(ctx.userId, importedTxId);
+        await ctx.reply("🗑️ Transação ignorada.");
+        ctx.state.context.importedTxId = null;
+        ctx.state.context.importedAmount = null;
+        ctx.state.context.importedType = null;
+        ctx.state.context.importedDescription = null;
+        ctx.state.context.importedBankName = null;
+        ctx.state.context.importedAccountName = null;
+        ctx.state.path = "/";
+      } catch (e) {
+        logger.error("[financialFlow] ignorarTransacaoImportada error:", e.message);
+        await ctx.reply("❌ Erro ao remover transação.");
+        return { noRender: true };
+      }
+    },
+
+    iniciarImportEditAmount: async (ctx) => {
+      ctx.state.context.awaitingImportEditAmount = true;
+      await ctx.reply("💰 Digite o novo valor (ex: 47,90):");
+      return { noRender: true };
+    },
+
+    iniciarImportEditDesc: async (ctx) => {
+      ctx.state.context.awaitingImportEditDesc = true;
+      await ctx.reply("📝 Digite a nova descrição:");
+      return { noRender: true };
+    },
+
+    setImportConta: async (ctx, data) => {
+      const { importedTxId } = ctx.state.context;
+      try {
+        await financialClient.updateTransaction(ctx.userId, importedTxId, { accountId: data.accountId });
+        ctx.state.context.importedAccountName = data.accountName;
+        ctx.state.path = "/financeiro/importado";
+      } catch (e) {
+        logger.error("[financialFlow] setImportConta error:", e.message);
+        await ctx.reply("❌ Erro ao mudar conta.");
+        return { noRender: true };
+      }
+    },
+
+    setImportCategoria: async (ctx, data) => {
+      const { importedTxId } = ctx.state.context;
+      try {
+        await financialClient.updateTransaction(ctx.userId, importedTxId, { categoryId: data.categoryId });
+        ctx.state.context.importedCategoryName = data.categoryName;
+        ctx.state.path = "/financeiro/importado";
+      } catch (e) {
+        logger.error("[financialFlow] setImportCategoria error:", e.message);
+        await ctx.reply("❌ Erro ao categorizar.");
         return { noRender: true };
       }
     },

@@ -788,6 +788,7 @@ class FlowManager {
           s?.context?.awaitingTransferAmount ||
           s?.context?.awaitingEditTxAmount || s?.context?.awaitingEditTxDesc ||
           s?.context?.awaitingEditInstallmentAmount ||
+          s?.context?.awaitingImportEditAmount || s?.context?.awaitingImportEditDesc ||
           s?.context?.awaitingNotifHour ||
           s?.context?.awaitingNlpNovaCategoria || s?.context?.awaitingNlpNovaSubcategoria) {
         state = s;
@@ -1154,6 +1155,54 @@ class FlowManager {
       }
       return true;
     }
+
+    if (state.context.awaitingImportEditAmount) {
+      const amount = parseAmount(trimmed);
+      if (amount === null || amount <= 0) {
+        await client.sendMessage(chatId, "❌ Valor inválido. Digite o valor em R$ (ex: 47,90):");
+        return true;
+      }
+      state.context.awaitingImportEditAmount = false;
+      state.context.importedAmount = amount;
+      await storage.saveState(stateUserId, flowId, state);
+      const financialClient = require("../../services/financialClient");
+      try {
+        await financialClient.updateTransaction(stateUserId, state.context.importedTxId, { amount });
+        await storage.saveState(stateUserId, flowId, state);
+      } catch (e) {
+        logFinancialError({ userId: stateUserId, source: "text_input", action: "awaitingImportEditAmount", error: e });
+        await client.sendMessage(chatId, "❌ Erro ao atualizar valor.");
+        return true;
+      }
+      state.path = "/financeiro/importado";
+      await storage.saveState(stateUserId, flowId, state);
+      await this._renderNode(client, chatId, stateUserId, flowId, "/financeiro/importado");
+      return true;
+    }
+
+    if (state.context.awaitingImportEditDesc) {
+      if (!trimmed) {
+        await client.sendMessage(chatId, "❌ Descrição inválida. Envie a nova descrição:");
+        return true;
+      }
+      state.context.awaitingImportEditDesc = false;
+      state.context.importedDescription = trimmed;
+      await storage.saveState(stateUserId, flowId, state);
+      const financialClient = require("../../services/financialClient");
+      try {
+        await financialClient.updateTransaction(stateUserId, state.context.importedTxId, { description: trimmed });
+        await storage.saveState(stateUserId, flowId, state);
+      } catch (e) {
+        logFinancialError({ userId: stateUserId, source: "text_input", action: "awaitingImportEditDesc", error: e });
+        await client.sendMessage(chatId, "❌ Erro ao atualizar descrição.");
+        return true;
+      }
+      state.path = "/financeiro/importado";
+      await storage.saveState(stateUserId, flowId, state);
+      await this._renderNode(client, chatId, stateUserId, flowId, "/financeiro/importado");
+      return true;
+    }
+
 
     // ���� Horário de notificações ����������������������������������������������������������������������������������������
 
