@@ -167,6 +167,7 @@ class FlowManager {
     const flow = this.flows.get(flowId);
 
     // Verifica política da opção (enabled/vip_only/admin_only)
+    logger.info(`[FlowPolicy] _executeOption flow=${flowId} optionKey=${option.optionKey ?? "(none)"} label="${option.label}"`);
     if (option.optionKey) {
       const policies = await _getFlowOptionPolicies();
       const p = policies[`${flowId}:${option.optionKey}`];
