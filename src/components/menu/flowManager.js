@@ -400,6 +400,7 @@ class FlowManager {
       handler: opt.handler, // handler name if action='exec'
       target: opt.target, // target path if action='goto'
       data: opt.data, // additional data for handler
+      optionKey: opt.optionKey || null,
     }));
 
     const pollResult = await polls.createPoll(client, chatId, renderTitle, optionLabels, {
