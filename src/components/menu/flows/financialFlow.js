@@ -177,34 +177,48 @@ const financialFlow = createFlow("financeiro", {
     dynamic: true,
     options: [],
     handler: async (ctx) => {
+      const now = new Date();
+      const nextMonth = (now.getMonth() + 1) % 12;
+      const nextYear = now.getMonth() === 11 ? now.getFullYear() + 1 : now.getFullYear();
+
+      let hasTxs = false;
+      let hasNextMonthTxs = false;
       try {
-        const res = await financialClient.listTransactions(ctx.userId, { period: "all", limit: 1 });
-        if (!res?.transactions?.length) {
-          await ctx.reply("📋 Você ainda não tem nenhuma transação registrada.");
-          return {
-            title: "O que deseja fazer?",
-            options: [
-              { label: "↩️ Voltar ao menu", action: "goto", target: "/" },
-              { label: "✖️ Fechar", action: "exec", handler: "close" },
-            ],
-          };
-        }
+        const [txsRes, schedRes] = await Promise.all([
+          financialClient.listTransactions(ctx.userId, { period: "all", limit: 1 }),
+          financialClient.listScheduled(ctx.userId).catch(() => null),
+        ]);
+        hasTxs = !!(txsRes?.transactions?.length);
+        hasNextMonthTxs = (schedRes?.transactions || []).some(t => {
+          const d = new Date(t.date);
+          return d.getMonth() === nextMonth && d.getFullYear() === nextYear;
+        });
       } catch (e) {
         logger.warn("[financialFlow] /extrato check error:", e.message);
       }
-      const now = new Date();
+      if (!hasTxs) {
+        await ctx.reply("📋 Você ainda não tem nenhuma transação registrada.");
+        return {
+          title: "O que deseja fazer?",
+          options: [
+            { label: "↩️ Voltar ao menu", action: "goto", target: "/" },
+            { label: "✖️ Fechar", action: "exec", handler: "close" },
+          ],
+        };
+      }
       const thisMonthName = MONTHS_PT[now.getMonth()];
       const lastMonthName = MONTHS_PT[(now.getMonth() + 11) % 12];
-      const nextMonthName = MONTHS_PT[(now.getMonth() + 1) % 12];
-      return {
-        title: "📋 Extrato — período",
-        options: [
-          { label: `📅 Lançamentos futuros (${nextMonthName})`, action: "exec", handler: "extratoMes", data: { period: "next" } },
-          { label: `📅 Este mês (${thisMonthName})`, action: "exec", handler: "extratoMes", data: { period: "current" } },
-          { label: `📅 Mês anterior (${lastMonthName})`, action: "exec", handler: "extratoMes", data: { period: "last" } },
-          { label: "↩️ Voltar", action: "back" },
-        ],
-      };
+      const nextMonthName = MONTHS_PT[nextMonth];
+      const options = [];
+      if (hasNextMonthTxs) {
+        options.push({ label: `📅 Lançamentos futuros (${nextMonthName})`, action: "exec", handler: "extratoMes", data: { period: "next" } });
+      }
+      options.push(
+        { label: `📅 Este mês (${thisMonthName})`, action: "exec", handler: "extratoMes", data: { period: "current" } },
+        { label: `📅 Mês anterior (${lastMonthName})`, action: "exec", handler: "extratoMes", data: { period: "last" } },
+        { label: "↩️ Voltar", action: "back" },
+      );
+      return { title: "📋 Extrato — período", options };
     },
   },
 
@@ -278,7 +292,8 @@ const financialFlow = createFlow("financeiro", {
 
           ctx.state.context.extratoTransacoes = txs.map(t => ({
             id: t.id, amount: t.amount, description: t.description, type: t.type,
-            date: t.date, installmentGroupId: null, installmentNumber: null, installmentTotal: null,
+            date: t.date, recurrence: t.recurrence || null,
+            installmentGroupId: null, installmentNumber: null, installmentTotal: null,
           }));
           return {
             title: `Lançamentos — ${monthName}`,
@@ -322,7 +337,8 @@ const financialFlow = createFlow("financeiro", {
 
         ctx.state.context.extratoTransacoes = txs.map(t => ({
           id: t.id, amount: t.amount, description: t.description, type: t.type,
-          date: t.date, installmentGroupId: t.installmentGroupId || null,
+          date: t.date, recurrence: t.recurrence || null,
+          installmentGroupId: t.installmentGroupId || null,
           installmentNumber: t.installmentNumber || null, installmentTotal: t.installmentTotal || null,
         }));
 
@@ -1259,6 +1275,7 @@ const financialFlow = createFlow("financeiro", {
             description: t.description,
             type: t.type,
             date: t.date,
+            recurrence: t.recurrence || null,
             installmentGroupId: t.installmentGroupId,
             installmentNumber: t.installmentNumber,
             installmentTotal: t.installmentTotal,
@@ -1274,18 +1291,31 @@ const financialFlow = createFlow("financeiro", {
     dynamic: true,
     options: [],
     handler: async (ctx) => {
-      const { editingTxInstallmentGroupId, editingTxInstallmentNumber, editingTxInstallmentTotal } = ctx.state.context;
+      const { editingTxInstallmentGroupId, editingTxInstallmentNumber, editingTxInstallmentTotal, editingTxRecurrence } = ctx.state.context;
       const options = [
         { label: "💰 Editar valor", action: "exec", handler: "awaitEditTxAmount" },
         { label: "📝 Editar descrição", action: "exec", handler: "awaitEditTxDesc" },
-        { label: "🗑️ Excluir", action: "exec", handler: "excluirLancamento" },
       ];
+      if (editingTxRecurrence) {
+        options.push({ label: "🗑️ Cancelar recorrência", action: "goto", target: "/lancamentos/editar/confirmar-excluir-recorrente" });
+      } else {
+        options.push({ label: "🗑️ Excluir", action: "exec", handler: "excluirLancamento" });
+      }
       if (editingTxInstallmentGroupId) {
         options.push({ label: `🗂️ Gerenciar parcelas (${editingTxInstallmentNumber}/${editingTxInstallmentTotal})`, action: "goto", target: "/lancamentos/parcelas" });
       }
       options.push({ label: "↩️ Voltar", action: "back" });
       return { title: "✏️ O que deseja fazer?", options };
     },
+  },
+
+  "/lancamentos/editar/confirmar-excluir-recorrente": {
+    dynamic: false,
+    title: "⚠️ Cancelar recorrência?\n\nAo excluir este lançamento, todos os ciclos futuros também serão cancelados — pois eles ainda não foram gerados.",
+    options: [
+      { label: "🗑️ Sim, cancelar recorrência", action: "exec", handler: "excluirLancamento" },
+      { label: "↩️ Não, manter", action: "back" },
+    ],
   },
 
   "/lancamentos/parcelas": {
@@ -2229,6 +2259,7 @@ const financialFlow = createFlow("financeiro", {
       ctx.state.context.editingTxId = data.txId;
       ctx.state.context.editingTxAmount = data.amount;
       ctx.state.context.editingTxDescription = data.description;
+      ctx.state.context.editingTxRecurrence = data.recurrence || null;
       ctx.state.context.editingTxInstallmentGroupId = data.installmentGroupId || null;
       ctx.state.context.editingTxInstallmentNumber = data.installmentNumber || null;
       ctx.state.context.editingTxInstallmentTotal = data.installmentTotal || null;
