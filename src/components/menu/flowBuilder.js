@@ -47,6 +47,7 @@ function createFlow(flowId, definition) {
       options: node.options || [],
       dynamic: node.dynamic || false,
       handler: node.handler || null,
+      staticOptionKeys: node.staticOptionKeys || null,
     };
   }
 
