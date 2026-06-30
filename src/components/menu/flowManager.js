@@ -170,28 +170,43 @@ class FlowManager {
     if (option.optionKey) {
       const policies = await _getFlowOptionPolicies();
       const p = policies[`${flowId}:${option.optionKey}`];
+
+      // Resolve perfil do usuário para o log (e para verificação de vip/admin)
+      let userIsVip = false;
+      let userIsAdmin = false;
+      try {
+        const { lookupByIdentifier } = require("../../utils/whatsapp/getUserData");
+        const lu = await lookupByIdentifier(userId);
+        userIsVip = lu && lu.found ? !!lu.confessions_vip : false;
+        userIsAdmin = lu && lu.found ? !!lu.isAdmin : false;
+      } catch (e) {
+        logger.warn("[FlowManager] user lookup para policy falhou:", e && e.message);
+      }
+
+      // Log de debug: política da opção + perfil do executor
+      const flowPolicies = Object.entries(policies)
+        .filter(([k]) => k.startsWith(`${flowId}:`))
+        .map(([k, v]) => `${k.slice(flowId.length + 1)}[enabled=${v.enabled},vip=${v.vipOnly},admin=${v.adminOnly}]`)
+        .join(" | ");
+      logger.info(
+        `[FlowPolicy] flow=${flowId} opção=${option.optionKey} ` +
+        `política=${p ? `enabled=${p.enabled},vip=${p.vipOnly},admin=${p.adminOnly}` : "sem política"} ` +
+        `usuário=${userId} isVip=${userIsVip} isAdmin=${userIsAdmin} ` +
+        `políticas do flow: [${flowPolicies || "nenhuma"}]`,
+      );
+
       if (p) {
         if (!p.enabled) {
           await client.sendMessage(chatId, "⏸ Esta opção está temporariamente desativada.");
           return;
         }
-        if (p.vipOnly || p.adminOnly) {
-          try {
-            const { lookupByIdentifier } = require("../../utils/whatsapp/getUserData");
-            const lu = await lookupByIdentifier(userId);
-            const userIsVip = lu && lu.found ? !!lu.confessions_vip : false;
-            const userIsAdmin = lu && lu.found ? !!lu.isAdmin : false;
-            if (p.vipOnly && !userIsVip) {
-              await client.sendMessage(chatId, "⭐ Esta opção é exclusiva para membros VIP.");
-              return;
-            }
-            if (p.adminOnly && !userIsAdmin) {
-              await client.sendMessage(chatId, "👑 Esta opção é exclusiva para administradores.");
-              return;
-            }
-          } catch (e) {
-            logger.warn("[FlowManager] user lookup para policy falhou:", e && e.message);
-          }
+        if (p.vipOnly && !userIsVip) {
+          await client.sendMessage(chatId, "⭐ Esta opção é exclusiva para membros VIP.");
+          return;
+        }
+        if (p.adminOnly && !userIsAdmin) {
+          await client.sendMessage(chatId, "👑 Esta opção é exclusiva para administradores.");
+          return;
         }
       }
     }
