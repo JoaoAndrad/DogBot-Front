@@ -217,7 +217,7 @@ function selectedIndexesFromVoteAndPoll(vote, storedPoll) {
  */
 async function processVoteViaBackend(pollId, vote, client) {
   try {
-    logger.debug(`[processor] Processing vote via backend for poll ${pollId}`);
+    console.log(`[FlowPolicy-DEBUG] processVoteViaBackend chamado pollId=${String(pollId).slice(0,40)}`);
 
     // Extract voter ID
     let voterId =
@@ -303,13 +303,7 @@ function sameWaPhoneNum(a, b) {
 async function executeAction(result, client) {
   const { action, actionType, poll, handler, target, data } = result;
 
-  logger.debug(`[processor] executeAction received:`, {
-    action,
-    actionType,
-    handler,
-    target,
-    dataKeys: data ? Object.keys(data) : [],
-  });
+  console.log(`[FlowPolicy-DEBUG] executeAction action=${action} actionType=${actionType} handler=${handler} target=${target}`);
 
   if (actionType === "noop" || action === "noop") {
     return;
