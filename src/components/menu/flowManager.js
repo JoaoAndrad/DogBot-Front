@@ -452,22 +452,33 @@ class FlowManager {
     // Resolve suggested category to an actual category ID from the user's vault
     let suggestedCategoryId = null;
     let suggestedCategoryName = parsed.suggestedCategoryName || null;
-    if (suggestedCategoryName && (parsed.categoryConfidence || 0) >= 0.4) {
-      try {
-        const catsRes = await financialClient.listCategories(resolvedId);
-        const allCats = (catsRes?.categories || []).flatMap((c) => [c, ...(c.children || [])]);
-        const { matchCategory } = require("../../utils/parses/categoryMatcher");
-        const catNames = allCats.map((c) => c.name);
+    try {
+      const catsRes = await financialClient.listCategories(resolvedId);
+      const allCats = (catsRes?.categories || []).flatMap((c) => [c, ...(c.children || [])]);
+      const { matchCategory, normalize } = require("../../utils/parses/categoryMatcher");
+      const catNames = allCats.map((c) => c.name);
+
+      // 1. Try keyword-index fuzzy match (predefined categories)
+      let found = null;
+      if (suggestedCategoryName && (parsed.categoryConfidence || 0) >= 0.4) {
         const refined = matchCategory(suggestedCategoryName, catNames) || matchCategory(parsed.description, catNames);
-        if (refined) {
-          const found = allCats.find((c) => c.name === refined.name);
-          if (found) {
-            suggestedCategoryId = found.id;
-            suggestedCategoryName = found.name;
-          }
-        }
-      } catch (_) {}
-    }
+        if (refined) found = allCats.find((c) => c.name === refined.name) || null;
+      }
+
+      // 2. Try direct name match against user's own categories (covers custom subcategories like "SquareCloud")
+      if (!found && parsed.description) {
+        const normDesc = normalize(parsed.description);
+        // Exact → substring → levenshtein ≤ 1
+        found = allCats.find((c) => normalize(c.name) === normDesc)
+          || allCats.find((c) => normDesc.includes(normalize(c.name)) || normalize(c.name).includes(normDesc))
+          || null;
+      }
+
+      if (found) {
+        suggestedCategoryId = found.id;
+        suggestedCategoryName = found.name;
+      }
+    } catch (_) {}
 
     const pendingNlpTransaction = {
       type,

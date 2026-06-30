@@ -653,13 +653,38 @@ const financialFlow = createFlow("financeiro", {
       const catNote = tx.suggestedCategoryName
         ? `\n🏷️ Categoria sugerida: *${tx.suggestedCategoryName}*`
         : "";
+      const catLabel = tx.suggestedCategoryName ? `*${tx.suggestedCategoryName}*` : "_nenhuma_";
       return {
-        title: `Registrar R$ ${formatMoney(tx.amount)}${installNote}${desc} como ${typeLabel} em *${tx.accountName}* (${dateLabel})${pendingNote}?${recurrenceNote}${catNote}`,
+        title: `Registrar R$ ${formatMoney(tx.amount)}${installNote}${desc} como ${typeLabel} em *${tx.accountName}* (${dateLabel})${pendingNote}?${recurrenceNote}\n🏷️ Categoria: ${catLabel}`,
         options: [
           { label: "✅ Sim, registrar", action: "exec", handler: "confirmarNlp" },
+          { label: "🏷️ Editar categoria", action: "goto", target: "/nlp-confirm/categoria" },
           { label: "❌ Cancelar", action: "exec", handler: "cancelarNlp" },
         ],
       };
+    },
+  },
+
+  "/nlp-confirm/categoria": {
+    dynamic: true,
+    options: [],
+    handler: async (ctx) => {
+      let allCats = [];
+      try {
+        const res = await financialClient.listCategories(ctx.userId);
+        allCats = (res?.categories || []).flatMap(c => [c, ...(c.children || []).map(s => ({ ...s, _parentName: c.name }))]);
+      } catch (e) {
+        logger.warn("[financialFlow] /nlp-confirm/categoria error:", e.message);
+      }
+      const options = allCats.map(c => ({
+        label: c._parentName ? `↳ ${c.name} (${c._parentName})` : c.name,
+        action: "exec",
+        handler: "setCategoriaNlp",
+        data: { categoryId: c.id, categoryName: c.name },
+      }));
+      options.push({ label: "🚫 Sem categoria", action: "exec", handler: "setCategoriaNlp", data: { categoryId: null, categoryName: null } });
+      options.push({ label: "↩️ Voltar", action: "back" });
+      return { title: "🏷️ Escolha a categoria:", options };
     },
   },
 
@@ -1722,6 +1747,13 @@ const financialFlow = createFlow("financeiro", {
 
     // ── NLP ───────────────────────────────────────────────────────────────────
 
+    setCategoriaNlp: async (ctx, data) => {
+      if (!ctx.state.context.pendingNlpTransaction) return { noRender: true };
+      ctx.state.context.pendingNlpTransaction.suggestedCategoryId = data.categoryId || null;
+      ctx.state.context.pendingNlpTransaction.suggestedCategoryName = data.categoryName || null;
+      ctx.state.path = "/nlp-confirm";
+    },
+
     confirmarNlp: async (ctx) => {
       const tx = ctx.state.context.pendingNlpTransaction;
       if (!tx) return { end: true };
@@ -1734,6 +1766,7 @@ const financialFlow = createFlow("financeiro", {
             type: tx.type,
             date: tx.date,
             installmentCount: tx.installmentCount,
+            categoryId: tx.suggestedCategoryId || undefined,
           });
           const amountEach = tx.amount / tx.installmentCount;
           await ctx.reply(
