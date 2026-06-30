@@ -12,7 +12,8 @@
  * }
  */
 
-const AMOUNT_RE = /R?\$?\s*(\d{1,3}(?:[.,]\d{3})*(?:[.,]\d{1,2})?)/i;
+// Formatted (3.000,50 / 3,000.50) OR plain integer/decimal (3000 / 3000,50)
+const AMOUNT_RE = /R?\$?\s*(\d{1,3}(?:[.,]\d{3})+(?:[.,]\d{1,2})?|\d+(?:[.,]\d{1,2})?)/i;
 const INSTALLMENT_RE = /\b(\d+)\s*[xX×]\b|\bem\s+(\d+)\s+(?:vezes?|parcelas?)\b|\bparcelad[ao]\s+em\s+(\d+)\b|\b(\d+)\s+parcelas?\b/i;
 
 const MONTHLY_RE = /\btodo\s+(dia\s+(\d{1,2})|m[eê]s)\b|\bmensalmente\b|\btodo\s+m[eê]s\b/i;
@@ -126,12 +127,13 @@ function parseInstallments(text) {
 }
 
 function extractDescription(text) {
-  // Remove triggers, amount, date words, filler words
+  // Remove triggers, amount, installment pattern, date words, filler words
   let desc = text
     .replace(AMOUNT_RE, "")
+    .replace(INSTALLMENT_RE, "")
     .replace(/R?\$\s*/gi, "")
     .replace(/\b(gast[eouia]i?|paguei|debit[ao]u?|comprei|recebi|entrou|recebendo|ganhei|me pagaram|depositaram|caiu|transfer[ei]|transferindo|movi|movendo|vou|vou pagar|pagarei|vou gastar|gastarei)\b/gi, "")
-    .replace(/\b(de|do|da|no|na|em|com|para|pra|um|uma|uns|umas|hoje|ontem|amanhã|dia|reais|real|brl)\b/gi, "")
+    .replace(/\b(de|do|da|no|na|em|por|com|para|pra|um|uma|uns|umas|hoje|ontem|amanhã|dia|reais|real|brl)\b/gi, "")
     .replace(/\s{2,}/g, " ")
     .trim();
   return desc || null;
