@@ -445,8 +445,9 @@ class FlowManager {
       // onVote removed - now processed via backend through processor.js
     });
 
-    // Enquetes do flow financeiro são apagadas da nossa sessão após 2 minutos
-    if (flowId === "financeiro" && pollResult?.sent) {
+    // No flow financeiro, só enquetes com dados sensíveis (valores, despesas, nomes de
+    // contas etc.) são apagadas da nossa sessão após 2 minutos. Enquetes de menu são mantidas.
+    if (flowId === "financeiro" && node.sensitive === true && pollResult?.sent) {
       setTimeout(() => pollResult.sent.delete(false).catch(() => {}), 2 * 60 * 1000);
     }
   }

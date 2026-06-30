@@ -235,6 +235,7 @@ const financialFlow = createFlow("financeiro", {
 
   "/extrato/ver": {
     dynamic: true,
+    sensitive: true, // mostra valores e descrições de transações
     options: [],
     handler: async (ctx) => {
       const { extratoPeriod = "current", extratoPage = 0 } = ctx.state.context;
@@ -402,6 +403,7 @@ const financialFlow = createFlow("financeiro", {
 
   "/contas/editar": {
     dynamic: true,
+    sensitive: true, // lista nomes de contas
     options: [],
     handler: async (ctx) => {
       try {
@@ -441,6 +443,7 @@ const financialFlow = createFlow("financeiro", {
 
   "/contas/editar/opcoes": {
     dynamic: true,
+    sensitive: true, // mostra nome e saldo da conta
     options: [],
     handler: async (ctx) => {
       const { editingAccountName, editingAccountType, editingAccountBalance, editingAccountIsDefault } = ctx.state.context;
@@ -475,6 +478,7 @@ const financialFlow = createFlow("financeiro", {
 
   "/contas/editar/confirmar": {
     dynamic: true,
+    sensitive: true, // mostra nome da conta
     options: [],
     handler: async (ctx) => {
       const { editingAccountName, pendingEditName, pendingEditType } = ctx.state.context;
@@ -499,6 +503,7 @@ const financialFlow = createFlow("financeiro", {
 
   "/contas/editar/saldo-ajuste": {
     dynamic: true,
+    sensitive: true, // mostra valores de saldo
     options: [],
     handler: async (ctx) => {
       const { editingAccountName, editingAccountBalance, pendingEditBalance } = ctx.state.context;
@@ -531,6 +536,7 @@ const financialFlow = createFlow("financeiro", {
 
   "/contas/confirmar": {
     dynamic: true,
+    sensitive: true, // mostra nome e saldo da conta
     options: [],
     handler: async (ctx) => {
       const { pendingAccountName, pendingAccountType, pendingAccountBalance } = ctx.state.context;
@@ -699,6 +705,7 @@ const financialFlow = createFlow("financeiro", {
 
   "/orcamentos/confirmar": {
     dynamic: true,
+    sensitive: true, // mostra valor de orçamento
     options: [],
     handler: async (ctx) => {
       const { pendingBudgetLimit, pendingBudgetCategoryName } = ctx.state.context;
@@ -717,6 +724,7 @@ const financialFlow = createFlow("financeiro", {
 
   "/nlp-confirm": {
     dynamic: true,
+    sensitive: true, // mostra valor, conta e categoria da transação
     options: [],
     handler: async (ctx) => {
       const tx = ctx.state.context.pendingNlpTransaction;
@@ -824,6 +832,7 @@ const financialFlow = createFlow("financeiro", {
 
   "/agendamentos": {
     dynamic: true,
+    sensitive: true, // opções mostram valores e descrições de lançamentos
     options: [],
     handler: async (ctx) => {
       try {
@@ -862,6 +871,7 @@ const financialFlow = createFlow("financeiro", {
 
   "/agendamentos/ver": {
     dynamic: true,
+    sensitive: true, // mostra valor e descrição do agendamento
     options: [],
     handler: async (ctx) => {
       const t = ctx.state.context.currentScheduledTx;
@@ -940,6 +950,7 @@ const financialFlow = createFlow("financeiro", {
 
   "/agendamentos/novo/conta": {
     dynamic: true,
+    sensitive: true, // opções mostram nome e saldo da conta
     options: [],
     handler: async (ctx) => {
       let accounts = [];
@@ -962,6 +973,7 @@ const financialFlow = createFlow("financeiro", {
 
   "/agendamentos/novo/confirmar": {
     dynamic: true,
+    sensitive: true, // mostra valor, descrição e conta do agendamento
     options: [],
     handler: async (ctx) => {
       const DOW_LABELS = ["Domingo","Segunda-Feira","Terça-Feira","Quarta-Feira","Quinta-Feira","Sexta-Feira","Sábado"];
@@ -993,6 +1005,7 @@ const financialFlow = createFlow("financeiro", {
 
   "/cartoes": {
     dynamic: true,
+    sensitive: true, // opções mostram nome do cartão e valor da fatura
     options: [],
     handler: async (ctx) => {
       let cards = [];
@@ -1021,6 +1034,7 @@ const financialFlow = createFlow("financeiro", {
 
   "/cartoes/ver": {
     dynamic: true,
+    sensitive: true, // mostra valores da fatura
     options: [],
     handler: async (ctx) => {
       const { currentCardId } = ctx.state.context;
@@ -1074,6 +1088,7 @@ const financialFlow = createFlow("financeiro", {
 
   "/cartoes/vincular": {
     dynamic: true,
+    sensitive: true, // opções mostram nomes de contas
     options: [],
     handler: async (ctx) => {
       let accounts = [];
@@ -1097,6 +1112,7 @@ const financialFlow = createFlow("financeiro", {
 
   "/cartoes/confirmar": {
     dynamic: true,
+    sensitive: true, // mostra nome do cartão e limite
     options: [],
     handler: async (ctx) => {
       const { pendingCardName, pendingCardLimit, pendingCardClosingDay, pendingCardDueDay, pendingCardLinkedAccountId } = ctx.state.context;
@@ -1113,6 +1129,7 @@ const financialFlow = createFlow("financeiro", {
 
   "/cartoes/pagar/conta": {
     dynamic: true,
+    sensitive: true, // opções mostram nome e saldo da conta
     options: [],
     handler: async (ctx) => {
       let accounts = [];
@@ -1135,6 +1152,7 @@ const financialFlow = createFlow("financeiro", {
 
   "/cartoes/pagar/valor": {
     dynamic: true,
+    sensitive: true, // mostra valor total da fatura
     options: [],
     handler: async (ctx) => {
       const { currentCardId } = ctx.state.context;
@@ -1164,6 +1182,7 @@ const financialFlow = createFlow("financeiro", {
 
   "/cartoes/pagar/confirmar": {
     dynamic: true,
+    sensitive: true, // mostra valor do pagamento e nome do cartão
     options: [],
     handler: async (ctx) => {
       const { pendingPaymentAmount, currentInvoiceTotal, currentCardName } = ctx.state.context;
@@ -1183,6 +1202,7 @@ const financialFlow = createFlow("financeiro", {
 
   "/transferencia": {
     dynamic: true,
+    sensitive: true, // opções mostram nome e saldo da conta
     options: [],
     handler: async (ctx) => {
       let accounts = [];
@@ -1215,6 +1235,7 @@ const financialFlow = createFlow("financeiro", {
 
   "/transferencia/destino": {
     dynamic: true,
+    sensitive: true, // opções mostram nome e saldo da conta
     options: [],
     handler: async (ctx) => {
       const { pendingTransferFrom } = ctx.state.context;
@@ -1248,6 +1269,7 @@ const financialFlow = createFlow("financeiro", {
 
   "/transferencia/confirmar": {
     dynamic: true,
+    sensitive: true, // mostra valor e nomes das contas
     options: [],
     handler: async (ctx) => {
       const { pendingTransferFromName, pendingTransferToName, pendingTransferAmount } = ctx.state.context;
@@ -1265,6 +1287,7 @@ const financialFlow = createFlow("financeiro", {
 
   "/lancamentos/editar": {
     dynamic: true,
+    sensitive: true, // opções mostram valores e descrições de lançamentos
     options: [],
     handler: async (ctx) => {
       const txs = ctx.state.context.extratoTransacoes || [];
@@ -1394,6 +1417,7 @@ const financialFlow = createFlow("financeiro", {
 
   "/config/conta-padrao": {
     dynamic: true,
+    sensitive: true, // opções mostram nomes de contas
     options: [],
     handler: async (ctx) => {
       let accounts = [];
@@ -1497,6 +1521,7 @@ const financialFlow = createFlow("financeiro", {
 
   "/financeiro/importado": {
     dynamic: true,
+    sensitive: true, // mostra valor, banco e conta da transação importada
     options: [],
     handler: async (ctx) => {
       const { importedTxId, importedAmount, importedType, importedDescription, importedBankName, importedAccountName } = ctx.state.context;
@@ -1506,7 +1531,9 @@ const financialFlow = createFlow("financeiro", {
       const emoji = importedType === "income" ? "🟢" : "🔴";
       const sign = importedType === "income" ? "+" : "-";
       const typeLabel = importedType === "income" ? "Receita" : "Despesa";
-      const bankLine = importedBankName ? `📱 ${importedBankName}` : "";
+      const sameBank = importedBankName && importedAccountName &&
+        importedBankName.toLowerCase() === importedAccountName.toLowerCase();
+      const bankLine = importedBankName && !sameBank ? `📱 ${importedBankName}` : "";
       const accountLine = importedAccountName ? `🏦 ${importedAccountName}` : "";
       const desc = importedDescription || typeLabel;
       const details = [bankLine, accountLine].filter(Boolean).join(" · ");
@@ -1527,6 +1554,7 @@ const financialFlow = createFlow("financeiro", {
 
   "/financeiro/importado/conta": {
     dynamic: true,
+    sensitive: true, // opções mostram nome e saldo da conta
     options: [],
     handler: async (ctx) => {
       let accounts = [];
