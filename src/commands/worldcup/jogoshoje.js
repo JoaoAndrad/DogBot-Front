@@ -76,12 +76,14 @@ function formatMatch(m) {
       const penGoals = wentToPen ? allGoals.slice(regularCount + etGoalCount) : [];
 
       // Tempo regular
+      lines.push("");
       if (regularGoals.length) {
         lines.push("*Tempo regular:*");
         regularGoals.forEach((g) => lines.push(formatGoalLine(g)));
       }
 
       // Prorrogação
+      lines.push("");
       if (etGoals.length) {
         lines.push("*Prorrogação:*");
         etGoals.forEach((g) => lines.push(formatGoalLine(g)));
@@ -91,6 +93,7 @@ function formatMatch(m) {
 
       // Pênaltis
       if (wentToPen) {
+        lines.push("");
         const penScore = m.penalties_home != null && m.penalties_away != null
           ? ` (${m.home_team.split(" ")[0]} ${m.penalties_home}–${m.penalties_away} ${m.away_team.split(" ")[0]})`
           : "";
