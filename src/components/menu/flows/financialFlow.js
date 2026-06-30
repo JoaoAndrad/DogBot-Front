@@ -292,7 +292,8 @@ const financialFlow = createFlow("financeiro", {
 
           ctx.state.context.extratoTransacoes = txs.map(t => ({
             id: t.id, amount: t.amount, description: t.description, type: t.type,
-            date: t.date, recurrence: t.recurrence || null,
+            date: t.date, accountId: t.accountId || null, categoryId: t.categoryId || null,
+            recurrence: t.recurrence || null, recurrenceDay: t.recurrenceDay != null ? t.recurrenceDay : null,
             installmentGroupId: null, installmentNumber: null, installmentTotal: null,
           }));
           return {
@@ -337,7 +338,8 @@ const financialFlow = createFlow("financeiro", {
 
         ctx.state.context.extratoTransacoes = txs.map(t => ({
           id: t.id, amount: t.amount, description: t.description, type: t.type,
-          date: t.date, recurrence: t.recurrence || null,
+          date: t.date, accountId: t.accountId || null, categoryId: t.categoryId || null,
+          recurrence: t.recurrence || null, recurrenceDay: t.recurrenceDay != null ? t.recurrenceDay : null,
           installmentGroupId: t.installmentGroupId || null,
           installmentNumber: t.installmentNumber || null, installmentTotal: t.installmentTotal || null,
         }));
@@ -1275,7 +1277,10 @@ const financialFlow = createFlow("financeiro", {
             description: t.description,
             type: t.type,
             date: t.date,
+            accountId: t.accountId || null,
+            categoryId: t.categoryId || null,
             recurrence: t.recurrence || null,
+            recurrenceDay: t.recurrenceDay != null ? t.recurrenceDay : null,
             installmentGroupId: t.installmentGroupId,
             installmentNumber: t.installmentNumber,
             installmentTotal: t.installmentTotal,
@@ -1292,28 +1297,37 @@ const financialFlow = createFlow("financeiro", {
     options: [],
     handler: async (ctx) => {
       const { editingTxInstallmentGroupId, editingTxInstallmentNumber, editingTxInstallmentTotal, editingTxRecurrence } = ctx.state.context;
-      const options = [
-        { label: "💰 Editar valor", action: "exec", handler: "awaitEditTxAmount" },
-        { label: "📝 Editar descrição", action: "exec", handler: "awaitEditTxDesc" },
-      ];
+      let options;
       if (editingTxRecurrence) {
-        options.push({ label: "🗑️ Cancelar recorrência", action: "goto", target: "/lancamentos/editar/confirmar-excluir-recorrente" });
+        options = [
+          { label: "💰 Editar valor — somente este", action: "exec", handler: "setEditScope", data: { action: "amount", onlyThis: true } },
+          { label: "💰 Editar valor — este e futuros", action: "exec", handler: "setEditScope", data: { action: "amount", onlyThis: false } },
+          { label: "📝 Descrição — somente este", action: "exec", handler: "setEditScope", data: { action: "desc", onlyThis: true } },
+          { label: "📝 Descrição — este e futuros", action: "exec", handler: "setEditScope", data: { action: "desc", onlyThis: false } },
+          { label: "🗑️ Apagar somente este", action: "exec", handler: "apagarSomenteEste" },
+          { label: "🗑️ Apagar este e os futuros", action: "goto", target: "/lancamentos/editar/confirmar-excluir-recorrente" },
+          { label: "↩️ Voltar", action: "back" },
+        ];
       } else {
-        options.push({ label: "🗑️ Excluir", action: "exec", handler: "excluirLancamento" });
+        options = [
+          { label: "💰 Editar valor", action: "exec", handler: "awaitEditTxAmount" },
+          { label: "📝 Editar descrição", action: "exec", handler: "awaitEditTxDesc" },
+          { label: "🗑️ Excluir", action: "exec", handler: "excluirLancamento" },
+        ];
+        if (editingTxInstallmentGroupId) {
+          options.push({ label: `🗂️ Gerenciar parcelas (${editingTxInstallmentNumber}/${editingTxInstallmentTotal})`, action: "goto", target: "/lancamentos/parcelas" });
+        }
+        options.push({ label: "↩️ Voltar", action: "back" });
       }
-      if (editingTxInstallmentGroupId) {
-        options.push({ label: `🗂️ Gerenciar parcelas (${editingTxInstallmentNumber}/${editingTxInstallmentTotal})`, action: "goto", target: "/lancamentos/parcelas" });
-      }
-      options.push({ label: "↩️ Voltar", action: "back" });
       return { title: "✏️ O que deseja fazer?", options };
     },
   },
 
   "/lancamentos/editar/confirmar-excluir-recorrente": {
     dynamic: false,
-    title: "⚠️ Cancelar recorrência?\n\nAo excluir este lançamento, todos os ciclos futuros também serão cancelados — pois eles ainda não foram gerados.",
+    title: "⚠️ Apagar este e os futuros?\n\nIsso remove este lançamento e cancela todos os ciclos futuros da recorrência.",
     options: [
-      { label: "🗑️ Sim, cancelar recorrência", action: "exec", handler: "excluirLancamento" },
+      { label: "🗑️ Sim, apagar este e os futuros", action: "exec", handler: "excluirLancamento" },
       { label: "↩️ Não, manter", action: "back" },
     ],
   },
@@ -2259,10 +2273,16 @@ const financialFlow = createFlow("financeiro", {
       ctx.state.context.editingTxId = data.txId;
       ctx.state.context.editingTxAmount = data.amount;
       ctx.state.context.editingTxDescription = data.description;
+      ctx.state.context.editingTxType = data.type || null;
+      ctx.state.context.editingTxDate = data.date || null;
+      ctx.state.context.editingTxAccountId = data.accountId || null;
+      ctx.state.context.editingTxCategoryId = data.categoryId || null;
       ctx.state.context.editingTxRecurrence = data.recurrence || null;
+      ctx.state.context.editingTxRecurrenceDay = data.recurrenceDay != null ? data.recurrenceDay : null;
       ctx.state.context.editingTxInstallmentGroupId = data.installmentGroupId || null;
       ctx.state.context.editingTxInstallmentNumber = data.installmentNumber || null;
       ctx.state.context.editingTxInstallmentTotal = data.installmentTotal || null;
+      ctx.state.context.editingScopeOnlyThis = null;
       ctx.state.path = "/lancamentos/editar/opcoes";
     },
 
@@ -2278,6 +2298,18 @@ const financialFlow = createFlow("financeiro", {
       return { noRender: true };
     },
 
+    setEditScope: async (ctx, data) => {
+      ctx.state.context.editingScopeOnlyThis = data.onlyThis;
+      if (data.action === "amount") {
+        ctx.state.context.awaitingEditTxAmount = true;
+        await ctx.reply(`💰 Digite o novo valor em R$ (atual: R$ ${formatMoney(ctx.state.context.editingTxAmount)}):`);
+      } else {
+        ctx.state.context.awaitingEditTxDesc = true;
+        await ctx.reply(`📝 Digite a nova descrição (atual: ${ctx.state.context.editingTxDescription || "sem descrição"}):`);
+      }
+      return { noRender: true };
+    },
+
     excluirLancamento: async (ctx) => {
       const { editingTxId } = ctx.state.context;
       try {
@@ -2288,6 +2320,40 @@ const financialFlow = createFlow("financeiro", {
       } catch (e) {
         logger.error("[financialFlow] excluirLancamento error:", e.message);
         await ctx.reply("❌ Erro ao excluir lançamento.");
+        return { noRender: true };
+      }
+    },
+
+    apagarSomenteEste: async (ctx) => {
+      const { editingTxId, editingTxAmount, editingTxDescription, editingTxType, editingTxDate,
+              editingTxRecurrence, editingTxRecurrenceDay, editingTxAccountId, editingTxCategoryId } = ctx.state.context;
+      try {
+        await financialClient.deleteTransaction(ctx.userId, editingTxId);
+        // Create next occurrence with original values
+        const nextDate = new Date(editingTxDate);
+        if (editingTxRecurrence === "monthly") {
+          nextDate.setMonth(nextDate.getMonth() + 1);
+          if (editingTxRecurrenceDay != null) nextDate.setDate(editingTxRecurrenceDay);
+        } else if (editingTxRecurrence === "weekly") {
+          nextDate.setDate(nextDate.getDate() + 7);
+        }
+        await financialClient.createTransaction(ctx.userId, {
+          accountId: editingTxAccountId,
+          amount: editingTxAmount,
+          description: editingTxDescription,
+          type: editingTxType,
+          date: nextDate.toISOString(),
+          status: "pending",
+          recurrence: editingTxRecurrence,
+          recurrenceDay: editingTxRecurrenceDay != null ? editingTxRecurrenceDay : undefined,
+          categoryId: editingTxCategoryId || undefined,
+        });
+        await ctx.reply("🗑️ Lançamento removido.\n📅 Próxima ocorrência agendada.");
+        ctx.state.context.editingTxId = null;
+        ctx.state.path = "/extrato";
+      } catch (e) {
+        logger.error("[financialFlow] apagarSomenteEste error:", e.message);
+        await ctx.reply("❌ Erro ao apagar lançamento.");
         return { noRender: true };
       }
     },

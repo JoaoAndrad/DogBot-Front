@@ -904,15 +904,38 @@ class FlowManager {
     if (state.context.awaitingEditTxAmount) {
       const amount = parseAmount(trimmed);
       if (amount === null || amount <= 0) {
-        await client.sendMessage(chatId, "�R Valor inválido. Digite o valor em R$ (ex: 150):");
+        await client.sendMessage(chatId, "❌ Valor inválido. Digite o valor em R$ (ex: 150):");
         return true;
       }
       state.context.awaitingEditTxAmount = false;
+      const originalAmount = state.context.editingTxAmount;
+      const onlyThis = state.context.editingScopeOnlyThis;
+      state.context.editingScopeOnlyThis = null;
       await storage.saveState(stateUserId, flowId, state);
       const financialClient = require("../../services/financialClient");
       try {
         await financialClient.updateTransaction(stateUserId, state.context.editingTxId, { amount });
         state.context.editingTxAmount = amount;
+        if (onlyThis && state.context.editingTxRecurrence) {
+          const nextDate = new Date(state.context.editingTxDate);
+          if (state.context.editingTxRecurrence === "monthly") {
+            nextDate.setMonth(nextDate.getMonth() + 1);
+            if (state.context.editingTxRecurrenceDay != null) nextDate.setDate(state.context.editingTxRecurrenceDay);
+          } else if (state.context.editingTxRecurrence === "weekly") {
+            nextDate.setDate(nextDate.getDate() + 7);
+          }
+          await financialClient.createTransaction(stateUserId, {
+            accountId: state.context.editingTxAccountId,
+            amount: originalAmount,
+            description: state.context.editingTxDescription,
+            type: state.context.editingTxType,
+            date: nextDate.toISOString(),
+            status: "pending",
+            recurrence: state.context.editingTxRecurrence,
+            recurrenceDay: state.context.editingTxRecurrenceDay != null ? state.context.editingTxRecurrenceDay : undefined,
+            categoryId: state.context.editingTxCategoryId || undefined,
+          });
+        }
         await storage.saveState(stateUserId, flowId, state);
         await client.sendMessage(chatId, "✅ Valor atualizado.");
       } catch (e) {
@@ -924,15 +947,38 @@ class FlowManager {
 
     if (state.context.awaitingEditTxDesc) {
       if (!trimmed) {
-        await client.sendMessage(chatId, "�R Descrição inválida. Envie a nova descrição:");
+        await client.sendMessage(chatId, "❌ Descrição inválida. Envie a nova descrição:");
         return true;
       }
       state.context.awaitingEditTxDesc = false;
+      const originalDesc = state.context.editingTxDescription;
+      const onlyThis = state.context.editingScopeOnlyThis;
+      state.context.editingScopeOnlyThis = null;
       await storage.saveState(stateUserId, flowId, state);
       const financialClient = require("../../services/financialClient");
       try {
         await financialClient.updateTransaction(stateUserId, state.context.editingTxId, { description: trimmed });
         state.context.editingTxDescription = trimmed;
+        if (onlyThis && state.context.editingTxRecurrence) {
+          const nextDate = new Date(state.context.editingTxDate);
+          if (state.context.editingTxRecurrence === "monthly") {
+            nextDate.setMonth(nextDate.getMonth() + 1);
+            if (state.context.editingTxRecurrenceDay != null) nextDate.setDate(state.context.editingTxRecurrenceDay);
+          } else if (state.context.editingTxRecurrence === "weekly") {
+            nextDate.setDate(nextDate.getDate() + 7);
+          }
+          await financialClient.createTransaction(stateUserId, {
+            accountId: state.context.editingTxAccountId,
+            amount: state.context.editingTxAmount,
+            description: originalDesc,
+            type: state.context.editingTxType,
+            date: nextDate.toISOString(),
+            status: "pending",
+            recurrence: state.context.editingTxRecurrence,
+            recurrenceDay: state.context.editingTxRecurrenceDay != null ? state.context.editingTxRecurrenceDay : undefined,
+            categoryId: state.context.editingTxCategoryId || undefined,
+          });
+        }
         await storage.saveState(stateUserId, flowId, state);
         await client.sendMessage(chatId, "✅ Descrição atualizada.");
       } catch (e) {
