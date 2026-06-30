@@ -1405,7 +1405,10 @@ const financialFlow = createFlow("financeiro", {
 
     listarContas: async (ctx) => {
       try {
-        const res = await financialClient.listAccounts(ctx.userId);
+        const [res, schedRes] = await Promise.all([
+          financialClient.listAccounts(ctx.userId),
+          financialClient.listScheduled(ctx.userId).catch(() => null),
+        ]);
         if (!res?.accounts?.length) {
           await ctx.reply("🏦 Você ainda não tem contas cadastradas.\n\nUse *Adicionar conta* para criar uma.");
           return { noRender: true };
@@ -1415,17 +1418,29 @@ const financialFlow = createFlow("financeiro", {
         const lines = res.accounts.map(a => {
           const type = ACCOUNT_TYPES.find(t => t.key === a.type)?.label || a.type;
           const sign = a.balance < 0 ? "🔴" : "🟢";
-          let line = `${sign} *${a.name}* (${type}): R$ ${formatMoney(a.balance)}`;
-          if (a.projectedBalance != null && Math.abs(a.projectedBalance - a.balance) >= 0.01) {
-            line += `\n   📈 Projetado: R$ ${formatMoney(a.projectedBalance)}`;
-          }
-          return line;
+          return `${sign} *${a.name}* (${type}): R$ ${formatMoney(a.balance)}`;
         });
         const hasPending = Math.abs(totalProjected - total) >= 0.01;
+        let projLine = "";
+        if (hasPending) {
+          const pending = (schedRes?.transactions || []).sort((a, b) => new Date(a.date) - new Date(b.date));
+          const lastDate = pending.length ? formatDate(new Date(pending[pending.length - 1].date)) : null;
+          const shown = pending.slice(0, 3);
+          const rest = pending.length - shown.length;
+          const breakdownLines = shown.map(t => {
+            const sign = t.type === "income" ? "+" : "-";
+            const desc = t.description || (t.type === "income" ? "Receita" : "Despesa");
+            const dayNote = (t.recurrence === "monthly" && t.recurrenceDay) ? ` (dia ${t.recurrenceDay})` : "";
+            return `   └ ${sign}R$ ${formatMoney(t.amount)} ${desc}${dayNote}`;
+          });
+          if (rest > 0) breakdownLines.push(`   └ e mais ${rest}...`);
+          projLine = `\n📈 *Projetado${lastDate ? ` até ${lastDate}` : ""}: R$ ${formatMoney(totalProjected)}*` +
+            (breakdownLines.length ? "\n" + breakdownLines.join("\n") : "");
+        }
         await ctx.reply(
           `🏦 *Suas contas:*\n\n${lines.join("\n")}\n\n` +
           `💰 *Total: R$ ${formatMoney(total)}*` +
-          (hasPending ? `\n📈 *Projetado: R$ ${formatMoney(totalProjected)}*` : "")
+          projLine
         );
       } catch (e) {
         logger.error("[financialFlow] listarContas error:", e.message);
