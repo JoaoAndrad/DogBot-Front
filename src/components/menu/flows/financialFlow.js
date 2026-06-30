@@ -18,6 +18,8 @@ function formatDate(date) {
   return `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}`;
 }
 
+const MONTHS_PT = ["Janeiro","Fevereiro","Março","Abril","Maio","Junho","Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"];
+
 function progressBar(pct, width = 8) {
   const filled = Math.min(Math.round((Math.min(pct, 100) / 100) * width), width);
   return "█".repeat(filled) + "░".repeat(width - filled);
@@ -190,11 +192,16 @@ const financialFlow = createFlow("financeiro", {
       } catch (e) {
         logger.warn("[financialFlow] /extrato check error:", e.message);
       }
+      const now = new Date();
+      const thisMonthName = MONTHS_PT[now.getMonth()];
+      const lastMonthName = MONTHS_PT[(now.getMonth() + 11) % 12];
+      const nextMonthName = MONTHS_PT[(now.getMonth() + 1) % 12];
       return {
         title: "📋 Extrato — período",
         options: [
-          { label: "📅 Este mês", action: "exec", handler: "extratoMes", data: { period: "current" } },
-          { label: "📅 Mês anterior", action: "exec", handler: "extratoMes", data: { period: "last" } },
+          { label: `📅 Lançamentos futuros (${nextMonthName})`, action: "exec", handler: "extratoMes", data: { period: "next" } },
+          { label: `📅 Este mês (${thisMonthName})`, action: "exec", handler: "extratoMes", data: { period: "current" } },
+          { label: `📅 Mês anterior (${lastMonthName})`, action: "exec", handler: "extratoMes", data: { period: "last" } },
           { label: "↩️ Voltar", action: "back" },
         ],
       };
@@ -208,9 +215,81 @@ const financialFlow = createFlow("financeiro", {
       const { extratoPeriod = "current", extratoPage = 0 } = ctx.state.context;
       const limit = 10;
       const skip = extratoPage * limit;
-      const periodLabel = extratoPeriod === "last" ? "Mês passado" : "Este mês";
+
+      const now = new Date();
+      const monthIdx = extratoPeriod === "last"
+        ? (now.getMonth() + 11) % 12
+        : extratoPeriod === "next"
+        ? (now.getMonth() + 1) % 12
+        : now.getMonth();
+      const monthName = MONTHS_PT[monthIdx];
+
+      function buildGroupedLines(txs, headerLine, summaryLine) {
+        const byDate = new Map();
+        for (const t of txs) {
+          const key = formatDate(new Date(t.date));
+          if (!byDate.has(key)) byDate.set(key, []);
+          byDate.get(key).push(t);
+        }
+        const lines = [headerLine, ""];
+        if (summaryLine) lines.push(summaryLine, "");
+        for (const [date, group] of byDate) {
+          lines.push(`*${date}*`);
+          for (const t of group) {
+            const sign = t.type === "income" ? "+" : "-";
+            const desc = t.description || (t.type === "income" ? "Receita" : "Despesa");
+            const cat = t.categoryName ? `  [${t.categoryName}]` : "";
+            const recNote = t.recurrence ? " 🔁" : "";
+            lines.push(`  ${sign}R$ ${formatMoney(t.amount)}  ${desc}${cat}${recNote}`);
+          }
+          lines.push("");
+        }
+        return lines.join("\n").trimEnd();
+      }
 
       try {
+        // ── Lançamentos futuros (próximo mês) ───────────────────────────────
+        if (extratoPeriod === "next") {
+          const nextMonth = (now.getMonth() + 1) % 12;
+          const nextYear = now.getMonth() === 11 ? now.getFullYear() + 1 : now.getFullYear();
+          const schedRes = await financialClient.listScheduled(ctx.userId);
+          const txs = (schedRes?.transactions || [])
+            .filter(t => {
+              const d = new Date(t.date);
+              return d.getMonth() === nextMonth && d.getFullYear() === nextYear;
+            })
+            .sort((a, b) => new Date(a.date) - new Date(b.date));
+
+          if (!txs.length) {
+            await ctx.reply(`📋 Nenhum lançamento previsto para *${monthName}*.`);
+            return {
+              title: "Sem lançamentos",
+              options: [
+                { label: "🔄 Trocar período", action: "goto", target: "/extrato" },
+                { label: "↩️ Voltar ao menu", action: "goto", target: "/" },
+              ],
+            };
+          }
+
+          const totalIncome = txs.filter(t => t.type === "income").reduce((s, t) => s + (t.amount || 0), 0);
+          const totalExpense = txs.filter(t => t.type !== "income").reduce((s, t) => s + (t.amount || 0), 0);
+          const summaryLine = `🟢 +R$ ${formatMoney(totalIncome)}  ·  🔴 -R$ ${formatMoney(totalExpense)}  ·  💰 R$ ${formatMoney(totalIncome - totalExpense)}`;
+          await ctx.reply(buildGroupedLines(txs, `📅 *Lançamentos futuros — ${monthName}*`, summaryLine));
+
+          ctx.state.context.extratoTransacoes = txs.map(t => ({
+            id: t.id, amount: t.amount, description: t.description, type: t.type,
+            date: t.date, installmentGroupId: null, installmentNumber: null, installmentTotal: null,
+          }));
+          return {
+            title: `Lançamentos — ${monthName}`,
+            options: [
+              { label: "🔄 Trocar período", action: "goto", target: "/extrato" },
+              { label: "↩️ Voltar ao menu", action: "goto", target: "/" },
+            ],
+          };
+        }
+
+        // ── Este mês / Mês anterior ─────────────────────────────────────────
         const res = await financialClient.listTransactions(ctx.userId, {
           period: extratoPeriod,
           limit: limit + 1,
@@ -218,7 +297,7 @@ const financialFlow = createFlow("financeiro", {
         });
 
         if (!res?.transactions?.length) {
-          await ctx.reply(`📋 Nenhuma transação em *${periodLabel.toLowerCase()}*.`);
+          await ctx.reply(`📋 Nenhuma transação em *${monthName.toLowerCase()}*.`);
           return {
             title: "Extrato vazio",
             options: [
@@ -233,33 +312,18 @@ const financialFlow = createFlow("financeiro", {
         const hasPrev = extratoPage > 0;
         const txs = transactions.slice(0, limit);
 
-        const lines = [`📋 *Extrato — ${periodLabel}* (pág. ${extratoPage + 1})\n`];
+        const pageSuffix = hasNext || hasPrev ? ` (pág. ${extratoPage + 1})` : "";
+        let summaryLine = null;
         if (extratoPage === 0 && summary) {
-          lines.push(
-            `🟢 Entradas: R$ ${formatMoney(summary.income)}`,
-            `🔴 Saídas:   R$ ${formatMoney(summary.expense)}`,
-            `💰 Saldo:    R$ ${formatMoney(summary.net)}\n`,
-          );
+          const net = summary.net ?? (summary.income - summary.expense);
+          summaryLine = `🟢 +R$ ${formatMoney(summary.income)}  ·  🔴 -R$ ${formatMoney(summary.expense)}  ·  💰 R$ ${formatMoney(net)}`;
         }
-        for (const t of txs) {
-          const emoji = t.type === "income" ? "🟢" : "🔴";
-          const sign = t.type === "income" ? "+" : "-";
-          const desc = t.description || (t.type === "income" ? "Receita" : "Despesa");
-          const cat = t.categoryName ? ` [${t.categoryName}]` : "";
-          lines.push(`${emoji} ${formatDate(t.date)}  ${sign}R$ ${formatMoney(t.amount)}  ${desc}${cat}`);
-        }
-        await ctx.reply(lines.join("\n"));
+        await ctx.reply(buildGroupedLines(txs, `📋 *Extrato — ${monthName}*${pageSuffix}`, summaryLine));
 
-        // Save transactions for editing
         ctx.state.context.extratoTransacoes = txs.map(t => ({
-          id: t.id,
-          amount: t.amount,
-          description: t.description,
-          type: t.type,
-          date: t.date,
-          installmentGroupId: t.installmentGroupId || null,
-          installmentNumber: t.installmentNumber || null,
-          installmentTotal: t.installmentTotal || null,
+          id: t.id, amount: t.amount, description: t.description, type: t.type,
+          date: t.date, installmentGroupId: t.installmentGroupId || null,
+          installmentNumber: t.installmentNumber || null, installmentTotal: t.installmentTotal || null,
         }));
 
         const options = [];
@@ -268,7 +332,7 @@ const financialFlow = createFlow("financeiro", {
         options.push({ label: "✏️ Editar lançamento", action: "exec", handler: "iniciarEditarLancamento" });
         options.push({ label: "🔄 Trocar período", action: "goto", target: "/extrato" });
         options.push({ label: "↩️ Voltar ao menu", action: "goto", target: "/" });
-        return { title: `Extrato — página ${extratoPage + 1}`, options };
+        return { title: `Extrato — ${monthName} · pág. ${extratoPage + 1}`, options };
       } catch (e) {
         logger.error("[financialFlow] extrato/ver error:", e.message);
         await ctx.reply("❌ Erro ao carregar extrato. Tente novamente.");

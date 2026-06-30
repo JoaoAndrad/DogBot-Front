@@ -489,11 +489,21 @@ class FlowManager {
       }
     } catch (_) {}
 
+    // For monthly recurring with a specific day, advance to next month if the day has already passed
+    let txDate = parsed.date || new Date();
+    if (parsed.recurrence === "monthly" && parsed.recurrenceDay != null) {
+      const nowRef = new Date();
+      const candidate = new Date(nowRef.getFullYear(), nowRef.getMonth(), parsed.recurrenceDay);
+      txDate = candidate > nowRef
+        ? candidate
+        : new Date(nowRef.getFullYear(), nowRef.getMonth() + 1, parsed.recurrenceDay);
+    }
+
     const pendingNlpTransaction = {
       type,
       amount: parsed.amount,
       description: parsed.description || null,
-      date: (parsed.date || new Date()).toISOString(),
+      date: txDate.toISOString(),
       isPending,
       installmentCount,
       recurrence,
