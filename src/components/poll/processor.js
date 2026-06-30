@@ -311,7 +311,17 @@ async function executeAction(result, client) {
 
   if (action === "menu_policy_block") {
     const msg = result.policyMessage || "⏸ Esta opção não está disponível.";
-    await client.sendMessage(poll.chatId, msg);
+    console.log(`[FlowPolicy-DEBUG] menu_policy_block poll=${JSON.stringify(poll)} msg=${msg}`);
+    try {
+      const chatId = poll && (poll.chatId || poll.chat_id);
+      if (chatId) {
+        await client.sendMessage(chatId, msg);
+      } else {
+        console.log(`[FlowPolicy-DEBUG] menu_policy_block sem chatId, result.poll=${JSON.stringify(result.poll)}`);
+      }
+    } catch (e) {
+      console.log(`[FlowPolicy-DEBUG] menu_policy_block sendMessage erro:`, e && e.message);
+    }
     return;
   }
 
