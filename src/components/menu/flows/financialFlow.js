@@ -669,30 +669,57 @@ const financialFlow = createFlow("financeiro", {
     dynamic: true,
     options: [],
     handler: async (ctx) => {
-      let allCats = [];
+      let parents = [];
       try {
         const res = await financialClient.listCategories(ctx.userId);
-        // Subcategories first (more specific), then parent categories without children
-        const subs = (res?.categories || []).flatMap(c =>
-          (c.children || []).map(s => ({ ...s, _parentName: c.name }))
-        );
-        const parents = (res?.categories || []).filter(c => !(c.children && c.children.length));
-        allCats = [...subs, ...parents];
+        parents = res?.categories || [];
       } catch (e) {
         logger.warn("[financialFlow] /nlp-confirm/categoria error:", e.message);
       }
-      // WhatsApp polls allow max 12 options; reserve 2 slots for "Sem categoria" + "Voltar"
-      const MAX_CAT_OPTIONS = 10;
-      const shown = allCats.slice(0, MAX_CAT_OPTIONS);
-      const options = shown.map(c => ({
-        label: c._parentName ? `${c.name} (${c._parentName})` : c.name,
-        action: "exec",
-        handler: "setCategoriaNlp",
-        data: { categoryId: c.id, categoryName: c.name },
-      }));
-      options.push({ label: "🚫 Sem categoria", action: "exec", handler: "setCategoriaNlp", data: { categoryId: null, categoryName: null } });
+      // WhatsApp max 12 options; reserve 2 for "Nova" + "Voltar"
+      const shown = parents.slice(0, 10);
+      const options = shown.map(c => {
+        const hasChildren = !!(c.children && c.children.length);
+        return {
+          label: hasChildren ? `${c.name} ›` : c.name,
+          action: "exec",
+          handler: hasChildren ? "nlpSelecionarCategoriaPai" : "setCategoriaNlp",
+          data: { categoryId: c.id, categoryName: c.name },
+        };
+      });
+      options.push({ label: "➕ Nova categoria", action: "exec", handler: "nlpNovaCategoriaInput" });
       options.push({ label: "↩️ Voltar", action: "back" });
       return { title: "🏷️ Escolha a categoria:", options };
+    },
+  },
+
+  "/nlp-confirm/categoria/subs": {
+    dynamic: true,
+    options: [],
+    handler: async (ctx) => {
+      const parentId = ctx.state.context.nlpSelectedParentCat?.id;
+      const parentName = ctx.state.context.nlpSelectedParentCat?.name;
+      if (!parentId) {
+        return { title: "❌ Categoria não encontrada", options: [{ label: "↩️ Voltar", action: "back" }, { label: "❌ Cancelar", action: "exec", handler: "cancelarNlp" }] };
+      }
+      let subs = [];
+      try {
+        const res = await financialClient.listCategories(ctx.userId);
+        const parent = (res?.categories || []).find(c => c.id === parentId);
+        subs = parent?.children || [];
+      } catch (e) {
+        logger.warn("[financialFlow] /nlp-confirm/categoria/subs error:", e.message);
+      }
+      const shown = subs.slice(0, 10);
+      const options = shown.map(s => ({
+        label: s.name,
+        action: "exec",
+        handler: "setCategoriaNlp",
+        data: { categoryId: s.id, categoryName: s.name },
+      }));
+      options.push({ label: "➕ Nova subcategoria", action: "exec", handler: "nlpNovaSubcategoriaInput" });
+      options.push({ label: "↩️ Voltar", action: "back" });
+      return { title: `🏷️ Subcategorias de *${parentName}*:`, options };
     },
   },
 
@@ -1754,6 +1781,26 @@ const financialFlow = createFlow("financeiro", {
     },
 
     // ── NLP ───────────────────────────────────────────────────────────────────
+
+    nlpSelecionarCategoriaPai: async (ctx, data) => {
+      if (!ctx.state.context.pendingNlpTransaction) return { noRender: true };
+      ctx.state.context.nlpSelectedParentCat = { id: data.categoryId, name: data.categoryName };
+      ctx.state.path = "/nlp-confirm/categoria/subs";
+    },
+
+    nlpNovaCategoriaInput: async (ctx) => {
+      if (!ctx.state.context.pendingNlpTransaction) return { noRender: true };
+      ctx.state.context.awaitingNlpNovaCategoria = true;
+      await ctx.reply("📝 Digite o nome da nova categoria:");
+      return { noRender: true };
+    },
+
+    nlpNovaSubcategoriaInput: async (ctx) => {
+      if (!ctx.state.context.pendingNlpTransaction) return { noRender: true };
+      ctx.state.context.awaitingNlpNovaSubcategoria = true;
+      await ctx.reply("📝 Digite o nome da nova subcategoria:");
+      return { noRender: true };
+    },
 
     setCategoriaNlp: async (ctx, data) => {
       if (!ctx.state.context.pendingNlpTransaction) return { noRender: true };

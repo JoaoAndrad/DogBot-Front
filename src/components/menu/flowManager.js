@@ -655,7 +655,8 @@ class FlowManager {
           s?.context?.awaitingTransferAmount ||
           s?.context?.awaitingEditTxAmount || s?.context?.awaitingEditTxDesc ||
           s?.context?.awaitingEditInstallmentAmount ||
-          s?.context?.awaitingNotifHour) {
+          s?.context?.awaitingNotifHour ||
+          s?.context?.awaitingNlpNovaCategoria || s?.context?.awaitingNlpNovaSubcategoria) {
         state = s;
         stateUserId = id;
         break;
@@ -975,6 +976,57 @@ class FlowManager {
       state.path = "/config";
       await storage.saveState(stateUserId, flowId, state);
       await this._renderNode(client, chatId, stateUserId, flowId, "/config");
+      return true;
+    }
+
+    // 🏷️ Criar categoria/subcategoria a partir do NLP confirm ────────────────
+
+    if (state.context.awaitingNlpNovaCategoria) {
+      if (!trimmed) {
+        await client.sendMessage(chatId, "❌ Nome inválido. Digite o nome da nova categoria:");
+        return true;
+      }
+      state.context.awaitingNlpNovaCategoria = false;
+      const financialClient = require("../../services/financialClient");
+      try {
+        const res = await financialClient.createCategory(stateUserId, { name: trimmed, parentId: null });
+        const newCat = res?.category || res;
+        if (newCat?.id && state.context.pendingNlpTransaction) {
+          state.context.pendingNlpTransaction.suggestedCategoryId = newCat.id;
+          state.context.pendingNlpTransaction.suggestedCategoryName = newCat.name;
+        }
+      } catch (e) {
+        logFinancialError({ userId: stateUserId, source: "text_input", action: "awaitingNlpNovaCategoria", error: e });
+        await client.sendMessage(chatId, "❌ Erro ao criar categoria.");
+      }
+      state.path = "/nlp-confirm";
+      await storage.saveState(stateUserId, flowId, state);
+      await this._renderNode(client, chatId, stateUserId, flowId, "/nlp-confirm");
+      return true;
+    }
+
+    if (state.context.awaitingNlpNovaSubcategoria) {
+      if (!trimmed) {
+        await client.sendMessage(chatId, "❌ Nome inválido. Digite o nome da nova subcategoria:");
+        return true;
+      }
+      state.context.awaitingNlpNovaSubcategoria = false;
+      const parentId = state.context.nlpSelectedParentCat?.id || null;
+      const financialClient = require("../../services/financialClient");
+      try {
+        const res = await financialClient.createCategory(stateUserId, { name: trimmed, parentId });
+        const newCat = res?.category || res;
+        if (newCat?.id && state.context.pendingNlpTransaction) {
+          state.context.pendingNlpTransaction.suggestedCategoryId = newCat.id;
+          state.context.pendingNlpTransaction.suggestedCategoryName = newCat.name;
+        }
+      } catch (e) {
+        logFinancialError({ userId: stateUserId, source: "text_input", action: "awaitingNlpNovaSubcategoria", error: e });
+        await client.sendMessage(chatId, "❌ Erro ao criar subcategoria.");
+      }
+      state.path = "/nlp-confirm";
+      await storage.saveState(stateUserId, flowId, state);
+      await this._renderNode(client, chatId, stateUserId, flowId, "/nlp-confirm");
       return true;
     }
 
