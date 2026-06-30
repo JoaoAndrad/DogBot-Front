@@ -672,12 +672,20 @@ const financialFlow = createFlow("financeiro", {
       let allCats = [];
       try {
         const res = await financialClient.listCategories(ctx.userId);
-        allCats = (res?.categories || []).flatMap(c => [c, ...(c.children || []).map(s => ({ ...s, _parentName: c.name }))]);
+        // Subcategories first (more specific), then parent categories without children
+        const subs = (res?.categories || []).flatMap(c =>
+          (c.children || []).map(s => ({ ...s, _parentName: c.name }))
+        );
+        const parents = (res?.categories || []).filter(c => !(c.children && c.children.length));
+        allCats = [...subs, ...parents];
       } catch (e) {
         logger.warn("[financialFlow] /nlp-confirm/categoria error:", e.message);
       }
-      const options = allCats.map(c => ({
-        label: c._parentName ? `↳ ${c.name} (${c._parentName})` : c.name,
+      // WhatsApp polls allow max 12 options; reserve 2 slots for "Sem categoria" + "Voltar"
+      const MAX_CAT_OPTIONS = 10;
+      const shown = allCats.slice(0, MAX_CAT_OPTIONS);
+      const options = shown.map(c => ({
+        label: c._parentName ? `${c.name} (${c._parentName})` : c.name,
         action: "exec",
         handler: "setCategoriaNlp",
         data: { categoryId: c.id, categoryName: c.name },

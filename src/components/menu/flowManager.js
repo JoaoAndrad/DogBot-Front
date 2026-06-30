@@ -458,20 +458,21 @@ class FlowManager {
       const { matchCategory, normalize } = require("../../utils/parses/categoryMatcher");
       const catNames = allCats.map((c) => c.name);
 
-      // 1. Try keyword-index fuzzy match (predefined categories)
       let found = null;
-      if (suggestedCategoryName && (parsed.categoryConfidence || 0) >= 0.4) {
-        const refined = matchCategory(suggestedCategoryName, catNames) || matchCategory(parsed.description, catNames);
-        if (refined) found = allCats.find((c) => c.name === refined.name) || null;
+
+      // 1. Direct name match against user's own categories (highest priority — covers custom names like "SquareCloud")
+      if (parsed.description) {
+        const normDesc = normalize(parsed.description);
+        found = allCats.find((c) => normalize(c.name) === normDesc)
+          || allCats.find((c) => normDesc.includes(normalize(c.name)) && normalize(c.name).length >= 3)
+          || allCats.find((c) => normalize(c.name).includes(normDesc) && normDesc.length >= 3)
+          || null;
       }
 
-      // 2. Try direct name match against user's own categories (covers custom subcategories like "SquareCloud")
-      if (!found && parsed.description) {
-        const normDesc = normalize(parsed.description);
-        // Exact → substring → levenshtein ≤ 1
-        found = allCats.find((c) => normalize(c.name) === normDesc)
-          || allCats.find((c) => normDesc.includes(normalize(c.name)) || normalize(c.name).includes(normDesc))
-          || null;
+      // 2. Keyword-index fuzzy match — fallback for predefined categories ("Uber" → "Transporte")
+      if (!found && suggestedCategoryName && (parsed.categoryConfidence || 0) >= 0.4) {
+        const refined = matchCategory(suggestedCategoryName, catNames) || matchCategory(parsed.description, catNames);
+        if (refined) found = allCats.find((c) => c.name === refined.name) || null;
       }
 
       if (found) {

@@ -802,6 +802,15 @@ async function executeAction(result, client) {
           }
         } else if (target) {
           const flowManager = require("../menu/flowManager");
+          const storage = require("../menu/storage");
+          // Update state path/history before rendering (mirrors flowManager.js goto behavior)
+          const gotoState = (await storage.getState(stateUserId, data.flowId)) || { path: "/", history: [], context: {} };
+          if (gotoState.path && gotoState.path !== target) {
+            gotoState.history = gotoState.history || [];
+            gotoState.history.push(gotoState.path);
+            gotoState.path = target;
+            await storage.saveState(stateUserId, data.flowId, gotoState);
+          }
           // Navigate to target path by re-rendering (stateUserId so poll metadata matches state)
           await flowManager._renderNode(
             client,
