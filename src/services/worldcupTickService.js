@@ -936,7 +936,7 @@ async function handlePenalties(client, action) {
         const penLines = penPreds.map((p) => {
           const jid = toJid(p.senderNumber);
           if (jid) penMentions.push(jid);
-          return `  • @${String(p.senderNumber || "").split("@")[0]} — ${withFlag(p.penaltiesWinner)} ${p.penaltiesWinner}`;
+          return `  • @${String(p.senderNumber || "").split("@")[0]} — ${withFlag(p.penaltiesWinner)}`;
         });
         penBlock = `🎯 *Palpites de pênaltis (quem avança):*\n${penLines.join("\n")}`;
       }
@@ -1143,7 +1143,7 @@ async function handleResultNotification(client, action) {
       ];
       if (etScore) lines.push(`Prorrogação: *${etScore}*`);
       if (advancing) {
-        lines.push(`🏅 *${withFlag(advancing)} ${advancing} avança!*`);
+        lines.push(`🏅 *${withFlag(advancing)} avança!*`);
       }
       if (predBlock) lines.push(predBlock);
 
