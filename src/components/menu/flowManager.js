@@ -1,4 +1,4 @@
-const storage = require("./storage");
+﻿const storage = require("./storage");
 const logger = require("../../utils/logger");
 const bootLog = require("../../lib/bootLog");
 const { validateFlow } = require("./flowBuilder");
@@ -784,7 +784,7 @@ class FlowManager {
           s?.context?.awaitingCardClosingDay || s?.context?.awaitingCardDueDay ||
           s?.context?.awaitingPaymentAmount ||
           s?.context?.awaitingScheduleDesc || s?.context?.awaitingScheduleAmount ||
-          s?.context?.awaitingScheduleDay ||
+          s?.context?.awaitingScheduleDay || s?.context?.awaitingScheduleDate ||
           s?.context?.awaitingTransferAmount ||
           s?.context?.awaitingEditTxAmount || s?.context?.awaitingEditTxDesc ||
           s?.context?.awaitingEditInstallmentAmount ||
@@ -915,7 +915,7 @@ class FlowManager {
     if (state.context.awaitingCardClosingDay) {
       const day = parseInt(trimmed, 10);
       if (isNaN(day) || day < 1 || day > 31) {
-        await client.sendMessage(chatId, "�R Dia inválido. Digite um número entre 1 e 31:");
+        await client.sendMessage(chatId, "❌ Dia inválido. Digite um número entre 1 e 31:");
         return true;
       }
       state.context.pendingCardClosingDay = day;
@@ -929,7 +929,7 @@ class FlowManager {
     if (state.context.awaitingCardDueDay) {
       const day = parseInt(trimmed, 10);
       if (isNaN(day) || day < 1 || day > 31) {
-        await client.sendMessage(chatId, "�R Dia inválido. Digite um número entre 1 e 31:");
+        await client.sendMessage(chatId, "❌ Dia inválido. Digite um número entre 1 e 31:");
         return true;
       }
       state.context.pendingCardDueDay = day;
@@ -958,21 +958,21 @@ class FlowManager {
 
     if (state.context.awaitingScheduleDesc) {
       if (!trimmed) {
-        await client.sendMessage(chatId, "�R Descrição inválida. Envie o nome do agendamento:");
+        await client.sendMessage(chatId, "❌ Descrição inválida. Envie o nome do agendamento:");
         return true;
       }
       state.context.pendingScheduleDesc = trimmed;
       state.context.awaitingScheduleDesc = false;
       state.context.awaitingScheduleAmount = true;
       await storage.saveState(stateUserId, flowId, state);
-      await client.sendMessage(chatId, "�x� Digite o *valor* em R$ (ex: 1500 ou 1.500,00):");
+      await client.sendMessage(chatId, "💰 Digite o *valor* em R$ (ex: 1500 ou 1.500,00):");
       return true;
     }
 
     if (state.context.awaitingScheduleAmount) {
       const amount = parseAmount(trimmed);
       if (amount === null || amount <= 0) {
-        await client.sendMessage(chatId, "�R Valor inválido. Digite o valor em R$ (ex: 1500):");
+        await client.sendMessage(chatId, "❌ Valor inválido. Digite o valor em R$ (ex: 1500):");
         return true;
       }
       state.context.pendingScheduleAmount = amount;
@@ -986,11 +986,38 @@ class FlowManager {
     if (state.context.awaitingScheduleDay) {
       const day = parseInt(trimmed, 10);
       if (isNaN(day) || day < 1 || day > 31) {
-        await client.sendMessage(chatId, "�R Dia inválido. Digite um número entre 1 e 31:");
+        await client.sendMessage(chatId, "❌ Dia inválido. Digite um número entre 1 e 31:");
         return true;
       }
       state.context.pendingScheduleDay = day;
       state.context.awaitingScheduleDay = false;
+      state.path = "/agendamentos/novo/conta";
+      await storage.saveState(stateUserId, flowId, state);
+      await this._renderNode(client, chatId, stateUserId, flowId, "/agendamentos/novo/conta");
+      return true;
+    }
+
+    if (state.context.awaitingScheduleDate) {
+      const m = trimmed.match(/^(\d{1,2})[\/\-](\d{1,2})(?:[\/\-](\d{2,4}))?$/);
+      let schedDate = null;
+      if (m) {
+        const day = parseInt(m[1], 10);
+        const month = parseInt(m[2], 10);
+        const nowRef = new Date();
+        const year = m[3]
+          ? (m[3].length === 2 ? 2000 + parseInt(m[3], 10) : parseInt(m[3], 10))
+          : nowRef.getFullYear();
+        const d = new Date(year, month - 1, day);
+        if (!isNaN(d.getTime()) && day >= 1 && day <= 31 && month >= 1 && month <= 12) {
+          schedDate = d;
+        }
+      }
+      if (!schedDate) {
+        await client.sendMessage(chatId, "❌ Data inválida. Use DD/MM ou DD/MM/AAAA (ex: 05/07 ou 05/07/2026):");
+        return true;
+      }
+      state.context.pendingScheduleDate = schedDate.toISOString();
+      state.context.awaitingScheduleDate = false;
       state.path = "/agendamentos/novo/conta";
       await storage.saveState(stateUserId, flowId, state);
       await this._renderNode(client, chatId, stateUserId, flowId, "/agendamentos/novo/conta");

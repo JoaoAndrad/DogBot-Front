@@ -321,6 +321,7 @@ const financialFlow = createFlow("financeiro", {
           period: extratoPeriod,
           limit: limit + 1,
           skip,
+          status: "confirmed",
         });
 
         if (!res?.transactions?.length) {
@@ -965,14 +966,18 @@ const financialFlow = createFlow("financeiro", {
     handler: async (ctx) => {
       const DOW_LABELS = ["Domingo","Segunda-Feira","Terça-Feira","Quarta-Feira","Quinta-Feira","Sexta-Feira","Sábado"];
       const { pendingScheduleType, pendingScheduleDesc, pendingScheduleAmount,
-              pendingScheduleRecurrence, pendingScheduleDay, pendingScheduleAccountName } = ctx.state.context;
+              pendingScheduleRecurrence, pendingScheduleDay, pendingScheduleDate,
+              pendingScheduleAccountName } = ctx.state.context;
       const typeLabel = pendingScheduleType === "income" ? "🟢 Receita" : "🔴 Despesa";
-      let recLabel = "Único (não repetir)";
+      let recLabel;
       if (pendingScheduleRecurrence === "monthly") {
         recLabel = pendingScheduleDay ? `🔁 Todo dia ${pendingScheduleDay}` : "🔁 Mensalmente";
       } else if (pendingScheduleRecurrence === "weekly") {
         const dowName = pendingScheduleDay != null ? DOW_LABELS[pendingScheduleDay] : "—";
         recLabel = `🔁 Toda ${dowName}`;
+      } else {
+        const dateStr = pendingScheduleDate ? formatDate(new Date(pendingScheduleDate)) : "—";
+        recLabel = `📅 ${dateStr}`;
       }
       return {
         title: `📅 Confirmar agendamento?\n\n${typeLabel}\n${pendingScheduleDesc || "Sem descrição"}\nR$ ${formatMoney(pendingScheduleAmount)}\n${recLabel}\nConta: ${pendingScheduleAccountName || "—"}`,
@@ -2038,6 +2043,7 @@ const financialFlow = createFlow("financeiro", {
       ctx.state.context.pendingScheduleAmount = null;
       ctx.state.context.pendingScheduleRecurrence = null;
       ctx.state.context.pendingScheduleDay = null;
+      ctx.state.context.pendingScheduleDate = null;
       ctx.state.context.pendingScheduleAccountId = null;
       ctx.state.context.pendingScheduleAccountName = null;
       ctx.state.path = "/agendamentos/novo/tipo";
@@ -2064,6 +2070,11 @@ const financialFlow = createFlow("financeiro", {
         ctx.state.path = "/agendamentos/novo/dia-semana";
         return;
       }
+      if (recurrence === null) {
+        ctx.state.context.awaitingScheduleDate = true;
+        await ctx.reply("📅 Qual a *data* do agendamento? (ex: 05/07 ou 05/07/2026):");
+        return { noRender: true };
+      }
       ctx.state.path = "/agendamentos/novo/conta";
     },
 
@@ -2086,19 +2097,20 @@ const financialFlow = createFlow("financeiro", {
 
     confirmarNovoAgendamento: async (ctx) => {
       const { pendingScheduleType, pendingScheduleDesc, pendingScheduleAmount,
-              pendingScheduleRecurrence, pendingScheduleDay, pendingScheduleAccountId } = ctx.state.context;
+              pendingScheduleRecurrence, pendingScheduleDay, pendingScheduleDate,
+              pendingScheduleAccountId } = ctx.state.context;
       try {
-        // Calcular data inicial
         const now = new Date();
-        let scheduleDate = new Date();
+        let scheduleDate;
         if (pendingScheduleRecurrence === "monthly" && pendingScheduleDay) {
           const thisMonth = new Date(now.getFullYear(), now.getMonth(), pendingScheduleDay);
           scheduleDate = thisMonth > now ? thisMonth : new Date(now.getFullYear(), now.getMonth() + 1, pendingScheduleDay);
         } else if (pendingScheduleRecurrence === "weekly" && pendingScheduleDay != null) {
-          // Próxima ocorrência do dia da semana informado
           const diff = (pendingScheduleDay - now.getDay() + 7) % 7 || 7;
           scheduleDate = new Date(now);
           scheduleDate.setDate(now.getDate() + diff);
+        } else {
+          scheduleDate = pendingScheduleDate ? new Date(pendingScheduleDate) : now;
         }
 
         await financialClient.createTransaction(ctx.userId, {
@@ -2129,6 +2141,7 @@ const financialFlow = createFlow("financeiro", {
         ctx.state.context.pendingScheduleAmount = null;
         ctx.state.context.pendingScheduleRecurrence = null;
         ctx.state.context.pendingScheduleDay = null;
+        ctx.state.context.pendingScheduleDate = null;
         ctx.state.context.pendingScheduleAccountId = null;
         ctx.state.context.pendingScheduleAccountName = null;
         ctx.state.path = "/agendamentos";

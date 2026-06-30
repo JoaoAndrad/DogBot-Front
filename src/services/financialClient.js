@@ -107,9 +107,10 @@ async function deleteCategory(userId, categoryId) {
 
 // Transactions
 
-async function listTransactions(userId, { period = "current", accountId, limit = 30, skip = 0 } = {}) {
+async function listTransactions(userId, { period = "current", accountId, status, limit = 30, skip = 0 } = {}) {
   const params = { userId, period, limit, skip };
   if (accountId) params.accountId = accountId;
+  if (status) params.status = status;
   return _get("/api/financial/transactions", params);
 }
 
