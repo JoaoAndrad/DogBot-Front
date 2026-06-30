@@ -452,9 +452,16 @@ class FlowManager {
     // Resolve suggested category to an actual category ID from the user's vault
     let suggestedCategoryId = null;
     let suggestedCategoryName = parsed.suggestedCategoryName || null;
+    let suggestedCategoryParentName = null;
     try {
       const catsRes = await financialClient.listCategories(resolvedId);
-      const allCats = (catsRes?.categories || []).flatMap((c) => [c, ...(c.children || [])]);
+      const topCats = catsRes?.categories || [];
+      // Build flat list and a childId→parentName map
+      const parentMap = {};
+      const allCats = topCats.flatMap((c) => {
+        (c.children || []).forEach((s) => { parentMap[s.id] = c.name; });
+        return [c, ...(c.children || [])];
+      });
       const { matchCategory, normalize } = require("../../utils/parses/categoryMatcher");
       const catNames = allCats.map((c) => c.name);
 
@@ -478,6 +485,7 @@ class FlowManager {
       if (found) {
         suggestedCategoryId = found.id;
         suggestedCategoryName = found.name;
+        suggestedCategoryParentName = parentMap[found.id] || null;
       }
     } catch (_) {}
 
@@ -494,6 +502,7 @@ class FlowManager {
       accountName: defaultAccount.name,
       suggestedCategoryId,
       suggestedCategoryName,
+      suggestedCategoryParentName,
       categoryConfidence: parsed.categoryConfidence || 0,
     };
 
@@ -1019,6 +1028,7 @@ class FlowManager {
         if (newCat?.id && state.context.pendingNlpTransaction) {
           state.context.pendingNlpTransaction.suggestedCategoryId = newCat.id;
           state.context.pendingNlpTransaction.suggestedCategoryName = newCat.name;
+          state.context.pendingNlpTransaction.suggestedCategoryParentName = state.context.nlpSelectedParentCat?.name || null;
         }
       } catch (e) {
         logFinancialError({ userId: stateUserId, source: "text_input", action: "awaitingNlpNovaSubcategoria", error: e });

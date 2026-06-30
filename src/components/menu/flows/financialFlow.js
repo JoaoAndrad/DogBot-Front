@@ -650,10 +650,13 @@ const financialFlow = createFlow("financeiro", {
       } else if (tx.recurrence === "weekly") {
         recurrenceNote = "\n🔁 Recorrente semanalmente";
       }
-      const catNote = tx.suggestedCategoryName
-        ? `\n🏷️ Categoria sugerida: *${tx.suggestedCategoryName}*`
-        : "";
-      const catLabel = tx.suggestedCategoryName ? `*${tx.suggestedCategoryName}*` : "_nenhuma_";
+      const catDisplayName = tx.suggestedCategoryName
+        ? (tx.suggestedCategoryParentName
+            ? `${tx.suggestedCategoryParentName} › ${tx.suggestedCategoryName}`
+            : tx.suggestedCategoryName)
+        : null;
+      const catNote = catDisplayName ? `\n🏷️ Categoria sugerida: *${catDisplayName}*` : "";
+      const catLabel = catDisplayName ? `*${catDisplayName}*` : "_nenhuma_";
       return {
         title: `Registrar R$ ${formatMoney(tx.amount)}${installNote}${desc} como ${typeLabel} em *${tx.accountName}* (${dateLabel})${pendingNote}?${recurrenceNote}\n🏷️ Categoria: ${catLabel}`,
         options: [
@@ -715,7 +718,7 @@ const financialFlow = createFlow("financeiro", {
         label: s.name,
         action: "exec",
         handler: "setCategoriaNlp",
-        data: { categoryId: s.id, categoryName: s.name },
+        data: { categoryId: s.id, categoryName: s.name, parentName },
       }));
       options.push({ label: "➕ Nova subcategoria", action: "exec", handler: "nlpNovaSubcategoriaInput" });
       options.push({ label: "↩️ Voltar", action: "back" });
@@ -1806,6 +1809,7 @@ const financialFlow = createFlow("financeiro", {
       if (!ctx.state.context.pendingNlpTransaction) return { noRender: true };
       ctx.state.context.pendingNlpTransaction.suggestedCategoryId = data.categoryId || null;
       ctx.state.context.pendingNlpTransaction.suggestedCategoryName = data.categoryName || null;
+      ctx.state.context.pendingNlpTransaction.suggestedCategoryParentName = data.parentName || null;
       ctx.state.path = "/nlp-confirm";
     },
 
