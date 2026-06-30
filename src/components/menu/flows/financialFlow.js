@@ -118,6 +118,17 @@ const financialFlow = createFlow("financeiro", {
 
   root: {
     dynamic: true,
+    staticOptionKeys: [
+      { key: "primeiros-passos",    label: "🚀 Primeiros passos" },
+      { key: "extrato",             label: "📊 Extrato" },
+      { key: "contas",              label: "🏦 Contas" },
+      { key: "cartoes",             label: "💳 Cartões" },
+      { key: "lancamentos-futuros", label: "📅 Lançamentos futuros" },
+      { key: "categorias",          label: "🏷️ Categorias" },
+      { key: "orcamentos",          label: "🎯 Orçamentos" },
+      { key: "configuracoes",       label: "⚙️ Configurações" },
+      { key: "duvidas",             label: "❓ Dúvidas" },
+    ],
     options: [],
     handler: async (ctx) => {
       const linked = await checkLinked(ctx.userId);
@@ -125,8 +136,8 @@ const financialFlow = createFlow("financeiro", {
         return {
           title: "💰 Assistente Financeiro",
           options: [
-            { label: "🚀 Primeiros passos", action: "goto", target: "/onboarding" },
-            { label: "❓ Dúvidas", action: "goto", target: "/duvidas" },
+            { label: "🚀 Primeiros passos", optionKey: "primeiros-passos", action: "goto", target: "/onboarding" },
+            { label: "❓ Dúvidas", optionKey: "duvidas", action: "goto", target: "/duvidas" },
             { label: "✖️ Fechar", action: "exec", handler: "close" },
           ],
         };
@@ -134,14 +145,14 @@ const financialFlow = createFlow("financeiro", {
       return {
         title: "💰 Assistente Financeiro",
         options: [
-          { label: "📋 Extrato", action: "goto", target: "/extrato" },
-          { label: "🏦 Contas", action: "goto", target: "/contas" },
-          { label: "💳 Cartões", action: "goto", target: "/cartoes" },
-          { label: "📅 Lançamentos futuros", action: "goto", target: "/agendamentos" },
-          { label: "🏷️ Categorias", action: "goto", target: "/categorias" },
-          { label: "📊 Orçamentos", action: "goto", target: "/orcamentos" },
-          { label: "⚙️ Configurações", action: "goto", target: "/config" },
-          { label: "❓ Dúvidas", action: "goto", target: "/duvidas" },
+          { label: "📋 Extrato", optionKey: "extrato", action: "goto", target: "/extrato" },
+          { label: "🏦 Contas", optionKey: "contas", action: "goto", target: "/contas" },
+          { label: "💳 Cartões", optionKey: "cartoes", action: "goto", target: "/cartoes" },
+          { label: "📅 Lançamentos futuros", optionKey: "lancamentos-futuros", action: "goto", target: "/agendamentos" },
+          { label: "🏷️ Categorias", optionKey: "categorias", action: "goto", target: "/categorias" },
+          { label: "📊 Orçamentos", optionKey: "orcamentos", action: "goto", target: "/orcamentos" },
+          { label: "⚙️ Configurações", optionKey: "configuracoes", action: "goto", target: "/config" },
+          { label: "❓ Dúvidas", optionKey: "duvidas", action: "goto", target: "/duvidas" },
           { label: "✖️ Fechar", action: "exec", handler: "close" },
         ],
       };

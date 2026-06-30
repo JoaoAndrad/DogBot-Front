@@ -88,12 +88,17 @@ const rotinaFlow = createFlow("rotina", {
   root: {
     title: "📋 *Rotinas*",
     dynamic: true,
+    staticOptionKeys: [
+      { key: "criar-rotina",   label: "➕ Criar rotina" },
+      { key: "exibir-rotinas", label: "📃 Exibir rotinas" },
+    ],
     handler: async (ctx) => {
       const isGroup = String(ctx.chatId || "").endsWith("@g.us");
       const opts = [
-        { label: "➕ Criar rotina", action: "goto", target: "/create/repeat" },
+        { label: "➕ Criar rotina", optionKey: "criar-rotina", action: "goto", target: "/create/repeat" },
         {
           label: "📃 Exibir rotinas",
+          optionKey: "exibir-rotinas",
           action: "exec",
           handler: "listRoutines",
         },

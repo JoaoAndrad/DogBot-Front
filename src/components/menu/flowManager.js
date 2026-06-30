@@ -5,6 +5,28 @@ const { validateFlow } = require("./flowBuilder");
 const resolveUserUuidForMenu = require("../../utils/whatsapp/resolveUserUuidForMenu");
 const { logFinancialError } = require("../../services/financialErrorLogger");
 
+let _flowOptionPoliciesCache = null;
+let _flowOptionPoliciesFetchedAt = 0;
+const FLOW_OPTION_POLICIES_TTL_MS = 60_000; // 1 minuto de cache
+
+async function _getFlowOptionPolicies() {
+  const now = Date.now();
+  if (_flowOptionPoliciesCache && now - _flowOptionPoliciesFetchedAt < FLOW_OPTION_POLICIES_TTL_MS) {
+    return _flowOptionPoliciesCache;
+  }
+  try {
+    const backendClient = require("../../services/backendClient");
+    const res = await backendClient.sendToBackend("/api/bot/flow-option-policies", null, "GET");
+    _flowOptionPoliciesCache = (res && res.policies) ? res.policies : {};
+    _flowOptionPoliciesFetchedAt = now;
+  } catch (e) {
+    logger.warn("[FlowManager] falha ao carregar flow option policies (fail-open):", e && e.message);
+    if (!_flowOptionPoliciesCache) _flowOptionPoliciesCache = {};
+  }
+  return _flowOptionPoliciesCache;
+}
+
+
 /**
  * FlowManager - Core engine for interactive menu navigation
  * Manages state, renders polls, and handles vote navigation
@@ -143,6 +165,36 @@ class FlowManager {
     selectedIndex,
   ) {
     const flow = this.flows.get(flowId);
+
+    // Verifica política da opção (enabled/vip_only/admin_only)
+    if (option.optionKey) {
+      const policies = await _getFlowOptionPolicies();
+      const p = policies[`${flowId}:${option.optionKey}`];
+      if (p) {
+        if (!p.enabled) {
+          await client.sendMessage(chatId, "⏸ Esta opção está temporariamente desativada.");
+          return;
+        }
+        if (p.vipOnly || p.adminOnly) {
+          try {
+            const { lookupByIdentifier } = require("../../utils/whatsapp/getUserData");
+            const lu = await lookupByIdentifier(userId);
+            const userIsVip = lu && lu.found ? !!lu.confessions_vip : false;
+            const userIsAdmin = lu && lu.found ? !!lu.isAdmin : false;
+            if (p.vipOnly && !userIsVip) {
+              await client.sendMessage(chatId, "⭐ Esta opção é exclusiva para membros VIP.");
+              return;
+            }
+            if (p.adminOnly && !userIsAdmin) {
+              await client.sendMessage(chatId, "👑 Esta opção é exclusiva para administradores.");
+              return;
+            }
+          } catch (e) {
+            logger.warn("[FlowManager] user lookup para policy falhou:", e && e.message);
+          }
+        }
+      }
+    }
 
     if (option.action === "goto") {
       // Navigate to target
@@ -389,6 +441,36 @@ class FlowManager {
    */
   async getActiveFlows(userId) {
     return storage.listStates(userId);
+  }
+
+  /**
+   * Coleta todas as opções de flow com optionKey para sincronizar com o backend.
+   * Para nós estáticos: extrai de node.options.
+   * Para nós dinâmicos: extrai de node.staticOptionKeys (manifesto declarado no flow).
+   * @returns {Array<{ flowId, optionKey, label, nodePath }>}
+   */
+  listFlowOptionsForSync() {
+    const result = [];
+    for (const [flowId, flow] of this.flows.entries()) {
+      for (const [nodePath, node] of Object.entries(flow.nodes)) {
+        if (node.dynamic) {
+          if (Array.isArray(node.staticOptionKeys)) {
+            for (const item of node.staticOptionKeys) {
+              if (item && item.key) {
+                result.push({ flowId, optionKey: item.key, label: item.label || item.key, nodePath });
+              }
+            }
+          }
+        } else if (Array.isArray(node.options)) {
+          for (const opt of node.options) {
+            if (opt && opt.optionKey) {
+              result.push({ flowId, optionKey: opt.optionKey, label: opt.label || opt.optionKey, nodePath });
+            }
+          }
+        }
+      }
+    }
+    return result;
   }
 
   /**

@@ -18,7 +18,7 @@ async function main() {
     const [syncResult, botResult] = await Promise.allSettled([
       (async () => {
         try {
-          const { syncRegisteredCommandsToBackend } = require("./services/commandPolicySync");
+          const { syncRegisteredCommandsToBackend, syncFlowOptionsToBackend } = require("./services/commandPolicySync");
           const sync = await syncRegisteredCommandsToBackend(
             commands.listCommandsForPolicySync(),
           );
@@ -26,6 +26,10 @@ async function main() {
             ? `${cmdCount} cmd  ·  DB +${sync.created}`
             : `${cmdCount} cmd  ·  DB ok`;
           bootLog.line("comandos", { ok: true, ms: cmdMs, extra: syncExtra });
+
+          const flowManager = require("./components/menu/flowManager");
+          await syncFlowOptionsToBackend(flowManager.listFlowOptionsForSync());
+
           return sync;
         } catch (err) {
           bootLog.line("comandos", {

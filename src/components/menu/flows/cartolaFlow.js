@@ -148,6 +148,17 @@ const cartolaFlow = createFlow("cartola", {
   root: {
     title: "⚽ *Cartola FC*",
     dynamic: true,
+    staticOptionKeys: [
+      { key: "meu-time",       label: "🏠 Meu time" },
+      { key: "jogando-agora",  label: "Jogando agora" },
+      { key: "scouts",         label: "🔍 Scouts do meu time" },
+      { key: "parcial-grupo",  label: "📊 Parcial do grupo" },
+      { key: "destaques-grupo", label: "⭐ Destaques do grupo" },
+      { key: "ranking-liga",   label: "🏆 Ranking da liga" },
+      { key: "rodada-atual",   label: "📊 Rodada atual" },
+      { key: "duvidas",        label: "❓ Dúvidas" },
+      { key: "configuracoes",  label: "⚙️ Configurações" },
+    ],
     handler: async (ctx) => {
       const isGroup = String(ctx.chatId).endsWith("@g.us");
 
@@ -162,24 +173,24 @@ const cartolaFlow = createFlow("cartola", {
 
       const options = isGroup
         ? [
-            { label: "🏠 Meu time", action: "exec", handler: "showMyTeam" },
-            { label: jogandoLabel, action: "exec", handler: "showJogandoAgora" },
-            { label: "🔍 Scouts do meu time", action: "exec", handler: "showScout" },
-            { label: "📊 Parcial do grupo", action: "exec", handler: "showGroupParcial" },
-            { label: "⭐ Destaques do grupo", action: "exec", handler: "showDestaques" },
-            { label: "🏆 Ranking da liga", action: "exec", handler: "showLeagueRanking" },
-            { label: "📊 Rodada atual", action: "exec", handler: "showRodada" },
-            { label: "❓ Dúvidas", action: "goto", target: "/duvidas" },
-            { label: "⚙️ Configurações", action: "goto", target: "/config" },
+            { label: "🏠 Meu time", optionKey: "meu-time", action: "exec", handler: "showMyTeam" },
+            { label: jogandoLabel, optionKey: "jogando-agora", action: "exec", handler: "showJogandoAgora" },
+            { label: "🔍 Scouts do meu time", optionKey: "scouts", action: "exec", handler: "showScout" },
+            { label: "📊 Parcial do grupo", optionKey: "parcial-grupo", action: "exec", handler: "showGroupParcial" },
+            { label: "⭐ Destaques do grupo", optionKey: "destaques-grupo", action: "exec", handler: "showDestaques" },
+            { label: "🏆 Ranking da liga", optionKey: "ranking-liga", action: "exec", handler: "showLeagueRanking" },
+            { label: "📊 Rodada atual", optionKey: "rodada-atual", action: "exec", handler: "showRodada" },
+            { label: "❓ Dúvidas", optionKey: "duvidas", action: "goto", target: "/duvidas" },
+            { label: "⚙️ Configurações", optionKey: "configuracoes", action: "goto", target: "/config" },
             { label: "👋 Sair", action: "exec", handler: "leave" },
           ]
         : [
-            { label: "🏠 Meu time", action: "exec", handler: "showMyTeam" },
-            { label: jogandoLabel, action: "exec", handler: "showJogandoAgora" },
-            { label: "🔍 Scouts do meu time", action: "exec", handler: "showScout" },
-            { label: "📊 Rodada atual", action: "exec", handler: "showRodada" },
-            { label: "❓ Dúvidas", action: "goto", target: "/duvidas" },
-            { label: "⚙️ Configurações", action: "goto", target: "/config" },
+            { label: "🏠 Meu time", optionKey: "meu-time", action: "exec", handler: "showMyTeam" },
+            { label: jogandoLabel, optionKey: "jogando-agora", action: "exec", handler: "showJogandoAgora" },
+            { label: "🔍 Scouts do meu time", optionKey: "scouts", action: "exec", handler: "showScout" },
+            { label: "📊 Rodada atual", optionKey: "rodada-atual", action: "exec", handler: "showRodada" },
+            { label: "❓ Dúvidas", optionKey: "duvidas", action: "goto", target: "/duvidas" },
+            { label: "⚙️ Configurações", optionKey: "configuracoes", action: "goto", target: "/config" },
             { label: "👋 Sair", action: "exec", handler: "leave" },
           ];
       return { title: "⚽ *Cartola FC*", options };

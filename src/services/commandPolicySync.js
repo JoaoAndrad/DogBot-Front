@@ -16,4 +16,24 @@ async function syncRegisteredCommandsToBackend(commands) {
   return res;
 }
 
-module.exports = { syncRegisteredCommandsToBackend };
+/**
+ * Envia opções de flow ao backend para criação de políticas em falta.
+ * Nunca altera enabled/vip_only/admin_only já existentes.
+ *
+ * @param {Array<{ flowId, optionKey, label, nodePath }>} options
+ */
+async function syncFlowOptionsToBackend(options) {
+  try {
+    const res = await backendClient.sendToBackend(
+      "/api/bot/flow-option-policies/sync",
+      { options },
+      "POST",
+    );
+    return res;
+  } catch (err) {
+    logger.warn("[commandPolicySync] falha ao sincronizar flow options:", err && err.message);
+    return null;
+  }
+}
+
+module.exports = { syncRegisteredCommandsToBackend, syncFlowOptionsToBackend };

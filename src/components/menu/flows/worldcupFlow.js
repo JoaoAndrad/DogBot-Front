@@ -56,12 +56,12 @@ const worldcupFlow = createFlow("copa", {
   root: {
     title: "⚽ *Copa do Mundo*",
     options: [
-      { label: "📅 Próximos jogos (5)", action: "exec", handler: "showNextMatches" },
-      { label: "📊 Tabela", action: "goto", target: "/tabela" },
-      { label: "🏆 Ranking do grupo", action: "exec", handler: "showLeaderboard" },
-      { label: "📋 Meus palpites", action: "exec", handler: "showMyPredictions" },
-      { label: "❓ Dúvidas", action: "goto", target: "/duvidas" },
-      { label: "⚙️ Configurações", action: "exec", handler: "showSettings" },
+      { label: "📅 Próximos jogos (5)", optionKey: "proximos-jogos", action: "exec", handler: "showNextMatches" },
+      { label: "📊 Tabela", optionKey: "tabela", action: "goto", target: "/tabela" },
+      { label: "🏆 Ranking do grupo", optionKey: "ranking", action: "exec", handler: "showLeaderboard" },
+      { label: "📋 Meus palpites", optionKey: "meus-palpites", action: "exec", handler: "showMyPredictions" },
+      { label: "❓ Dúvidas", optionKey: "duvidas", action: "goto", target: "/duvidas" },
+      { label: "⚙️ Configurações", optionKey: "configuracoes", action: "exec", handler: "showSettings" },
       { label: "👋 Sair", action: "exec", handler: "leave" },
     ],
   },

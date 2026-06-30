@@ -77,6 +77,13 @@ const spotifyFlow = createFlow("spotify", {
   root: {
     title: "🎵 Spotify",
     dynamic: true,
+    staticOptionKeys: [
+      { key: "conectar",     label: "🔗 Conectar / Reconectar" },
+      { key: "tocando-agora", label: "🎧 Tocando agora" },
+      { key: "estatisticas", label: "📊 Estatísticas" },
+      { key: "todos-grupo",  label: "👥 Todos (grupo)" },
+      { key: "historico",    label: "📜 Histórico" },
+    ],
     handler: async (ctx) => {
       // Build options; include 'Todos' when opened in a group chat
       const isGroup = !!(
@@ -90,6 +97,7 @@ const spotifyFlow = createFlow("spotify", {
       if (!isGroup) {
         opts.push({
           label: "🔗 Conectar / Reconectar",
+          optionKey: "conectar",
           action: "exec",
           handler: "connect",
         });
@@ -98,11 +106,13 @@ const spotifyFlow = createFlow("spotify", {
       opts.push(
         {
           label: "🎧 Tocando agora",
+          optionKey: "tocando-agora",
           action: "exec",
           handler: "currentlyPlaying",
         },
         {
           label: "📊 Estatísticas",
+          optionKey: "estatisticas",
           action: "goto",
           target: "/stats",
         },
@@ -111,12 +121,13 @@ const spotifyFlow = createFlow("spotify", {
       if (isGroup) {
         opts.push({
           label: "👥 Todos (grupo)",
+          optionKey: "todos-grupo",
           action: "exec",
           handler: "todosMenu",
         });
       }
 
-      opts.push({ label: "📜 Histórico", action: "goto", target: "/history" });
+      opts.push({ label: "📜 Histórico", optionKey: "historico", action: "goto", target: "/history" });
       opts.push({ label: "❌ Sair", action: "exec", handler: "exit" });
 
       return { options: opts };
