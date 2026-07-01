@@ -17,11 +17,13 @@ function formatMoney(amount) {
 }
 
 function formatDate(date) {
-  return DateTime.fromJSDate(new Date(date), { zone: TZ }).toFormat("dd/MM");
+  const d = new Date(date);
+  return `${String(d.getUTCDate()).padStart(2, "0")}/${String(d.getUTCMonth() + 1).padStart(2, "0")}`;
 }
 
 function formatDateFull(date) {
-  return DateTime.fromJSDate(new Date(date), { zone: TZ }).toFormat("dd/MM/yyyy");
+  const d = new Date(date);
+  return `${String(d.getUTCDate()).padStart(2, "0")}/${String(d.getUTCMonth() + 1).padStart(2, "0")}/${d.getUTCFullYear()}`;
 }
 
 const MONTHS_PT = ["Janeiro","Fevereiro","Março","Abril","Maio","Junho","Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"];
@@ -219,8 +221,8 @@ const financialFlow = createFlow("financeiro", {
         ]);
         hasTxs = !!(txsRes?.transactions?.length);
         hasNextMonthTxs = (schedRes?.transactions || []).some(t => {
-          const d = DateTime.fromJSDate(new Date(t.date), { zone: TZ });
-          return (d.month - 1) === nextMonth && d.year === nextYear;
+          const d = new Date(t.date);
+          return d.getUTCMonth() === nextMonth && d.getUTCFullYear() === nextYear;
         });
       } catch (e) {
         logger.warn("[financialFlow] /extrato check error:", e.message);
@@ -301,8 +303,8 @@ const financialFlow = createFlow("financeiro", {
           const schedRes = await financialClient.listScheduled(ctx.userId);
           const txs = (schedRes?.transactions || [])
             .filter(t => {
-              const d = DateTime.fromJSDate(new Date(t.date), { zone: TZ });
-              return (d.month - 1) === nextMonth && d.year === nextYear;
+              const d = new Date(t.date);
+              return d.getUTCMonth() === nextMonth && d.getUTCFullYear() === nextYear;
             })
             .sort((a, b) => new Date(a.date) - new Date(b.date));
 
