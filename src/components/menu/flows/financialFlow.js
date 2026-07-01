@@ -1575,7 +1575,13 @@ const financialFlow = createFlow("financeiro", {
         }
         options.push({ label: "↩️ Voltar", action: "back" });
       }
-      return { title: "✏️ O que deseja fazer?", options };
+      const { editingTxAmount, editingTxDescription, editingTxType, editingTxDate } = ctx.state.context;
+      const emoji = editingTxType === "income" ? "🟢" : "🔴";
+      const sign = editingTxType === "income" ? "+" : "-";
+      const desc = editingTxDescription || (editingTxType === "income" ? "Receita" : "Despesa");
+      const dateStr = editingTxDate ? ` (${formatDate(editingTxDate)})` : "";
+      const txSummary = `${emoji} ${sign}R$ ${formatMoney(editingTxAmount)} — ${desc}${dateStr}`;
+      return { title: `✏️ O que deseja fazer?\n${txSummary}`, options };
     },
   },
 
@@ -2867,7 +2873,7 @@ const financialFlow = createFlow("financeiro", {
         await financialClient.deleteTransaction(ctx.userId, editingTxId);
         await ctx.reply("🗑️ Lançamento excluído.");
         ctx.state.context.editingTxId = null;
-        ctx.state.path = "/extrato";
+        ctx.state.path = "/lancamentos/editar";
       } catch (e) {
         logger.error("[financialFlow] excluirLancamento error:", e.message);
         await ctx.reply("❌ Erro ao excluir lançamento.");
@@ -2901,7 +2907,7 @@ const financialFlow = createFlow("financeiro", {
         });
         await ctx.reply("🗑️ Lançamento removido.\n📅 Próxima ocorrência agendada.");
         ctx.state.context.editingTxId = null;
-        ctx.state.path = "/extrato";
+        ctx.state.path = "/lancamentos/editar";
       } catch (e) {
         logger.error("[financialFlow] apagarSomenteEste error:", e.message);
         await ctx.reply("❌ Erro ao apagar lançamento.");
@@ -2919,7 +2925,7 @@ const financialFlow = createFlow("financeiro", {
         await ctx.reply("✅ Parcelas futuras canceladas.");
         ctx.state.context.editingTxId = null;
         ctx.state.context.editingTxInstallmentGroupId = null;
-        ctx.state.path = "/extrato";
+        ctx.state.path = "/lancamentos/editar";
       } catch (e) {
         logger.error("[financialFlow] cancelarParcelasFuturas error:", e.message);
         await ctx.reply("❌ Erro ao cancelar parcelas.");
@@ -2934,7 +2940,7 @@ const financialFlow = createFlow("financeiro", {
         await ctx.reply("✅ Todas as parcelas canceladas.");
         ctx.state.context.editingTxId = null;
         ctx.state.context.editingTxInstallmentGroupId = null;
-        ctx.state.path = "/extrato";
+        ctx.state.path = "/lancamentos/editar";
       } catch (e) {
         logger.error("[financialFlow] cancelarTodasParcelas error:", e.message);
         await ctx.reply("❌ Erro ao cancelar parcelas.");

@@ -13,6 +13,11 @@ const FLOW_OPTION_POLICIES_TTL_MS = 60_000; // 1 minuto de cache
 // Cache da última enquete enviada por usuário+flow, para apagar ao renderizar a próxima.
 const _lastPollMsgCache = new Map(); // `${userId}:${flowId}` → WA Message object
 
+// Mutex por usuário: impede execuções concorrentes de handleVote para o mesmo userId.
+// Sem isso, dois votos rápidos (ex: "Editar lançamento" + re-vote em poll antigo) disparam
+// dois _renderNode simultâneos, gerando enquetes duplicadas.
+const _userVoteLocks = new Map(); // userId → Promise
+
 async function _getFlowOptionPolicies() {
   const now = Date.now();
   if (_flowOptionPoliciesCache && now - _flowOptionPoliciesFetchedAt < FLOW_OPTION_POLICIES_TTL_MS) {
@@ -102,6 +107,23 @@ class FlowManager {
    * @param {object} [resolvedOption] - Opção completa vinda da metadata da enquete (obrigatória para nós `dynamic` com options vazias no flow)
    */
   async handleVote(client, chatId, userId, pollMeta, selectedIndex, resolvedOption) {
+    // Serializa execuções por usuário: aguarda qualquer handleVote anterior do mesmo user terminar.
+    while (_userVoteLocks.has(userId)) {
+      await _userVoteLocks.get(userId);
+    }
+
+    let releaseLock;
+    _userVoteLocks.set(userId, new Promise((r) => { releaseLock = r; }));
+
+    try {
+      await this._handleVoteInner(client, chatId, userId, pollMeta, selectedIndex, resolvedOption);
+    } finally {
+      _userVoteLocks.delete(userId);
+      releaseLock();
+    }
+  }
+
+  async _handleVoteInner(client, chatId, userId, pollMeta, selectedIndex, resolvedOption) {
     const { flowId, path } = pollMeta;
 
     logger.debug(
@@ -1252,8 +1274,10 @@ class FlowManager {
             categoryId: state.context.editingTxCategoryId || undefined,
           });
         }
+        state.path = "/lancamentos/editar";
         await storage.saveState(stateUserId, flowId, state);
         await client.sendMessage(chatId, "✅ Valor atualizado.");
+        await this._renderNode(client, chatId, stateUserId, flowId, "/lancamentos/editar");
       } catch (e) {
         logFinancialError({ userId: stateUserId, source: "text_input", action: "awaitingEditTxAmount", error: e });
         await client.sendMessage(chatId, "❌ Erro ao atualizar valor.");
@@ -1295,8 +1319,10 @@ class FlowManager {
             categoryId: state.context.editingTxCategoryId || undefined,
           });
         }
+        state.path = "/lancamentos/editar";
         await storage.saveState(stateUserId, flowId, state);
         await client.sendMessage(chatId, "✅ Descrição atualizada.");
+        await this._renderNode(client, chatId, stateUserId, flowId, "/lancamentos/editar");
       } catch (e) {
         logFinancialError({ userId: stateUserId, source: "text_input", action: "awaitingEditTxDesc", error: e });
         await client.sendMessage(chatId, "❌ Erro ao atualizar descrição.");
