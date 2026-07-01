@@ -780,8 +780,9 @@ async function executeAction(result, client) {
               // Apaga imediatamente a enquete de confirmação (valores, limites, etc.)
               try {
                 const flowManager = require("../menu/flowManager");
+                console.log(`[PollCache] end=true, chamando deleteCachedPoll stateUserId=${stateUserId} flowId=${data.flowId}`);
                 flowManager.deleteCachedPoll(stateUserId, data.flowId);
-              } catch (_) {}
+              } catch (e) { console.log("[PollCache] deleteCachedPoll erro:", e?.message); }
             } else {
               // Handler completed but flow continues (end: false)
               // Save updated state and re-render if path changed (use stateUserId so next vote finds same state)

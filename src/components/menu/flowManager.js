@@ -482,7 +482,7 @@ class FlowManager {
     // ao confirmar (end: true) ou ao navegar para outro nó. Agenda fallback de 2 min
     // caso o usuário não responda e a sessão expire sem renderizar novo nó.
     if (flowId === "financeiro" && node.sensitive === true && pollResult?.sent) {
-      logger.debug(`[FlowManager] cachePoll userId=${userId} flowId=${flowId} path=${path}`);
+      console.log(`[PollCache] SET userId=${userId} path=${path} sent=${!!pollResult.sent}`);
       _lastPollMsgCache.set(`${userId}:${flowId}`, pollResult.sent);
       setTimeout(() => {
         pollResult.sent.delete(false).catch(() => {});
@@ -498,9 +498,9 @@ class FlowManager {
   deleteCachedPoll(userId, flowId) {
     const key = `${userId}:${flowId}`;
     const msg = _lastPollMsgCache.get(key);
-    logger.debug(`[FlowManager] deleteCachedPoll key=${key} found=${!!msg} cacheSize=${_lastPollMsgCache.size}`);
+    console.log(`[PollCache] DELETE key=${key} found=${!!msg} cacheSize=${_lastPollMsgCache.size}`);
     if (msg) {
-      msg.delete(false).catch((e) => logger.warn("[FlowManager] deleteCachedPoll .delete() erro:", e?.message));
+      msg.delete(false).catch((e) => console.log("[PollCache] .delete() erro:", e?.message));
       _lastPollMsgCache.delete(key);
     }
   }
