@@ -128,6 +128,16 @@ if (!fs.existsSync(TEMP_DIR)) {
   fs.mkdirSync(TEMP_DIR, { recursive: true });
 }
 
+const STICKER_DELETE_DELAY_MS = 30_000;
+
+async function _sendAndDelete(client, chatId, media, sendOpts, deleteAfterMs) {
+  const sent = await client.sendMessage(chatId, media, sendOpts);
+  if (sent && deleteAfterMs > 0) {
+    setTimeout(() => sent.delete(false).catch(() => {}), deleteAfterMs);
+  }
+  return sent;
+}
+
 /**
  * Download image from URL to raw buffer (no resize). Use for posters so
  * sendBufferAsSticker can send dual stickers (crop + full) when aspect !== 1.
@@ -243,9 +253,7 @@ async function sendTrackSticker(client, chatId, track) {
 
     // Send as sticker with explicit sticker metadata. If it fails, log details and try a fallback (send as image)
     try {
-      await client.sendMessage(chatId, media, {
-        sendMediaAsSticker: true,
-      });
+      await _sendAndDelete(client, chatId, media, { sendMediaAsSticker: true }, STICKER_DELETE_DELAY_MS);
       return true;
     } catch (sendErr) {
       // Log full error for debugging (stack and raw object if available)
@@ -256,7 +264,7 @@ async function sendTrackSticker(client, chatId, track) {
         logger.debug(
           `[StickerHelper] Attempting fallback: send as regular image for ${track.trackName}`,
         );
-        await client.sendMessage(chatId, media); // fallback: send as image
+        await _sendAndDelete(client, chatId, media, {}, STICKER_DELETE_DELAY_MS);
         return true;
       } catch (fallbackErr) {
         logger.error(
@@ -520,9 +528,7 @@ async function sendCompositeSticker(client, chatId, tracks) {
 
     // Try to send as sticker
     try {
-      await client.sendMessage(chatId, media, {
-        sendMediaAsSticker: true,
-      });
+      await _sendAndDelete(client, chatId, media, { sendMediaAsSticker: true }, STICKER_DELETE_DELAY_MS);
       return true;
     } catch (sendErr) {
       logger.error(
@@ -534,7 +540,7 @@ async function sendCompositeSticker(client, chatId, tracks) {
         logger.debug(
           `[StickerHelper] Attempting fallback: send as regular image`,
         );
-        await client.sendMessage(chatId, media);
+        await _sendAndDelete(client, chatId, media, {}, STICKER_DELETE_DELAY_MS);
         return true;
       } catch (fallbackErr) {
         logger.error(
@@ -558,6 +564,9 @@ async function sendCompositeSticker(client, chatId, tracks) {
 async function sendBufferAsSticker(client, chatId, buffer, opts = {}) {
   try {
     if (!buffer) return false;
+
+    const _del = opts.deleteAfterMs != null ? opts.deleteAfterMs : STICKER_DELETE_DELAY_MS;
+    const _send = (media, sendOpts) => _sendAndDelete(client, chatId, media, sendOpts, _del);
 
     // Respect EXIF rotation and read metadata
     const image = sharp(buffer).rotate();
@@ -600,7 +609,7 @@ async function sendBufferAsSticker(client, chatId, buffer, opts = {}) {
         .toBuffer();
       const media = buildMedia(containBuf, opts.filename || "sticker.webp");
       try {
-        await client.sendMessage(chatId, media, {
+        await _send(media, {
           sendMediaAsSticker: true,
           ...(opts.quoted ? { quoted: opts.quoted } : {}),
         });
@@ -610,7 +619,7 @@ async function sendBufferAsSticker(client, chatId, buffer, opts = {}) {
           `[StickerHelper] Error sending full-only sticker: ${sendErr && sendErr.stack ? sendErr.stack : String(sendErr)}`,
         );
         try {
-          await client.sendMessage(chatId, media, opts.quoted ? { quoted: opts.quoted } : {});
+          await _send(media, opts.quoted ? { quoted: opts.quoted } : {});
           return true;
         } catch (fallbackErr) {
           logger.error(`[StickerHelper] Fallback failed: ${fallbackErr && fallbackErr.stack ? fallbackErr.stack : String(fallbackErr)}`);
@@ -649,8 +658,7 @@ async function sendBufferAsSticker(client, chatId, buffer, opts = {}) {
         );
 
         // send cropped first (quoted if provided)
-        await client.sendMessage(
-          chatId,
+        await _send(
           cropMedia,
           Object.assign(
             { sendMediaAsSticker: true },
@@ -659,8 +667,7 @@ async function sendBufferAsSticker(client, chatId, buffer, opts = {}) {
         );
 
         // then send full-fit
-        await client.sendMessage(
-          chatId,
+        await _send(
           containMedia,
           Object.assign(
             { sendMediaAsSticker: true },
@@ -684,8 +691,7 @@ async function sendBufferAsSticker(client, chatId, buffer, opts = {}) {
             fallbackBuf,
             opts.filename || "sticker.webp",
           );
-          await client.sendMessage(
-            chatId,
+          await _send(
             media2,
             opts.quoted ? { quoted: opts.quoted } : {},
           );
@@ -712,7 +718,7 @@ async function sendBufferAsSticker(client, chatId, buffer, opts = {}) {
         { sendMediaAsSticker: true },
         opts.quoted ? { quoted: opts.quoted } : {},
       );
-      await client.sendMessage(chatId, media, sendOpts);
+      await _send(media, sendOpts);
       return true;
     } catch (sendErr) {
       logger.error(
@@ -721,7 +727,7 @@ async function sendBufferAsSticker(client, chatId, buffer, opts = {}) {
       // Fallback to send as regular image
       try {
         const sendOpts = opts.quoted ? { quoted: opts.quoted } : {};
-        await client.sendMessage(chatId, media, sendOpts);
+        await _send(media, sendOpts);
         return true;
       } catch (fallbackErr) {
         logger.error(
