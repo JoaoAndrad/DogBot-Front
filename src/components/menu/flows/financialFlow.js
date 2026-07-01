@@ -1511,13 +1511,17 @@ const financialFlow = createFlow("financeiro", {
       const pageItems = txs.slice(clampedPage * PAGE_SIZE, (clampedPage + 1) * PAGE_SIZE);
       const hasPrev = clampedPage > 0;
       const hasNext = clampedPage < totalPages - 1;
+      const labelCount = {};
       const options = pageItems.map(t => {
         const emoji = t.type === "income" ? "🟢" : "🔴";
         const sign = t.type === "income" ? "+" : "-";
         const desc = t.description || (t.type === "income" ? "Receita" : "Despesa");
         const dateLabel = formatDate(t.date);
+        const baseLabel = `${emoji} ${sign}R$ ${formatMoney(t.amount)} — ${desc} (${dateLabel})`;
+        labelCount[baseLabel] = (labelCount[baseLabel] || 0) + 1;
+        const label = labelCount[baseLabel] > 1 ? `${baseLabel} ·${labelCount[baseLabel]}` : baseLabel;
         return {
-          label: `${emoji} ${sign}R$ ${formatMoney(t.amount)} — ${desc} (${dateLabel})`,
+          label,
           action: "exec",
           handler: "selecionarLancamentoEditar",
           data: {
