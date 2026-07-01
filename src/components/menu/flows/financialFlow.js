@@ -427,8 +427,10 @@ const financialFlow = createFlow("financeiro", {
     options: [],
     handler: async (ctx) => {
       try {
+        const KNOWN_TYPES = new Set(ACCOUNT_TYPES.map(t => t.key));
         const res = await financialClient.listAccounts(ctx.userId);
-        const accounts = res?.accounts || [];
+        // Exclude card-type accounts — those are managed under "Cartões"
+        const accounts = (res?.accounts || []).filter(a => KNOWN_TYPES.has(a.type));
         if (!accounts.length) {
           await ctx.reply("🏦 Nenhuma conta para editar.");
           return {
@@ -439,12 +441,15 @@ const financialFlow = createFlow("financeiro", {
             ],
           };
         }
-        const options = accounts.slice(0, 11).map(a => ({
-          label: a.name,
-          action: "exec",
-          handler: "selectContaEditar",
-          data: { accountId: a.id, accountName: a.name, accountType: a.type, accountBalance: a.balance, accountIsDefault: a.isDefault },
-        }));
+        const options = accounts.slice(0, 11).map(a => {
+          const typeName = ACCOUNT_TYPES.find(t => t.key === a.type)?.label || a.type;
+          return {
+            label: `${a.name} (${typeName})`,
+            action: "exec",
+            handler: "selectContaEditar",
+            data: { accountId: a.id, accountName: a.name, accountType: a.type, accountBalance: a.balance, accountIsDefault: a.isDefault },
+          };
+        });
         options.push({ label: "❌ Cancelar", action: "back" });
         return { title: "✏️ Qual conta editar?", options };
       } catch (e) {
@@ -1792,21 +1797,65 @@ const financialFlow = createFlow("financeiro", {
 
     listarContas: async (ctx) => {
       try {
-        const [res, schedRes] = await Promise.all([
+        const KNOWN_TYPES = new Set(ACCOUNT_TYPES.map(t => t.key));
+        const [res, schedRes, cardsRes] = await Promise.all([
           financialClient.listAccounts(ctx.userId),
           financialClient.listScheduled(ctx.userId).catch(() => null),
+          financialClient.listCards(ctx.userId).catch(() => null),
         ]);
-        if (!res?.accounts?.length) {
+        const allAccounts = res?.accounts || [];
+        // Only real accounts (not legacy "cartao" or other unknown types)
+        const accounts = allAccounts.filter(a => KNOWN_TYPES.has(a.type));
+        const cards = cardsRes?.cards || [];
+
+        if (!accounts.length && !cards.length) {
           await ctx.reply("🏦 Você ainda não tem contas cadastradas.\n\nUse *Adicionar conta* para criar uma.");
           return { noRender: true };
         }
-        const total = res.accounts.reduce((s, a) => s + (a.balance || 0), 0);
-        const totalProjected = res.accounts.reduce((s, a) => s + (a.projectedBalance ?? a.balance ?? 0), 0);
-        const lines = res.accounts.map(a => {
+
+        // Legacy card accounts (unknown type) may hold the card's current balance
+        const legacyCardBalance = {};
+        for (const a of allAccounts) {
+          if (!KNOWN_TYPES.has(a.type)) legacyCardBalance[a.id] = a.balance;
+        }
+
+        // Group cards by their linked account (must exist in filtered list)
+        const cardsByAccount = {};
+        const unlinkedCards = [];
+        for (const card of cards) {
+          const parentExists = card.linkedAccountId && accounts.find(a => a.id === card.linkedAccountId);
+          if (parentExists) {
+            if (!cardsByAccount[card.linkedAccountId]) cardsByAccount[card.linkedAccountId] = [];
+            cardsByAccount[card.linkedAccountId].push(card);
+          } else {
+            unlinkedCards.push(card);
+          }
+        }
+
+        const total = accounts.reduce((s, a) => s + (a.balance || 0), 0);
+        const totalProjected = accounts.reduce((s, a) => s + (a.projectedBalance ?? a.balance ?? 0), 0);
+
+        const lines = accounts.map(a => {
           const type = ACCOUNT_TYPES.find(t => t.key === a.type)?.label || a.type;
           const sign = a.balance < 0 ? "🔴" : "🟢";
-          return `${sign} *${a.name}* (${type}): R$ ${formatMoney(a.balance)}`;
+          let line = `${sign} *${a.name}* (${type}): R$ ${formatMoney(a.balance)}`;
+          for (const card of (cardsByAccount[a.id] || [])) {
+            const bal = card.invoiceBalance ?? legacyCardBalance[card.linkedAccountId] ?? null;
+            const balStr = bal != null ? `R$ ${formatMoney(bal)}` : "—";
+            line += `\n   └ 💳 *${card.name}*: ${balStr}`;
+          }
+          return line;
         });
+
+        if (unlinkedCards.length) {
+          lines.push("\n💳 *Cartões:*");
+          for (const c of unlinkedCards) {
+            const bal = c.invoiceBalance ?? legacyCardBalance[c.linkedAccountId] ?? null;
+            const balStr = bal != null ? `R$ ${formatMoney(bal)}` : "—";
+            lines.push(`   └ 💳 *${c.name}*: ${balStr}`);
+          }
+        }
+
         const hasPending = Math.abs(totalProjected - total) >= 0.01;
         let projLine = "";
         if (hasPending) {
