@@ -126,6 +126,7 @@ const financialFlow = createFlow("financeiro", {
     dynamic: true,
     staticOptionKeys: [
       { key: "primeiros-passos",    label: "🚀 Primeiros passos" },
+      { key: "importados",          label: "📥 Importações" },
       { key: "extrato",             label: "📊 Extrato" },
       { key: "contas",              label: "🏦 Contas" },
       { key: "cartoes",             label: "💳 Cartões" },
@@ -148,9 +149,18 @@ const financialFlow = createFlow("financeiro", {
           ],
         };
       }
+      let importedCount = 0;
+      try {
+        const imp = await financialClient.listImported(ctx.userId);
+        importedCount = imp?.count || 0;
+      } catch (_) {}
+      const importedOption = importedCount > 0
+        ? [{ label: `📥 Importações (${importedCount})`, optionKey: "importados", action: "goto", target: "/financeiro/importados" }]
+        : [];
       return {
         title: "💰 Assistente Financeiro",
         options: [
+          ...importedOption,
           { label: "📋 Extrato", optionKey: "extrato", action: "goto", target: "/extrato" },
           { label: "🏦 Contas", optionKey: "contas", action: "goto", target: "/contas" },
           { label: "💳 Cartões", optionKey: "cartoes", action: "goto", target: "/cartoes" },
@@ -773,10 +783,66 @@ const financialFlow = createFlow("financeiro", {
         title: `Registrar R$ ${formatMoney(tx.amount)}${installNote}${desc} como ${typeLabel} em *${tx.accountName}* (${dateLabel})${pendingNote}?${recurrenceNote}\n🏷️ Categoria: ${catLabel}`,
         options: [
           { label: "✅ Sim, registrar", action: "exec", handler: "confirmarNlp" },
-          { label: "🏷️ Editar categoria", action: "goto", target: "/nlp-confirm/categoria" },
+          { label: "✏️ Editar", action: "goto", target: "/nlp-confirm/editar" },
           { label: "❌ Cancelar", action: "exec", handler: "cancelarNlp" },
         ],
       };
+    },
+  },
+
+  "/nlp-confirm/editar": {
+    dynamic: true,
+    options: [],
+    handler: async (ctx) => {
+      const tx = ctx.state.context.pendingNlpTransaction;
+      if (!tx) { ctx.state.path = "/"; return {}; }
+      const dateLabel = tx.recurrence ? "dia da recorrência" : "data";
+      return {
+        title: "✏️ O que deseja editar?",
+        options: [
+          { label: "💰 Editar valor", action: "exec", handler: "nlpAwaitEditAmount" },
+          { label: "📝 Editar descrição", action: "exec", handler: "nlpAwaitEditDesc" },
+          { label: "🏷️ Editar categoria", action: "goto", target: "/nlp-confirm/categoria" },
+          { label: "🏦 Editar conta", action: "goto", target: "/nlp-confirm/conta" },
+          { label: `📅 Editar ${dateLabel}`, action: "exec", handler: "nlpAwaitEditDate" },
+          { label: "↩️ Voltar", action: "back" },
+        ],
+      };
+    },
+  },
+
+  "/nlp-confirm/dia": {
+    dynamic: true,
+    options: [],
+    handler: async (ctx) => {
+      const mode = ctx.state.context.awaitingNlpRecurrenceDay;
+      if (!ctx.state.context.pendingNlpTransaction || !mode) { ctx.state.path = "/"; return {}; }
+      if (mode === "weekly") {
+        return {
+          title: "📅 Qual dia da semana?",
+          options: [
+            { label: "Segunda-feira", action: "exec", handler: "setNlpRecurrenceDow", data: { dow: 1 } },
+            { label: "Terça-feira",   action: "exec", handler: "setNlpRecurrenceDow", data: { dow: 2 } },
+            { label: "Quarta-feira",  action: "exec", handler: "setNlpRecurrenceDow", data: { dow: 3 } },
+            { label: "Quinta-feira",  action: "exec", handler: "setNlpRecurrenceDow", data: { dow: 4 } },
+            { label: "Sexta-feira",   action: "exec", handler: "setNlpRecurrenceDow", data: { dow: 5 } },
+            { label: "Sábado",        action: "exec", handler: "setNlpRecurrenceDow", data: { dow: 6 } },
+            { label: "Domingo",       action: "exec", handler: "setNlpRecurrenceDow", data: { dow: 0 } },
+            { label: "❌ Cancelar",    action: "exec", handler: "cancelarNlp" },
+          ],
+        };
+      }
+      // monthly — quick picks
+      const COMMON_DAYS = [1, 5, 10, 15, 20, 25, 30];
+      const options = COMMON_DAYS.map(d => ({
+        label: `Dia ${d}`,
+        action: "exec",
+        handler: "setNlpRecurrenceMonthDay",
+        data: { day: d },
+      }));
+      options.push({ label: "📝 Outro dia", action: "exec", handler: "nlpAwaitMonthlyDay" });
+      options.push({ label: "❌ Cancelar",   action: "exec", handler: "cancelarNlp" });
+      return { title: "📅 Qual dia do mês?", options };
     },
   },
 
@@ -835,6 +901,30 @@ const financialFlow = createFlow("financeiro", {
       options.push({ label: "➕ Nova subcategoria", action: "exec", handler: "nlpNovaSubcategoriaInput" });
       options.push({ label: "↩️ Voltar", action: "back" });
       return { title: `🏷️ Subcategorias de *${parentName}*:`, options };
+    },
+  },
+
+  "/nlp-confirm/conta": {
+    dynamic: true,
+    sensitive: true,
+    options: [],
+    handler: async (ctx) => {
+      if (!ctx.state.context.pendingNlpTransaction) { ctx.state.path = "/"; return {}; }
+      let accounts = [];
+      try {
+        const res = await financialClient.listAccounts(ctx.userId);
+        accounts = res?.accounts || [];
+      } catch (e) {
+        logger.warn("[financialFlow] /nlp-confirm/conta error:", e.message);
+      }
+      const options = accounts.map(a => ({
+        label: `🏦 ${a.name} — R$ ${formatMoney(a.balance)}`,
+        action: "exec",
+        handler: "setNlpConta",
+        data: { accountId: a.id, accountName: a.name },
+      }));
+      options.push({ label: "↩️ Voltar", action: "back" });
+      return { title: "🏦 Em qual conta registrar?", options };
     },
   },
 
@@ -1611,6 +1701,51 @@ const financialFlow = createFlow("financeiro", {
     },
   },
 
+  // ── Importações pendentes ─────────────────────────────────────────────────
+
+  "/financeiro/importados": {
+    dynamic: true,
+    sensitive: true,
+    options: [],
+    handler: async (ctx) => {
+      try {
+        const res = await financialClient.listImported(ctx.userId);
+        const txs = res?.transactions || [];
+        if (!txs.length) {
+          await ctx.reply("📥 Nenhuma transação pendente de revisão.");
+          ctx.state.path = "/";
+          return {};
+        }
+        const MAX_VISIBLE = 10;
+        const visible = txs.slice(0, MAX_VISIBLE);
+        const hidden = txs.length - visible.length;
+        const options = visible.map(t => {
+          const emoji = t.type === "income" ? "🟢" : "🔴";
+          const sign = t.type === "income" ? "+" : "-";
+          const desc = t.description || (t.type === "income" ? "Receita" : "Despesa");
+          const dateLabel = formatDate(new Date(t.date));
+          return {
+            label: `${emoji} ${sign}R$ ${formatMoney(t.amount)} ${desc} (${dateLabel})`,
+            action: "exec",
+            handler: "abrirImportadoParaRevisao",
+            data: { txId: t.id, amount: t.amount, type: t.type, description: t.description, accountName: t.accountName },
+          };
+        });
+        options.push({ label: "↩️ Voltar", action: "back" });
+        const extraNote = hidden > 0 ? ` (e mais ${hidden})` : "";
+        return {
+          title: `📥 Importações para revisar${extraNote}`,
+          options,
+        };
+      } catch (e) {
+        logger.error("[financialFlow] /financeiro/importados error:", e.message);
+        await ctx.reply("❌ Erro ao carregar importações.");
+        ctx.state.path = "/";
+        return {};
+      }
+    },
+  },
+
   // ── Handlers ──────────────────────────────────────────────────────────────
 
   handlers: {
@@ -2060,6 +2195,79 @@ const financialFlow = createFlow("financeiro", {
       ctx.state.context.awaitingNlpNovaSubcategoria = true;
       await ctx.reply("📝 Digite o nome da nova subcategoria:");
       return { noRender: true };
+    },
+
+    setNlpRecurrenceMonthDay: async (ctx, data) => {
+      const tx = ctx.state.context.pendingNlpTransaction;
+      if (!tx) return { noRender: true };
+      const day = data.day;
+      const nowRef = new Date();
+      const candidate = new Date(nowRef.getFullYear(), nowRef.getMonth(), day);
+      const date = candidate > nowRef
+        ? candidate
+        : new Date(nowRef.getFullYear(), nowRef.getMonth() + 1, day);
+      tx.recurrenceDay = day;
+      tx.date = date.toISOString();
+      ctx.state.context.awaitingNlpRecurrenceDay = null;
+      ctx.state.path = "/nlp-confirm";
+    },
+
+    setNlpRecurrenceDow: async (ctx, data) => {
+      const tx = ctx.state.context.pendingNlpTransaction;
+      if (!tx) return { noRender: true };
+      const dow = data.dow;
+      const now = new Date();
+      const diff = (dow - now.getDay() + 7) % 7 || 7;
+      const date = new Date(now);
+      date.setDate(now.getDate() + diff);
+      tx.recurrenceDay = dow;
+      tx.date = date.toISOString();
+      ctx.state.context.awaitingNlpRecurrenceDay = null;
+      ctx.state.path = "/nlp-confirm";
+    },
+
+    nlpAwaitMonthlyDay: async (ctx) => {
+      if (!ctx.state.context.pendingNlpTransaction) return { noRender: true };
+      ctx.state.context.awaitingNlpMonthlyDay = true;
+      await ctx.reply("📅 Digite o dia do mês (1–31):");
+      return { noRender: true };
+    },
+
+    nlpAwaitEditDate: async (ctx) => {
+      const tx = ctx.state.context.pendingNlpTransaction;
+      if (!tx) return { noRender: true };
+      if (tx.recurrence) {
+        ctx.state.context.awaitingNlpRecurrenceDay = tx.recurrence;
+        ctx.state.path = "/nlp-confirm/dia";
+        return;
+      }
+      ctx.state.context.awaitingNlpEditDate = true;
+      const cur = formatDate(new Date(tx.date));
+      await ctx.reply(`📅 Digite a nova data (atual: ${cur}):\nExemplos: hoje, ontem, amanhã, dia 15, 15/07`);
+      return { noRender: true };
+    },
+
+    nlpAwaitEditAmount: async (ctx) => {
+      if (!ctx.state.context.pendingNlpTransaction) return { noRender: true };
+      ctx.state.context.awaitingNlpEditAmount = true;
+      const cur = formatMoney(ctx.state.context.pendingNlpTransaction.amount);
+      await ctx.reply(`💰 Digite o novo valor em R$ (atual: R$ ${cur}):`);
+      return { noRender: true };
+    },
+
+    nlpAwaitEditDesc: async (ctx) => {
+      if (!ctx.state.context.pendingNlpTransaction) return { noRender: true };
+      ctx.state.context.awaitingNlpEditDesc = true;
+      const cur = ctx.state.context.pendingNlpTransaction.description || "sem descrição";
+      await ctx.reply(`📝 Digite a nova descrição (atual: ${cur}):`);
+      return { noRender: true };
+    },
+
+    setNlpConta: async (ctx, data) => {
+      if (!ctx.state.context.pendingNlpTransaction) return { noRender: true };
+      ctx.state.context.pendingNlpTransaction.accountId = data.accountId;
+      ctx.state.context.pendingNlpTransaction.accountName = data.accountName;
+      ctx.state.path = "/nlp-confirm";
     },
 
     setCategoriaNlp: async (ctx, data) => {
@@ -2701,8 +2909,19 @@ const financialFlow = createFlow("financeiro", {
 
     // ── Importação automática (DogBubble) ──────────────────────────────────
 
+    abrirImportadoParaRevisao: async (ctx, data) => {
+      ctx.state.context.importedTxId = data.txId;
+      ctx.state.context.importedAmount = data.amount;
+      ctx.state.context.importedType = data.type;
+      ctx.state.context.importedDescription = data.description || null;
+      ctx.state.context.importedBankName = null;
+      ctx.state.context.importedAccountName = data.accountName || null;
+      ctx.state.context.importedReturnPath = "/financeiro/importados";
+      ctx.state.path = "/financeiro/importado";
+    },
+
     confirmarTransacaoImportada: async (ctx) => {
-      const { importedTxId, importedAmount, importedType, importedDescription } = ctx.state.context;
+      const { importedTxId, importedAmount, importedType, importedDescription, importedReturnPath } = ctx.state.context;
       try {
         await financialClient.confirmTransaction(ctx.userId, importedTxId);
         const emoji = importedType === "income" ? "🟢" : "🔴";
@@ -2714,7 +2933,8 @@ const financialFlow = createFlow("financeiro", {
         ctx.state.context.importedDescription = null;
         ctx.state.context.importedBankName = null;
         ctx.state.context.importedAccountName = null;
-        ctx.state.path = "/";
+        ctx.state.context.importedReturnPath = null;
+        ctx.state.path = importedReturnPath || "/";
       } catch (e) {
         logger.error("[financialFlow] confirmarTransacaoImportada error:", e.message);
         await ctx.reply("❌ Erro ao confirmar transação.");
@@ -2723,7 +2943,7 @@ const financialFlow = createFlow("financeiro", {
     },
 
     ignorarTransacaoImportada: async (ctx) => {
-      const { importedTxId } = ctx.state.context;
+      const { importedTxId, importedReturnPath } = ctx.state.context;
       try {
         if (importedTxId) await financialClient.deleteTransaction(ctx.userId, importedTxId);
         await ctx.reply("🗑️ Transação ignorada.");
@@ -2733,7 +2953,8 @@ const financialFlow = createFlow("financeiro", {
         ctx.state.context.importedDescription = null;
         ctx.state.context.importedBankName = null;
         ctx.state.context.importedAccountName = null;
-        ctx.state.path = "/";
+        ctx.state.context.importedReturnPath = null;
+        ctx.state.path = importedReturnPath || "/";
       } catch (e) {
         logger.error("[financialFlow] ignorarTransacaoImportada error:", e.message);
         await ctx.reply("❌ Erro ao remover transação.");

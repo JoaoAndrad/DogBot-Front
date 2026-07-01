@@ -122,6 +122,10 @@ async function listScheduled(userId) {
   return _get("/api/financial/transactions/scheduled", { userId });
 }
 
+async function listImported(userId) {
+  return _get("/api/financial/transactions/imported", { userId });
+}
+
 async function confirmTransaction(userId, transactionId) {
   return _post(`/api/financial/transactions/${transactionId}/confirm`, { userId });
 }
@@ -234,7 +238,7 @@ module.exports = {
   listCategories, createCategory, deleteCategory,
   listTransactions, createTransaction, createInstallment, deleteTransaction,
   updateTransaction, createTransfer, deleteInstallments, updateInstallments,
-  listScheduled, confirmTransaction, skipTransaction,
+  listScheduled, confirmTransaction, skipTransaction, listImported,
   listBudgets, createBudget, deleteBudget,
   listCards, createCard, deleteCard,
   getCurrentInvoice, listInvoices, payInvoice,

@@ -127,13 +127,16 @@ function parseInstallments(text) {
 }
 
 function extractDescription(text) {
-  // Remove triggers, amount, installment pattern, date words, filler words
+  // Remove triggers, amount, installment pattern, recurrence phrases, date words, filler words
   let desc = text
     .replace(AMOUNT_RE, "")
     .replace(INSTALLMENT_RE, "")
+    .replace(MONTHLY_RE, "")
+    .replace(WEEKLY_RE, "")
     .replace(/R?\$\s*/gi, "")
-    .replace(/\b(gast[eouia]i?|paguei|debit[ao]u?|comprei|recebi|entrou|recebendo|ganhei|me pagaram|depositaram|caiu|transfer[ei]|transferindo|movi|movendo|vou|vou pagar|pagarei|vou gastar|gastarei)\b/gi, "")
-    .replace(/\b(de|do|da|no|na|em|por|com|para|pra|um|uma|uns|umas|hoje|ontem|amanhã|dia|reais|real|brl)\b/gi, "")
+    // Multi-word phrases must come before single-word matches to prevent partial stripping
+    .replace(/\b(vou pagar|vou gastar|me pagaram|gast[eouia]i?|paguei|pagar|debit[ao]u?|comprei|recebi|entrou|recebendo|ganhei|depositaram|caiu|transfer[ei]|transferindo|movi|movendo|vou|pagarei|gastarei)\b/gi, "")
+    .replace(/\b(de|do|da|no|na|em|por|com|para|pra|um|uma|uns|umas|hoje|ontem|amanhã|dia|todo|toda|reais|real|brl)\b/gi, "")
     .replace(/\s{2,}/g, " ")
     .trim();
   return desc || null;
@@ -214,4 +217,4 @@ function parseQuery(text) {
   return null;
 }
 
-module.exports = { parse, parseRecurrence, parseQuery };
+module.exports = { parse, parseRecurrence, parseDate, parseQuery };

@@ -639,6 +639,16 @@ class FlowManager {
       expiresAt: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
     };
     existing.context.pendingNlpTransaction = pendingNlpTransaction;
+
+    // Recurrence without a specific day — ask the user before confirming
+    if (recurrence && recurrenceDay == null) {
+      existing.context.awaitingNlpRecurrenceDay = recurrence;
+      existing.path = "/nlp-confirm/dia";
+      await storage.saveState(resolvedId, "financeiro", existing);
+      await this._renderNode(client, chatId, resolvedId, "financeiro", "/nlp-confirm/dia");
+      return true;
+    }
+
     existing.path = "/nlp-confirm";
     await storage.saveState(resolvedId, "financeiro", existing);
     await this._renderNode(client, chatId, resolvedId, "financeiro", "/nlp-confirm");
@@ -1232,6 +1242,92 @@ class FlowManager {
       state.path = "/config";
       await storage.saveState(stateUserId, flowId, state);
       await this._renderNode(client, chatId, stateUserId, flowId, "/config");
+      return true;
+    }
+
+    // 📅 Dia do mês para recorrência mensal sem dia especificado ────────────
+
+    if (state.context.awaitingNlpMonthlyDay) {
+      const day = parseInt(trimmed, 10);
+      if (!day || day < 1 || day > 31) {
+        await client.sendMessage(chatId, "❌ Dia inválido. Digite um número entre 1 e 31:");
+        await storage.saveState(stateUserId, flowId, state);
+        return true;
+      }
+      state.context.awaitingNlpMonthlyDay = false;
+      if (state.context.pendingNlpTransaction) {
+        const nowRef = new Date();
+        const candidate = new Date(nowRef.getFullYear(), nowRef.getMonth(), day);
+        const date = candidate > nowRef
+          ? candidate
+          : new Date(nowRef.getFullYear(), nowRef.getMonth() + 1, day);
+        state.context.pendingNlpTransaction.recurrenceDay = day;
+        state.context.pendingNlpTransaction.date = date.toISOString();
+        state.context.awaitingNlpRecurrenceDay = null;
+      }
+      state.path = "/nlp-confirm";
+      await storage.saveState(stateUserId, flowId, state);
+      await this._renderNode(client, chatId, stateUserId, flowId, "/nlp-confirm");
+      return true;
+    }
+
+    // 📅 Editar data de transação única ──────────────────────────────────────
+
+    if (state.context.awaitingNlpEditDate) {
+      state.context.awaitingNlpEditDate = false;
+      const { parseDate } = require("../../utils/parses/parseFinancialCommandPtBr");
+      let date = parseDate(trimmed);
+      if (!date) {
+        const m = trimmed.match(/^(\d{1,2})(?:\/(\d{1,2}))?$/);
+        if (m) {
+          const now = new Date();
+          const day = parseInt(m[1], 10);
+          const month = m[2] ? parseInt(m[2], 10) - 1 : now.getMonth();
+          date = new Date(now.getFullYear(), month, day);
+        }
+      }
+      if (!date) {
+        await client.sendMessage(chatId, "❌ Data inválida. Use: hoje, ontem, amanhã, dia 15 ou 15/07:");
+        state.context.awaitingNlpEditDate = true;
+        await storage.saveState(stateUserId, flowId, state);
+        return true;
+      }
+      if (state.context.pendingNlpTransaction) {
+        state.context.pendingNlpTransaction.date = date.toISOString();
+      }
+      state.path = "/nlp-confirm";
+      await storage.saveState(stateUserId, flowId, state);
+      await this._renderNode(client, chatId, stateUserId, flowId, "/nlp-confirm");
+      return true;
+    }
+
+    // ✏️ Editar valor/descrição antes de confirmar NLP ───────────────────────
+
+    if (state.context.awaitingNlpEditAmount) {
+      state.context.awaitingNlpEditAmount = false;
+      const raw = trimmed.replace(",", ".");
+      const val = parseFloat(raw);
+      if (!val || val <= 0) {
+        await client.sendMessage(chatId, "❌ Valor inválido. Digite apenas o número (ex: 47,90):");
+        state.context.awaitingNlpEditAmount = true;
+        await storage.saveState(stateUserId, flowId, state);
+        return true;
+      }
+      if (state.context.pendingNlpTransaction) state.context.pendingNlpTransaction.amount = val;
+      state.path = "/nlp-confirm";
+      await storage.saveState(stateUserId, flowId, state);
+      await this._renderNode(client, chatId, stateUserId, flowId, "/nlp-confirm");
+      return true;
+    }
+
+    if (state.context.awaitingNlpEditDesc) {
+      state.context.awaitingNlpEditDesc = false;
+      if (state.context.pendingNlpTransaction) {
+        state.context.pendingNlpTransaction.description = trimmed || null;
+      }
+      state.path = "/nlp-confirm";
+      await storage.saveState(stateUserId, flowId, state);
+      await this._renderNode(client, chatId, stateUserId, flowId, "/nlp-confirm");
       return true;
     }
 
