@@ -420,6 +420,25 @@ class FlowManager {
       return;
     }
 
+    // Guard: WhatsApp polls allow at most 12 options.
+    // Preserve all navigation options and truncate only content slots.
+    const MAX_POLL_OPTIONS = 12;
+    if (renderOptions && renderOptions.length > MAX_POLL_OPTIONS) {
+      const NAV_PREFIXES = ["↩️", "⬅️", "➡️", "✖️", "❌"];
+      const isNav = (opt) =>
+        opt.action === "back" ||
+        (opt.label && NAV_PREFIXES.some((e) => opt.label.startsWith(e)));
+      const navOptions = renderOptions.filter(isNav);
+      const contentOptions = renderOptions.filter((opt) => !isNav(opt));
+      const slots = Math.max(MAX_POLL_OPTIONS - navOptions.length, 0);
+      const truncated = contentOptions.slice(0, slots);
+      logger.warn(
+        `[FlowManager] Enquete '${flowId}${path}' tinha ${renderOptions.length} opções. ` +
+        `Truncando conteúdo de ${contentOptions.length} para ${truncated.length} (${navOptions.length} nav preservadas).`,
+      );
+      renderOptions = [...truncated, ...navOptions];
+    }
+
     const polls = require("../poll");
     const optionLabels = renderOptions.map((o) => o.label);
 

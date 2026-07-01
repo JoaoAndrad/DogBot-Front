@@ -1726,7 +1726,7 @@ const financialFlow = createFlow("financeiro", {
           ctx.state.path = "/";
           return {};
         }
-        const MAX_VISIBLE = 10;
+        const MAX_VISIBLE = 9;
         const visible = txs.slice(0, MAX_VISIBLE);
         const hidden = txs.length - visible.length;
         const options = visible.map(t => {
