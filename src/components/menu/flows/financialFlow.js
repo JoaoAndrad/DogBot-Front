@@ -255,7 +255,7 @@ const financialFlow = createFlow("financeiro", {
 
   "/extrato/ver": {
     dynamic: true,
-    sensitive: true, // mostra valores e descrições de transações
+    sensitive: false, // valores são enviados na mensagem de texto (ctx.reply, já apagada em 30s); o poll só tem navegação
     options: [],
     handler: async (ctx) => {
       const { extratoPeriod = "current", extratoPage = 0 } = ctx.state.context;
