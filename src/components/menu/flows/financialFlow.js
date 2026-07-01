@@ -3,6 +3,9 @@
 const { createFlow } = require("../flowBuilder");
 const financialClient = require("../../../services/financialClient");
 const logger = require("../../../utils/logger");
+const { DateTime } = require("luxon");
+
+const TZ = "America/Sao_Paulo";
 
 // ─── Formatação ──────────────────────────────────────────────────────────────
 
@@ -14,8 +17,11 @@ function formatMoney(amount) {
 }
 
 function formatDate(date) {
-  const d = new Date(date);
-  return `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}`;
+  return DateTime.fromJSDate(new Date(date), { zone: TZ }).toFormat("dd/MM");
+}
+
+function formatDateFull(date) {
+  return DateTime.fromJSDate(new Date(date), { zone: TZ }).toFormat("dd/MM/yyyy");
 }
 
 const MONTHS_PT = ["Janeiro","Fevereiro","Março","Abril","Maio","Junho","Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"];
@@ -188,9 +194,11 @@ const financialFlow = createFlow("financeiro", {
     dynamic: true,
     options: [],
     handler: async (ctx) => {
-      const now = new Date();
-      const nextMonth = (now.getMonth() + 1) % 12;
-      const nextYear = now.getMonth() === 11 ? now.getFullYear() + 1 : now.getFullYear();
+      const now = DateTime.now().setZone(TZ);
+      const nowMonth = now.month - 1; // 0-based para índice MONTHS_PT
+      const nextDT = now.plus({ months: 1 });
+      const nextMonth = nextDT.month - 1;
+      const nextYear = nextDT.year;
 
       let hasTxs = false;
       let hasNextMonthTxs = false;
@@ -201,8 +209,8 @@ const financialFlow = createFlow("financeiro", {
         ]);
         hasTxs = !!(txsRes?.transactions?.length);
         hasNextMonthTxs = (schedRes?.transactions || []).some(t => {
-          const d = new Date(t.date);
-          return d.getMonth() === nextMonth && d.getFullYear() === nextYear;
+          const d = DateTime.fromJSDate(new Date(t.date), { zone: TZ });
+          return (d.month - 1) === nextMonth && d.year === nextYear;
         });
       } catch (e) {
         logger.warn("[financialFlow] /extrato check error:", e.message);
@@ -217,8 +225,8 @@ const financialFlow = createFlow("financeiro", {
           ],
         };
       }
-      const thisMonthName = MONTHS_PT[now.getMonth()];
-      const lastMonthName = MONTHS_PT[(now.getMonth() + 11) % 12];
+      const thisMonthName = MONTHS_PT[nowMonth];
+      const lastMonthName = MONTHS_PT[(nowMonth + 11) % 12];
       const nextMonthName = MONTHS_PT[nextMonth];
       const options = [];
       if (hasNextMonthTxs) {
@@ -242,12 +250,13 @@ const financialFlow = createFlow("financeiro", {
       const limit = 10;
       const skip = extratoPage * limit;
 
-      const now = new Date();
+      const now = DateTime.now().setZone(TZ);
+      const nowMonth = now.month - 1; // 0-based
       const monthIdx = extratoPeriod === "last"
-        ? (now.getMonth() + 11) % 12
+        ? (nowMonth + 11) % 12
         : extratoPeriod === "next"
-        ? (now.getMonth() + 1) % 12
-        : now.getMonth();
+        ? (nowMonth + 1) % 12
+        : nowMonth;
       const monthName = MONTHS_PT[monthIdx];
 
       function buildGroupedLines(txs, headerLine, summaryLine) {
@@ -276,13 +285,14 @@ const financialFlow = createFlow("financeiro", {
       try {
         // ── Lançamentos futuros (próximo mês) ───────────────────────────────
         if (extratoPeriod === "next") {
-          const nextMonth = (now.getMonth() + 1) % 12;
-          const nextYear = now.getMonth() === 11 ? now.getFullYear() + 1 : now.getFullYear();
+          const nextDT2 = now.plus({ months: 1 });
+          const nextMonth = nextDT2.month - 1;
+          const nextYear = nextDT2.year;
           const schedRes = await financialClient.listScheduled(ctx.userId);
           const txs = (schedRes?.transactions || [])
             .filter(t => {
-              const d = new Date(t.date);
-              return d.getMonth() === nextMonth && d.getFullYear() === nextYear;
+              const d = DateTime.fromJSDate(new Date(t.date), { zone: TZ });
+              return (d.month - 1) === nextMonth && d.year === nextYear;
             })
             .sort((a, b) => new Date(a.date) - new Date(b.date));
 
@@ -885,8 +895,7 @@ const financialFlow = createFlow("financeiro", {
       }
       const typeLabel = t.type === "income" ? "🟢 Receita" : "🔴 Despesa";
       const desc = t.description || (t.type === "income" ? "Receita" : "Despesa");
-      const d = new Date(t.date);
-      const dateStr = `${String(d.getUTCDate()).padStart(2, "0")}/${String(d.getUTCMonth() + 1).padStart(2, "0")}/${d.getUTCFullYear()}`;
+      const dateStr = formatDateFull(t.date);
       let recLabel = "";
       if (t.recurrence === "monthly") {
         recLabel = t.recurrenceDay ? `\n🔁 Recorrente — Todo dia ${t.recurrenceDay} do mês` : "\n🔁 Recorrente — Mensal";
@@ -2204,17 +2213,20 @@ const financialFlow = createFlow("financeiro", {
               pendingScheduleRecurrence, pendingScheduleDay, pendingScheduleDate,
               pendingScheduleAccountId } = ctx.state.context;
       try {
-        const now = new Date();
+        const nowDT = DateTime.now().setZone(TZ);
         let scheduleDate;
         if (pendingScheduleRecurrence === "monthly" && pendingScheduleDay) {
-          const thisMonth = new Date(now.getFullYear(), now.getMonth(), pendingScheduleDay);
-          scheduleDate = thisMonth > now ? thisMonth : new Date(now.getFullYear(), now.getMonth() + 1, pendingScheduleDay);
+          const thisMonth = nowDT.set({ day: pendingScheduleDay }).toJSDate();
+          scheduleDate = thisMonth > nowDT.toJSDate()
+            ? thisMonth
+            : nowDT.plus({ months: 1 }).set({ day: pendingScheduleDay }).toJSDate();
         } else if (pendingScheduleRecurrence === "weekly" && pendingScheduleDay != null) {
-          const diff = (pendingScheduleDay - now.getDay() + 7) % 7 || 7;
-          scheduleDate = new Date(now);
-          scheduleDate.setDate(now.getDate() + diff);
+          // pendingScheduleDay usa convenção JS: 0=Dom, 1=Seg, ..., 6=Sáb
+          const todayDow = nowDT.weekday % 7; // Luxon: 7=Dom→0, 1=Seg→1, ...
+          const diff = (pendingScheduleDay - todayDow + 7) % 7 || 7;
+          scheduleDate = nowDT.plus({ days: diff }).toJSDate();
         } else {
-          scheduleDate = pendingScheduleDate ? new Date(pendingScheduleDate) : now;
+          scheduleDate = pendingScheduleDate ? new Date(pendingScheduleDate) : nowDT.toJSDate();
         }
 
         await financialClient.createTransaction(ctx.userId, {
@@ -2635,8 +2647,7 @@ const financialFlow = createFlow("financeiro", {
           const emoji = t.type === "income" ? "🟢" : "🔴";
           const sign = t.type === "income" ? "+" : "-";
           const desc = t.description || "Lançamento";
-          const d = new Date(t.date);
-          const dateStr = `${String(d.getUTCDate()).padStart(2, "0")}/${String(d.getUTCMonth() + 1).padStart(2, "0")}`;
+          const dateStr = formatDate(t.date);
           lines.push(`${emoji} ${dateStr}  ${sign}R$ ${formatMoney(t.amount)}  ${desc}`);
         }
         lines.push(`\n💰 *Total: R$ ${formatMoney(res.totalAmount)}*`);
