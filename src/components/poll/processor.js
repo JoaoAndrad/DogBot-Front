@@ -777,6 +777,11 @@ async function executeAction(result, client) {
                   cleanupErr.message,
                 );
               }
+              // Apaga imediatamente a enquete de confirmação (valores, limites, etc.)
+              try {
+                const flowManager = require("../menu/flowManager");
+                flowManager.deleteCachedPoll(stateUserId, data.flowId);
+              } catch (_) {}
             } else {
               // Handler completed but flow continues (end: false)
               // Save updated state and re-render if path changed (use stateUserId so next vote finds same state)

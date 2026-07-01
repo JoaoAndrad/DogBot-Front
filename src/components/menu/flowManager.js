@@ -10,6 +10,9 @@ let _flowOptionPoliciesCache = null;
 let _flowOptionPoliciesFetchedAt = 0;
 const FLOW_OPTION_POLICIES_TTL_MS = 60_000; // 1 minuto de cache
 
+// Cache da última enquete enviada por usuário+flow, para apagar ao renderizar a próxima.
+const _lastPollMsgCache = new Map(); // `${userId}:${flowId}` → WA Message object
+
 async function _getFlowOptionPolicies() {
   const now = Date.now();
   if (_flowOptionPoliciesCache && now - _flowOptionPoliciesFetchedAt < FLOW_OPTION_POLICIES_TTL_MS) {
@@ -454,6 +457,16 @@ class FlowManager {
       optionKey: opt.optionKey || null,
     }));
 
+    // Se havia uma enquete sensitiva cacheada para este usuário, apaga-a agora.
+    if (flowId === "financeiro") {
+      const prevCacheKey = `${userId}:${flowId}`;
+      const prevMsg = _lastPollMsgCache.get(prevCacheKey);
+      if (prevMsg) {
+        prevMsg.delete(false).catch(() => {});
+        _lastPollMsgCache.delete(prevCacheKey);
+      }
+    }
+
     const pollResult = await polls.createPoll(client, chatId, renderTitle, optionLabels, {
       metadata: {
         actionType: "menu",
@@ -465,10 +478,28 @@ class FlowManager {
       // onVote removed - now processed via backend through processor.js
     });
 
-    // No flow financeiro, só enquetes com dados sensíveis (valores, despesas, nomes de
-    // contas etc.) são apagadas da nossa sessão após 2 minutos. Enquetes de menu são mantidas.
+    // Nós sensíveis (com valores financeiros): guarda no cache para deleção imediata
+    // ao confirmar (end: true) ou ao navegar para outro nó. Agenda fallback de 2 min
+    // caso o usuário não responda e a sessão expire sem renderizar novo nó.
     if (flowId === "financeiro" && node.sensitive === true && pollResult?.sent) {
-      setTimeout(() => pollResult.sent.delete(false).catch(() => {}), 2 * 60 * 1000);
+      _lastPollMsgCache.set(`${userId}:${flowId}`, pollResult.sent);
+      setTimeout(() => {
+        pollResult.sent.delete(false).catch(() => {});
+        _lastPollMsgCache.delete(`${userId}:${flowId}`);
+      }, 2 * 60 * 1000);
+    }
+  }
+
+  /**
+   * Apaga imediatamente a última enquete cacheada para userId+flowId.
+   * Chamado quando um handler retorna { end: true } no flow financeiro.
+   */
+  deleteCachedPoll(userId, flowId) {
+    const key = `${userId}:${flowId}`;
+    const msg = _lastPollMsgCache.get(key);
+    if (msg) {
+      msg.delete(false).catch(() => {});
+      _lastPollMsgCache.delete(key);
     }
   }
 
