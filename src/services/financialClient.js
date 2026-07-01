@@ -191,6 +191,16 @@ async function createCard(userId, { name, limit, closingDay, dueDay, linkedAccou
   return _post("/api/financial/cards", { userId, name, limit, closingDay, dueDay, linkedAccountId });
 }
 
+async function updateCard(userId, cardId, fields) {
+  const res = await fetch(`${BACKEND_URL}/api/financial/cards/${cardId}`, {
+    method: "PATCH",
+    headers: authHeaders(),
+    body: JSON.stringify({ userId, ...fields }),
+  });
+  const text = await res.text();
+  try { return JSON.parse(text); } catch { return { status: res.status, text }; }
+}
+
 async function deleteCard(userId, cardId) {
   const res = await fetch(`${BACKEND_URL}/api/financial/cards/${cardId}?userId=${encodeURIComponent(userId)}`, {
     method: "DELETE",
@@ -240,6 +250,6 @@ module.exports = {
   updateTransaction, createTransfer, deleteInstallments, updateInstallments,
   listScheduled, confirmTransaction, skipTransaction, listImported,
   listBudgets, createBudget, deleteBudget,
-  listCards, createCard, deleteCard,
+  listCards, createCard, updateCard, deleteCard,
   getCurrentInvoice, listInvoices, payInvoice,
 };

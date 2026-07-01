@@ -4,6 +4,7 @@ const bootLog = require("../../lib/bootLog");
 const { validateFlow } = require("./flowBuilder");
 const resolveUserUuidForMenu = require("../../utils/whatsapp/resolveUserUuidForMenu");
 const { logFinancialError } = require("../../services/financialErrorLogger");
+const financialClient = require("../../services/financialClient");
 
 let _flowOptionPoliciesCache = null;
 let _flowOptionPoliciesFetchedAt = 0;
@@ -970,6 +971,93 @@ class FlowManager {
       state.path = "/cartoes/vincular";
       await storage.saveState(stateUserId, flowId, state);
       await this._renderNode(client, chatId, stateUserId, flowId, "/cartoes/vincular");
+      return true;
+    }
+
+    if (state.context.awaitingCardInitialBalance) {
+      const amount = parseAmount(trimmed);
+      if (amount === null || amount <= 0) {
+        await client.sendMessage(chatId, "❌ Valor inválido. Digite o saldo em R$ (ex: 350 ou 1.200,50):");
+        return true;
+      }
+      state.context.awaitingCardInitialBalance = false;
+      await storage.saveState(stateUserId, flowId, state);
+      const { currentCardAccountId, currentCardName } = state.context;
+      try {
+        await financialClient.createTransaction(stateUserId, {
+          accountId: currentCardAccountId,
+          amount,
+          description: "Saldo inicial da fatura",
+          type: "expense",
+          date: new Date().toISOString(),
+          status: "confirmed",
+        });
+        await client.sendMessage(chatId, `✅ Saldo de R$ ${amount.toLocaleString("pt-BR", { minimumFractionDigits: 2 })} lançado na fatura de ${currentCardName || "cartão"}.`);
+      } catch (e) {
+        logger.error("[FlowManager] awaitingCardInitialBalance error:", e.message);
+        await client.sendMessage(chatId, "❌ Erro ao lançar saldo. Tente novamente.");
+      }
+      await this._renderNode(client, chatId, stateUserId, flowId, state.path);
+      return true;
+    }
+
+    if (state.context.awaitingEditCardLimit) {
+      const amount = parseAmount(trimmed);
+      if (amount === null || amount <= 0) {
+        await client.sendMessage(chatId, "❌ Valor inválido. Digite o limite em R$ (ex: 5000):");
+        return true;
+      }
+      state.context.awaitingEditCardLimit = false;
+      await storage.saveState(stateUserId, flowId, state);
+      const { currentCardId, currentCardName } = state.context;
+      try {
+        await financialClient.updateCard(stateUserId, currentCardId, { limit: amount });
+        await client.sendMessage(chatId, `✅ Limite de *${currentCardName || "cartão"}* atualizado para R$ ${amount.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}.`);
+      } catch (e) {
+        logger.error("[FlowManager] awaitingEditCardLimit error:", e.message);
+        await client.sendMessage(chatId, "❌ Erro ao atualizar limite. Tente novamente.");
+      }
+      await this._renderNode(client, chatId, stateUserId, flowId, "/cartoes/editar");
+      return true;
+    }
+
+    if (state.context.awaitingEditCardClosingDay) {
+      const day = parseInt(trimmed, 10);
+      if (isNaN(day) || day < 1 || day > 31) {
+        await client.sendMessage(chatId, "❌ Dia inválido. Digite um número entre 1 e 31:");
+        return true;
+      }
+      state.context.awaitingEditCardClosingDay = false;
+      await storage.saveState(stateUserId, flowId, state);
+      const { currentCardId, currentCardName } = state.context;
+      try {
+        await financialClient.updateCard(stateUserId, currentCardId, { closingDay: day });
+        await client.sendMessage(chatId, `✅ Fechamento de *${currentCardName || "cartão"}* atualizado para dia ${day}.`);
+      } catch (e) {
+        logger.error("[FlowManager] awaitingEditCardClosingDay error:", e.message);
+        await client.sendMessage(chatId, "❌ Erro ao atualizar. Tente novamente.");
+      }
+      await this._renderNode(client, chatId, stateUserId, flowId, "/cartoes/editar");
+      return true;
+    }
+
+    if (state.context.awaitingEditCardDueDay) {
+      const day = parseInt(trimmed, 10);
+      if (isNaN(day) || day < 1 || day > 31) {
+        await client.sendMessage(chatId, "❌ Dia inválido. Digite um número entre 1 e 31:");
+        return true;
+      }
+      state.context.awaitingEditCardDueDay = false;
+      await storage.saveState(stateUserId, flowId, state);
+      const { currentCardId, currentCardName } = state.context;
+      try {
+        await financialClient.updateCard(stateUserId, currentCardId, { dueDay: day });
+        await client.sendMessage(chatId, `✅ Vencimento de *${currentCardName || "cartão"}* atualizado para dia ${day}.`);
+      } catch (e) {
+        logger.error("[FlowManager] awaitingEditCardDueDay error:", e.message);
+        await client.sendMessage(chatId, "❌ Erro ao atualizar. Tente novamente.");
+      }
+      await this._renderNode(client, chatId, stateUserId, flowId, "/cartoes/editar");
       return true;
     }
 

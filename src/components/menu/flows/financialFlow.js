@@ -1,4 +1,4 @@
-"use strict";
+﻿"use strict";
 
 const { createFlow } = require("../flowBuilder");
 const financialClient = require("../../../services/financialClient");
@@ -1179,6 +1179,8 @@ const financialFlow = createFlow("financeiro", {
           options: [
             { label: "📋 Ver lançamentos", action: "exec", handler: "verLancamentos" },
             { label: "💰 Pagar fatura", action: "exec", handler: "pagarFatura" },
+            { label: "💳 Lançar saldo inicial", action: "exec", handler: "iniciarSaldoInicial" },
+            { label: "✏️ Editar cartão", action: "goto", target: "/cartoes/editar" },
             { label: "↩️ Voltar", action: "back" },
           ],
         };
@@ -1211,7 +1213,7 @@ const financialFlow = createFlow("financeiro", {
         label: `🏦 ${a.name}`,
         action: "exec",
         handler: "vincularContaCartao",
-        data: { accountId: a.id },
+        data: { accountId: a.id, accountName: a.name },
       }));
       options.push({ label: "➕ Criar nova conta", action: "exec", handler: "criarContaParaCartao" });
       options.push({ label: "⏭️ Pular (sem conta vinculada)", action: "exec", handler: "pularVinculo" });
@@ -1224,13 +1226,34 @@ const financialFlow = createFlow("financeiro", {
     sensitive: true, // mostra nome do cartão e limite
     options: [],
     handler: async (ctx) => {
-      const { pendingCardName, pendingCardLimit, pendingCardClosingDay, pendingCardDueDay, pendingCardLinkedAccountId } = ctx.state.context;
-      const linkedLabel = pendingCardLinkedAccountId ? "Com conta vinculada" : "Sem conta vinculada";
+      const { pendingCardName, pendingCardLimit, pendingCardClosingDay, pendingCardDueDay, pendingCardLinkedAccountId, pendingCardLinkedAccountName } = ctx.state.context;
+      const linkedLabel = pendingCardLinkedAccountId
+        ? `Vinculado à *${pendingCardLinkedAccountName || "conta selecionada"}*`
+        : "Sem conta vinculada";
       return {
         title: `Criar cartão *${pendingCardName}*?\n\nLimite: R$ ${formatMoney(pendingCardLimit)}\nFechamento: dia ${pendingCardClosingDay} | Vencimento: dia ${pendingCardDueDay}\n${linkedLabel}`,
         options: [
           { label: "✅ Confirmar", action: "exec", handler: "confirmarCriarCartao" },
           { label: "❌ Cancelar", action: "goto", target: "/cartoes" },
+        ],
+      };
+    },
+  },
+
+  "/cartoes/editar": {
+    dynamic: true,
+    sensitive: true,
+    options: [],
+    handler: async (ctx) => {
+      const { currentCardName } = ctx.state.context;
+      return {
+        title: `✏️ Editar — ${currentCardName || "Cartão"}`,
+        options: [
+          { label: "💲 Alterar limite", action: "exec", handler: "iniciarEditarLimite" },
+          { label: "📅 Alterar fechamento", action: "exec", handler: "iniciarEditarFechamento" },
+          { label: "📅 Alterar vencimento", action: "exec", handler: "iniciarEditarVencimento" },
+          { label: "💳 Ajustar saldo da fatura", action: "exec", handler: "iniciarSaldoInicial" },
+          { label: "↩️ Voltar", action: "back" },
         ],
       };
     },
@@ -2844,6 +2867,7 @@ const financialFlow = createFlow("financeiro", {
       const cards = (await financialClient.listCards(ctx.userId))?.cards || [];
       const card = cards.find(c => c.id === data.cardId) || null;
       ctx.state.context.currentCardId = data.cardId;
+      ctx.state.context.currentCardAccountId = card ? card.accountId : null;
       ctx.state.context.currentCardLinkedAccountId = card ? card.linkedAccountId : null;
       ctx.state.context.currentCardName = card ? card.name : null;
       ctx.state.path = "/cartoes/ver";
@@ -2855,6 +2879,7 @@ const financialFlow = createFlow("financeiro", {
       ctx.state.context.pendingCardClosingDay = null;
       ctx.state.context.pendingCardDueDay = null;
       ctx.state.context.pendingCardLinkedAccountId = null;
+      ctx.state.context.pendingCardLinkedAccountName = null;
       ctx.state.context.awaitingCardName = true;
       await ctx.reply("✏️ Digite o *nome* do cartão (ex: Nubank, C6, Inter):");
       return { noRender: true };
@@ -2862,6 +2887,7 @@ const financialFlow = createFlow("financeiro", {
 
     vincularContaCartao: async (ctx, data) => {
       ctx.state.context.pendingCardLinkedAccountId = data.accountId;
+      ctx.state.context.pendingCardLinkedAccountName = data.accountName || null;
       ctx.state.path = "/cartoes/confirmar";
     },
 
@@ -2875,6 +2901,7 @@ const financialFlow = createFlow("financeiro", {
           isDefault: false,
         });
         ctx.state.context.pendingCardLinkedAccountId = result.id;
+        ctx.state.context.pendingCardLinkedAccountName = name;
         ctx.state.path = "/cartoes/confirmar";
       } catch (e) {
         logger.error("[financialFlow] criarContaParaCartao error:", e.message);
@@ -2885,7 +2912,32 @@ const financialFlow = createFlow("financeiro", {
 
     pularVinculo: async (ctx) => {
       ctx.state.context.pendingCardLinkedAccountId = null;
+      ctx.state.context.pendingCardLinkedAccountName = null;
       ctx.state.path = "/cartoes/confirmar";
+    },
+
+    iniciarSaldoInicial: async (ctx) => {
+      ctx.state.context.awaitingCardInitialBalance = true;
+      await ctx.reply("💳 Digite o *saldo atual da fatura* em R$ (ex: 350 ou 1.200,50):\n\n_Será lançado como despesa na fatura atual._");
+      return { noRender: true };
+    },
+
+    iniciarEditarLimite: async (ctx) => {
+      ctx.state.context.awaitingEditCardLimit = true;
+      await ctx.reply(`💲 Limite atual: R$ —\n\nDigite o *novo limite* em R$ (ex: 5000 ou 5.000,00):`);
+      return { noRender: true };
+    },
+
+    iniciarEditarFechamento: async (ctx) => {
+      ctx.state.context.awaitingEditCardClosingDay = true;
+      await ctx.reply("📅 Digite o novo *dia de fechamento* da fatura (1–31):");
+      return { noRender: true };
+    },
+
+    iniciarEditarVencimento: async (ctx) => {
+      ctx.state.context.awaitingEditCardDueDay = true;
+      await ctx.reply("📅 Digite o novo *dia de vencimento* da fatura (1–31):");
+      return { noRender: true };
     },
 
     confirmarCriarCartao: async (ctx) => {
