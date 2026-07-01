@@ -801,7 +801,9 @@ class FlowManager {
           s?.context?.awaitingEditInstallmentAmount ||
           s?.context?.awaitingImportEditAmount || s?.context?.awaitingImportEditDesc ||
           s?.context?.awaitingNotifHour ||
-          s?.context?.awaitingNlpNovaCategoria || s?.context?.awaitingNlpNovaSubcategoria) {
+          s?.context?.awaitingNlpNovaCategoria || s?.context?.awaitingNlpNovaSubcategoria ||
+          s?.context?.awaitingNlpEditAmount || s?.context?.awaitingNlpEditDesc ||
+          s?.context?.awaitingNlpEditDate || s?.context?.awaitingNlpMonthlyDay) {
         state = s;
         stateUserId = id;
         break;

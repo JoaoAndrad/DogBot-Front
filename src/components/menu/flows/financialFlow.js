@@ -439,7 +439,7 @@ const financialFlow = createFlow("financeiro", {
             ],
           };
         }
-        const options = accounts.map(a => ({
+        const options = accounts.slice(0, 11).map(a => ({
           label: a.name,
           action: "exec",
           handler: "selectContaEditar",
@@ -619,7 +619,7 @@ const financialFlow = createFlow("financeiro", {
             ],
           };
         }
-        const options = roots.map(r => ({
+        const options = roots.slice(0, 11).map(r => ({
           label: r.name,
           action: "exec",
           handler: "setParentCategory",
@@ -917,7 +917,7 @@ const financialFlow = createFlow("financeiro", {
       } catch (e) {
         logger.warn("[financialFlow] /nlp-confirm/conta error:", e.message);
       }
-      const options = accounts.map(a => ({
+      const options = accounts.slice(0, 11).map(a => ({
         label: `🏦 ${a.name} — R$ ${formatMoney(a.balance)}`,
         action: "exec",
         handler: "setNlpConta",
@@ -1064,7 +1064,7 @@ const financialFlow = createFlow("financeiro", {
       } catch (e) {
         logger.warn("[financialFlow] /agendamentos/novo/conta error:", e.message);
       }
-      const options = accounts.map(a => ({
+      const options = accounts.slice(0, 11).map(a => ({
         label: `🏦 ${a.name} — R$ ${formatMoney(a.balance)}`,
         action: "exec",
         handler: "setScheduleConta",
@@ -1202,7 +1202,7 @@ const financialFlow = createFlow("financeiro", {
       } catch (e) {
         logger.warn("[financialFlow] /cartoes/vincular error:", e.message);
       }
-      const options = accounts.map(a => ({
+      const options = accounts.slice(0, 10).map(a => ({
         label: `🏦 ${a.name}`,
         action: "exec",
         handler: "vincularContaCartao",
@@ -1243,7 +1243,7 @@ const financialFlow = createFlow("financeiro", {
       } catch (e) {
         logger.warn("[financialFlow] /cartoes/pagar/conta error:", e.message);
       }
-      const options = accounts.map(a => ({
+      const options = accounts.slice(0, 11).map(a => ({
         label: `🏦 ${a.name} — R$ ${formatMoney(a.balance)}`,
         action: "exec",
         handler: "selecionarContaPagamento",
@@ -1326,7 +1326,7 @@ const financialFlow = createFlow("financeiro", {
           ],
         };
       }
-      const options = accounts.map(a => ({
+      const options = accounts.slice(0, 11).map(a => ({
         label: `🏦 ${a.name} — R$ ${formatMoney(a.balance)}`,
         action: "exec",
         handler: "selecionarContaOrigem",
@@ -1360,7 +1360,7 @@ const financialFlow = createFlow("financeiro", {
           ],
         };
       }
-      const options = accounts.map(a => ({
+      const options = accounts.slice(0, 11).map(a => ({
         label: `🏦 ${a.name} — R$ ${formatMoney(a.balance)}`,
         action: "exec",
         handler: "selecionarContaDestino",
@@ -1405,7 +1405,14 @@ const financialFlow = createFlow("financeiro", {
           ],
         };
       }
-      const options = txs.map(t => {
+      const PAGE_SIZE = 9;
+      const page = ctx.state.context.editarLancamentosPage || 0;
+      const totalPages = Math.ceil(txs.length / PAGE_SIZE);
+      const clampedPage = Math.min(Math.max(page, 0), totalPages - 1);
+      const pageItems = txs.slice(clampedPage * PAGE_SIZE, (clampedPage + 1) * PAGE_SIZE);
+      const hasPrev = clampedPage > 0;
+      const hasNext = clampedPage < totalPages - 1;
+      const options = pageItems.map(t => {
         const emoji = t.type === "income" ? "🟢" : "🔴";
         const sign = t.type === "income" ? "+" : "-";
         const desc = t.description || (t.type === "income" ? "Receita" : "Despesa");
@@ -1430,8 +1437,11 @@ const financialFlow = createFlow("financeiro", {
           },
         };
       });
+      if (hasPrev) options.push({ label: "⬅️ Anterior", action: "exec", handler: "editarLancamentosPagePrev" });
+      if (hasNext) options.push({ label: "➡️ Próxima", action: "exec", handler: "editarLancamentosPageNext" });
       options.push({ label: "↩️ Voltar", action: "back" });
-      return { title: "✏️ Qual lançamento editar?", options };
+      const pageNote = totalPages > 1 ? ` · pág. ${clampedPage + 1}/${totalPages}` : "";
+      return { title: `✏️ Qual lançamento editar?${pageNote}`, options };
     },
   },
 
@@ -1538,7 +1548,7 @@ const financialFlow = createFlow("financeiro", {
           options: [{ label: "↩️ Voltar", action: "back" }, { label: "➕ Adicionar conta", action: "goto", target: "/contas/tipo" }],
         };
       }
-      const options = accounts.map(a => ({
+      const options = accounts.slice(0, 11).map(a => ({
         label: `${a.isDefault ? "⭐ " : ""}${a.name}`,
         action: "exec",
         handler: "definirContaPadrao",
@@ -1668,7 +1678,7 @@ const financialFlow = createFlow("financeiro", {
       } catch (e) {
         logger.warn("[financialFlow] /financeiro/importado/conta error:", e.message);
       }
-      const options = accounts.map(a => ({
+      const options = accounts.slice(0, 11).map(a => ({
         label: `🏦 ${a.name} — R$ ${formatMoney(a.balance)}`,
         action: "exec",
         handler: "setImportConta",
@@ -2619,6 +2629,17 @@ const financialFlow = createFlow("financeiro", {
     // ── Edição de lançamentos ─────────────────────────────────────────────────
 
     iniciarEditarLancamento: async (ctx) => {
+      ctx.state.context.editarLancamentosPage = 0;
+      ctx.state.path = "/lancamentos/editar";
+    },
+
+    editarLancamentosPagePrev: async (ctx) => {
+      ctx.state.context.editarLancamentosPage = Math.max((ctx.state.context.editarLancamentosPage || 0) - 1, 0);
+      ctx.state.path = "/lancamentos/editar";
+    },
+
+    editarLancamentosPageNext: async (ctx) => {
+      ctx.state.context.editarLancamentosPage = (ctx.state.context.editarLancamentosPage || 0) + 1;
       ctx.state.path = "/lancamentos/editar";
     },
 

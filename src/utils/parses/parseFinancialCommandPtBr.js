@@ -133,6 +133,8 @@ function extractDescription(text) {
     .replace(INSTALLMENT_RE, "")
     .replace(MONTHLY_RE, "")
     .replace(WEEKLY_RE, "")
+    .replace(DAY_RE, "")
+    .replace(/\b\d{1,2}\/\d{1,2}\b/g, "")
     .replace(/R?\$\s*/gi, "")
     // Multi-word phrases must come before single-word matches to prevent partial stripping
     .replace(/\b(vou pagar|vou gastar|me pagaram|gast[eouia]i?|paguei|pagar|debit[ao]u?|comprei|recebi|entrou|recebendo|ganhei|depositaram|caiu|transfer[ei]|transferindo|movi|movendo|vou|pagarei|gastarei)\b/gi, "")
