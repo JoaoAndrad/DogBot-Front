@@ -83,13 +83,34 @@ const COPY = {
   rotinas: [
     "🔔 *Rotinas e lembretes*",
     "",
-    "Envie */rotina* (ou */rotinas*, */habito*) no chat que quiser — grupo ou privado.",
+    "Crio rotinas recorrentes para você ou para o grupo e aviso automaticamente no dia e horário certo.",
     "",
-    "Abrirei o menu de rotinas no próprio chat. Crie rotinas, defina repetição e, em grupos, ofereço suporte para organização de participantes.",
+    "Envie */rotina* em qualquer chat para abrir o menu.",
+  ].join("\n"),
+
+  rotinasGuia: [
+    "📋 *Criando uma rotina*",
     "",
-    "Uso enquetes — basta seguir as opções.",
+    "Ao abrir o menu, escolha *Nova rotina* e me informe:",
     "",
-    "Se a sessão expirar, envie */rotina* novamente.",
+    "• *Nome* — ex: \"Tomar remédio\", \"Reunião semanal\"",
+    "• *Repetição* — diária, a cada 2 ou 3 dias, dias úteis, semanal, quinzenal ou mensal",
+    "• *Data de início*",
+    "• *Horário* do lembrete",
+    "",
+    "*Em grupos:* posso designar a rotina para um ou mais participantes.",
+    "*No privado:* a rotina fica só para você.",
+  ].join("\n"),
+
+  rotinasGerir: [
+    "⚙️ *O que posso fazer com uma rotina*",
+    "",
+    "Ao selecionar uma rotina existente:",
+    "",
+    "✅ *Marcar como feita* — registro a conclusão de hoje",
+    "⏸ *Pausar / Reativar* — suspendo os lembretes sem excluir",
+    "✏️ *Editar* — nome, horário, data, repetição ou participantes (grupos)",
+    "🗑️ *Excluir* — removo permanentemente",
   ].join("\n"),
 
   listas: [
@@ -444,7 +465,32 @@ const ajudaFlow = createFlow("ajuda", {
     options: [],
     handler: async (ctx) => {
       await replyLong(ctx, COPY.rotinas);
-      return { title: "O que mais quer saber?", options: navPadrao() };
+      return {
+        title: "🔔 Rotinas — o que quer ver?",
+        options: [
+          { label: "📋 Como criar uma rotina",  action: "goto", target: "/rotinas/criar" },
+          { label: "⚙️ O que posso editar",     action: "goto", target: "/rotinas/gerir" },
+          { label: "↩️ Voltar ao menu",         action: "goto", target: "/" },
+        ],
+      };
+    },
+  },
+
+  "/rotinas/criar": {
+    dynamic: true,
+    options: [],
+    handler: async (ctx) => {
+      await replyLong(ctx, COPY.rotinasGuia);
+      return { title: "O que mais quer saber?", options: navSecao("/rotinas", "Rotinas") };
+    },
+  },
+
+  "/rotinas/gerir": {
+    dynamic: true,
+    options: [],
+    handler: async (ctx) => {
+      await replyLong(ctx, COPY.rotinasGerir);
+      return { title: "O que mais quer saber?", options: navSecao("/rotinas", "Rotinas") };
     },
   },
 
