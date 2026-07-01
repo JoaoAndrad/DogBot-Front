@@ -1061,6 +1061,28 @@ class FlowManager {
       return true;
     }
 
+    if (state.context.awaitingInstallmentCustomMonth) {
+      const match = trimmed.match(/^(\d{1,2})[\/\-](\d{4})$/);
+      if (!match) {
+        await client.sendMessage(chatId, "❌ Formato inválido. Use MM/AAAA (ex: 06/2026):");
+        return true;
+      }
+      const month = parseInt(match[1], 10) - 1;
+      const year = parseInt(match[2], 10);
+      if (month < 0 || month > 11 || year < 2000 || year > 2100) {
+        await client.sendMessage(chatId, "❌ Data inválida. Use MM/AAAA (ex: 06/2026):");
+        return true;
+      }
+      state.context.awaitingInstallmentCustomMonth = false;
+      const startDate = new Date(Date.UTC(year, month, 1)).toISOString();
+      if (state.context.pendingNlpTransaction) {
+        state.context.pendingNlpTransaction.installmentStartDate = startDate;
+      }
+      await storage.saveState(stateUserId, flowId, state);
+      await this._renderNode(client, chatId, stateUserId, flowId, "/nlp-confirm");
+      return true;
+    }
+
     if (state.context.awaitingPaymentAmount) {
       const amount = parseAmount(trimmed);
       if (amount === null || amount <= 0) {

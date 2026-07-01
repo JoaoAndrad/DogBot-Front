@@ -784,13 +784,78 @@ const financialFlow = createFlow("financeiro", {
         : null;
       const catNote = catDisplayName ? `\n🏷️ Categoria sugerida: *${catDisplayName}*` : "";
       const catLabel = catDisplayName ? `*${catDisplayName}*` : "_nenhuma_";
+
+      let installmentBreakdown = "";
+      if (tx.installmentCount >= 2) {
+        const startDate = tx.installmentStartDate ? new Date(tx.installmentStartDate) : new Date(tx.date);
+        const now = new Date();
+        const currentMonthStart = new Date(Date.UTC(now.getFullYear(), now.getMonth(), 1));
+        const startMonthStart = new Date(Date.UTC(startDate.getFullYear(), startDate.getMonth(), 1));
+        const paidCount = Math.max(0, Math.round((currentMonthStart - startMonthStart) / (1000 * 60 * 60 * 24 * 30.5)));
+        const remaining = tx.installmentCount - paidCount;
+        if (paidCount > 0) {
+          const monthNames = ["jan","fev","mar","abr","mai","jun","jul","ago","set","out","nov","dez"];
+          const startLabel = `${monthNames[startDate.getMonth()]}/${String(startDate.getFullYear()).slice(2)}`;
+          installmentBreakdown = `\n_${paidCount} já ${paidCount === 1 ? "paga" : "pagas"} (a partir de ${startLabel}) — ${remaining} restantes_`;
+        }
+      }
+
+      const options = [
+        { label: "✅ Sim, registrar", action: "exec", handler: "confirmarNlp" },
+      ];
+      if (tx.installmentCount >= 2) {
+        options.push({ label: "📅 Alterar mês de início", action: "goto", target: "/nlp-installment-month" });
+      }
+      options.push({ label: "✏️ Editar", action: "goto", target: "/nlp-confirm/editar" });
+      options.push({ label: "❌ Cancelar", action: "exec", handler: "cancelarNlp" });
+
       return {
-        title: `Registrar R$ ${formatMoney(tx.amount)}${installNote}${desc} como ${typeLabel} em *${tx.accountName}* (${dateLabel})${pendingNote}?${recurrenceNote}\n🏷️ Categoria: ${catLabel}`,
-        options: [
-          { label: "✅ Sim, registrar", action: "exec", handler: "confirmarNlp" },
-          { label: "✏️ Editar", action: "goto", target: "/nlp-confirm/editar" },
-          { label: "❌ Cancelar", action: "exec", handler: "cancelarNlp" },
-        ],
+        title: `Registrar R$ ${formatMoney(tx.amount)}${installNote}${desc} como ${typeLabel} em *${tx.accountName}* (${dateLabel})${pendingNote}?${recurrenceNote}\n🏷️ Categoria: ${catLabel}${installmentBreakdown}`,
+        options,
+      };
+    },
+  },
+
+  "/nlp-installment-month": {
+    dynamic: true,
+    options: [],
+    handler: async (ctx) => {
+      const tx = ctx.state.context.pendingNlpTransaction;
+      if (!tx || !tx.installmentCount) {
+        ctx.state.path = "/nlp-confirm";
+        return {};
+      }
+      const now = new Date();
+      const monthNames = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"];
+      const maxPast = Math.min(tx.installmentCount - 1, 8);
+      const options = [];
+
+      for (let i = 0; i <= maxPast; i++) {
+        const d = new Date(Date.UTC(now.getFullYear(), now.getMonth() - i, 1));
+        const label = `${monthNames[d.getUTCMonth()]}/${d.getUTCFullYear()}`;
+        const paidCount = i;
+        const remaining = tx.installmentCount - paidCount;
+        let desc;
+        if (i === 0) {
+          desc = `▶️ ${label} — nova compra, todas as ${tx.installmentCount} a pagar`;
+        } else if (remaining <= 0) {
+          desc = `◀️ ${label} — todas já pagas (só histórico)`;
+        } else {
+          desc = `◀️ ${label} — ${paidCount} já ${paidCount === 1 ? "paga" : "pagas"}, ${remaining} restantes`;
+        }
+        options.push({
+          label: desc,
+          action: "exec",
+          handler: "selecionarMesInicioParcelamento",
+          data: { startDate: d.toISOString(), paidCount },
+        });
+      }
+      options.push({ label: "✏️ Digitar mês/ano", action: "exec", handler: "iniciarDigitarMesParcelamento" });
+      options.push({ label: "↩️ Voltar", action: "back" });
+
+      return {
+        title: `📅 *A partir de qual mês é este parcelamento?*\n\n_Útil para registrar parcelas que já começaram. As parcelas passadas ficam como histórico; as futuras contam no limite disponível._`,
+        options,
       };
     },
   },
@@ -1158,7 +1223,7 @@ const financialFlow = createFlow("financeiro", {
             ],
           };
         }
-        const { invoice, totalAmount, available, limit } = res;
+        const { invoice, totalAmount, committedFuture, available, limit } = res;
         const dueStr = invoice.dueDate
           ? (() => {
               const d = new Date(invoice.dueDate);
@@ -1169,9 +1234,13 @@ const financialFlow = createFlow("financeiro", {
         const monthNames = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"];
         const monthLabel = `${monthNames[parseInt(m, 10) - 1]} ${y}`;
 
+        const committedLine = committedFuture > 0
+          ? `\nParcelas futuras: R$ ${formatMoney(committedFuture)}`
+          : "";
         await ctx.reply(
           `💳 *${ctx.state.context.currentCardName || "Cartão"} — ${monthLabel}*\n\n` +
           `Fatura: R$ ${formatMoney(totalAmount)} | Disponível: R$ ${formatMoney(available)}\n` +
+          `Limite: R$ ${formatMoney(limit)}${committedLine}\n` +
           `Vence: ${dueStr}`
         );
         return {
@@ -2365,21 +2434,32 @@ const financialFlow = createFlow("financeiro", {
       if (!tx) return { end: true };
       try {
         if (tx.installmentCount && tx.installmentCount >= 2) {
+          const startDate = tx.installmentStartDate || tx.date;
           await financialClient.createInstallment(ctx.userId, {
             accountId: tx.accountId,
             amount: tx.amount,
             description: tx.description,
             type: tx.type,
-            date: tx.date,
+            date: startDate,
             installmentCount: tx.installmentCount,
             categoryId: tx.suggestedCategoryId || undefined,
           });
           const amountEach = tx.amount / tx.installmentCount;
+          const now = new Date();
+          const start = new Date(startDate);
+          const currentMonthStart = new Date(Date.UTC(now.getFullYear(), now.getMonth(), 1));
+          const startMonthStart = new Date(Date.UTC(start.getFullYear(), start.getMonth(), 1));
+          const paidCount = Math.max(0, Math.round((currentMonthStart - startMonthStart) / (1000 * 60 * 60 * 24 * 30.5)));
+          const remaining = tx.installmentCount - paidCount;
+          const monthNames = ["jan","fev","mar","abr","mai","jun","jul","ago","set","out","nov","dez"];
+          const historyLine = paidCount > 0
+            ? `\n${paidCount} ${paidCount === 1 ? "parcela registrada como histórico" : "parcelas registradas como histórico"} (${monthNames[start.getMonth()]}/${start.getFullYear()})\n${remaining} restantes`
+            : "";
           await ctx.reply(
             `✅ *Parcelamento registrado!*\n\n` +
             `${tx.installmentCount}x de R$ ${formatMoney(amountEach)}` +
             (tx.description ? ` — ${tx.description}` : "") +
-            `\n\nTotal: R$ ${formatMoney(tx.amount)}`
+            `\n\nTotal: R$ ${formatMoney(tx.amount)}${historyLine}`
           );
         } else {
           const result = await financialClient.createTransaction(ctx.userId, {
@@ -2441,6 +2521,19 @@ const financialFlow = createFlow("financeiro", {
       ctx.state.context.pendingNlpTransaction = null;
       await ctx.reply("❌ Transação cancelada.");
       return { end: true };
+    },
+
+    selecionarMesInicioParcelamento: async (ctx, data) => {
+      if (ctx.state.context.pendingNlpTransaction) {
+        ctx.state.context.pendingNlpTransaction.installmentStartDate = data.startDate;
+      }
+      ctx.state.path = "/nlp-confirm";
+    },
+
+    iniciarDigitarMesParcelamento: async (ctx) => {
+      ctx.state.context.awaitingInstallmentCustomMonth = true;
+      await ctx.reply("✏️ Digite o mês de início no formato *MM/AAAA* (ex: 06/2026):");
+      return { noRender: true };
     },
 
     // ── Agendamentos ──────────────────────────────────────────────────────────
