@@ -472,6 +472,7 @@ class FlowManager {
       }
     }
 
+    console.log(`[RenderNode] PRE-CREATE path=${path} optCount=${optionLabels?.length}`);
     const pollResult = await polls.createPoll(client, chatId, renderTitle, optionLabels, {
       metadata: {
         actionType: "menu",
@@ -482,6 +483,7 @@ class FlowManager {
       },
       // onVote removed - now processed via backend through processor.js
     });
+    console.log(`[RenderNode] POST-CREATE path=${path} sent=${!!pollResult?.sent} msgId=${pollResult?.msgId?.slice?.(0,20)}`)
 
     // Nós sensíveis (com valores financeiros): guarda no cache para deleção imediata
     // ao confirmar (end: true) ou ao navegar para outro nó. Agenda fallback de 2 min
