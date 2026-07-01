@@ -111,7 +111,7 @@ class FlowManager {
       );
       await client.sendMessage(
         chatId,
-        "�R Sessão expirada. Digite o comando novamente para começar.",
+        "❌ Sessão expirada. Digite o comando novamente para começar.",
       );
       return;
     }
@@ -231,7 +231,7 @@ class FlowManager {
         logger.error(`[FlowManager] Handler ${option.handler} não encontrado`);
         await client.sendMessage(
           chatId,
-          "�R Erro interno: handler não encontrado",
+          "❌ Erro interno: handler não encontrado",
         );
         return;
       }
@@ -311,7 +311,7 @@ class FlowManager {
 
     if (!node) {
       logger.warn(`[FlowManager] Nó ${path} inexistente no flow ${flowId}`);
-      await client.sendMessage(chatId, "�R Erro: nó não encontrado");
+      await client.sendMessage(chatId, "❌ Erro: nó não encontrado");
       return;
     }
 
@@ -390,7 +390,7 @@ class FlowManager {
           }
         } catch (err) {
           logger.error(`[FlowManager] Erro no handler:`, err);
-          await client.sendMessage(chatId, "�R Erro ao executar");
+          await client.sendMessage(chatId, "❌ Erro ao executar");
         }
       }
       return;
@@ -415,7 +415,7 @@ class FlowManager {
     if (!renderOptions || renderOptions.length < 2) {
       await client.sendMessage(
         chatId,
-        "�R Sessão expirada ou contexto perdido. Use o comando novamente para começar.",
+        "❌ Sessão expirada ou contexto perdido. Use o comando novamente para começar.",
       );
       return;
     }
@@ -709,13 +709,13 @@ class FlowManager {
         const res = await financialClient.listAccounts(resolvedId);
         const accounts = res?.accounts || [];
         if (!accounts.length) {
-          await send( "�x�� Você ainda não tem contas cadastradas.");
+          await send( "💰 Você ainda não tem contas cadastradas.");
           return true;
         }
         const total = accounts.reduce((s, a) => s + (a.balance || 0), 0);
         const totalProjected = accounts.reduce((s, a) => s + (a.projectedBalance ?? a.balance ?? 0), 0);
         const lines = accounts.map(a => {
-          const sign = a.balance < 0 ? "�x�" : "�xx�";
+          const sign = a.balance < 0 ? "🔴" : "🟢";
           let line = `${sign} *${a.name}*: R$ ${fmt(a.balance)}`;
           if (a.projectedBalance != null && Math.abs(a.projectedBalance - a.balance) >= 0.01) {
             line += `  _(projetado: R$ ${fmt(a.projectedBalance)})_`;
@@ -724,9 +724,9 @@ class FlowManager {
         });
         const hasPending = Math.abs(totalProjected - total) >= 0.01;
         await send(
-          `�x�� *Seus saldos:*\n\n${lines.join("\n")}\n\n` +
-          `�x� *Total: R$ ${fmt(total)}*` +
-          (hasPending ? `\n�x� *Projetado: R$ ${fmt(totalProjected)}*` : "")
+          `💰 *Seus saldos:*\n\n${lines.join("\n")}\n\n` +
+          `💵 *Total: R$ ${fmt(total)}*` +
+          (hasPending ? `\n📅 *Projetado: R$ ${fmt(totalProjected)}*` : "")
         );
         return true;
       }
@@ -736,7 +736,7 @@ class FlowManager {
         const txs = (res?.transactions || []).filter(t => t.status === "confirmed");
         const filtered = txs.filter(t => t.type === (queryType === "expenses" ? "expense" : "income"));
         const total = filtered.reduce((s, t) => s + (t.amount || 0), 0);
-        const emoji = queryType === "expenses" ? "�x�" : "�xx�";
+        const emoji = queryType === "expenses" ? "🔴" : "🟢";
         const label = queryType === "expenses" ? "Gastos" : "Receitas";
         if (!filtered.length) {
           await send( `${emoji} Nenhuma ${label.toLowerCase().slice(0, -1)} registrada este mês.`);
@@ -758,17 +758,17 @@ class FlowManager {
         const res = await financialClient.listScheduled(resolvedId);
         const txs = res?.transactions || [];
         if (!txs.length) {
-          await send( "�x& Nenhum agendamento pendente.");
+          await send( "📅 Nenhum agendamento pendente.");
           return true;
         }
         const lines = txs.slice(0, 8).map(t => {
-          const emoji = t.type === "income" ? "�xx�" : "�x�";
+          const emoji = t.type === "income" ? "🟢" : "🔴";
           const sign = t.type === "income" ? "+" : "-";
           const desc = t.description || (t.type === "income" ? "Receita" : "Despesa");
           return `${emoji} ${fmtDate(t.date)}  ${sign}R$ ${fmt(t.amount)}  ${desc}`;
         });
         const more = txs.length > 8 ? `\n_...e mais ${txs.length - 8}_` : "";
-        await send( `�x& *Agendamentos pendentes:*\n\n${lines.join("\n")}${more}`);
+        await send( `📅 *Agendamentos pendentes:*\n\n${lines.join("\n")}${more}`);
         return true;
       }
 
@@ -835,21 +835,21 @@ class FlowManager {
 
     if (state.context.awaitingAccountName) {
       if (!trimmed) {
-        await client.sendMessage(chatId, "�R Nome inválido. Envie o nome da conta:");
+        await client.sendMessage(chatId, "❌ Nome inválido. Envie o nome da conta:");
         return true;
       }
       state.context.pendingAccountName = trimmed;
       state.context.awaitingAccountName = false;
       state.context.awaitingAccountBalance = true;
       await storage.saveState(stateUserId, flowId, state);
-      await client.sendMessage(chatId, "�S�️ Digite o *saldo inicial* em R$ (ex: 1500 ou 0 para começar do zero):");
+      await client.sendMessage(chatId, "💰 Digite o *saldo inicial* em R$ (ex: 1500 ou 0 para começar do zero):");
       return true;
     }
 
     if (state.context.awaitingAccountBalance) {
       const amount = parseAmount(trimmed);
       if (amount === null) {
-        await client.sendMessage(chatId, "�R Valor inválido. Digite o saldo em R$ (ex: 1500 ou 0):");
+        await client.sendMessage(chatId, "❌ Valor inválido. Digite o saldo em R$ (ex: 1500 ou 0):");
         return true;
       }
       state.context.pendingAccountBalance = amount;
@@ -862,7 +862,7 @@ class FlowManager {
 
     if (state.context.awaitingCategoryName) {
       if (!trimmed) {
-        await client.sendMessage(chatId, "�R Nome inválido. Envie o nome da categoria:");
+        await client.sendMessage(chatId, "❌ Nome inválido. Envie o nome da categoria:");
         return true;
       }
       state.context.pendingCategoryName = trimmed;
@@ -877,7 +877,7 @@ class FlowManager {
 
     if (state.context.awaitingEditName) {
       if (!trimmed) {
-        await client.sendMessage(chatId, "�R Nome inválido. Envie o novo nome:");
+        await client.sendMessage(chatId, "❌ Nome inválido. Envie o novo nome:");
         return true;
       }
       state.context.pendingEditName = trimmed;
@@ -891,7 +891,7 @@ class FlowManager {
     if (state.context.awaitingEditBalance) {
       const amount = parseAmount(trimmed);
       if (amount === null) {
-        await client.sendMessage(chatId, "�R Valor inválido. Digite o novo saldo em R$ (ex: 1500 ou 0):");
+        await client.sendMessage(chatId, "❌ Valor inválido. Digite o novo saldo em R$ (ex: 1500 ou 0):");
         return true;
       }
       state.context.pendingEditBalance = amount;
@@ -905,7 +905,7 @@ class FlowManager {
     if (state.context.awaitingBudgetLimit) {
       const amount = parseAmount(trimmed);
       if (amount === null || amount <= 0) {
-        await client.sendMessage(chatId, "�R Valor inválido. Digite o limite em R$ (ex: 1500):");
+        await client.sendMessage(chatId, "❌ Valor inválido. Digite o limite em R$ (ex: 1500):");
         return true;
       }
       state.context.pendingBudgetLimit = amount;
@@ -920,28 +920,28 @@ class FlowManager {
 
     if (state.context.awaitingCardName) {
       if (!trimmed) {
-        await client.sendMessage(chatId, "�R Nome inválido. Envie o nome do cartão:");
+        await client.sendMessage(chatId, "❌ Nome inválido. Envie o nome do cartão:");
         return true;
       }
       state.context.pendingCardName = trimmed;
       state.context.awaitingCardName = false;
       state.context.awaitingCardLimit = true;
       await storage.saveState(stateUserId, flowId, state);
-      await client.sendMessage(chatId, "�S�️ Digite o *limite* do cartão em R$ (ex: 5000 ou 5.000,00):");
+      await client.sendMessage(chatId, "💰 Digite o *limite* do cartão em R$ (ex: 5000 ou 5.000,00):");
       return true;
     }
 
     if (state.context.awaitingCardLimit) {
       const amount = parseAmount(trimmed);
       if (amount === null || amount <= 0) {
-        await client.sendMessage(chatId, "�R Valor inválido. Digite o limite em R$ (ex: 5000):");
+        await client.sendMessage(chatId, "❌ Valor inválido. Digite o limite em R$ (ex: 5000):");
         return true;
       }
       state.context.pendingCardLimit = amount;
       state.context.awaitingCardLimit = false;
       state.context.awaitingCardClosingDay = true;
       await storage.saveState(stateUserId, flowId, state);
-      await client.sendMessage(chatId, "�x& Dia de *fechamento* da fatura (1�31):");
+      await client.sendMessage(chatId, "📅 Dia de *fechamento* da fatura (1–31):");
       return true;
     }
 
@@ -955,7 +955,7 @@ class FlowManager {
       state.context.awaitingCardClosingDay = false;
       state.context.awaitingCardDueDay = true;
       await storage.saveState(stateUserId, flowId, state);
-      await client.sendMessage(chatId, "�x& Dia de *vencimento* da fatura (1�31):");
+      await client.sendMessage(chatId, "📅 Dia de *vencimento* da fatura (1–31):");
       return true;
     }
 
@@ -976,7 +976,7 @@ class FlowManager {
     if (state.context.awaitingPaymentAmount) {
       const amount = parseAmount(trimmed);
       if (amount === null || amount <= 0) {
-        await client.sendMessage(chatId, "�R Valor inválido. Digite o valor a pagar em R$ (ex: 320 ou 320,00):");
+        await client.sendMessage(chatId, "❌ Valor inválido. Digite o valor a pagar em R$ (ex: 320 ou 320,00):");
         return true;
       }
       state.context.pendingPaymentAmount = amount;
@@ -1062,7 +1062,7 @@ class FlowManager {
     if (state.context.awaitingTransferAmount) {
       const amount = parseAmount(trimmed);
       if (amount === null || amount <= 0) {
-        await client.sendMessage(chatId, "�R Valor inválido. Digite o valor a transferir em R$ (ex: 500):");
+        await client.sendMessage(chatId, "❌ Valor inválido. Digite o valor a transferir em R$ (ex: 500):");
         return true;
       }
       state.context.pendingTransferAmount = amount;
@@ -1167,7 +1167,7 @@ class FlowManager {
     if (state.context.awaitingEditInstallmentAmount) {
       const amount = parseAmount(trimmed);
       if (amount === null || amount <= 0) {
-        await client.sendMessage(chatId, "�R Valor inválido. Digite o valor em R$ (ex: 150):");
+        await client.sendMessage(chatId, "❌ Valor inválido. Digite o valor em R$ (ex: 150):");
         return true;
       }
       state.context.awaitingEditInstallmentAmount = false;
@@ -1244,7 +1244,7 @@ class FlowManager {
       const h = match ? parseInt(match[1], 10) : NaN;
       const m = match && match[2] != null ? parseInt(match[2], 10) : 0;
       if (!match || isNaN(h) || h < 0 || h > 23 || m < 0 || m > 59) {
-        await client.sendMessage(chatId, "�R Horário inválido. Use o formato *HH:MM* (ex: 9:00 ou 12:30):");
+        await client.sendMessage(chatId, "❌ Horário inválido. Use o formato *HH:MM* (ex: 9:00 ou 12:30):");
         return true;
       }
       state.context.awaitingNotifHour = false;
@@ -1454,13 +1454,13 @@ class FlowManager {
     if (!trimmed) {
       await client.sendMessage(
         chatId,
-        "�R Mensagem vazia. Envie uma data (ex: 12/08/26 ou *ontem*).",
+        "❌ Mensagem vazia. Envie uma data (ex: 12/08/26 ou *ontem*).",
       );
       return true;
     }
     const parsed = parseViewingDatePtBr(trimmed);
     if (!parsed.ok) {
-      await client.sendMessage(chatId, `�R ${parsed.reason}`);
+      await client.sendMessage(chatId, `❌ ${parsed.reason}`);
       return true;
     }
     state.context.awaitingViewingDateText = false;
