@@ -848,8 +848,11 @@ const financialFlow = createFlow("financeiro", {
       try {
         const res = await financialClient.listScheduled(ctx.userId);
         const txs = res?.transactions || [];
+        const MAX_VISIBLE = 10; // WhatsApp polls: máx 12 opções (10 tx + 2 fixas)
+        const visible = txs.slice(0, MAX_VISIBLE);
+        const hidden = txs.length - visible.length;
         const options = [];
-        for (const t of txs) {
+        for (const t of visible) {
           const emoji = t.type === "income" ? "🟢" : "🔴";
           const sign = t.type === "income" ? "+" : "-";
           const desc = t.description || (t.type === "income" ? "Receita" : "Despesa");
@@ -864,7 +867,9 @@ const financialFlow = createFlow("financeiro", {
         }
         options.push({ label: "➕ Novo agendamento", action: "exec", handler: "iniciarNovoAgendamento" });
         options.push({ label: "↩️ Voltar", action: "back" });
-        return { title: txs.length ? "📅 Agendamentos pendentes" : "📅 Agendamentos\n\nNenhum pendente ainda.", options };
+        const extraNote = hidden > 0 ? `\n\n_(e mais ${hidden} não exibidos)_` : "";
+        const title = txs.length ? `📅 Agendamentos pendentes${extraNote}` : "📅 Agendamentos\n\nNenhum pendente ainda.";
+        return { title, options };
       } catch (e) {
         logger.error("[financialFlow] /agendamentos error:", e.message);
         await ctx.reply("❌ Erro ao carregar agendamentos.");
