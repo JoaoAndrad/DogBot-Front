@@ -466,14 +466,14 @@ class FlowManager {
       optionKey: opt.optionKey || null,
     }));
 
-    // Se havia uma enquete sensitiva cacheada para este usuário, apaga-a agora.
-    // Deve ser aguardado (await) para não competir com o createPoll seguinte.
+    // Apaga a última enquete sensitiva cacheada. Fire-and-forget — o mutex por usuário
+    // já garante que não há execução concorrente, então não precisamos bloquear aqui.
     if (flowId === "financeiro") {
       const prevCacheKey = `${userId}:${flowId}`;
       const prevMsg = _lastPollMsgCache.get(prevCacheKey);
       if (prevMsg) {
-        await prevMsg.delete(false).catch(() => {});
         _lastPollMsgCache.delete(prevCacheKey);
+        prevMsg.delete(false).catch(() => {});
       }
     }
 
