@@ -312,7 +312,6 @@ async function start() {
         }
 
         // NEW: Process vote through backend instead of local processor
-        console.log(`[FlowPolicy-DEBUG] vote_update: voteAccepted=${voteAccepted} pollId=${pollId ? String(pollId).slice(0,40) : null}`);
         if (voteAccepted && pollId) {
           await processor.processVoteViaBackend(pollId, vote, client);
         }

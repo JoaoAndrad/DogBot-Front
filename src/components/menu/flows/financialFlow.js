@@ -1252,6 +1252,7 @@ const financialFlow = createFlow("financeiro", {
             { label: "💰 Pagar fatura", action: "exec", handler: "pagarFatura" },
             { label: "💳 Lançar saldo inicial", action: "exec", handler: "iniciarSaldoInicial" },
             { label: "✏️ Editar cartão", action: "goto", target: "/cartoes/editar" },
+            { label: "🗑️ Excluir cartão", action: "goto", target: "/cartoes/confirmar-excluir" },
             { label: "↩️ Voltar", action: "back" },
           ],
         };
@@ -1325,6 +1326,21 @@ const financialFlow = createFlow("financeiro", {
           { label: "📅 Alterar vencimento", action: "exec", handler: "iniciarEditarVencimento" },
           { label: "💳 Ajustar saldo da fatura", action: "exec", handler: "iniciarSaldoInicial" },
           { label: "↩️ Voltar", action: "back" },
+        ],
+      };
+    },
+  },
+
+  "/cartoes/confirmar-excluir": {
+    dynamic: true,
+    options: [],
+    handler: async (ctx) => {
+      const { currentCardName } = ctx.state.context;
+      return {
+        title: `⚠️ Excluir o cartão "${currentCardName || "Cartão"}"?\n\nIsso remove o cartão e todos os seus lançamentos permanentemente.`,
+        options: [
+          { label: "🗑️ Sim, excluir", action: "exec", handler: "excluirCartao" },
+          { label: "↩️ Não, cancelar", action: "back" },
         ],
       };
     },
@@ -3031,6 +3047,21 @@ const financialFlow = createFlow("financeiro", {
       ctx.state.context.awaitingCardInitialBalance = true;
       await ctx.reply("💳 Digite o *saldo atual da fatura* em R$ (ex: 350 ou 1.200,50):\n\n_Será lançado como despesa na fatura atual._");
       return { noRender: true };
+    },
+
+    excluirCartao: async (ctx) => {
+      const { currentCardId, currentCardName } = ctx.state.context;
+      try {
+        await financialClient.deleteCard(ctx.userId, currentCardId);
+        await ctx.reply(`🗑️ Cartão "${currentCardName || "Cartão"}" excluído.`);
+        ctx.state.context.currentCardId = null;
+        ctx.state.context.currentCardName = null;
+        ctx.state.path = "/cartoes";
+      } catch (e) {
+        logger.error("[financialFlow] excluirCartao error:", e.message);
+        await ctx.reply("❌ Erro ao excluir cartão.");
+        return { noRender: true };
+      }
     },
 
     iniciarEditarLimite: async (ctx) => {

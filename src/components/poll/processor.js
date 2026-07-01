@@ -217,8 +217,6 @@ function selectedIndexesFromVoteAndPoll(vote, storedPoll) {
  */
 async function processVoteViaBackend(pollId, vote, client) {
   try {
-    console.log(`[FlowPolicy-DEBUG] processVoteViaBackend chamado pollId=${String(pollId).slice(0,40)}`);
-
     // Extract voter ID
     let voterId =
       vote.voter ||
@@ -303,24 +301,19 @@ function sameWaPhoneNum(a, b) {
 async function executeAction(result, client) {
   const { action, actionType, poll, handler, target, data } = result;
 
-  console.log(`[FlowPolicy-DEBUG] executeAction action=${action} actionType=${actionType} handler=${handler} target=${target}`);
-
   if (actionType === "noop" || action === "noop") {
     return;
   }
 
   if (action === "menu_policy_block") {
     const msg = result.policyMessage || "⏸ Esta opção não está disponível.";
-    console.log(`[FlowPolicy-DEBUG] menu_policy_block poll=${JSON.stringify(poll)} msg=${msg}`);
     try {
       const chatId = poll && (poll.chatId || poll.chat_id);
       if (chatId) {
         await client.sendMessage(chatId, msg);
-      } else {
-        console.log(`[FlowPolicy-DEBUG] menu_policy_block sem chatId, result.poll=${JSON.stringify(result.poll)}`);
       }
     } catch (e) {
-      console.log(`[FlowPolicy-DEBUG] menu_policy_block sendMessage erro:`, e && e.message);
+      logger.warn(`[processor] menu_policy_block sendMessage erro: ${e && e.message}`);
     }
     return;
   }

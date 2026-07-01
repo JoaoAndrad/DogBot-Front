@@ -193,7 +193,6 @@ class FlowManager {
     const flow = this.flows.get(flowId);
 
     // Verifica política da opção (enabled/vip_only/admin_only)
-    console.log(`[FlowPolicy] _executeOption flow=${flowId} optionKey=${option.optionKey ?? "(none)"} label="${option.label}"`);
     if (option.optionKey) {
       const policies = await _getFlowOptionPolicies();
       const p = policies[`${flowId}:${option.optionKey}`];
@@ -209,18 +208,6 @@ class FlowManager {
       } catch (e) {
         logger.warn("[FlowManager] user lookup para policy falhou:", e && e.message);
       }
-
-      // Log de debug: política da opção + perfil do executor
-      const flowPolicies = Object.entries(policies)
-        .filter(([k]) => k.startsWith(`${flowId}:`))
-        .map(([k, v]) => `${k.slice(flowId.length + 1)}[enabled=${v.enabled},vip=${v.vipOnly},admin=${v.adminOnly}]`)
-        .join(" | ");
-      console.log(
-        `[FlowPolicy] flow=${flowId} opção=${option.optionKey} ` +
-        `política=${p ? `enabled=${p.enabled},vip=${p.vipOnly},admin=${p.adminOnly}` : "sem política"} ` +
-        `usuário=${userId} isVip=${userIsVip} isAdmin=${userIsAdmin} ` +
-        `políticas do flow: [${flowPolicies || "nenhuma"}]`,
-      );
 
       if (p) {
         if (!p.enabled) {
