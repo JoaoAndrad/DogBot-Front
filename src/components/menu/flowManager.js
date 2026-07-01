@@ -308,12 +308,14 @@ class FlowManager {
    * @private
    */
   async _renderNode(client, chatId, userId, flowId, path) {
+    console.log(`[RenderNode] ENTER flowId=${flowId} path=${path} userId=${String(userId).slice(0,20)}`);
     const flow = this.flows.get(flowId);
     const node = flow.nodes[path];
     let renderTitle = node?.title;
     let renderOptions = node?.options;
 
     if (!node) {
+      console.log(`[RenderNode] NO NODE path=${path}`);
       logger.warn(`[FlowManager] Nó ${path} inexistente no flow ${flowId}`);
       await client.sendMessage(chatId, "❌ Erro: nó não encontrado");
       return;
@@ -339,6 +341,7 @@ class FlowManager {
 
       try {
         const result = await node.handler(ctx);
+        console.log(`[RenderNode] handler result: end=${result?.end} skipPoll=${result?.skipPoll} optCount=${result?.options?.length}`);
 
         if (result && result.end) {
           await storage.deleteState(userId, flowId);
@@ -416,7 +419,9 @@ class FlowManager {
     }
 
     // Create poll with metadata for backend processing (WhatsApp requires at least 2 options)
+    console.log(`[RenderNode] PRE-POLL renderOptions.length=${renderOptions?.length}`);
     if (!renderOptions || renderOptions.length < 2) {
+      console.log(`[RenderNode] LESS THAN 2 OPTIONS — abortando`);
       await client.sendMessage(
         chatId,
         "❌ Sessão expirada ou contexto perdido. Use o comando novamente para começar.",
