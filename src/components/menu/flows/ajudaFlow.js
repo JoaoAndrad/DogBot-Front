@@ -271,6 +271,26 @@ const COPY = {
     "⚙️ *Configurações* — Conta padrão, horário de notificações, desvincular conta Google",
   ].join("\n"),
 
+  financeiroCartoes: [
+    "💳 *Cartões de crédito*",
+    "",
+    "Controlo suas faturas, parcelas e limite disponível de forma completa.",
+    "",
+    "*📊 Fatura atual*",
+    "Mostro o total da fatura, o disponível real e o limite. O disponível já desconta automaticamente as parcelas futuras — por exemplo, se você tem 10x e ainda faltam 8, essas 8 já saem do limite disponível agora.",
+    "",
+    "*💳 Lançar saldo inicial*",
+    "Se o cartão já tem um saldo em aberto quando você o cadastrou, use essa opção para importar o valor. Ele entra como despesa na fatura atual.",
+    "",
+    "*✏️ Editar cartão*",
+    "Você pode alterar limite, dia de fechamento, dia de vencimento e saldo da fatura atual.",
+    "",
+    "*🔁 Parcelamentos com mês de início*",
+    "Ao registrar uma compra parcelada (ex: \"comprei notebook por 3000 em 10x\"), posso perguntar a partir de qual mês. Útil para importar parcelamentos que já começaram: as parcelas passadas ficam como histórico, as futuras contam no cálculo do disponível.",
+    "",
+    "Acesse pelo menu: *Financeiro › Cartões*.",
+  ].join("\n"),
+
   exitMsg: "Se precisar, envie /ajuda novamente. 🐾",
 };
 
@@ -520,6 +540,7 @@ const ajudaFlow = createFlow("ajuda", {
         title: "💰 Assistente financeiro — o que quer ver?",
         options: [
           { label: "📋 Ver todas as funções", action: "goto", target: "/financeiro/funcoes" },
+          { label: "💳 Cartões de crédito",   action: "goto", target: "/financeiro/cartoes" },
           { label: "↩️ Voltar ao menu",       action: "goto", target: "/" },
           { label: "✖️ Fechar ajuda",          action: "exec", handler: "exitHelp" },
         ],
@@ -532,6 +553,15 @@ const ajudaFlow = createFlow("ajuda", {
     options: [],
     handler: async (ctx) => {
       await replyLong(ctx, COPY.financeiroFuncoes);
+      return { title: "O que mais quer saber?", options: navSecao("/financeiro", "Assistente financeiro") };
+    },
+  },
+
+  "/financeiro/cartoes": {
+    dynamic: true,
+    options: [],
+    handler: async (ctx) => {
+      await replyLong(ctx, COPY.financeiroCartoes);
       return { title: "O que mais quer saber?", options: navSecao("/financeiro", "Assistente financeiro") };
     },
   },

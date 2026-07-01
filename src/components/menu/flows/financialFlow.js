@@ -1697,7 +1697,8 @@ const financialFlow = createFlow("financeiro", {
         "• \"Paguei 120 de mercado ontem\"\n\n" +
 
         "🔁 *Parcelamento*\n" +
-        "• \"Comprei notebook por 3000 em 12x\"\n\n" +
+        "• \"Comprei notebook por 3000 em 12x\"\n" +
+        "• Posso perguntar a partir de qual mês — útil para importar parcelamentos que já começaram. Parcelas passadas ficam como histórico; futuras contam no disponível do cartão.\n\n" +
 
         "📅 *Lançamento futuro / recorrente*\n" +
         "• \"Vou pagar 800 de aluguel todo dia 5\"\n" +
@@ -1714,6 +1715,11 @@ const financialFlow = createFlow("financeiro", {
 
         "🏦 *Saldo projetado*\n" +
         "Em *Contas › Ver contas*, o saldo projetado considera todos os lançamentos futuros pendentes.\n\n" +
+
+        "💳 *Cartões de crédito*\n" +
+        "O disponível mostrado já desconta parcelas comprometidas em faturas futuras, não só a fatura atual.\n" +
+        "• Use *Lançar saldo inicial* para importar um saldo preexistente no cartão\n" +
+        "• Em *Editar cartão* você altera limite, fechamento e vencimento\n\n" +
 
         "🔒 *Segurança*\n" +
         "Tudo é criptografado com sua chave pessoal."
