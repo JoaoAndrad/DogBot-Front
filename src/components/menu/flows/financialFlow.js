@@ -1210,7 +1210,7 @@ const financialFlow = createFlow("financeiro", {
 
   "/cartoes/ver": {
     dynamic: true,
-    sensitive: true, // mostra valores da fatura
+    sensitive: false, // opções de navegação apenas; valores da fatura são enviados via ctx.reply (já apagado em 30s)
     options: [],
     handler: async (ctx) => {
       const { currentCardId } = ctx.state.context;

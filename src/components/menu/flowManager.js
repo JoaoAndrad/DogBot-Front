@@ -466,15 +466,14 @@ class FlowManager {
       optionKey: opt.optionKey || null,
     }));
 
-    // Apaga a última enquete sensitiva cacheada. Fire-and-forget — o mutex por usuário
-    // já garante que não há execução concorrente, então não precisamos bloquear aqui.
+    // Captura a mensagem anterior ANTES de criar a nova, mas apaga DEPOIS.
+    // Assim o novo poll entra na fila do WhatsApp primeiro e chega rápido ao usuário;
+    // a deleção da antiga acontece logo em seguida, fire-and-forget.
+    let prevPollToDelete = null;
     if (flowId === "financeiro") {
       const prevCacheKey = `${userId}:${flowId}`;
-      const prevMsg = _lastPollMsgCache.get(prevCacheKey);
-      if (prevMsg) {
-        _lastPollMsgCache.delete(prevCacheKey);
-        prevMsg.delete(false).catch(() => {});
-      }
+      prevPollToDelete = _lastPollMsgCache.get(prevCacheKey) || null;
+      if (prevPollToDelete) _lastPollMsgCache.delete(prevCacheKey);
     }
 
     const pollResult = await polls.createPoll(client, chatId, renderTitle, optionLabels, {
@@ -482,11 +481,13 @@ class FlowManager {
         actionType: "menu",
         flowId,
         path,
-        userId, // Store who started the flow
-        options, // All option configurations
+        userId,
+        options,
       },
-      // onVote removed - now processed via backend through processor.js
     });
+
+    // Apaga o poll anterior depois de enviar o novo — não bloqueia a fila do WA.
+    if (prevPollToDelete) prevPollToDelete.delete(false).catch(() => {});
 
     // Nós sensíveis (com valores financeiros): guarda no cache para deleção imediata
     // ao confirmar (end: true) ou ao navegar para outro nó. Agenda fallback de 2 min
