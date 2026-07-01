@@ -274,27 +274,46 @@ const ajudaFlow = createFlow("ajuda", {
     dynamic: true,
     staticOptionKeys: [
       { key: "primeiros-passos", label: "🚀 Primeiros passos" },
-      { key: "spotify",          label: "🎵 Spotify" },
-      { key: "cartola",          label: "⚽ Cartola FC" },
-      { key: "copa",             label: "🏆 Copa" },
-      { key: "rotinas",          label: "📋 Rotinas" },
-      { key: "listas",           label: "📝 Listas" },
-      { key: "fitness",          label: "💪 Fitness" },
-      { key: "financeiro",       label: "💰 Financeiro" },
+      { key: "vip",              label: "⭐ Funções VIP" },
+      { key: "basico",           label: "📱 Uso básico" },
     ],
     options: [],
     handler: async () => ({
       title: COPY.rootTitle,
       options: [
-        { label: "🚀 Primeiros passos",        optionKey: "primeiros-passos", action: "goto", target: "/primeiros-passos" },
-        { label: "🎵 Spotify",                  optionKey: "spotify",          action: "goto", target: "/spotify" },
-        { label: "⚽ Cartola FC",               optionKey: "cartola",          action: "goto", target: "/cartola" },
-        { label: "🏆 Copa do Mundo",            optionKey: "copa",             action: "goto", target: "/copa" },
-        { label: "🔔 Rotinas",                  optionKey: "rotinas",          action: "goto", target: "/rotinas" },
-        { label: "📋 Listas e filmes/livros",   optionKey: "listas",           action: "goto", target: "/listas" },
-        { label: "🏋️ Fitness",                 optionKey: "fitness",          action: "goto", target: "/fitness" },
-        { label: "💰 Assistente financeiro",    optionKey: "financeiro",       action: "goto", target: "/financeiro" },
-        { label: "✖️ Fechar ajuda",             action: "exec", handler: "exitHelp" },
+        { label: "🚀 Primeiros passos", optionKey: "primeiros-passos", action: "goto", target: "/primeiros-passos" },
+        { label: "⭐ Funções VIP",      optionKey: "vip",              action: "goto", target: "/vip" },
+        { label: "📱 Uso básico",       optionKey: "basico",           action: "goto", target: "/basico" },
+        { label: "✖️ Fechar ajuda",     action: "exec", handler: "exitHelp" },
+      ],
+    }),
+  },
+
+  "/vip": {
+    dynamic: true,
+    options: [],
+    handler: async () => ({
+      title: "⭐ Funções VIP",
+      options: [
+        { label: "⚽ Cartola FC",              action: "goto", target: "/cartola" },
+        { label: "🔔 Rotinas",                 action: "goto", target: "/rotinas" },
+        { label: "💰 Assistente Financeiro",   action: "goto", target: "/financeiro" },
+        { label: "🎬 DogLog (Filmes e Livros)", action: "goto", target: "/listas" },
+        { label: "↩️ Voltar ao menu",          action: "goto", target: "/" },
+      ],
+    }),
+  },
+
+  "/basico": {
+    dynamic: true,
+    options: [],
+    handler: async () => ({
+      title: "📱 Uso básico",
+      options: [
+        { label: "🎵 Spotify",       action: "goto", target: "/spotify" },
+        { label: "🏆 Copa do Mundo", action: "goto", target: "/copa" },
+        { label: "🏋️ Fitness",      action: "goto", target: "/fitness" },
+        { label: "↩️ Voltar ao menu", action: "goto", target: "/" },
       ],
     }),
   },
