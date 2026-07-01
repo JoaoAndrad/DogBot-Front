@@ -481,6 +481,7 @@ class FlowManager {
     // Nós sensíveis (com valores financeiros): guarda no cache para deleção imediata
     // ao confirmar (end: true) ou ao navegar para outro nó. Agenda fallback de 2 min
     // caso o usuário não responda e a sessão expire sem renderizar novo nó.
+    console.log(`[PollCache] CHECK flowId=${flowId} sensitive=${node?.sensitive} hasSent=${!!pollResult?.sent} path=${path}`);
     if (flowId === "financeiro" && node.sensitive === true && pollResult?.sent) {
       console.log(`[PollCache] SET userId=${userId} path=${path} sent=${!!pollResult.sent}`);
       _lastPollMsgCache.set(`${userId}:${flowId}`, pollResult.sent);
