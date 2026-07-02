@@ -1987,15 +1987,12 @@ const financialFlow = createFlow("financeiro", {
         if (hasPending) {
           const pending = (schedRes?.transactions || []).sort((a, b) => new Date(a.date) - new Date(b.date));
           const lastDate = pending.length ? formatDate(new Date(pending[pending.length - 1].date)) : null;
-          const shown = pending.slice(0, 3);
-          const rest = pending.length - shown.length;
-          const breakdownLines = shown.map(t => {
+          const breakdownLines = pending.map(t => {
             const sign = t.type === "income" ? "+" : "-";
             const desc = t.description || (t.type === "income" ? "Receita" : "Despesa");
             const dayNote = (t.recurrence === "monthly" && t.recurrenceDay) ? ` (dia ${t.recurrenceDay})` : "";
             return `   └ ${sign}R$ ${formatMoney(t.amount)} ${desc}${dayNote}`;
           });
-          if (rest > 0) breakdownLines.push(`   └ e mais ${rest}...`);
           projLine = `\n📈 *Projetado${lastDate ? ` até ${lastDate}` : ""}: R$ ${formatMoney(totalProjected)}*` +
             (breakdownLines.length ? "\n" + breakdownLines.join("\n") : "");
         }
