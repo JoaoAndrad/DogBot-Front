@@ -639,7 +639,7 @@ class FlowManager {
         (c.children || []).forEach((s) => { parentMap[s.id] = c.name; });
         return [c, ...(c.children || [])];
       });
-      const { matchCategory, normalize } = require("../../utils/parses/categoryMatcher");
+      const { matchCategory, normalize, THRESHOLD: CATEGORY_MATCH_THRESHOLD } = require("../../utils/parses/categoryMatcher");
       const catNames = allCats.map((c) => c.name);
 
       let found = null;
@@ -654,7 +654,7 @@ class FlowManager {
       }
 
       // 2. Keyword-index fuzzy match — fallback for predefined categories ("Uber" → "Transporte")
-      if (!found && suggestedCategoryName && (parsed.categoryConfidence || 0) >= 0.4) {
+      if (!found && suggestedCategoryName && (parsed.categoryConfidence || 0) >= CATEGORY_MATCH_THRESHOLD) {
         const refined = matchCategory(suggestedCategoryName, catNames) || matchCategory(parsed.description, catNames);
         if (refined) found = allCats.find((c) => c.name === refined.name) || null;
       }

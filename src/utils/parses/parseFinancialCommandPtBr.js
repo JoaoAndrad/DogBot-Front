@@ -13,7 +13,7 @@
  */
 
 // Formatted (3.000,50 / 3,000.50) OR plain integer/decimal (3000 / 3000,50)
-const AMOUNT_RE = /R?\$?\s*(\d{1,3}(?:[.,]\d{3})+(?:[.,]\d{1,2})?|\d+(?:[.,]\d{1,2})?)/i;
+const AMOUNT_RE = /(?:R\$|\$)?\s*(\d{1,3}(?:[.,]\d{3})+(?:[.,]\d{1,2})?|\d+(?:[.,]\d{1,2})?)/i;
 const INSTALLMENT_RE = /\b(\d+)\s*[xX×]\b|\bem\s+(\d+)\s+(?:vezes?|parcelas?)\b|\bparcelad[ao]\s+em\s+(\d+)\b|\b(\d+)\s+parcelas?\b/i;
 
 const MONTHLY_RE = /\btodo\s+(dia\s+(\d{1,2})|m[eê]s)\b|\bmensalmente\b|\btodo\s+m[eê]s\b/i;
@@ -58,7 +58,7 @@ function parseRecurrence(text) {
 
 // How much / what / when patterns
 const EXPENSE_TRIGGERS = /\b(gast[eouia]i?|paguei|debit[ao]u?|comprei|sa[íi]u|saiu|saindo|devo|tive que pagar)\b/i;
-const INCOME_TRIGGERS  = /\b(recebi|entrou|recebendo|ganhei|me pagaram|depositaram|caiu)\b/i;
+const INCOME_TRIGGERS  = /\b(recebi|receber|receberei|entrou|recebendo|ganhei|me pagaram|depositaram|caiu)\b/i;
 const FUTURE_MARKERS   = /\b(vou|vou pagar|pagarei|vou gastar|gastarei|amanhã|próxim[ao]|essa semana|próxima semana|daqui)\b/i;
 const TRANSFER_TRIGGERS = /\b(transfer[ei]|transferindo|movi|movendo)\b/i;
 
@@ -137,7 +137,7 @@ function extractDescription(text) {
     .replace(/\b\d{1,2}\/\d{1,2}\b/g, "")
     .replace(/R?\$\s*/gi, "")
     // Multi-word phrases must come before single-word matches to prevent partial stripping
-    .replace(/\b(vou pagar|vou gastar|me pagaram|gast[eouia]i?|paguei|pagar|debit[ao]u?|comprei|recebi|entrou|recebendo|ganhei|depositaram|caiu|transfer[ei]|transferindo|movi|movendo|vou|pagarei|gastarei)\b/gi, "")
+    .replace(/\b(vou pagar|vou gastar|me pagaram|gast[eouia]i?|paguei|pagar|debit[ao]u?|comprei|receber|receberei|recebi|entrou|recebendo|ganhei|depositaram|caiu|transfer[ei]|transferindo|movi|movendo|vou|pagarei|gastarei)\b/gi, "")
     .replace(/\b(de|do|da|no|na|em|por|com|para|pra|um|uma|uns|umas|hoje|ontem|amanhã|dia|todo|toda|reais|real|brl)\b/gi, "")
     .replace(/\s{2,}/g, " ")
     .trim();
@@ -177,7 +177,7 @@ function parse(text) {
     return { intent: "transfer", amount, description, date, isPending: false, installmentCount, recurrence, recurrenceDay, suggestedCategoryName, categoryConfidence, raw: t };
   }
 
-  const isFuture = FUTURE_MARKERS.test(t) && !INCOME_TRIGGERS.test(t);
+  const isFuture = FUTURE_MARKERS.test(t);
   const isIncome = INCOME_TRIGGERS.test(t);
   const isExpense = EXPENSE_TRIGGERS.test(t);
 
@@ -186,10 +186,13 @@ function parse(text) {
 
   if (!isIncome && !isExpense && !isFuture && !isRecurrent) return null;
 
+  if (isFuture && isIncome) {
+    return { intent: "future_income", amount, description, date, isPending: true, installmentCount, recurrence, recurrenceDay, suggestedCategoryName, categoryConfidence, raw: t };
+  }
   if (isFuture && isExpense) {
     return { intent: "future_expense", amount, description, date, isPending: true, installmentCount, recurrence, recurrenceDay, suggestedCategoryName, categoryConfidence, raw: t };
   }
-  if (isFuture && !isIncome) {
+  if (isFuture && !isIncome && !isExpense) {
     return { intent: "future_expense", amount, description, date, isPending: true, installmentCount, recurrence, recurrenceDay, suggestedCategoryName, categoryConfidence, raw: t };
   }
   if (isIncome) {

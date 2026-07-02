@@ -19,7 +19,7 @@
 
 const { CATEGORY_INDEX } = require("./categoryKeywords");
 
-const THRESHOLD = 0.4;
+const THRESHOLD = 0.6;
 
 // Normalize: lowercase, remove accents, collapse spaces
 function normalize(str) {
@@ -83,7 +83,9 @@ function matchCategory(description, allowedNames = null) {
 
       // Layer 1 — keyword exact token match
       // Every token of the keyword must appear in the description tokens
-      const allMatch = kwTokens.every((kt) => tokens.includes(kt));
+      // (kwTokens.length check guards against short/symbol-only keywords like "c&a",
+      // whose tokens are all filtered out — an empty array would vacuously match anything)
+      const allMatch = kwTokens.length > 0 && kwTokens.every((kt) => tokens.includes(kt));
       if (allMatch) {
         const conf = 1.0;
         if (!best || conf > best.confidence) {
